@@ -3,7 +3,7 @@ import json
 import os
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -65,10 +65,12 @@ app = dash.Dash(__name__, external_stylesheets=['https://stackpath.bootstrapcdn.
 
 app.layout = html.Div([
     html.H1("Market Simulation Live Dashboard", className="text-center mb-4"),
+    html.Button('Start Simulation', id='start-button', n_clicks=0, className="btn btn-primary mb-3"),
     dcc.Interval(
         id='interval-component',
         interval=1*1000,  # in milliseconds
-        n_intervals=0
+        n_intervals=0,
+        disabled=True
     ),
     html.Div([
         # First Column: Tables (4 tables in a 2x2 grid)
@@ -115,6 +117,18 @@ app.layout = html.Div([
     
 ], className="container-fluid")
 
+# Global variable to track if the auction has been run
+auction_completed = False
+
+@app.callback(
+    Output('interval-component', 'disabled'),
+    Input('start-button', 'n_clicks')
+)
+def start_simulation(n_clicks):
+    if n_clicks > 0:
+        return False
+    return True
+
 @app.callback(
     [Output('market-state-table', 'children'),
      Output('order-book-table', 'children'),
@@ -122,48 +136,56 @@ app.layout = html.Div([
      Output('supply-demand-chart', 'figure'),
      Output('price-vs-trade-chart', 'figure'),
      Output('cumulative-quantity-surplus-chart', 'figure')],
-    Input('interval-component', 'n_intervals')
+    Input('interval-component', 'n_intervals'),
+    State('start-button', 'n_clicks')
 )
-def update_dashboard(n):
-    if n is None:
+def update_dashboard(n, start_clicks):
+    global auction_completed
+    
+    if start_clicks == 0:
         raise PreventUpdate
 
-    if auction.current_round < auction.max_rounds:
-        # Run one step of the auction
-        auction.run_auction()
-        logger.info(f"Auction round {auction.current_round} completed")
+    if not auction_completed:
+        # Run the entire auction
+        while auction.current_round < auction.max_rounds:
+            auction.run_auction()
+            logger.info(f"Auction round {auction.current_round} completed")
 
-        # save agent interactions after each round
-        for agent in env.agents:
-            save_llama_logs(agent.llm_agent.interactions)
+            # save agent interactions after each round
+            for agent in env.agents:
+                save_llama_logs(agent.llm_agent.interactions)
 
-        # Update data storage only if there are successful trades
-        data['trade_numbers'].append(len(auction.successful_trades))
-        if auction.successful_trades:
-            last_trade = auction.successful_trades[-1]
-            data['prices'].append(last_trade.price)
-            data['cumulative_quantities'].append(sum(trade.quantity for trade in auction.successful_trades))
-            data['cumulative_surplus'].append(auction.total_surplus_extracted)
-            data['price_history'].append(last_trade.price)
-        else:
-            # To keep lengths consistent, append `None` or the last known value
-            data['prices'].append(None)
-            data['cumulative_quantities'].append(data['cumulative_quantities'][-1] if data['cumulative_quantities'] else 0)
-            data['cumulative_surplus'].append(data['cumulative_surplus'][-1] if data['cumulative_surplus'] else 0)
-            data['price_history'].append(data['price_history'][-1] if data['price_history'] else None)
+            # Update data storage
+            update_data_storage()
 
-    # Generate tables
+        auction_completed = True
+        logger.info("Auction simulation completed")
+
+    # Generate tables and charts
     market_state_table = generate_market_state_table(env)
     order_book_table = generate_order_book_table(auction)
     trade_history_table = generate_trade_history_table(auction)
-
-    # Generate charts
     supply_demand_chart = generate_supply_demand_chart(env)
     price_vs_trade_chart = generate_price_vs_trade_chart()
     cumulative_quantity_surplus_chart = generate_cumulative_quantity_surplus_chart()
 
     return (market_state_table, order_book_table, trade_history_table, supply_demand_chart, 
             price_vs_trade_chart, cumulative_quantity_surplus_chart)
+
+def update_data_storage():
+    data['trade_numbers'].append(len(auction.successful_trades))
+    if auction.successful_trades:
+        last_trade = auction.successful_trades[-1]
+        data['prices'].append(last_trade.price)
+        data['cumulative_quantities'].append(sum(trade.quantity for trade in auction.successful_trades))
+        data['cumulative_surplus'].append(auction.total_surplus_extracted)
+        data['price_history'].append(last_trade.price)
+    else:
+        # To keep lengths consistent, append `None` or the last known value
+        data['prices'].append(None)
+        data['cumulative_quantities'].append(data['cumulative_quantities'][-1] if data['cumulative_quantities'] else 0)
+        data['cumulative_surplus'].append(data['cumulative_surplus'][-1] if data['cumulative_surplus'] else 0)
+        data['price_history'].append(data['price_history'][-1] if data['price_history'] else None)
 
 def generate_market_state_table(env):
     headers = ['Agent ID', 'Role', 'Goods', 'Cash', 'Utility']
