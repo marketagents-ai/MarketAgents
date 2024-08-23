@@ -62,6 +62,16 @@ class Order(BaseModel):
     base_value: Optional[float] = None  # Value for buyers
     base_cost: Optional[float] = None   # Cost for sellers
 
+    def is_valid(self) -> bool:
+        if self.is_buy:
+            return self.price <= self.base_value
+        else:
+            return self.price >= self.base_cost
+
+    @staticmethod
+    def validate_order(order: 'Order') -> bool:
+        return order.is_valid()
+
 class Trade(BaseModel):
     trade_id: int  # Unique identifier for the trade
     buyer_id: int
