@@ -1,5 +1,4 @@
 from typing import List
-import matplotlib.pyplot as plt
 from environment import Environment, generate_llm_market_agents
 from ziagents import Order, Trade
 from plotter import analyze_and_plot_auction_results
@@ -102,9 +101,21 @@ class DoubleAuction:
         self.summarize_results()
 
     def _get_market_info(self) -> dict:
+        last_trade_price = self.average_prices[-1] if self.average_prices else None
+        average_price = sum(self.average_prices) / len(self.average_prices) if self.average_prices else None
+        
+        # If no trades have occurred, use the midpoint of buyer and seller base values
+        if last_trade_price is None or average_price is None:
+            buyer_base_value = max(agent.zi_agent.preference_schedule.get_value(1) for agent in self.environment.buyers)
+            seller_base_value = min(agent.zi_agent.preference_schedule.get_value(1) for agent in self.environment.sellers)
+            initial_price_estimate = (buyer_base_value + seller_base_value) / 2
+            
+            last_trade_price = last_trade_price or initial_price_estimate
+            average_price = average_price or initial_price_estimate
+
         return {
-            "last_trade_price": self.average_prices[-1] if self.average_prices else None,
-            "average_price": sum(self.average_prices) / len(self.average_prices) if self.average_prices else None,
+            "last_trade_price": last_trade_price,
+            "average_price": average_price,
             "total_trades": len(self.successful_trades),
             "current_round": self.current_round,
         }
