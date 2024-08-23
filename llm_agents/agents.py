@@ -92,6 +92,7 @@ class Agent(BaseModel):
 
     def log_interaction(self, prompt, response):
         self.interactions.append({
+            "id": self.id,
             "name": self.role,
             "messages": prompt,
             "response": response,
