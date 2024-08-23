@@ -9,7 +9,7 @@ class TestSchema(BaseModel):
 
 class BidSchema(BaseModel):
     bid_action: Literal["buy", "sell"] = Field(..., description="The type of action: 'buy' for purchasing or 'sell' for offering goods")
-    price: float = Field(..., description="The proposed price for the bid or ask")
+    price: float = Field(..., description="The proposed price for the bid or ask. Round off to 2 decimal places")
     quantity: int = Field(default=1, description="The quantity of goods to buy or sell")
     confidence: float = Field(..., ge=0, le=1, description="Confidence level in the proposed bid (0-1)")
     reasoning: str = Field(..., description="Brief explanation for the proposed bid")
