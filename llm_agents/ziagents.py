@@ -1,7 +1,12 @@
 import random
+import logging
 import matplotlib.pyplot as plt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Optional, List
+from typing_extensions import Self
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 # Global counter for trade IDs
 trade_counter = 0
@@ -62,15 +67,26 @@ class Order(BaseModel):
     base_value: Optional[float] = None  # Value for buyers
     base_cost: Optional[float] = None   # Cost for sellers
 
-    def is_valid(self) -> bool:
+    @model_validator(mode='after')
+    def validate_order(self) -> Self:
         if self.is_buy:
-            return self.price <= self.base_value
+            if self.base_value is None:
+                raise ValueError("base_value must be provided for buy orders")
+            if self.price > self.base_value:
+                raise ValueError("buy price cannot exceed base value")
         else:
-            return self.price >= self.base_cost
+            if self.base_cost is None:
+                raise ValueError("base_cost must be provided for sell orders")
+            if self.price < self.base_cost:
+                raise ValueError("sell price cannot be less than base cost")
 
-    @staticmethod
-    def validate_order(order: 'Order') -> bool:
-        return order.is_valid()
+        @classmethod
+        def validate_order(cls, order: 'Order') -> bool:
+            try:
+                order.validate_order()
+                return True
+            except ValueError:
+                return False
 
 class Trade(BaseModel):
     trade_id: int  # Unique identifier for the trade
@@ -104,18 +120,18 @@ class ZIAgent(BaseModel):
     def calculate_trade_surplus(self, trade: Trade) -> float:
         if trade.buyer_id == self.id:
             surplus = trade.buyer_value - trade.price
-            print(f"Calculating Buyer Surplus:")
-            print(f"  Buyer ID: {self.id}")
-            print(f"  Buyer's Value: {trade.buyer_value:.2f}")
-            print(f"  Trade Price: {trade.price:.2f}")
-            print(f"  Surplus: {surplus:.2f}")
+            logger.info(f"Calculating Buyer Surplus:")
+            logger.info(f"  Buyer ID: {self.id}")
+            logger.info(f"  Buyer's Value: {trade.buyer_value:.2f}")
+            logger.info(f"  Trade Price: {trade.price:.2f}")
+            logger.info(f"  Surplus: {surplus:.2f}")
         elif trade.seller_id == self.id:
             surplus = trade.price - trade.seller_cost
-            print(f"Calculating Seller Surplus:")
-            print(f"  Seller ID: {self.id}")
-            print(f"  Seller's Cost: {trade.seller_cost:.2f}")
-            print(f"  Trade Price: {trade.price:.2f}")
-            print(f"  Surplus: {surplus:.2f}")
+            logger.info(f"Calculating Seller Surplus:")
+            logger.info(f"  Seller ID: {self.id}")
+            logger.info(f"  Seller's Cost: {trade.seller_cost:.2f}")
+            logger.info(f"  Trade Price: {trade.price:.2f}")
+            logger.info(f"  Surplus: {surplus:.2f}")
         else:
             surplus = 0.0
 
@@ -141,11 +157,13 @@ class ZIAgent(BaseModel):
             base_value = self.preference_schedule.get_value(current_quantity + 1)
 
             if base_value <= 0 or available_cash < base_value:
+                logger.debug(f"Agent {self.id} cannot generate buy order: base_value={base_value}, available_cash={available_cash}")
                 return None
 
             price = random.uniform(base_value * (1 - self.max_relative_spread), base_value)
             price = min(price, available_cash, base_value)
 
+            logger.debug(f"Agent {self.id} generated buy order: price={price}, base_value={base_value}")
             return Order(
                 agent_id=self.id,
                 is_buy=True,
@@ -159,11 +177,13 @@ class ZIAgent(BaseModel):
             base_cost = self.preference_schedule.get_value(current_quantity + 1)
 
             if base_cost <= 0:
+                logger.debug(f"Agent {self.id} cannot generate sell order: base_cost={base_cost}")
                 return None
 
             price = random.uniform(base_cost, base_cost * (1.0 + self.max_relative_spread))
             price = max(price, base_cost)
 
+            logger.debug(f"Agent {self.id} generated sell order: price={price}, base_cost={base_cost}")
             return Order(
                 agent_id=self.id,
                 is_buy=False,
@@ -177,16 +197,19 @@ class ZIAgent(BaseModel):
             cash_change = trade.price * trade.quantity
             self.allocation.cash = round(self.allocation.cash - cash_change, 10)
             self.allocation.goods += trade.quantity
+            logger.info(f"Agent {self.id} finalized buy trade: cash_change={cash_change}, new_cash={self.allocation.cash}, new_goods={self.allocation.goods}")
         elif trade.seller_id == self.id:
             cash_change = trade.price * trade.quantity
             self.allocation.cash = round(self.allocation.cash + cash_change, 10)
             self.allocation.goods -= trade.quantity
+            logger.info(f"Agent {self.id} finalized sell trade: cash_change={cash_change}, new_cash={self.allocation.cash}, new_goods={self.allocation.goods}")
 
     def respond_to_order(self, order: Order, accepted: bool):
         if accepted:
-            print(f"Order Accepted: {'Buyer' if order.is_buy else 'Seller'} {self.id} {'spends' if order.is_buy else 'earns'} ${order.price:.2f} per unit.")
+            logger.info(f"Order Accepted: {'Buyer' if order.is_buy else 'Seller'} {self.id} {'spends' if order.is_buy else 'earns'} ${order.price:.2f} per unit.")
             self.posted_orders.append(order)
         else:
+            logger.info(f"Order Rejected: {'Buyer' if order.is_buy else 'Seller'} {self.id}")
             self.rejected_orders.append(order)
 
     def plot_order_history(self):
@@ -208,15 +231,19 @@ class ZIAgent(BaseModel):
     def calculate_individual_surplus(self) -> float:
         if self.preference_schedule.is_buyer:
             goods_utility = sum(self.preference_schedule.get_value(q) for q in range(1, self.allocation.goods + 1))
-            return goods_utility - (self.allocation.initial_cash - self.allocation.cash)
+            surplus = goods_utility - (self.allocation.initial_cash - self.allocation.cash)
         else:
             goods_cost = sum(self.preference_schedule.get_value(q) for q in range(1, self.allocation.initial_goods - self.allocation.goods + 1))
-            return self.allocation.cash - self.allocation.initial_cash - goods_cost
+            surplus = self.allocation.cash - self.allocation.initial_cash - goods_cost
+        
+        logger.info(f"Agent {self.id} individual surplus: {surplus:.2f}")
+        return surplus
 
 
 def run_simulation(agent: ZIAgent, num_rounds: int):
     global trade_counter  # Use the global counter
-    for _ in range(num_rounds):
+    for round_num in range(num_rounds):
+        logger.info(f"Starting round {round_num + 1} for Agent {agent.id}")
         order = agent.generate_bid()
         if order:
             global trade_counter
@@ -228,7 +255,7 @@ def run_simulation(agent: ZIAgent, num_rounds: int):
                 price=order.price,
                 buyer_value=order.base_value if order.is_buy else 0.0,
                 seller_cost=order.base_cost if not order.is_buy else 0.0,
-                round=0  # Set the round number as needed
+                round=round_num + 1
             )
             trade_counter += 1  # Increment the counter after creating a trade
             
@@ -236,26 +263,27 @@ def run_simulation(agent: ZIAgent, num_rounds: int):
             agent.respond_to_order(order, accepted=True)
         else:
             agent.respond_to_order(order, accepted=False)
+        logger.info(f"Finished round {round_num + 1} for Agent {agent.id}")
 
 if __name__ == "__main__":
     # Test PreferenceSchedule
-    print("Testing PreferenceSchedule:")
+    logger.info("Testing PreferenceSchedule:")
     buyer_schedule = PreferenceSchedule.generate(is_buyer=True, num_units=10, base_value=100)
-    print("Buyer Schedule:")
-    print(f"Initial Endowment: {buyer_schedule.initial_endowment}")
+    logger.info("Buyer Schedule:")
+    logger.info(f"Initial Endowment: {buyer_schedule.initial_endowment}")
     for q, v in buyer_schedule.values.items():
-        print(f"Quantity: {q}, Value: {v:.2f}")
+        logger.info(f"Quantity: {q}, Value: {v:.2f}")
     buyer_schedule.plot_schedule()
 
     seller_schedule = PreferenceSchedule.generate(is_buyer=False, num_units=10, base_value=50)
-    print("\nSeller Schedule:")
-    print(f"Initial Endowment: {seller_schedule.initial_endowment}")
+    logger.info("\nSeller Schedule:")
+    logger.info(f"Initial Endowment: {seller_schedule.initial_endowment}")
     for q, v in seller_schedule.values.items():
-        print(f"Quantity: {q}, Cost: {v:.2f}")
+        logger.info(f"Quantity: {q}, Cost: {v:.2f}")
     seller_schedule.plot_schedule()
 
     # Test ZIAgent and trades
-    print("\nTesting ZIAgent and trades:")
+    logger.info("\nTesting ZIAgent and trades:")
     buyer_agent = ZIAgent.generate(agent_id=1, is_buyer=True, num_units=100, base_value=100, max_relative_spread=0.5)
     seller_agent = ZIAgent.generate(agent_id=2, is_buyer=False, num_units=100, base_value=50, max_relative_spread=0.5)
     
@@ -270,13 +298,12 @@ if __name__ == "__main__":
     seller_agent.plot_order_history()
 
     # Print final allocations and surpluses
-    print("\nFinal Allocations and Surpluses:")
-    print(f"Buyer Agent:")
-    print(f"  Final Cash: {buyer_agent.allocation.cash:.2f}")
-    print(f"  Final Goods: {buyer_agent.allocation.goods}")
-    print(f"  Surplus: {buyer_agent.calculate_individual_surplus():.2f}")
+    logger.info("\nFinal Allocations and Surpluses:")
+    logger.info(f"Buyer Agent:")
+    logger.info(f"  Final Cash: {buyer_agent.allocation.cash:.2f}")
+    logger.info(f"  Final Goods: {buyer_agent.allocation.goods}")
+    logger.info(f"  Surplus: {buyer_agent.calculate_individual_surplus():.2f}")
 
-    print(f"\nSeller Agent:")
-    print(f"  Final Cash: {seller_agent.allocation.cash:.2f}")
-    print(f"  Final Goods: {seller_agent.allocation.goods}")
-    print(f"  Surplus: {seller_agent.calculate_individual_surplus():.2f}")
+    logger.info(f"\nSeller Agent:")
+    logger.info(f"  Final Cash: {seller_agent.allocation.cash:.2f}")
+    logger.info(f"  Final Goods: {seller_agent.allocation.goods}")
