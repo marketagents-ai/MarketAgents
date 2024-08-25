@@ -15,6 +15,6 @@ class BidSchema(BaseModel):
     reasoning: str = Field(..., description="Brief explanation for the proposed bid")
 
 class MarketActionSchema(BaseModel):
+    thought: str = Field(..., description="Explanation for the chosen action")
     action: Literal["bid", "ask", "hold"] = Field(..., description="The market action to take: 'bid' for buying, 'ask' for selling, or 'hold' for no action")
     bid: BidSchema = Field(None, description="Bid details if action is 'bid' or 'ask'")
-    reasoning: str = Field(..., description="Explanation for the chosen action")
