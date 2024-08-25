@@ -1,14 +1,17 @@
 import os
+import logging
 import matplotlib.pyplot as plt
 from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Any, List, Dict, Tuple, Optional
 from ziagents import PreferenceSchedule, Allocation, Order
-import os
 from datetime import datetime
 
 from market_agents import MarketAgent
 from agents import Agent as LLMAgent
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 class Environment(BaseModel):
     agents: List[MarketAgent]
@@ -46,14 +49,14 @@ class Environment(BaseModel):
         return sum(self.get_agent_utility(agent) for agent in self.agents)
 
     def print_market_state(self):
-        print("\nMarket State:")
+        logger.info("Market State:")
         for agent in self.agents:
             role = "Buyer" if agent.zi_agent.preference_schedule.is_buyer else "Seller"
-            print(f"Agent {agent.zi_agent.id} ({role}):")
-            print(f"  Goods: {agent.zi_agent.allocation.goods}")
-            print(f"  Cash: {agent.zi_agent.allocation.cash:.2f}")
-            print(f"  Utility: {self.get_agent_utility(agent):.2f}")
-        print(f"Total Market Utility: {self.get_total_utility():.2f}")
+            logger.info(f"Agent {agent.zi_agent.id} ({role}):")
+            logger.info(f"  Goods: {agent.zi_agent.allocation.goods}")
+            logger.info(f"  Cash: {agent.zi_agent.allocation.cash:.2f}")
+            logger.info(f"  Utility: {self.get_agent_utility(agent):.2f}")
+        logger.info(f"Total Market Utility: {self.get_total_utility():.2f}")
 
     def calculate_remaining_trade_opportunities(self) -> int:
         potential_trades = 0
@@ -148,7 +151,7 @@ class Environment(BaseModel):
         if save_location:
             file_path = os.path.join(save_location, "theoretical_supply_demand.png")
             fig.savefig(file_path)
-            print(f"Plot saved to {file_path}")
+            logger.info(f"Plot saved to {file_path}")
         
         return fig
         
@@ -203,16 +206,16 @@ if __name__ == "__main__":
     env.print_market_state()
 
     # Calculate and print initial utilities
-    print("\nInitial Utilities:")
+    logger.info("Initial Utilities:")
     for agent in env.agents:
         initial_utility = env.get_agent_utility(agent)
-        print(f"Agent {agent.zi_agent.id} ({'Buyer' if agent.zi_agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
+        logger.info(f"Agent {agent.zi_agent.id} ({'Buyer' if agent.zi_agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
 
     # Calculate and print remaining trade opportunities and surplus
     remaining_trades = env.calculate_remaining_trade_opportunities()
     remaining_surplus = env.calculate_remaining_surplus()
-    print(f"\nRemaining Trade Opportunities: {remaining_trades}")
-    print(f"Remaining Surplus: {remaining_surplus:.2f}")
+    logger.info(f"Remaining Trade Opportunities: {remaining_trades}")
+    logger.info(f"Remaining Surplus: {remaining_surplus:.2f}")
 
     # Plot the theoretical supply and demand curves
     env.plot_theoretical_supply_demand()

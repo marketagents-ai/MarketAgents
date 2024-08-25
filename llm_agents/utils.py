@@ -2,27 +2,19 @@ import json
 import ast
 import logging
 
-agent_logger = logging.getLogger("agent-simulator")
+agent_logger = logging.getLogger(__name__)
 
-def setup_logger(name, log_file=None):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+def setup_logger(log_file=None, log_level=logging.INFO):
+    # Configure the root logger
+    logging.basicConfig(level=log_level,
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        handlers=[logging.StreamHandler()])
 
-    # Create a formatter
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    # Create a console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # If a log file is specified, create a file handler
+    # If a log file is specified, add a file handler to the root logger
     if log_file:
         file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-    return logger
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logging.getLogger().addHandler(file_handler)
 
 def extract_json_from_response(response_string):
     try:

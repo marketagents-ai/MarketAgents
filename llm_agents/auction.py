@@ -1,9 +1,13 @@
+import logging
 from typing import List
 from environment import Environment, generate_llm_market_agents
 from ziagents import Order, Trade
 from plotter import analyze_and_plot_auction_results
 
 from colorama import Fore, Style
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 class DoubleAuction:
     def __init__(self, environment: Environment, max_rounds: int):
@@ -51,7 +55,7 @@ class DoubleAuction:
             seller_surplus = trade.price - trade.seller_cost
 
             if buyer_surplus < 0 or seller_surplus < 0:
-                print(f"Trade rejected due to negative surplus: Buyer Surplus = {buyer_surplus}, Seller Surplus = {seller_surplus}")
+                logger.warning(f"Trade rejected due to negative surplus: Buyer Surplus = {buyer_surplus}, Seller Surplus = {seller_surplus}")
                 continue
 
             buyer.finalize_trade(trade)
@@ -61,15 +65,15 @@ class DoubleAuction:
             self.successful_trades.append(trade)
             self.trade_history.append(trade)  # Update trade history
 
-            print(f"Executing trade: Buyer {buyer.zi_agent.id} - Surplus: {buyer_surplus:.2f}, Seller {seller.zi_agent.id} - Surplus: {seller_surplus:.2f}")
+            logger.info(f"Executing trade: Buyer {buyer.zi_agent.id} - Surplus: {buyer_surplus:.2f}, Seller {seller.zi_agent.id} - Surplus: {seller_surplus:.2f}")
 
     def run_auction(self):
         if self.current_round >= self.max_rounds:
-            print("Max rounds reached. Auction has ended.")
+            logger.info("Max rounds reached. Auction has ended.")
             return
         
         for round_num in range(self.current_round + 1, self.max_rounds + 1):
-            print(f"\n=== Round {round_num} ===")
+            logger.info(f"\n=== Round {round_num} ===")
             self.current_round = round_num
 
             # Prepare market info
@@ -82,7 +86,7 @@ class DoubleAuction:
                     bid = buyer.generate_bid(market_info)
                     if bid:
                         bids.append(bid)
-                        print(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{bid.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
+                        logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{bid.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
 
             # Generate asks from sellers
             asks = []
@@ -91,7 +95,7 @@ class DoubleAuction:
                     ask = seller.generate_bid(market_info)
                     if ask:
                         asks.append(ask)
-                        print(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{ask.price:.2f}{Fore.RED} for {Fore.YELLOW}{ask.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
+                        logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{ask.price:.2f}{Fore.RED} for {Fore.YELLOW}{ask.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
 
             trades = self.match_orders(bids, asks, round_num)
             if trades:
@@ -124,24 +128,24 @@ class DoubleAuction:
         total_trades = len(self.successful_trades)
         avg_price = sum(self.average_prices) / total_trades if total_trades > 0 else 0
 
-        print(f"\n=== Auction Summary ===")
-        print(f"Total Successful Trades: {total_trades}")
-        print(f"Total Surplus Extracted: {self.total_surplus_extracted:.2f}")
-        print(f"Average Price: {avg_price:.2f}")
+        logger.info(f"\n=== Auction Summary ===")
+        logger.info(f"Total Successful Trades: {total_trades}")
+        logger.info(f"Total Surplus Extracted: {self.total_surplus_extracted:.2f}")
+        logger.info(f"Average Price: {avg_price:.2f}")
 
         # Compare theoretical and practical surplus
         ce_price, ce_quantity, theoretical_buyer_surplus, theoretical_seller_surplus, theoretical_total_surplus = self.environment.calculate_equilibrium()
-        print(f"\n=== Theoretical vs. Practical Surplus ===")
-        print(f"Theoretical Total Surplus: {theoretical_total_surplus:.2f}")
-        print(f"Practical Total Surplus: {self.total_surplus_extracted:.2f}")
-        print(f"Difference (Practical - Theoretical): {self.total_surplus_extracted - theoretical_total_surplus:.2f}")
+        logger.info(f"\n=== Theoretical vs. Practical Surplus ===")
+        logger.info(f"Theoretical Total Surplus: {theoretical_total_surplus:.2f}")
+        logger.info(f"Practical Total Surplus: {self.total_surplus_extracted:.2f}")
+        logger.info(f"Difference (Practical - Theoretical): {self.total_surplus_extracted - theoretical_total_surplus:.2f}")
 
         # Detecting and explaining potential negative surplus
         if self.total_surplus_extracted < 0:
-            print(f"Warning: Negative practical surplus detected. Possible causes include:")
-            print(f"  1. Mismatch between bid/ask values and agent utilities.")
-            print(f"  2. Overestimated initial utilities.")
-            print(f"  3. High frictions or spread preventing trades.")
+            logger.warning(f"Warning: Negative practical surplus detected. Possible causes include:")
+            logger.warning(f"  1. Mismatch between bid/ask values and agent utilities.")
+            logger.warning(f"  2. Overestimated initial utilities.")
+            logger.warning(f"  3. High frictions or spread preventing trades.")
 
     def get_order_book(self):
         return self.order_book
@@ -160,10 +164,10 @@ def run_market_simulation(num_buyers: int, num_sellers: int, num_units: int, buy
     env.print_market_state()
 
     # Calculate and print initial utilities
-    print("\nInitial Utilities:")
+    logger.info("\nInitial Utilities:")
     for agent in env.agents:
         initial_utility = env.get_agent_utility(agent)
-        print(f"Agent {agent.zi_agent.id} ({'Buyer' if agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
+        logger.info(f"Agent {agent.zi_agent.id} ({'Buyer' if agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
 
     # Run the auction
     auction = DoubleAuction(environment=env, max_rounds=max_rounds)
@@ -202,10 +206,10 @@ if __name__ == "__main__":
     env.print_market_state()
 
     # Calculate and print initial utilities
-    print("\nInitial Utilities:")
+    logger.info("\nInitial Utilities:")
     for agent in env.agents:
         initial_utility = env.get_agent_utility(agent)
-        print(f"Agent {agent.zi_agent.id} ({'Buyer' if agent.zi_agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
+        logger.info(f"Agent {agent.zi_agent.id} ({'Buyer' if agent.zi_agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
 
     # Run the auction
     auction = DoubleAuction(environment=env, max_rounds=5)

@@ -1,6 +1,7 @@
 import importlib
 import uuid
 import json
+import logging
 from datetime import datetime
 from typing import Any, Dict, Optional, Union
 
@@ -10,7 +11,8 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 from aiutilities import AIUtilities
 from prompter import PromptManager
 from schema import *
-from utils import agent_logger
+
+agent_logger = logging.getLogger(__name__)
 
 class Agent(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -55,7 +57,7 @@ class Agent(BaseModel):
             user_message = prompt_manager.generate_task_prompt()
             messages.append({"role": "user", "content": user_message})
         
-        agent_logger.info(f"Logging prompt text\n{messages}")
+        agent_logger.debug(f"Logging prompt text\n{messages}")
 
         @retry(
             wait=wait_random_exponential(multiplier=1, max=30),
@@ -69,7 +71,7 @@ class Agent(BaseModel):
                     raise NotImplementedError("Tool calling is not implemented yet.")
                 else:
                     completion = self.ai_utilities.run_ai_completion(messages, self.llm_config)
-                    agent_logger.info(f"Assistant Message:\n{completion}")
+                    agent_logger.debug(f"Assistant Message:\n{completion}")
                     messages.append({"role": "assistant", "content": completion})
                     self.log_interaction(messages, completion)
             except Exception as e:
@@ -98,4 +100,4 @@ class Agent(BaseModel):
             "response": response,
             "timestamp": datetime.now().isoformat()
         })
-        agent_logger.info(f"Agent Interaction logged:\n{json.dumps(self.interactions[-1], indent=2)}")
+        agent_logger.debug(f"Agent Interaction logged:\n{json.dumps(self.interactions[-1], indent=2)}")
