@@ -1,27 +1,41 @@
-from datetime import datetime
 import json
 import os
 import dash
+import argparse
+import logging
+
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
+
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+
 import pandas as pd
 import numpy as np
-from dash.exceptions import PreventUpdate
+from datetime import datetime
 
 from environment import Environment, generate_llm_market_agents
 from auction import DoubleAuction
 
 from utils import setup_logger  # Import the setup_logger function
 
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Market Simulation Dashboard')
+parser.add_argument('--max_rounds', type=int, default=5, help='Maximum number of rounds for the double auction simulation')
+parser.add_argument('--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                    help='Set the logging level for simulation logs')
+args = parser.parse_args()
+
 # Create log directory
-log_dir = "logs"
+log_dir = "logs/sim_logs"
 os.makedirs(log_dir, exist_ok=True)
 
-# Setup logger with a file handler
 log_file = os.path.join(log_dir, f"simulation_{datetime.now().strftime('%Y%m%d%H%M%S')}.log")
-logger = setup_logger(__name__, log_file)
+setup_logger(log_file, log_level=args.log_level)
+
+# Get a logger for this file
+logger = logging.getLogger(__name__)
 
 # Initialize environment and auction
 num_buyers = 5
@@ -47,7 +61,7 @@ agents = generate_llm_market_agents(
     llm_config=llm_config)
 
 env = Environment(agents=agents)
-auction = DoubleAuction(environment=env, max_rounds=5)
+auction = DoubleAuction(environment=env, max_rounds=args.max_rounds)
 
 # Global variables to store data
 data = {
@@ -65,7 +79,10 @@ app = dash.Dash(__name__, external_stylesheets=['https://stackpath.bootstrapcdn.
 
 app.layout = html.Div([
     html.H1("Market Simulation Live Dashboard", className="text-center mb-4"),
-    html.Button('Start Simulation', id='start-button', n_clicks=0, className="btn btn-primary mb-3"),
+    html.Div([
+        html.Button('Start Simulation', id='start-button', n_clicks=0, className="btn btn-primary mb-3 mr-2"),
+        html.Button('Stop Simulation', id='stop-button', n_clicks=0, className="btn btn-danger mb-3 ml-2", disabled=True),
+    ], className="text-center"),
     dcc.Interval(
         id='interval-component',
         interval=1*1000,  # in milliseconds
@@ -121,13 +138,26 @@ app.layout = html.Div([
 auction_completed = False
 
 @app.callback(
-    Output('interval-component', 'disabled'),
-    Input('start-button', 'n_clicks')
+    [Output('interval-component', 'disabled'),
+     Output('start-button', 'disabled'),
+     Output('stop-button', 'disabled')],
+    [Input('start-button', 'n_clicks'),
+     Input('stop-button', 'n_clicks')],
+    [State('interval-component', 'disabled')]
 )
-def start_simulation(n_clicks):
-    if n_clicks > 0:
-        return False
-    return True
+def toggle_simulation(start_clicks, stop_clicks, interval_disabled):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return True, False, True
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    if button_id == 'start-button' and start_clicks > 0:
+        return False, True, False
+    elif button_id == 'stop-button' and stop_clicks > 0:
+        return True, False, True
+    else:
+        return interval_disabled, not interval_disabled, interval_disabled
 
 @app.callback(
     [Output('market-state-table', 'children'),
@@ -146,6 +176,7 @@ def update_dashboard(n, start_clicks):
         raise PreventUpdate
 
     if not auction_completed:
+        logger.info("Starting auction simulation")
         # Run the entire auction
         while auction.current_round < auction.max_rounds:
             auction.run_auction()
@@ -153,7 +184,11 @@ def update_dashboard(n, start_clicks):
 
             # save agent interactions after each round
             for agent in env.agents:
-                save_llama_logs(agent.llm_agent.interactions)
+                logger.info(f"Saving logs for agent {agent.llm_agent.id}, round {auction.current_round}")
+                if hasattr(agent, 'llm_agent') and hasattr(agent.llm_agent, 'interactions'):
+                    save_llama_logs(agent.llm_agent.interactions, agent.llm_agent.id, auction.current_round)
+                else:
+                    logger.warning(f"Agent {agent.id} does not have llm_agent or interactions attribute")
 
             # Update data storage
             update_data_storage()
@@ -319,12 +354,38 @@ def generate_cumulative_quantity_surplus_chart():
     
     return fig
 
-def save_llama_logs(interactions):
+def save_llama_logs(interactions, agent_id, round_number):
     log_path = "logs"
     qa_interactions_path = os.path.join(log_path, "qa_interactions")
-    qa_interaction_path = os.path.join(qa_interactions_path, "qa_interactions" + datetime.now().strftime("%Y%m%d%H%M%S") + ".json")
-    with open(qa_interaction_path, "w") as file:
-        json.dump(interactions, file, indent=2)
+    qa_interaction_file = f"qa_interactions_agent_{agent_id}.json"
+    qa_interaction_path = os.path.join(qa_interactions_path, qa_interaction_file)
+
+    logger.debug(f"Preparing to save logs for agent {agent_id}, round {round_number}")
+
+    # Ensure the directory exists
+    os.makedirs(qa_interactions_path, exist_ok=True)
+
+    # Load existing data if file exists, or create an empty list
+    if os.path.exists(qa_interaction_path):
+        with open(qa_interaction_path, "r") as file:
+            existing_data = json.load(file)
+    else:
+        existing_data = []
+
+    # Append new interactions with round information
+    new_entry = {
+        "round": round_number,
+        "interactions": interactions
+    }
+    existing_data.append(new_entry)
+
+    # Write updated data back to file
+    try:
+        with open(qa_interaction_path, "w") as file:
+            json.dump(existing_data, file, indent=2)
+        logger.debug(f"Successfully saved logs to {qa_interaction_path}")
+    except Exception as e:
+        logger.error(f"Failed to save logs: {str(e)}")
 
 if __name__ == '__main__':
     os.makedirs("logs/qa_interactions", exist_ok=True)
