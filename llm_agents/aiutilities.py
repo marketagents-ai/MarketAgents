@@ -24,6 +24,11 @@ class AIUtilities:
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         self.anthropic_model = os.getenv("ANTHROPIC_MODEL")
 
+        # vLLM credentials
+        self.vllm_api_key = os.getenv("VLLM_API_KEY", "EMPTY")
+        self.vllm_api_base = os.getenv("VLLM_API_BASE", "http://localhost:8000/v1")
+        self.vllm_model = os.getenv("VLLM_MODEL")
+
     def run_ai_completion(self, prompt, llm_config):
         client = None
         
@@ -42,6 +47,13 @@ class AIUtilities:
         elif llm_config["client"] == "anthropic":
             anthropic = Anthropic(api_key=self.anthropic_api_key)
             return self.run_anthropic_completion(anthropic, prompt, llm_config)
+        
+        elif llm_config["client"] == "vllm":
+            client = OpenAI(
+                api_key=self.vllm_api_key,
+                base_url=self.vllm_api_base,
+            )
+            return self.run_vllm_completion(client, prompt, llm_config)
         
         else:
             return "Invalid AI vendor"
@@ -144,6 +156,19 @@ class AIUtilities:
             )
             
             return response.content[0].text
+        except Exception as e:
+            return str(e)
+        
+    def run_vllm_completion(self, client, prompt, llm_config):
+        try:
+            response = client.chat.completions.create(
+                model=llm_config.get("model", self.vllm_model),
+                messages=prompt,
+                #response_format=llm_config.get("response_format"),
+                max_tokens=llm_config.get("max_tokens", 1024),
+                temperature=llm_config.get("temperature", 0),
+            )
+            return response.choices[0].message.content
         except Exception as e:
             return str(e)
 
