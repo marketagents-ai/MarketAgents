@@ -1,0 +1,12 @@
+# Adding gitignore for
+.venv
+
+# Env files
+.env
+.env.local
+
+#Cache files
+__pycache__
+
+# log files
+llm_agents/logs*
