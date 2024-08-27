@@ -1,7 +1,8 @@
+from datetime import datetime
 import json
 import random
 import logging
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from ziagents import ZIAgent, Order, Trade
 from agents import Agent as LLMAgent
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 class MarketAgent(BaseModel):
     zi_agent: ZIAgent
     llm_agent: LLMAgent
+    memory: List[Dict[str, Any]] = Field(default_factory=list)
     use_llm: bool = Field(default=False, description="Whether to use LLM for decision making")
 
     class Config:
@@ -29,15 +31,26 @@ class MarketAgent(BaseModel):
 
         return cls(zi_agent=zi_agent, llm_agent=llm_agent, use_llm=use_llm)
 
-    def generate_bid(self, market_info: dict) -> Optional[Order]:
+    def generate_bid(self, market_info: dict, round_num: int) -> Optional[Order]:
         if self.use_llm:
-            return self._generate_llm_bid(market_info)
+            return self._generate_llm_bid(market_info, round_num)
         else:
             return self.zi_agent.generate_bid()
         
-    def _generate_llm_bid(self, market_info: dict) -> Optional[Order]:
+    def _generate_llm_bid(self, market_info: dict, round_num:int) -> Optional[Order]:
         market_info_str = self._get_market_info(market_info)
-        llm_response = self.llm_agent.execute(f"Generate a market action based on the following market information: {market_info_str}")
+        recent_memories = self.get_recent_memories(2) # Get last 2 market memories
+        memory_str = self._format_memories(recent_memories)
+
+        task_prompt = f"Generate a market action based on the following market information: {market_info_str}"
+        
+        if memory_str:
+            task_prompt += f"\n\nRecent market activities:\n{memory_str}"
+        
+        llm_response = self.llm_agent.execute(task_prompt)
+
+        self.log_interaction(round_num, task_prompt, llm_response)
+
         logger.info("---LLM JSON RESPONSE---")
         logger.info(json.dumps(json.loads(llm_response), indent=2))
         try:
@@ -77,7 +90,28 @@ class MarketAgent(BaseModel):
         except Exception as e:
             logger.error(f"Error parsing LLM response: {e}")
             return None
-        
+    
+    def log_interaction(self, round_num: int, task_prompt: str, response: str):
+        interaction = {
+            "round": round_num,
+            "task": task_prompt,
+            "response": response,
+            "timestamp": datetime.now().isoformat()
+        }
+        self.memory.append(interaction)
+
+    def get_recent_memories(self, n: int) -> List[Dict[str, Any]]:
+        """Retrieve the n most recent memories."""
+        return self.memory[-n:]
+
+    def _format_memories(self, memories: List[Dict[str, Any]]) -> str:
+        if not memories:
+            return ""
+        formatted_memories = []
+        for memory in memories:
+            formatted_memories.append(f"Round {memory['round']}:\nTask: {memory['task'].split('Recent market activities:')[0].strip()}\nResponse: {memory['response']}\n")
+        return "\n".join(formatted_memories)  
+    
     def _get_market_info(self, market_info: dict) -> str:
         return f"""
         Current Cash: {round(self.zi_agent.allocation.cash, 2)}
