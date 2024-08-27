@@ -58,7 +58,7 @@ def plot_cumulative_quantity_and_surplus(cumulative_quantities, cumulative_surpl
 
     # Combine legends from both axes
     lines = [qty_line, eq_qty_line, surp_line, eq_surp_line]
-    labels = [line.get_label() for line in lines]
+    labels = [str(line.get_label()) for line in lines]
     fig.legend(lines, labels, loc='upper right', bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
 
     # Set the title with padding

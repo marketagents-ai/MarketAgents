@@ -4,11 +4,11 @@ from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Field, computed_field
 import matplotlib.pyplot as plt
 from functools import cached_property
-
+from typing_extensions import Self
 # Set up logger
 logger = logging.getLogger(__name__)
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 from typing import Dict
 from functools import cached_property
 import random
@@ -102,9 +102,20 @@ class Order(BaseModel):
 
 class Bid(Order):
     base_value: float
+    
+    @model_validator(mode='after')
+    def check_bid_validity(self) -> Self:
+        if self.price > self.base_value:
+            raise ValueError("Bid price is higher than base value")
+        return self
 
 class Ask(Order):
     base_cost: float
+    @model_validator(mode='after')
+    def check_ask_validity(self) -> Self:
+        if self.price < self.base_cost:
+            raise ValueError("Ask price is lower than base cost")
+        return self
 
 class Trade(BaseModel):
     trade_id: int
@@ -127,6 +138,12 @@ class Trade(BaseModel):
     @property
     def total_surplus(self) -> float:
         return self.buyer_surplus + self.seller_surplus
+
+    @model_validator(mode='after')
+    def check_trade_validity(self) -> Self:
+        if self.bid.price < self.ask.price:
+            raise ValueError("Bid price is lower than Ask price")
+        return self
 
 class Allocation(BaseModel):
     goods: int = Field(default=0, description="Quantity of goods")
