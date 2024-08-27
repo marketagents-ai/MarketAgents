@@ -83,7 +83,7 @@ class DoubleAuction:
             bids = []
             for buyer in self.environment.buyers:
                 if buyer.zi_agent.allocation.goods < buyer.zi_agent.preference_schedule.values.get(len(buyer.zi_agent.preference_schedule.values), 0):
-                    bid = buyer.generate_bid(market_info)
+                    bid = buyer.generate_bid(market_info, round_num)
                     if bid:
                         bids.append(bid)
                         logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{bid.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
@@ -92,7 +92,7 @@ class DoubleAuction:
             asks = []
             for seller in self.environment.sellers:
                 if seller.zi_agent.allocation.goods > 0:
-                    ask = seller.generate_bid(market_info)
+                    ask = seller.generate_bid(market_info, round_num)
                     if ask:
                         asks.append(ask)
                         logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{ask.price:.2f}{Fore.RED} for {Fore.YELLOW}{ask.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
