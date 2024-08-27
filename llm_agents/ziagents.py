@@ -18,6 +18,7 @@ class PreferenceSchedule(BaseModel):
     num_units: int = Field(..., description="Number of units")
     base_value: float = Field(..., description="Base value for the first unit")
     noise_factor: float = Field(default=0.1, description="Noise factor for value generation")
+    is_buyer: bool = Field(default=True, description="Whether the agent is a buyer")
 
     @computed_field
     @cached_property
@@ -88,11 +89,7 @@ class SellerPreferenceSchedule(PreferenceSchedule):
     def initial_endowment(self) -> float:
         return sum(self.values.values())
 
-def create_preference_schedule(is_buyer: bool, num_units: int, base_value: float, noise_factor: float = 0.1, endowment_factor: float = 1.2):
-    if is_buyer:
-        return BuyerPreferenceSchedule(num_units=num_units, base_value=base_value, noise_factor=noise_factor, endowment_factor=endowment_factor)
-    else:
-        return SellerPreferenceSchedule(num_units=num_units, base_value=base_value, noise_factor=noise_factor)
+
 class Order(BaseModel):
     agent_id: int
     price: float
