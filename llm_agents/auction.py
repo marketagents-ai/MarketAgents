@@ -67,6 +67,29 @@ class DoubleAuction:
 
             logger.info(f"Executing trade: Buyer {buyer.zi_agent.id} - Surplus: {buyer_surplus:.2f}, Seller {seller.zi_agent.id} - Surplus: {seller_surplus:.2f}")
 
+
+    def generate_bids(self, market_info: dict) -> List[Order]:
+        '''Generate bids from buyers'''
+        bids = []
+        for buyer in self.environment.buyers:
+            if buyer.zi_agent.allocation.goods < buyer.zi_agent.preference_schedule.values.get(len(buyer.zi_agent.preference_schedule.values), 0):
+                bid = buyer.generate_bid(market_info)
+                if bid:
+                    bids.append(bid)
+                    logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{bid.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
+        return bids
+    
+    def generate_asks(self, market_info: dict) -> List[Order]:
+        '''Generate asks from sellers'''
+        asks = []
+        for seller in self.environment.sellers:
+            if seller.zi_agent.allocation.goods > 0:
+                ask = seller.generate_bid(market_info)
+                if ask:
+                    asks.append(ask)
+                    logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{ask.price:.2f}{Fore.RED} for {Fore.YELLOW}{ask.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
+        return asks
+    
     def run_auction(self):
         if self.current_round >= self.max_rounds:
             logger.info("Max rounds reached. Auction has ended.")
@@ -80,22 +103,9 @@ class DoubleAuction:
             market_info = self._get_market_info()
 
             # Generate bids from buyers
-            bids = []
-            for buyer in self.environment.buyers:
-                if buyer.zi_agent.allocation.goods < buyer.zi_agent.preference_schedule.values.get(len(buyer.zi_agent.preference_schedule.values), 0):
-                    bid = buyer.generate_bid(market_info)
-                    if bid:
-                        bids.append(bid)
-                        logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{bid.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
-
+            bids = self.generate_bids(market_info)
             # Generate asks from sellers
-            asks = []
-            for seller in self.environment.sellers:
-                if seller.zi_agent.allocation.goods > 0:
-                    ask = seller.generate_bid(market_info)
-                    if ask:
-                        asks.append(ask)
-                        logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{ask.price:.2f}{Fore.RED} for {Fore.YELLOW}{ask.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
+            asks = self.generate_asks(market_info)
 
             trades = self.match_orders(bids, asks, round_num)
             if trades:

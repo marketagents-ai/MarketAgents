@@ -10,3 +10,4 @@ __pycache__
 
 # log files
 llm_agents/logs*
+/reports
