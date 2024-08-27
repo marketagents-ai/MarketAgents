@@ -1,45 +1,58 @@
 import logging
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel, Field, computed_field
 from environment import Environment, generate_market_agents
-from ziagents import Order, Trade, ZIAgent, Bid, Ask
+from ziagents import Order, Trade, ZIAgent, Bid, Ask, MarketInfo
 
 from colorama import Fore, Style
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
-class DoubleAuction:
-    def __init__(self, environment: Environment, max_rounds: int):
-        self.environment = environment
-        self.max_rounds = max_rounds
-        self.current_round = 0
-        self.successful_trades: List[Trade] = []
-        self.total_surplus_extracted = 0.0
-        self.average_prices: List[float] = []
-        self.order_book = []  # Store current order book
-        self.trade_history = []  # Store trade history
-        self.trade_counter = 0
+class OrderBook(BaseModel):
+    bids: List[Bid] = Field(default_factory=list, description="List of current bids")
+    asks: List[Ask] = Field(default_factory=list, description="List of current asks")
 
-    def match_orders(self, bids: List[Bid], asks: List[Ask], round_num: int) -> List[Trade]:
+    def add_bid(self, bid: Bid):
+        self.bids.append(bid)
+        self.bids.sort(key=lambda x: x.price, reverse=True)
+
+    def add_ask(self, ask: Ask):
+        self.asks.append(ask)
+        self.asks.sort(key=lambda x: x.price)
+
+    def match_orders(self, round_num: int) -> List[Trade]:
         trades = []
-        bids.sort(key=lambda x: x.price, reverse=True)  # Highest bids first
-        asks.sort(key=lambda x: x.price)  # Lowest asks first
-
-        while bids and asks and bids[0].price >= asks[0].price:
-            bid = bids.pop(0)
-            ask = asks.pop(0)
+        trade_counter = 0
+        while self.bids and self.asks and self.bids[0].price >= self.asks[0].price:
+            bid = self.bids.pop(0)
+            ask = self.asks.pop(0)
             trade_price = (bid.price + ask.price) / 2  # Midpoint price
             trade = Trade(
-                trade_id=self.trade_counter,
+                trade_id=trade_counter,
                 bid=bid,
                 ask=ask,
                 price=trade_price,
                 round=round_num
             )
             trades.append(trade)
-            self.trade_counter += 1
-            self.order_book.append({'price': trade_price, 'shares': 1, 'total': trade_price})  # Update order book
+            trade_counter += 1
         return trades
+
+class DoubleAuction(BaseModel):
+    environment: Environment = Field(..., description="The market environment")
+    max_rounds: int = Field(..., description="Maximum number of auction rounds")
+    current_round: int = Field(default=0, description="Current round number")
+    successful_trades: List[Trade] = Field(default_factory=list, description="List of successful trades")
+    total_surplus_extracted: float = Field(default=0.0, description="Total surplus extracted from trades")
+    average_prices: List[float] = Field(default_factory=list, description="List of average prices per round")
+    order_book: OrderBook = Field(default_factory=OrderBook, description="Current order book")
+    trade_history: List[Trade] = Field(default_factory=list, description="Complete trade history")
+
+    @computed_field
+    @property
+    def trade_counter(self) -> int:
+        return len(self.trade_history)
 
     def execute_trades(self, trades: List[Trade]):
         for trade in trades:
@@ -54,11 +67,11 @@ class DoubleAuction:
             self.total_surplus_extracted += trade.total_surplus
             self.average_prices.append(trade.price)
             self.successful_trades.append(trade)
-            self.trade_history.append(trade)  # Update trade history
+            self.trade_history.append(trade)
 
             logger.info(f"Executing trade: Buyer {buyer.id} - Surplus: {trade.buyer_surplus:.2f}, Seller {seller.id} - Surplus: {trade.seller_surplus:.2f}")
 
-    def generate_bids(self, market_info: dict) -> List[Bid]:
+    def generate_bids(self, market_info: MarketInfo) -> List[Bid]:
         bids = []
         for buyer in self.environment.buyers:
             bid = buyer.generate_bid(market_info)
@@ -67,7 +80,7 @@ class DoubleAuction:
                 logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for 1 unit(s){Style.RESET_ALL}")
         return bids
     
-    def generate_asks(self, market_info: dict) -> List[Ask]:
+    def generate_asks(self, market_info: MarketInfo) -> List[Ask]:
         asks = []
         for seller in self.environment.sellers:
             ask = seller.generate_ask(market_info)
@@ -93,17 +106,23 @@ class DoubleAuction:
             # Generate asks from sellers
             asks = self.generate_asks(market_info)
 
-            trades = self.match_orders(bids, asks, round_num)
+            # Add bids and asks to the order book
+            for bid in bids:
+                self.order_book.add_bid(bid)
+            for ask in asks:
+                self.order_book.add_ask(ask)
+
+            trades = self.order_book.match_orders(round_num)
             if trades:
                 self.execute_trades(trades)
 
         self.summarize_results()
 
-    def _get_market_info(self) -> dict:
+    def _get_market_info(self) -> MarketInfo:
         last_trade_price = self.average_prices[-1] if self.average_prices else None
         average_price = sum(self.average_prices) / len(self.average_prices) if self.average_prices else None
         
-        # If no trades have occurred, use the midpoint of buyer and seller base values
+        # If no trades have occurred, use the midpoint of buyer and seller base values - this is a crime leaking hidden information
         if last_trade_price is None or average_price is None:
             buyer_base_value = max(agent.base_value for agent in self.environment.buyers)
             seller_base_value = min(agent.base_value for agent in self.environment.sellers)
@@ -112,12 +131,12 @@ class DoubleAuction:
             last_trade_price = last_trade_price or initial_price_estimate
             average_price = average_price or initial_price_estimate
 
-        return {
-            "last_trade_price": last_trade_price,
-            "average_price": average_price,
-            "total_trades": len(self.successful_trades),
-            "current_round": self.current_round,
-        }
+        return MarketInfo(
+            last_trade_price=last_trade_price,
+            average_price=average_price,
+            total_trades=len(self.successful_trades),
+            current_round=self.current_round,
+        )
 
     def summarize_results(self):
         total_trades = len(self.successful_trades)
@@ -134,13 +153,6 @@ class DoubleAuction:
         logger.info(f"Theoretical Total Surplus: {theoretical_total_surplus:.2f}")
         logger.info(f"Practical Total Surplus: {self.total_surplus_extracted:.2f}")
         logger.info(f"Difference (Practical - Theoretical): {self.total_surplus_extracted - theoretical_total_surplus:.2f}")
-
-    def get_order_book(self):
-        return self.order_book
-
-    def get_trade_history(self):
-        return self.trade_history
-
 
 if __name__ == "__main__":
     # Generate ZI agents

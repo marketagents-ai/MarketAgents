@@ -12,11 +12,11 @@ from ziagents import ZIAgent, create_zi_agent
 logger = logging.getLogger(__name__)
 
 class CurvePoint(BaseModel):
-    quantity: float
-    price: float
+    quantity: float = Field(..., description="Quantity of goods")
+    price: float = Field(..., description="Price of goods")
 
 class BaseCurve(BaseModel):
-    points: List[CurvePoint]
+    points: List[CurvePoint] = Field(..., description="List of points defining the curve")
 
     def get_x_y_values(self) -> Tuple[List[float], List[float]]:
         x_values = []
@@ -45,8 +45,10 @@ class InitialSupplyCurve(BaseCurve):
                 raise ValueError("Initial supply curve must be monotonically increasing")
         return self
 
+
+
 class Environment(BaseModel):
-    agents: List[ZIAgent]
+    agents: List[ZIAgent] = Field(..., description="List of all agents in the environment")
 
     @cached_property
     def buyers(self) -> List[ZIAgent]:
@@ -300,7 +302,13 @@ class Environment(BaseModel):
         
         return fig
 
-def generate_market_agents(num_agents: int, num_units: int, buyer_base_value: int, seller_base_value: int, spread: float) -> List[ZIAgent]:
+def generate_market_agents(
+    num_agents: int = Field(..., description="Total number of agents to generate"),
+    num_units: int = Field(..., description="Number of units for each agent"),
+    buyer_base_value: int = Field(..., description="Base value for buyers"),
+    seller_base_value: int = Field(..., description="Base value for sellers"),
+    spread: float = Field(..., description="Maximum relative price spread")
+) -> List[ZIAgent]:
     agents = []
     for i in range(num_agents):
         is_buyer = i < num_agents // 2

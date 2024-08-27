@@ -91,9 +91,9 @@ class SellerPreferenceSchedule(PreferenceSchedule):
 
 
 class Order(BaseModel):
-    agent_id: int
-    price: float
-    quantity: int = Field(default=1, ge=1, le=1)  # Constrain quantity to 1
+    agent_id: int = Field(..., description="Unique identifier of the agent placing the order")
+    price: float = Field(..., description="Price of the order")
+    quantity: int = Field(default=1, ge=1, le=1, description="Quantity of the order, constrained to 1")
 
     @computed_field
     @cached_property
@@ -101,7 +101,7 @@ class Order(BaseModel):
         return isinstance(self, Bid)
 
 class Bid(Order):
-    base_value: float
+    base_value: float = Field(..., description="Base value of the item for the buyer")
     
     @model_validator(mode='after')
     def check_bid_validity(self) -> Self:
@@ -110,7 +110,7 @@ class Bid(Order):
         return self
 
 class Ask(Order):
-    base_cost: float
+    base_cost: float = Field(..., description="Base cost of the item for the seller")
     @model_validator(mode='after')
     def check_ask_validity(self) -> Self:
         if self.price < self.base_cost:
@@ -118,11 +118,11 @@ class Ask(Order):
         return self
 
 class Trade(BaseModel):
-    trade_id: int
-    bid: Bid
-    ask: Ask
-    price: float
-    round: int
+    trade_id: int = Field(..., description="Unique identifier for the trade")
+    bid: Bid = Field(..., description="The bid involved in the trade")
+    ask: Ask = Field(..., description="The ask involved in the trade")
+    price: float = Field(..., description="The price at which the trade was executed")
+    round: int = Field(..., description="The round in which the trade occurred")
 
     @computed_field
     @property
@@ -145,6 +145,12 @@ class Trade(BaseModel):
             raise ValueError("Bid price is lower than Ask price")
         return self
 
+class MarketInfo(BaseModel):
+    last_trade_price: Optional[float] = Field(None, description="Price of the last executed trade")
+    average_price: Optional[float] = Field(None, description="Average price of all executed trades")
+    total_trades: int = Field(0, description="Total number of executed trades")
+    current_round: int = Field(1, description="Current round number")
+
 class Allocation(BaseModel):
     goods: int = Field(default=0, description="Quantity of goods")
     cash: float = Field(default=0.0, description="Amount of cash")
@@ -152,17 +158,17 @@ class Allocation(BaseModel):
     initial_cash: float = Field(default=0.0, description="Initial amount of cash")
 
 class AgentHistory(BaseModel):
-    active_orders: List[Union[Bid, Ask]] = Field(default_factory=list)
-    illegal_orders: List[Union[Bid, Ask]] = Field(default_factory=list)
-    accepted_trades: List[Trade] = Field(default_factory=list)
-    expired_orders: List[Union[Bid, Ask]] = Field(default_factory=list)
+    active_orders: List[Union[Bid, Ask]] = Field(default_factory=list, description="List of active orders")
+    illegal_orders: List[Union[Bid, Ask]] = Field(default_factory=list, description="List of illegal orders")
+    accepted_trades: List[Trade] = Field(default_factory=list, description="List of accepted trades")
+    expired_orders: List[Union[Bid, Ask]] = Field(default_factory=list, description="List of expired orders")
 
 class ZIAgent(BaseModel):
     id: int = Field(..., description="Unique identifier for the agent")
-    preference_schedule: PreferenceSchedule
-    allocation: Allocation
+    preference_schedule: PreferenceSchedule = Field(..., description="Preference schedule of the agent")
+    allocation: Allocation = Field(..., description="Current allocation of goods and cash")
     max_relative_spread: float = Field(default=0.2, description="Maximum relative price spread")
-    history: AgentHistory = Field(default_factory=AgentHistory)
+    history: AgentHistory = Field(default_factory=AgentHistory, description="History of agent's actions")
 
     @computed_field
     @cached_property
@@ -179,14 +185,14 @@ class ZIAgent(BaseModel):
     def base_value(self) -> float:
         return self.preference_schedule.get_value(self.current_quantity + 1)
 
-    def generate_bid(self, market_info: dict) -> Optional[Bid]:
+    def generate_bid(self, market_info: Optional[MarketInfo] = None) -> Optional[Bid]:
         if not self.is_buyer or self.base_value <= 0 or self.allocation.cash < self.base_value:
             return None
         price = random.uniform(self.base_value * (1 - self.max_relative_spread), self.base_value)
         price = min(price, self.allocation.cash, self.base_value)
         return Bid(agent_id=self.id, price=price, base_value=self.base_value)
 
-    def generate_ask(self, market_info: dict) -> Optional[Ask]:
+    def generate_ask(self, market_info: Optional[MarketInfo] = None) -> Optional[Ask]:
         if self.is_buyer or self.base_value <= 0:
             return None
         price = random.uniform(self.base_value, self.base_value * (1 + self.max_relative_spread))
@@ -274,8 +280,8 @@ if __name__ == "__main__":
         print(f"\nRound {round}")
         
         # Generate orders
-        bid = buyer.generate_bid({})
-        ask = seller.generate_ask({})
+        bid = buyer.generate_bid()
+        ask = seller.generate_ask()
 
         if bid and ask:
             print(f"Bid: {bid.price:.2f}, Ask: {ask.price:.2f}")
