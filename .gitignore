@@ -12,3 +12,5 @@ __pycache__
 llm_agents/logs*
 /reports
 .vscode/settings.json
+current_supply_demand.png
+initial_supply_demand.png
