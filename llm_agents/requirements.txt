@@ -6,3 +6,4 @@ anthropic==0.34.1
 openai==1.42.0
 python-dotenv==1.0.1
 colorama==0.4.6
+tiny-fnc-engine==0.1.7
