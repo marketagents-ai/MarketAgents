@@ -10,3 +10,10 @@ __pycache__
 
 # log files
 llm_agents/logs*
+/reports
+.vscode/settings.json
+current_supply_demand.png
+initial_supply_demand.png
+current_supply_demand.png
+initial_supply_demand.png
+*.png
