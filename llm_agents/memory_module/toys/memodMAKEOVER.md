@@ -302,3 +302,260 @@ In this method:
 3. Both CSV data and search results are incorporated into the final prompt.
 
 This approach allows the system to combine recent market history (from CSV) with relevant historical information and analysis (from the index) to create comprehensive and context-aware prompts for the agent.
+
+
+## EXAMPLES AT THE DIFFERENT LEVELS OF RESOLUTION
+
+```
+# Universal Agent Input Prompt
+
+## System State
+Corrective measures applied, system returning to equilibrium
+
+## Relevant Information
+1. Equilibrium restoration often involves balancing resource allocation across system components.
+   - Relevance Score: 0.95
+   - Source: System Dynamics Principles
+
+2. Minor fluctuations in stable systems can lead to self-correction without external intervention.
+   - Relevance Score: 0.92
+   - Source: Complexity Theory in Economics
+
+3. System entropy increases may indicate temporary inefficiencies in resource distribution.
+   - Relevance Score: 0.88
+   - Source: Thermodynamics of Economic Systems
+
+4. Corrective measures in economic systems often involve policy adjustments or market interventions.
+   - Relevance Score: 0.85
+   - Source: Macroeconomic Policy Analysis
+
+5. Monitoring key system indicators is crucial for maintaining long-term equilibrium.
+   - Relevance Score: 0.82
+   - Source: Economic Stability Metrics
+
+## Objective
+Maintain equilibrium through continuous interaction
+
+## Action
+Analyze the current state and decide on the next action
+
+# Universal Agent Analysis and Action Plan
+
+Based on the current system state and relevant information, here's my analysis and proposed action plan:
+
+1. System Status Assessment:
+   - The system is currently in a recovery phase, moving back towards equilibrium.
+   - Recent corrective measures appear to be effective in addressing the previous resource imbalance.
+
+2. Key Considerations:
+   - While the system is returning to equilibrium, we must be cautious of overcorrection.
+   - Minor fluctuations are normal and can contribute to system resilience.
+   - Monitoring entropy levels will be crucial to ensure the system doesn't slip back into imbalance.
+
+3. Proposed Actions:
+   a) Implement a comprehensive monitoring system to track key stability indicators in real-time.
+   b) Conduct a thorough analysis of the effectiveness of the applied corrective measures.
+   c) Develop contingency plans for potential future imbalances, focusing on rapid response mechanisms.
+   d) Initiate a gradual reduction of any emergency interventions to allow the system to stabilize naturally.
+   e) Engage with all system components to ensure equitable resource distribution is maintained.
+
+4. Long-term Strategy:
+   - Develop predictive models to anticipate potential future imbalances before they occur.
+   - Establish a feedback loop system to continuously refine and improve our equilibrium maintenance strategies.
+
+By taking these actions, we aim to solidify the current return to equilibrium and enhance the system's overall resilience against future disturbances.
+
+Next Review: Schedule a comprehensive system status review in 24 hours to assess the impact of these actions and make any necessary adjustments.
+```
+```
+# Intelligent Economic Agent Input Prompt
+
+## Market State
+Bearish
+
+## Recent Events
+Geopolitical tensions rising
+
+## Key Insights
+Risk-off sentiment growing among investors
+
+## Relevant Information
+1. Geopolitical tensions often lead to increased volatility in financial markets and a flight to safe-haven assets.
+   - Relevance Score: 0.94
+   - Source: Geopolitical Risk Analysis
+
+2. Bearish markets during geopolitical crises may present value investment opportunities in oversold sectors.
+   - Relevance Score: 0.91
+   - Source: Contrarian Investment Strategies
+
+3. Risk-off sentiment typically results in increased demand for government bonds, gold, and defensive stocks.
+   - Relevance Score: 0.89
+   - Source: Safe-Haven Asset Performance
+
+4. Historical data shows that markets often overreact to geopolitical events in the short term.
+   - Relevance Score: 0.86
+   - Source: Market Behavior During Crises
+
+5. Diversification across uncorrelated assets becomes crucial during periods of heightened geopolitical risk.
+   - Relevance Score: 0.83
+   - Source: Portfolio Management in Volatile Markets
+
+## Objective
+Maximize outcomes while managing risk
+
+## Action
+Analyze market conditions, consider potential outcomes, and make an informed decision
+```
+```
+# Intelligent Economic Agent: Market Analysis and Strategy
+
+Given the current bearish market state, rising geopolitical tensions, and growing risk-off sentiment, here's my analysis and recommended strategy:
+
+1. Market Assessment:
+   - The bearish trend is likely to persist in the short term due to geopolitical uncertainties.
+   - Expect increased volatility across most asset classes.
+   - Safe-haven assets are likely to outperform riskier assets in the near term.
+
+2. Risk Management:
+   a) Increase allocation to safe-haven assets:
+      - Government bonds: +5% (focus on US Treasuries and German Bunds)
+      - Gold: +3%
+      - Defensive stocks: +4% (utilities, consumer staples)
+   b) Reduce exposure to cyclical and growth stocks by 10%
+   c) Implement stop-loss orders on volatile positions to limit downside risk
+
+3. Opportunity Identification:
+   a) Watch for oversold quality companies in stable sectors for potential value plays
+   b) Prepare a watchlist of fundamentally strong companies in geopolitically sensitive sectors (e.g., energy, defense) for potential entry points
+   c) Consider slowly building positions in emerging market bonds, which may offer attractive yields
+
+4. Hedging Strategies:
+   a) Implement a put option strategy on major indices to protect against further downside
+   b) Consider long volatility positions through VIX futures or options
+
+5. Monitoring and Analysis:
+   a) Set up real-time alerts for significant geopolitical developments
+   b) Closely track safe-haven asset flows and correlations
+   c) Monitor credit spreads as an indicator of market stress
+
+6. Client Communication:
+   Prepare a client memo explaining the current market situation, our risk management approach, and potential opportunities we're monitoring.
+
+7. Review and Adjustment:
+   Schedule daily strategy reviews to assess the effectiveness of our approach and make necessary adjustments based on new developments.
+
+By implementing this strategy, we aim to protect capital in the short term while positioning ourselves to capitalize on opportunities that may arise from market overreactions. Our focus is on balancing risk management with the potential for long-term growth.
+
+Next Steps: Begin implementing the proposed asset allocation changes and hedging strategies. Prepare a detailed report on potential value opportunities for review in 48 hours.
+```
+```
+# Highly Sophisticated Economic Agent Input Prompt
+
+## Market Dynamics
+Emerging markets outperforming developed markets
+
+## Economic Indicators
+Consumer confidence index: 110.2
+
+## Relevant Information
+1. Emerging market outperformance often correlates with periods of global economic expansion and increased risk appetite.
+   - Relevance Score: 0.96
+   - Source: Emerging Markets Economic Analysis
+
+2. Consumer confidence above 100 indicates optimism, potentially leading to increased consumer spending and economic growth.
+   - Relevance Score: 0.93
+   - Source: Consumer Behavior and Economic Indicators
+
+3. Divergence between emerging and developed markets may signal a shift in global economic dynamics and investment flows.
+   - Relevance Score: 0.90
+   - Source: Global Market Trends Analysis
+
+4. High consumer confidence in developed markets can drive demand for emerging market exports, supporting their outperformance.
+   - Relevance Score: 0.87
+   - Source: International Trade and Market Correlations
+
+5. Currency fluctuations play a crucial role in the relative performance of emerging vs. developed markets.
+   - Relevance Score: 0.85
+   - Source: Forex Impact on Global Equities
+
+## Trade Analysis
+Commodities futures showing signs of backwardation
+
+## Agent Interactions
+Collaborative decision-making between human and AI agents increasing
+
+## Strategy Performance
+Long-short equity strategies showing positive alpha
+
+## Objective
+Achieve superior risk-adjusted returns while contributing to market efficiency
+
+## Action
+Conduct comprehensive market analysis, develop and test hypotheses, implement sophisticated trading strategies
+```
+```
+# Highly Sophisticated Economic Agent: Comprehensive Analysis and Strategic Deployment
+
+Based on the provided market dynamics, economic indicators, and additional contextual information, here's a detailed analysis and strategic plan:
+
+1. Market Dynamics Analysis:
+   a) Emerging Markets (EM) Outperformance:
+      - Likely drivers: Improving global risk appetite, potential undervaluation, and structural reforms in key EM countries.
+      - Risks: Currency volatility, geopolitical tensions, and potential overheating in certain EM economies.
+   b) Developed Markets (DM) Underperformance:
+      - Potential causes: Valuation concerns, slower growth prospects, and policy uncertainty in major DM economies.
+      - Opportunity: Look for specific DM sectors or companies that might buck the trend.
+
+2. Economic Indicator Interpretation:
+   - Consumer Confidence Index at 110.2 suggests strong economic optimism.
+   - Potential impacts: Increased consumer spending, potential inflationary pressures, and possible monetary policy tightening in the medium term.
+
+3. Commodities and Currency Analysis:
+   - Backwardation in commodities futures indicates potential near-term supply constraints or strong current demand.
+   - Strategy: Consider long positions in spot commodities and short-dated futures contracts.
+   - Monitor currency pairs, especially EM currencies against major DM currencies, for carry trade opportunities.
+
+4. Agent Interaction Optimization:
+   - Leverage increased collaborative decision-making between human and AI agents.
+   - Implement a hybrid decision-making model that combines AI-driven quantitative analysis with human qualitative insights.
+
+5. Strategy Refinement:
+   - Given the positive alpha in long-short equity strategies:
+     a) Increase capital allocation to these strategies by 10%.
+     b) Focus on EM vs. DM pairs trades to capitalize on the performance divergence.
+     c) Implement machine learning algorithms to identify optimal entry and exit points for these strategies.
+
+6. Risk Management:
+   a) Implement dynamic hedging strategies to manage EM-specific risks (e.g., currency, liquidity, geopolitical).
+   b) Develop stress testing scenarios that account for potential reversals in EM outperformance.
+   c) Set up real-time monitoring of key risk indicators with automated alert systems.
+
+7. Alpha Generation Hypotheses:
+   a) Test the hypothesis that EM outperformance is sector-specific rather than broad-based.
+   b) Investigate the correlation between consumer confidence and subsequent market performance in both EM and DM.
+   c) Analyze the impact of AI-human collaborative decisions on strategy performance and market efficiency.
+
+8. Tactical Asset Allocation:
+   a) Overweight EM equities: +7% allocation increase.
+   b) Underweight DM equities: -5% allocation reduction.
+   c) Increase allocation to EM local currency bonds: +3%.
+   d) Implement a commodities overlay strategy focused on backwardated markets.
+
+9. Quantitative Model Enhancement:
+   a) Incorporate consumer confidence data into our predictive models for both EM and DM performance.
+   b) Develop a new ML model to predict regime changes in EM-DM relative performance.
+   c) Enhance our NLP algorithms to better interpret and act on geopolitical news affecting EM countries.
+
+10. Contribution to Market Efficiency:
+    a) Publish a research paper on the impact of AI-human collaboration on market price discovery.
+    b) Engage with EM regulators to share insights on improving market structure and liquidity.
+    c) Develop and share (with a time delay) anonymized datasets on EM-DM correlations to promote academic research.
+
+11. Performance Monitoring and Adjustment:
+    - Implement a daily review of strategy performance with automated adjustments for strategies falling below predefined Sharpe ratio thresholds.
+    - Conduct weekly human-AI collaborative sessions to review and refine our overall market approach.
+
+By executing this comprehensive plan, we aim to capitalize on the current market dynamics while maintaining a robust risk management framework. Our focus on combining quantitative strategies with human oversight, continuous hypothesis testing, and contribution to overall market efficiency positions us to achieve superior risk-adjusted returns in this complex market environment.
+
+Next Steps: Begin immediate implementation of the tactical asset allocation changes and initiate the proposed hypothesis tests. Schedule a full review of preliminary results in 72 hours.
+```
