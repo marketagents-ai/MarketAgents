@@ -1,3 +1,46 @@
+Agent Market Memory at Three Levels of Abstraction
+
+```mermaid
+graph TD
+    A[Agent]
+    
+    I[Input]
+    P[Processing]
+    O[Output]
+    
+    I --> A
+    A --> P
+    P --> O
+    O --> |Feedback| A
+    
+    I <--> |Market Data| M[Market]
+    O --> |Actions| M
+```
+
+```mermaid
+graph TD
+    A[Agent Core]
+    
+    M[Memory System]
+    P[Perception System]
+    D[Decision System]
+    H[History System]
+    
+    A --> M
+    A --> P
+    A --> D
+    A --> H
+    
+    M --> |Informs| D
+    P --> |Updates| M
+    D --> |Influences| H
+    H --> |Shapes| M
+    
+    P <--> |Interacts with| MS[Market State]
+    D --> |Executes| T[Trades]
+    H --> |Records| PM[Performance Metrics]
+```
+
 ```mermaid
 graph TD
     Z[ZIAgent Memory]
