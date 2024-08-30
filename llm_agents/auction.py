@@ -15,19 +15,19 @@ class OrderBook(BaseModel):
 
     def add_bid(self, bid: Bid):
         self.bids.append(bid)
-        self.bids.sort(key=lambda x: x.price, reverse=True)
+        self.bids.sort(key=lambda x: x.market_action.price, reverse=True)
 
     def add_ask(self, ask: Ask):
         self.asks.append(ask)
-        self.asks.sort(key=lambda x: x.price)
+        self.asks.sort(key=lambda x: x.market_action.price)
 
     def match_orders(self, round_num: int) -> List[Trade]:
         trades = []
         trade_counter = 0
-        while self.bids and self.asks and self.bids[0].price >= self.asks[0].price:
+        while self.bids and self.asks and self.bids[0].market_action.price >= self.asks[0].market_action.price:
             bid = self.bids.pop(0)
             ask = self.asks.pop(0)
-            trade_price = (bid.price + ask.price) / 2  # Midpoint price
+            trade_price = (bid.market_action.price + ask.market_action.price) / 2  # Midpoint price
             trade = Trade(
                 trade_id=trade_counter,
                 bid=bid,
@@ -77,7 +77,7 @@ class DoubleAuction(BaseModel):
             bid = buyer.generate_bid(market_info)
             if bid:
                 bids.append(bid)
-                logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for 1 unit(s){Style.RESET_ALL}")
+                logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.market_action.price:.2f}{Fore.BLUE} for 1 unit(s){Style.RESET_ALL}")
         return bids
     
     def generate_asks(self, market_info: MarketInfo) -> List[Ask]:
@@ -86,7 +86,7 @@ class DoubleAuction(BaseModel):
             ask = seller.generate_ask(market_info)
             if ask:
                 asks.append(ask)
-                logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.id}{Fore.RED} ask: ${Fore.GREEN}{ask.price:.2f}{Fore.RED} for 1 unit(s){Style.RESET_ALL}")
+                logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.id}{Fore.RED} ask: ${Fore.GREEN}{ask.market_action.price:.2f}{Fore.RED} for 1 unit(s){Style.RESET_ALL}")
         return asks
     
     def run_auction(self):
