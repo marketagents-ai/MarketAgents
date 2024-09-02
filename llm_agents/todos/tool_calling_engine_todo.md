@@ -1,11 +1,11 @@
 # Tool Calling Engine TODO
 
 ## Integration with Base Agent Module
-- [ ] Create a new `ToolCallingEngine` class in a separate file (e.g., `tool_calling_engine.py`)
-- [ ] Implement a method to register tools with their schemas and functions
+- [X] Create a new `ToolCallingEngine` class in a separate file (e.g., `tool_calling_engine.py`)
+- [X] Implement a method to register tools 
 - [ ] Develop a method to parse LLM output and identify tool calls
-- [ ] Implement error handling for invalid tool calls
-- [ ] Add a method to execute tool calls and return results
+- [X] Implement error handling for invalid tool calls
+- [X] Add a method to execute tool calls and return results
 - [ ] Modify the `Agent` class in `agents.py` to initialize and use the `ToolCallingEngine`
 - [ ] Update the `execute` method in `Agent` class to handle tool calling scenarios
 
