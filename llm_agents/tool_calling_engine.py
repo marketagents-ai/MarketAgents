@@ -101,14 +101,23 @@ class ToolCallingEngine:
             List[FunctionCall]: A list of parsed FunctionCall objects.
         """
         function_calls = []
-        for tool_call in tool_calls:
-            function_call = FunctionCall(
-                name=tool_call['function']['name'],
-                parameters=tool_call['function']['arguments'],
-                returns=None  # Assuming OpenAIToolCall doesn't provide return information
-            )
-            function_calls.append(function_call)
-        return function_calls
+        try:
+            for tool_call in tool_calls:
+                try:
+                    parameters = json.loads(tool_call['function']['arguments'])
+                    function_call = FunctionCall(
+                        name=tool_call['function']['name'],
+                        parameters=parameters,
+                        returns=None 
+                    )
+                    function_calls.append(function_call)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON in function arguments: {str(e)}")
+            return function_calls
+        except KeyError as e:
+            raise ValueError(f"Invalid tool call format: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Error parsing tool calls: {str(e)}")
 
     def process_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, ValidOutput]]:
         """
