@@ -1,6 +1,6 @@
 # Adding gitignore for
 .venv
-
+market
 # Env files
 .env
 .env.local
