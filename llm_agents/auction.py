@@ -1,6 +1,8 @@
 import logging
+import traceback
 from typing import List
 from environment import Environment, generate_llm_market_agents
+from acl_message import ACLMessage, Performative
 from ziagents import Order, Trade
 from plotter import analyze_and_plot_auction_results
 
@@ -43,7 +45,23 @@ class DoubleAuction:
             )
             trades.append(trade)
             self.trade_counter += 1
-            self.order_book.append({'price': trade_price, 'shares': trade_quantity, 'total': trade_price * trade_quantity})  # Update order book
+            self.order_book.append({'price': trade_price, 'shares': trade_quantity, 'total': trade_price * trade_quantity})
+
+            logger.info(f"Trade matched: Buyer {trade.buyer_id}, Seller {trade.seller_id}, Price: {trade_price}, Quantity: {trade_quantity}")
+
+            # Send messages immediately after trade is completed
+            buyer_message = self.create_trade_message(trade, is_buyer=True)
+            seller_message = self.create_trade_message(trade, is_buyer=False)
+            
+            buyer = next(agent for agent in self.environment.agents if agent.zi_agent.id == trade.buyer_id)
+            seller = next(agent for agent in self.environment.agents if agent.zi_agent.id == trade.seller_id)
+            
+            logger.info(f"Sending trade message to buyer {buyer.zi_agent.id}")
+            buyer.receive_message(buyer_message)
+            logger.info(f"Sending trade message to seller {seller.zi_agent.id}")
+            seller.receive_message(seller_message)
+
+        logger.info(f"Matched {len(trades)} trades")
         return trades
 
     def execute_trades(self, trades: List[Trade]):
@@ -73,7 +91,7 @@ class DoubleAuction:
             return
         
         for round_num in range(self.current_round + 1, self.max_rounds + 1):
-            logger.info(f"\n=== Round {round_num} ===")
+            logger.info(f"\n=== Starting Round {round_num} ===")
             self.current_round = round_num
 
             # Prepare market info
@@ -82,27 +100,60 @@ class DoubleAuction:
             # Generate bids from buyers
             bids = []
             for buyer in self.environment.buyers:
-                if buyer.zi_agent.allocation.goods < buyer.zi_agent.preference_schedule.values.get(len(buyer.zi_agent.preference_schedule.values), 0):
-                    bid = buyer.generate_bid(market_info, round_num)
-                    if bid:
-                        bids.append(bid)
-                        logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{bid.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
+                try:
+                    if buyer.zi_agent.allocation.goods < buyer.zi_agent.preference_schedule.values.get(len(buyer.zi_agent.preference_schedule.values), 0):
+                        order = buyer.generate_bid(market_info, round_num)
+                        if order and order.is_buy:
+                            bids.append(order)
+                            logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{order.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{order.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
+                except Exception as e:
+                    logger.error(f"Error generating bid for buyer {buyer.zi_agent.id}: {e}")
+                    logger.error(traceback.format_exc())
 
             # Generate asks from sellers
             asks = []
             for seller in self.environment.sellers:
-                if seller.zi_agent.allocation.goods > 0:
-                    ask = seller.generate_bid(market_info, round_num)
-                    if ask:
-                        asks.append(ask)
-                        logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{ask.price:.2f}{Fore.RED} for {Fore.YELLOW}{ask.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
+                try:
+                    if seller.zi_agent.allocation.goods > 0:
+                        order = seller.generate_bid(market_info, round_num)
+                        if order and not order.is_buy:
+                            asks.append(order)
+                            logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{order.price:.2f}{Fore.RED} for {Fore.YELLOW}{order.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
+                except Exception as e:
+                    logger.error(f"Error generating ask for seller {seller.zi_agent.id}: {e}")
+                    logger.error(traceback.format_exc())
 
+            logger.info(f"Generated {len(bids)} bids and {len(asks)} asks")
+
+            # Match orders and execute trades
             trades = self.match_orders(bids, asks, round_num)
             if trades:
                 self.execute_trades(trades)
-            self.current_round += 1
+            
+            logger.info(f"=== Finished Round {round_num} ===\n")
 
+        logger.info("Auction completed. Summarizing results.")
         self.summarize_results()
+        
+    def create_trade_message(self, trade: Trade, is_buyer: bool) -> ACLMessage:
+        content = {
+            "trade_id": trade.trade_id,
+            "price": trade.price,
+            "quantity": trade.quantity,
+            "round": trade.round
+        }
+        
+        message = ACLMessage.create_message(
+            performative=Performative.INFORM,
+            sender="market",
+            receiver=str(trade.buyer_id if is_buyer else trade.seller_id),
+            content=content,
+            protocol="double-auction",
+            ontology="market-ontology",
+            conversation_id=f"trade-{trade.trade_id}"
+        )
+        logger.info(f"Created trade message: {message}")
+        return message
 
     def _get_market_info(self) -> dict:
         last_trade_price = self.average_prices[-1] if self.average_prices else None
