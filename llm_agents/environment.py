@@ -25,17 +25,13 @@ class Environment(BaseModel):
 
     def get_agent(self, agent_id: int) -> Optional[MarketAgent]:
         """Retrieve an agent by their ID."""
-        for agent in self.agents:
-            if agent.zi_agent.id == agent_id:
-                return agent
-        return None   # Return None if no agent with the given ID is found
+        return next((agent for agent in self.agents if agent.zi_agent.id == agent_id), None)
 
     def calculate_initial_utility(self, agent: MarketAgent) -> float:
         if agent.zi_agent.preference_schedule.is_buyer:
             return agent.zi_agent.allocation.initial_cash
         else:
-            goods_value = sum(agent.zi_agent.preference_schedule.get_value(q) for q in range(1, agent.zi_agent.allocation.initial_goods + 1))
-            return goods_value
+            return sum(agent.zi_agent.preference_schedule.get_value(q) for q in range(1, agent.zi_agent.allocation.initial_goods + 1))
 
     def get_agent_utility(self, agent: MarketAgent) -> float:
         if agent.zi_agent.preference_schedule.is_buyer:
@@ -59,44 +55,42 @@ class Environment(BaseModel):
         logger.info(f"Total Market Utility: {self.get_total_utility():.2f}")
 
     def calculate_remaining_trade_opportunities(self) -> int:
-        potential_trades = 0
-        for buyer in self.buyers:
-            for seller in self.sellers:
-                if buyer.zi_agent.allocation.cash > 0 and seller.zi_agent.allocation.goods > 0:
-                    buyer_value = buyer.zi_agent.preference_schedule.get_value(buyer.zi_agent.allocation.goods + 1)
-                    seller_cost = seller.zi_agent.preference_schedule.get_value(seller.zi_agent.allocation.goods)
-                    if buyer_value > seller_cost and buyer.zi_agent.allocation.cash >= seller_cost:
-                        potential_trades += 1
-        return potential_trades
+        return sum(
+            1 for buyer in self.buyers
+            for seller in self.sellers
+            if (buyer.zi_agent.allocation.cash > 0 and
+                seller.zi_agent.allocation.goods > 0 and
+                buyer.zi_agent.preference_schedule.get_value(buyer.zi_agent.allocation.goods + 1) >
+                seller.zi_agent.preference_schedule.get_value(seller.zi_agent.allocation.goods) and
+                buyer.zi_agent.allocation.cash >= seller.zi_agent.preference_schedule.get_value(seller.zi_agent.allocation.goods))
+        )
 
     def calculate_remaining_surplus(self) -> float:
-        remaining_surplus = 0.0
-        for buyer in self.buyers:
-            for seller in self.sellers:
-                if buyer.zi_agent.allocation.cash > 0 and seller.zi_agent.allocation.goods > 0:
-                    buyer_value = buyer.zi_agent.preference_schedule.get_value(buyer.zi_agent.allocation.goods + 1)
-                    seller_cost = seller.zi_agent.preference_schedule.get_value(seller.zi_agent.allocation.goods)
-                    if buyer_value > seller_cost:
-                        remaining_surplus += (buyer_value - seller_cost)
-        return remaining_surplus
+        return sum(
+            (buyer.zi_agent.preference_schedule.get_value(buyer.zi_agent.allocation.goods + 1) -
+             seller.zi_agent.preference_schedule.get_value(seller.zi_agent.allocation.goods))
+            for buyer in self.buyers
+            for seller in self.sellers
+            if (buyer.zi_agent.allocation.cash > 0 and
+                seller.zi_agent.allocation.goods > 0 and
+                buyer.zi_agent.preference_schedule.get_value(buyer.zi_agent.allocation.goods + 1) >
+                seller.zi_agent.preference_schedule.get_value(seller.zi_agent.allocation.goods))
+        )
 
     def calculate_theoretical_supply_demand(self) -> Tuple[List[float], List[float], List[float], List[float]]:
         buyer_valuations = [agent.zi_agent.preference_schedule.values for agent in self.buyers]
         seller_costs = [agent.zi_agent.preference_schedule.values for agent in self.sellers]
         
-        # Flatten and sort the valuations and costs
         demand_values = sorted([value for valuation in buyer_valuations for value in valuation.values()], reverse=True)
         supply_values = sorted([value for cost in seller_costs for value in cost.values()])
 
         demand_x, demand_y = [], []
         supply_x, supply_y = [], []
         
-        # Generate demand curve points
         for i, value in enumerate(demand_values, start=1):
             demand_x.extend([i-1, i])
             demand_y.extend([value, value])
         
-        # Generate supply curve points
         for i, value in enumerate(supply_values, start=1):
             supply_x.extend([i-1, i])
             supply_y.extend([value, value])
@@ -106,21 +100,14 @@ class Environment(BaseModel):
     def calculate_equilibrium(self) -> Tuple[float, float, float, float, float]:
         demand_x, demand_y, supply_x, supply_y = self.calculate_theoretical_supply_demand()
 
-        ce_quantity = 0
-        ce_price = 0
-        for i in range(0, min(len(demand_x), len(supply_x)), 2):
-            if demand_y[i] >= supply_y[i]:
-                ce_quantity = i // 2 + 1  # Add 1 because we start from 0
-                ce_price = (demand_y[i] + supply_y[i]) / 2
-            else:
-                break
+        ce_quantity = next((i // 2 + 1 for i in range(0, min(len(demand_x), len(supply_x)), 2) if demand_y[i] < supply_y[i]), 0)
+        ce_price = (demand_y[ce_quantity * 2 - 2] + supply_y[ce_quantity * 2 - 2]) / 2 if ce_quantity > 0 else 0
 
         buyer_surplus = sum(max(demand_y[i] - ce_price, 0) for i in range(0, ce_quantity * 2, 2))
         seller_surplus = sum(max(ce_price - supply_y[i], 0) for i in range(0, ce_quantity * 2, 2))
         total_surplus = buyer_surplus + seller_surplus
 
         return ce_price, ce_quantity, buyer_surplus, seller_surplus, total_surplus
-
 
     def plot_theoretical_supply_demand(self, save_location=None):
         """Plot the theoretical supply and demand curves and the competitive equilibrium."""
@@ -156,25 +143,18 @@ class Environment(BaseModel):
         return fig
         
 def generate_llm_market_agents(num_agents: int, num_units: int, buyer_base_value: int, seller_base_value: int, spread: float, use_llm: bool = False, llm_config: Dict[str, Any] = None) -> List[MarketAgent]:
-    agents = []
-    for i in range(num_agents):
-        is_buyer = i < num_agents // 2
-        base_value = buyer_base_value if is_buyer else seller_base_value
-        role = "buyer" if is_buyer else "seller"
-        
-        market_agent = MarketAgent.create(
+    return [
+        MarketAgent.create(
             agent_id=i,
-            is_buyer=is_buyer,
+            is_buyer=i < num_agents // 2,
             num_units=num_units,
-            base_value=base_value,
+            base_value=buyer_base_value if i < num_agents // 2 else seller_base_value,
             use_llm=use_llm,
             max_relative_spread=spread,
             llm_config=llm_config
         )
-        agents.append(market_agent)
-    
-    return agents
-
+        for i in range(num_agents)
+    ]
 
 if __name__ == "__main__":
     # Generate test agents
