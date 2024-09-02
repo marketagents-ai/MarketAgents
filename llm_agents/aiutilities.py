@@ -15,6 +15,8 @@ from openai.types.shared_params import ResponseFormatText, ResponseFormatJSONObj
 from openai import OpenAI, AzureOpenAI
 from anthropic import Anthropic
 from anthropic.types import MessageParam, TextBlockParam, ModelParam
+from anthropic.types.beta.prompt_caching.prompt_caching_beta_cache_control_ephemeral_param import PromptCachingBetaCacheControlEphemeralParam
+from anthropic.types.beta.prompt_caching.prompt_caching_beta_text_block_param import PromptCachingBetaTextBlockParam
 from anthropic.types import (
     ContentBlock, TextBlockParam, ImageBlockParam, TextBlock,
     ToolUseBlockParam, ToolResultBlockParam,
@@ -35,13 +37,121 @@ from openai.types.shared_params import FunctionDefinition
 
 from anthropic.types import ToolParam
 
+from pydantic import BaseModel, Field
+from typing import Union, Optional, List
+from openai.types.chat import ChatCompletionMessage
+from anthropic.types import Message as AnthropicMessage
+from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
+
+from anthropic.types import TextBlock, ToolUseBlock
+
+class LLMOutput(BaseModel):
+    raw_result: Union[str, dict, ChatCompletionMessage, AnthropicMessage, PromptCachingBetaMessage]
+    parsed_content: Optional[str] = None
+    parsed_json: Optional[dict] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._parse_result()
+
+    def _parse_result(self):
+        if isinstance(self.raw_result, str):
+            self.parsed_content = self.raw_result
+        elif isinstance(self.raw_result, dict):
+            self.parsed_json = self.raw_result
+        elif isinstance(self.raw_result, ChatCompletionMessage):
+            if self.raw_result.content:
+                self.parsed_content = self.raw_result.content
+            elif self.raw_result.tool_calls:
+                self.parsed_json = {
+                    "tool_calls": [
+                        {
+                            "id": tool_call.id,
+                            "type": tool_call.type,
+                            "function": {
+                                "name": tool_call.function.name,
+                                "arguments": tool_call.function.arguments
+                            }
+                        } for tool_call in self.raw_result.tool_calls
+                    ]
+                }
+        elif isinstance(self.raw_result, (AnthropicMessage, PromptCachingBetaMessage)):
+            if self.raw_result.content:
+                content = self.raw_result.content
+                if isinstance(content, list) and len(content) > 0:
+                    first_content = content[0]
+                    if isinstance(first_content, TextBlock):
+                        self.parsed_content = first_content.text
+                    elif isinstance(first_content, ToolUseBlock):
+                        self.parsed_json = {"tool_use": {"name": first_content.name, "input": first_content.input}}
+
+
+
+class StructuredTool(BaseModel):
+    json_schema: Optional[Dict[str, Any]] = None
+    schema_name: str = "generate_structured_output"
+    schema_description: str = "Generate a structured output based on the provided JSON schema."
+
+    def get_openai_tool(self) -> Optional[ChatCompletionToolParam]:
+        if self.json_schema:
+            return ChatCompletionToolParam(
+                type="function",
+                function=FunctionDefinition(
+                    name=self.schema_name,
+                    description=self.schema_description,
+                    parameters=self.json_schema
+                )
+            )
+        return None
+
+    def get_anthropic_tool(self) -> Optional[ToolParam]:
+        if self.json_schema:
+            return ToolParam(
+                name=self.schema_name,
+                description=self.schema_description,
+                input_schema=self.json_schema
+            )
+        return None
+
+class Prompt(BaseModel):
+    system: Optional[str] = None
+    history: Optional[List[Dict[str, Any]]] = None
+    user_message: str
+    prefill: str = Field(default="Here's the valid JSON object response:```json", alias="prefill_assistant_message")
+    use_prefill: bool = False
+
+    def get_messages_no_system(self) -> List[Dict[str, str]]:
+        messages = []
+        if self.history:
+            messages.extend(self.history)
+        messages.append({"role": "user", "content": self.user_message})
+        if self.use_prefill:
+            messages.append({"role": "assistant", "content": self.prefill})
+        return messages
+
+
 class LLMConfig(BaseModel):
     client: Literal["openai", "azure_openai", "anthropic", "vllm"]
     model: Optional[str] = None
     max_tokens: int = 4096
     temperature: float = 0
-    response_format: Literal["json", "text","json_object"] = "text"
-    json_schema: Optional[Dict[str, Any]] = None
+    response_format: Literal["json", "text","json_object","tool"] = "text"
+    tool: Optional[StructuredTool] = None
+
+    def get_tool(self) -> Union[ChatCompletionToolParam, ToolParam, None]:
+        if not self.tool:
+            return None
+        if self.client == "openai":
+            return self.tool.get_openai_tool()
+        elif self.client == "anthropic":
+            return self.tool.get_anthropic_tool()
+        else:
+            return None
+    
+    
 
 class AIUtilities:
     def __init__(self):
@@ -53,8 +163,6 @@ class AIUtilities:
         # anthropic credentials
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         self.anthropic_model = os.getenv("ANTHROPIC_MODEL")
-
-
 
     @staticmethod
     def msg_dict_to_oai(messages: List[Dict[str, Any]]) -> List[ChatCompletionMessageParam]:
@@ -81,7 +189,7 @@ class AIUtilities:
         return [convert_message(msg) for msg in messages]
 
     @staticmethod
-    def msg_dict_to_anthropic(messages: List[Dict[str, Any]]) -> List[MessageParam]:
+    def msg_dict_to_anthropic(prompt: Prompt) -> List[MessageParam]:
         def convert_message(msg: Dict[str, Any]) -> Union[MessageParam, None]:
             role = msg["role"]
             content = msg["content"]
@@ -89,18 +197,19 @@ class AIUtilities:
                 return None
             
             if isinstance(content, str):
-                content = [TextBlockParam(type="text", text=content)]
+                content = [PromptCachingBetaTextBlockParam(type="text", text=content)]
             elif isinstance(content, list):
                 content = [
-                    TextBlockParam(type="text", text=block) if isinstance(block, str)
-                    else block for block in content
+                    PromptCachingBetaTextBlockParam(type="text", text=block) if isinstance(block, str)
+                    else PromptCachingBetaTextBlockParam(type="text", text=block["text"]) for block in content
                 ]
             else:
                 raise ValueError("Invalid content type")
             
-
-            
             return MessageParam(role=role, content=content)
+        
+        messages = prompt.get_messages_no_system() 
+        
         converted_messages = [convert_message(msg) for msg in messages]
         return [msg for msg in converted_messages if msg is not None]
 
@@ -113,28 +222,50 @@ class AIUtilities:
         else:
             return None
 
-    def run_ai_completion(self, prompt: Union[str, List[Dict[str, Any]]], llm_config: LLMConfig):
-        if isinstance(prompt, str):
-            prompt = [{"role": "user", "content": prompt}]
-        oai_messages = self.msg_dict_to_oai(prompt)
-        
-        
+    def run_ai_completion(self, prompt: Prompt, llm_config: LLMConfig):
         if llm_config.client == "openai":
             assert self.openai_key is not None, "OpenAI API key is not set"
             client = OpenAI(api_key=self.openai_key)
-            print(oai_messages)
-            return self.run_openai_completion(client, oai_messages, llm_config)
-        
+            return self.run_openai_completion(client, prompt, llm_config)
         
         elif llm_config.client == "anthropic":
             assert self.anthropic_api_key is not None, "Anthropic API key is not set"
             anthropic = Anthropic(api_key=self.anthropic_api_key)
             return self.run_anthropic_completion(anthropic, prompt, llm_config)
         
-        
         else:
             return "Invalid AI vendor"
-    
+
+    def run_anthropic_completion(self, anthropic: Anthropic, prompt: Prompt, llm_config: LLMConfig):
+        system_content = self.create_anthropic_system_message(prompt.system)
+        if llm_config.response_format == "json" or llm_config.response_format == "json_object":
+                print("json format detected in anthropic")
+                prompt = prompt.model_copy(update={"use_prefill": True})
+        anthropic_messages = self.msg_dict_to_anthropic(prompt)
+        model = llm_config.model or self.anthropic_model
+
+        try:
+            assert model is not None, "Model is not set"
+            completion_kwargs = {
+                "model": model,
+                "messages": anthropic_messages,
+                "max_tokens": llm_config.max_tokens,
+                "temperature": llm_config.temperature,
+                "system": system_content,
+            }
+            
+
+            
+            response = anthropic.beta.prompt_caching.messages.create(**completion_kwargs)
+            return LLMOutput(raw_result=response)
+        except Exception as e:
+            return LLMOutput(raw_result=str(e))
+
+    def create_anthropic_system_message(self, system_message: Optional[str]) -> List[PromptCachingBetaTextBlockParam]:
+        if system_message:
+            return [PromptCachingBetaTextBlockParam(type="text", text=system_message, cache_control=PromptCachingBetaCacheControlEphemeralParam(type="ephemeral"))]
+        return []
+
     def get_ai_context_length(self, ai_vendor: Literal["openai", "azure_openai", "anthropic"]):
         if ai_vendor == "openai":
             return os.getenv("OPENAI_CONTEXT_LENGTH")
@@ -147,58 +278,37 @@ class AIUtilities:
         
     def run_ai_tool_completion(
         self,
-        prompt: List[Dict[str, Any]],
-        tools: Optional[Union[List[Dict[str, Any]], List[ToolParam]]] = None,
+        prompt: Prompt,
         llm_config: LLMConfig = LLMConfig(client="openai"),
-        tool_choice: Union[ChatCompletionToolChoiceOptionParam, NotGiven] = NotGiven()
     ):
         if llm_config.client == "openai":
-            if tools is not None:
-                openai_tools = []
-                for tool in tools:
-                    assert isinstance(tool, dict) and "function" in tool, "Invalid tool type for OpenAI"
-                    function = tool["function"]
-                    openai_tools.append(ChatCompletionToolParam(
-                        type="function",
-                        function=FunctionDefinition(
-                            name=function["name"],
-                            description=function.get("description", ""),
-                            parameters=function["parameters"]
-                        )
-                    ))
-            else:
-                openai_tools = None
-            return self.run_openai_tool_completion(prompt, openai_tools, llm_config, tool_choice)
+            return self.run_openai_tool_completion(prompt, llm_config)
         elif llm_config.client == "anthropic":
-            if tools is not None:
-                assert isinstance(tools, list) and all(isinstance(tool, dict) and "input_schema" in tool for tool in tools), "Invalid tool type for Anthropic"
-                anthropic_tools = []
-                for tool in tools:
-                    anthropic_tools.append(ToolParam(
-                        name=str(tool["name"]),
-                        description=str(tool.get("description", "")),
-                        input_schema=tool["input_schema"]
-                    ))
-            else:
-                anthropic_tools = None
-            return self.run_anthropic_tool_completion(prompt, anthropic_tools, llm_config)
+            return self.run_anthropic_tool_completion(prompt, llm_config)
         else:
             raise ValueError("Unsupported client for tool completion")
 
     def run_openai_tool_completion(
         self,
-        prompt: List[Dict[str, Any]],
-        tools: Optional[List[ChatCompletionToolParam]],
+        prompt: Prompt,
         llm_config: LLMConfig,
-        tool_choice: Union[ChatCompletionToolChoiceOptionParam, NotGiven]
     ):
-        oai_messages = self.msg_dict_to_oai(prompt)
         client = OpenAI(api_key=self.openai_key)
         model = llm_config.model or self.openai_model
         
         try:
             assert model is not None, "Model is not set"
+            assert llm_config.tool is not None, "Tool is not set"
             
+            messages = []
+            if prompt.system:
+                messages.append({"role": "system", "content": prompt.system})
+            if prompt.history:
+                messages.extend(prompt.history)
+            messages.append({"role": "user", "content": prompt.user_message})
+
+            oai_messages = self.msg_dict_to_oai(messages)
+
             completion_kwargs = {
                 "model": model,
                 "messages": oai_messages,
@@ -206,38 +316,27 @@ class AIUtilities:
                 "temperature": llm_config.temperature,
             }
 
-            if tools is not None:
-                completion_kwargs["tools"] = tools
-                if not isinstance(tool_choice, NotGiven):
-                    completion_kwargs["tool_choice"] = tool_choice
-            elif llm_config.json_schema is not None:
-                function_name = "generate_structured_output"
-                function_description = "Generate a structured output based on the provided JSON schema."
-                function_def = self.create_function_definition(function_name, llm_config.json_schema, function_description)
-                
-                tool = ChatCompletionToolParam(type="function", function=function_def)
+            tool = llm_config.get_tool()
+            if tool:
                 completion_kwargs["tools"] = [tool]
-                completion_kwargs["tool_choice"] = {"type": "function", "function": {"name": function_name}}
-
+                completion_kwargs["tool_choice"] = {"type": "function", "function": {"name": llm_config.tool.schema_name}}
+            
             if llm_config.response_format != "text":
                 completion_kwargs["response_format"] = self.convert_response_format(llm_config.response_format)
 
             response = client.chat.completions.create(**completion_kwargs)
             completion = response.choices[0].message
             print(completion)
-            return completion
+            return LLMOutput(raw_result=completion)
         except Exception as e:
-            return str(e)
+            return LLMOutput(raw_result=str(e))
 
     def run_anthropic_tool_completion(
         self,
-        prompt: List[Dict[str, Any]],
-        tools: Optional[List[ToolParam]],
+        prompt: Prompt,
         llm_config: LLMConfig
     ):  
-        #check if hte last message is a assistant and remove it
-        if prompt[-1]["role"] == "assistant":
-            prompt = prompt[:-1]
+        system_content = self.create_anthropic_system_message(prompt.system)
         anthropic_messages = self.msg_dict_to_anthropic(prompt)
         client = Anthropic(api_key=self.anthropic_api_key)
         model = llm_config.model or self.anthropic_model
@@ -250,25 +349,18 @@ class AIUtilities:
                 "messages": anthropic_messages,
                 "max_tokens": llm_config.max_tokens,
                 "temperature": llm_config.temperature,
+                "system": system_content,
             }
 
-            if tools is not None:
-                completion_kwargs["tools"] = tools
-            elif llm_config.json_schema is not None:
-                function_name = "generate_structured_output"
-                function_description = "Generate a structured output based on the provided JSON schema."
-                tool = ToolParam(
-                    name=function_name,
-                    description=function_description,
-                    input_schema=llm_config.json_schema,
-                )
+            tool = llm_config.get_tool()
+            if tool and llm_config.tool is not None:
                 completion_kwargs["tools"] = [tool]
-                completion_kwargs["tool_choice"] =  ToolChoiceToolChoiceTool(name= function_name, type="tool")
+                completion_kwargs["tool_choice"] = ToolChoiceToolChoiceTool(name=llm_config.tool.schema_name, type="tool")
 
-            response = client.messages.create(**completion_kwargs)
-            return response
+            response = client.beta.prompt_caching.messages.create(**completion_kwargs)
+            return LLMOutput(raw_result=response)
         except Exception as e:
-            return str(e)
+            return LLMOutput(raw_result=str(e))
 
     def create_function_definition(self, name: str, json_schema: Dict[str, Any], description: str) -> FunctionDefinition:
         # Ensure additionalProperties is set to false in the schema
@@ -282,164 +374,44 @@ class AIUtilities:
             strict=True
         )
 
-    def run_openai_completion(self, client: OpenAI, prompt: List[ChatCompletionMessageParam], llm_config: LLMConfig):
+    def run_openai_completion(self, client: OpenAI, prompt: Prompt, llm_config: LLMConfig):
         try:
+            messages = []
+            if prompt.system:
+                messages.append({"role": "system", "content": prompt.system})
+            if prompt.history:
+                messages.extend(prompt.history)
+            messages.append({"role": "user", "content": prompt.user_message})
+
+            oai_messages = self.msg_dict_to_oai(messages)
+
             completion_kwargs: Dict[str, Any] = {
                 "model": llm_config.model or self.openai_model,
-                "messages": prompt.copy(),  # Create a copy to avoid modifying the original prompt
+                "messages": oai_messages,
                 "max_tokens": llm_config.max_tokens,
                 "temperature": llm_config.temperature,
             }
 
             if llm_config.response_format != "text":
-                # Add JSON instruction to the last user message or create a new one
-                json_instruction = "Please provide your response in JSON format."
-                if prompt[-1]["role"] == "user":
-                    completion_kwargs["messages"][-1]["content"] += f"\n\n{json_instruction}"
-                else:
-                    completion_kwargs["messages"].append({"role": "user", "content": json_instruction})
-
+                # Add JSON instruction to the last user message
+                last_message = oai_messages[-1]
+                if last_message["role"] == "user" and isinstance(last_message["content"], str):
+                    last_message["content"] += "\n\nPlease provide your response in JSON format."
                 response_format = self.convert_response_format(llm_config.response_format)
                 if response_format:
                     completion_kwargs["response_format"] = response_format
 
-                if llm_config.json_schema:
+                if llm_config.tool is not None and llm_config.tool.json_schema:
                     # Add the JSON schema to the system message or create a new one
-                    schema_instruction = f"Please follow this JSON schema for your response: {llm_config.json_schema}"
-                    if completion_kwargs["messages"][0]["role"] == "system":
-                        completion_kwargs["messages"][0]["content"] += f"\n\n{schema_instruction}"
+                    schema_instruction = f"Please follow this JSON schema for your response: {llm_config.tool.json_schema}"
+                    if oai_messages[0]["role"] == "system" and isinstance(oai_messages[0]["content"], str):
+                        oai_messages[0]["content"] += f"\n\n{schema_instruction}"
                     else:
-                        completion_kwargs["messages"].insert(0, {"role": "system", "content": schema_instruction})
+                        oai_messages.insert(0, {"role": "system", "content": schema_instruction})
 
             response: ChatCompletion = client.chat.completions.create(**completion_kwargs)
-            return response.choices[0].message.content
+            return LLMOutput(raw_result=response.choices[0].message.content)
         except Exception as e:
-            return f"Error: {str(e)}"
+            return LLMOutput(raw_result=f"Error: {str(e)}")
 
 
-    def run_anthropic_completion(
-        self,
-        anthropic: Anthropic,
-        prompt: List[Dict[str, Any]],
-        llm_config: LLMConfig
-    ):
-        # try:
-        
-        
-        system_message = next((msg for msg in prompt if msg["role"] == "system"), None)
-        system_content= []
-        if system_message:
-            content = system_message["content"]
-            if isinstance(content, str):
-                system_content = content
-            elif isinstance(content, list):
-                system_content = [
-                    TextBlockParam(type="text", text=block) if isinstance(block, str)
-                    else TextBlockParam(type="text", text=block["text"]) for block in content
-                ]
-        
-        model_name = llm_config.model or self.anthropic_model
-        assert model_name in ["claude-3-sonnet-20240620", "claude-3-haiku-20240307", "claude-3-opus-20240229", "claude-3-5-sonnet-20240620"], "Invalid model name"
-        if llm_config.response_format == "json":
-            print("json format detected in anthropic")
-            prompt.append(
-                {"role": "assistant", "content": "Here's the valid JSON object response:```json"}
-            )
-        anthropic_messages = self.msg_dict_to_anthropic(prompt)
-        print(anthropic_messages)
-        response = anthropic.messages.create(
-            model=model_name,
-            max_tokens=llm_config.max_tokens,
-            temperature=llm_config.temperature,
-            system=system_content if isinstance(system_content, (str, NotGiven)) else system_content,
-            messages=anthropic_messages
-            
-        )
-        assert isinstance(response.content[0], TextBlock)
-        
-        return response.content[0].text
-            
-
-
-def main():
-    load_dotenv()  # Load environment variables from .env file
-
-    ai_utilities = AIUtilities()
-
-    # Example prompt
-    prompt = [
-        {"role": "system", "content": "You are a helpful pirate that tells jokes  pirate language."},
-        {"role": "user", "content": "Tell me a programmer joke in italiano"}
-    ]
-    
-    # JSON schema for structured responses
-    json_schema = {
-        "type": "object",
-        "properties": {
-            "joke": {"type": "string"},
-            "explanation": {"type": "string"}
-        },
-        "required": ["joke", "explanation"],
-        "additionalProperties": False  # Add this line
-    }
-
-    print("Schema: ", json_schema)
-    # OpenAI examples
-    print("OpenAI Examples:")
-    
-    # 1. OpenAI with text response
-    llm_config = LLMConfig(client="openai", model="gpt-3.5-turbo", response_format="text")
-    result = ai_utilities.run_ai_completion(prompt, llm_config)
-    print("\n1. OpenAI Completion Result (Text):")
-    print(f"{result}\n")
-
-    # 2. OpenAI with JSON response (no schema)
-    llm_config = LLMConfig(client="openai", model="gpt-3.5-turbo", response_format="json_object")
-    result = ai_utilities.run_ai_completion(prompt, llm_config)
-    print("\n2. OpenAI Completion Result (JSON, no schema):")
-    print(f"{result}\n")
-
-    # 3. OpenAI with JSON response (with schema)
-    llm_config = LLMConfig(client="openai", model="gpt-3.5-turbo", response_format="json", json_schema=json_schema)
-    result = ai_utilities.run_ai_completion(prompt, llm_config)
-    print("\n3. OpenAI Completion Result (JSON, with schema):")
-    print(f"{result}\n")
-
-    # 7. OpenAI with JSON schema as a tool
-    llm_config = LLMConfig(client="openai", model="gpt-3.5-turbo", json_schema=json_schema)
-    result = ai_utilities.run_ai_tool_completion(prompt, llm_config=llm_config)
-    print("\n7. OpenAI Completion Result (JSON schema as tool):")
-    print(f"{result}\n")
-
-    # Anthropic examples
-    print("\nAnthropic Examples:")
-
-    # 4. Anthropic with text response
-    llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="text")
-    result = ai_utilities.run_ai_completion(prompt, llm_config)
-    print("\n4. Anthropic Completion Result (Text):")
-    print(f"{result}\n")
-
-    # 5. Anthropic with JSON response (no schema)
-    llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="json_object")
-    result = ai_utilities.run_ai_completion(prompt, llm_config)
-    print("\n5. Anthropic Completion Result (JSON, no schema):")
-    print(f"{result}\n")
-
-    # 6. Anthropic with JSON response (with schema)
-    # Note: Anthropic doesn't support JSON schema directly, so we'll use the same approach as without schema
-    llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="json")
-    result = ai_utilities.run_ai_completion(prompt, llm_config)
-    print("\n6. Anthropic Completion Result (JSON, with schema - same as without schema for Anthropic):")
-    print(f"{result}\n")
-
-    #8. Anthropic with JSON schema as a tool
-    llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", json_schema=json_schema)
-    result = ai_utilities.run_ai_tool_completion(prompt, llm_config=llm_config)
-    print("\n8. Anthropic Completion Result (JSON schema as tool):")
-    print(f"{result}\n")
-
-
-
-if __name__ == "__main__":
-    main()
