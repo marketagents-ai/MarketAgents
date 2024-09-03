@@ -35,7 +35,7 @@ from openai.types.chat import (
 from openai.types.chat import ChatCompletion
 from openai.types.chat.completion_create_params import ResponseFormat
 from openai.types.shared_params import FunctionDefinition
-
+from openai.types.shared_params.response_format_json_schema import ResponseFormatJSONSchema, JSONSchema
 from anthropic.types import ToolParam
 
 from pydantic import BaseModel, Field, computed_field
@@ -45,7 +45,27 @@ from anthropic.types import Message as AnthropicMessage
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage, PromptCachingBetaToolParam
 from anthropic.types import TextBlock, ToolUseBlock
 import json
+import re
 
+def parse_json_string(content: str) -> Optional[Dict[str, Any]]:
+    # Remove any leading/trailing whitespace and newlines
+    cleaned_content = content.strip()
+    
+    # Remove markdown code block syntax if present
+    cleaned_content = re.sub(r'^```(?:json)?\s*|\s*```$', '', cleaned_content, flags=re.MULTILINE)
+    
+    # Attempt to find a JSON object, allowing for newlines and escaped quotes
+    json_match = re.search(r'(\{[^{}]*\{.*?\}[^{}]*\}|\{.*?\})', cleaned_content, re.DOTALL)
+    if json_match:
+        try:
+            # Normalize newlines and unescape quotes
+            json_str = json_match.group(1).replace('\n', '').replace('\\"', '"')
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+    
+    # If no valid JSON found, return None
+    return None
 
 def get_ai_context_length(ai_vendor: Literal["openai", "azure_openai", "anthropic"]):
         if ai_vendor == "openai":
@@ -134,10 +154,21 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
 
 
 class StructuredTool(BaseModel):
+    """ Supported type by OpenAI Structured Output:
+    String, Number, Boolean, Integer, Object, Array, Enum, anyOf
+    Root must be Object, not anyOf
+    Not supported by OpenAI Structured Output: 
+    For strings: minLength, maxLength, pattern, format
+    For numbers: minimum, maximum, multipleOf
+    For objects: patternProperties, unevaluatedProperties, propertyNames, minProperties, maxProperties
+    For arrays: unevaluatedItems, contains, minContains, maxContains, minItems, maxItems, uniqueItems
+    oai_reference: https://platform.openai.com/docs/guides/structured-outputs/how-to-use """
+
     json_schema: Optional[Dict[str, Any]] = None
     schema_name: str = Field(default = "generate_structured_output")
     schema_description: str = Field(default ="Generate a structured output based on the provided JSON schema.")
     instruction_string: str = Field(default = "Please follow this JSON schema for your response:")
+    strict_schema: bool = True
 
     @computed_field
     @property
@@ -165,24 +196,22 @@ class StructuredTool(BaseModel):
                 cache_control=PromptCachingBetaCacheControlEphemeralParam(type='ephemeral')
             )
         return None
+    def get_openai_json_schema_response(self) -> Optional[ResponseFormatJSONSchema]:
+
+        if self.json_schema:
+            schema = JSONSchema(name=self.schema_name,description=self.schema_description,schema=self.json_schema,strict=self.strict_schema)
+            return ResponseFormatJSONSchema(type="json_schema", json_schema=schema)
+        return None
     
 class LLMConfig(BaseModel):
     client: Literal["openai", "azure_openai", "anthropic", "vllm"]
     model: Optional[str] = None
     max_tokens: int = 4096
     temperature: float = 0
-    response_format: Literal["json", "text","json_object","tool"] = "text"
+    response_format: Literal["json_beg", "text","json_object","structured_output","tool"] = "text"
     use_cache: bool = True
 
-    @computed_field
-    @property
-    def oai_response_format(self) -> Optional[ResponseFormat]:
-        if self.response_format == "text":
-            return ResponseFormatText(type="text")
-        elif self.response_format == "json_object" or self.response_format == "json" or self.response_format =="tool":
-            return ResponseFormatJSONObject(type="json_object")
-        else:
-            return None
+   
 
 
 class HistoPrompt(BaseModel):
@@ -198,8 +227,23 @@ class HistoPrompt(BaseModel):
 
     @computed_field
     @property
+    def oai_response_format(self) -> Optional[ResponseFormat]:
+        if self.llm_config.response_format == "text":
+            return ResponseFormatText(type="text")
+        elif self.llm_config.response_format == "json_object":
+            return ResponseFormatJSONObject(type="json_object")
+        elif self.llm_config.response_format == "structured_output":
+            assert self.structured_output is not None, "Structured output is not set"
+            return self.structured_output.get_openai_json_schema_response()
+        else:
+            return None
+
+
+    @computed_field
+    @property
     def use_prefill(self) -> bool:
-        if self.llm_config.client == 'anthropic' and 'json' in self.llm_config.response_format:
+        if self.llm_config.client == 'anthropic' and  self.llm_config.response_format == "json_beg":
+
             return True
         else:
             return False
@@ -207,10 +251,9 @@ class HistoPrompt(BaseModel):
     @computed_field
     @property
     def use_postfill(self) -> bool:
-        if self.llm_config.client == 'openai' and 'json' in self.llm_config.response_format:
+        if self.llm_config.client == 'openai' and 'json' in self.llm_config.response_format and not self.use_schema_instruction:
             return True
-        elif self.llm_config.client == 'openai' and 'tool' in self.llm_config.response_format and not self.use_schema_instruction:
-            return True
+
         else:
             return False
         
@@ -230,10 +273,10 @@ class HistoPrompt(BaseModel):
             messages+=self.history
         messages.append({"role":"user","content":self.new_message})
         if self.use_prefill:
-            messages.append({"role":"assistant","content":self.prefill})
+            prefill_message = {"role":"assistant","content":self.prefill}
+            messages.append(prefill_message)
         elif self.use_postfill:
             messages[-1]["content"] = messages[-1]["content"] + self.postfill
-
         return messages
     
     @computed_field
@@ -298,7 +341,13 @@ class LLMOutput(BaseModel):
     @property
     def json_object(self) -> Optional[GeneratedJsonObject]:
         return self._parse_result()[1]
+    
 
+    @computed_field
+    @property
+    def contains_object(self) -> bool:
+        return self._parse_result()[1] is not None
+    
     @computed_field
     @property
     def usage(self) -> Optional[Usage]:
@@ -320,15 +369,9 @@ class LLMOutput(BaseModel):
             return "anthropicbetamessage"
 
     def _parse_json_string(self, content: str) -> Optional[Dict[str, Any]]:
-        try:
-            # Remove any leading/trailing whitespace, newlines, and backticks
-            cleaned_content = content.strip().strip('`').strip()
-            # Check if the content starts and ends with curly braces
-            if cleaned_content.startswith('{') and cleaned_content.endswith('}'):
-                return json.loads(cleaned_content)
-        except json.JSONDecodeError:
-            pass
-        return None
+        return parse_json_string(content)
+    
+    
 
     def _parse_oai_completion(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
         assert isinstance(self.raw_result, ChatCompletion), "The result is not an OpenAI ChatCompletion"
@@ -480,9 +523,11 @@ class AIUtilities:
                 "messages": prompt.oai_messages,
                 "max_tokens": prompt.llm_config.max_tokens,
                 "temperature": prompt.llm_config.temperature,
+                "response_format": prompt.oai_response_format,
             }
-           
+            
 
+            print(completion_kwargs)
             response: ChatCompletion = client.chat.completions.create(**completion_kwargs)
             return LLMOutput(raw_result=response)
         except Exception as e:
@@ -504,7 +549,7 @@ class AIUtilities:
             }
             
 
-            
+            print(completion_kwargs)
             response = anthropic.beta.prompt_caching.messages.create(**completion_kwargs)
             return LLMOutput(raw_result=response)
         except Exception as e:
@@ -547,9 +592,7 @@ class AIUtilities:
             completion_kwargs["tools"] = [tool]
             completion_kwargs["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
         
-        if prompt.llm_config.response_format != "text":
-            completion_kwargs["response_format"] = prompt.llm_config.oai_response_format
-
+        print(completion_kwargs)
         response : ChatCompletion = client.chat.completions.create(**completion_kwargs)
 
         return LLMOutput(raw_result=response)
@@ -579,7 +622,7 @@ class AIUtilities:
             if tool and prompt.structured_output is not None:
                 completion_kwargs["tools"] = [tool]
                 completion_kwargs["tool_choice"] = ToolChoiceToolChoiceTool(name=prompt.structured_output.schema_name, type="tool")
-
+            print(completion_kwargs)
             response = client.beta.prompt_caching.messages.create(**completion_kwargs)
             return LLMOutput(raw_result=response)
         except Exception as e:
