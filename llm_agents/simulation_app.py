@@ -15,10 +15,11 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from environment import Environment, generate_llm_market_agents
-from auction import DoubleAuction
+from zi_agent.environment import Environment, generate_llm_market_agents
+from zi_agent.auction import DoubleAuction
 
-from utils import setup_logger  # Import the setup_logger function
+from base_agent.utils import setup_logger  # Import the setup_logger function
+from base_agent.aiutilities import LLMConfig  # Import LLMConfig from aiutilities
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Market Simulation Dashboard')
@@ -42,14 +43,14 @@ num_buyers = 5
 num_sellers = 5
 spread = 0.5
 
-llm_config= {
-    "client": "openai",
-    "model": "gpt-4o-mini",
-    "temperature": 0.5,
-    "response_format": {
-        "type": "json_object"
-    }
-}
+llm_config = LLMConfig(
+    client="openai",
+    model="gpt-4o-mini",
+    temperature=0.5,
+    response_format="json_object",
+    max_tokens=4096,
+    use_cache=True
+)
 
 agents = generate_llm_market_agents(
     num_agents=num_buyers + num_sellers, 
@@ -58,7 +59,11 @@ agents = generate_llm_market_agents(
     seller_base_value=80, 
     spread=spread, 
     use_llm=True,
-    llm_config=llm_config)
+    llm_config=llm_config,
+    initial_cash=1000,
+    initial_goods=0,
+    noise_factor=0.1
+)
 
 env = Environment(agents=agents)
 auction = DoubleAuction(environment=env, max_rounds=args.max_rounds)
@@ -73,7 +78,7 @@ data = {
 }
 
 # Calculate equilibrium values
-ce_price, ce_quantity, _, _, theoretical_total_surplus = env.calculate_equilibrium()
+ce_price, ce_quantity, _, _, theoretical_total_surplus = env.calculate_equilibrium(initial=True)
 
 app = dash.Dash(__name__, external_stylesheets=['https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css'])
 
@@ -184,11 +189,11 @@ def update_dashboard(n, start_clicks):
 
             # save agent interactions after each round
             for agent in env.agents:
-                logger.info(f"Saving logs for agent {agent.llm_agent.id}, round {auction.current_round}")
-                if hasattr(agent, 'llm_agent') and hasattr(agent.llm_agent, 'interactions'):
-                    save_llama_logs(agent.llm_agent.interactions, agent.llm_agent.id, auction.current_round)
+                logger.info(f"Saving logs for agent {agent.zi_agent.id}, round {auction.current_round}")
+                if hasattr(agent, 'memory'):
+                    save_llama_logs(agent.memory, agent.zi_agent.id, auction.current_round)
                 else:
-                    logger.warning(f"Agent {agent.id} does not have llm_agent or interactions attribute")
+                    logger.warning(f"Agent {agent.zi_agent.id} does not have memory attribute")
 
             # Update data storage
             update_data_storage()
@@ -223,17 +228,18 @@ def update_data_storage():
         data['price_history'].append(data['price_history'][-1] if data['price_history'] else None)
 
 def generate_market_state_table(env):
-    headers = ['Agent ID', 'Role', 'Goods', 'Cash', 'Utility']
+    headers = ['Agent ID', 'Role', 'Goods', 'Cash', 'Individual Surplus']
     rows = []
     for agent in env.agents:
-        ziagent= agent.zi_agent
-        role = "Buyer" if ziagent.preference_schedule.is_buyer else "Seller"
+        ziagent = agent.zi_agent
+        role = "Buyer" if ziagent.is_buyer else "Seller"
+        individual_surplus = ziagent.individual_surplus  # Use the individual_surplus property
         rows.append([
             ziagent.id,
             role,
             ziagent.allocation.goods,
             f"${ziagent.allocation.cash:.2f}",
-            f"{env.get_agent_utility(agent):.2f}"
+            f"{individual_surplus:.2f}"
         ])
     
     return html.Table([
@@ -242,14 +248,30 @@ def generate_market_state_table(env):
     ], className="table table-striped table-hover")
 
 def generate_order_book_table(auction):
-    headers = ['Price', 'Shares', 'Total']
+    headers = ['Type', 'Agent ID', 'Price']
     rows = []
-    for order in auction.get_order_book():
+    
+    # Add bids to the table
+    for bid in auction.order_book.bids:
         rows.append([
-            f"${order['price']:.2f}",
-            order['shares'],
-            f"${order['total']:.2f}"
+            'Bid',
+            bid.agent_id,
+            bid.market_action.price
         ])
+    
+    # Add asks to the table
+    for ask in auction.order_book.asks:
+        rows.append([
+            'Ask',
+            ask.agent_id,
+            ask.market_action.price
+        ])
+    
+    # Sort rows by price (descending for bids, ascending for asks)
+    rows.sort(key=lambda x: (-float(x[2]) if x[0] == 'Bid' else float(x[2])))
+    
+    # Format price as string after sorting
+    rows = [[row[0], row[1], f"${float(row[2]):.2f}"] for row in rows]
     
     return html.Table([
         html.Thead(html.Tr([html.Th(col) for col in headers]), className="thead-light"),
@@ -259,11 +281,11 @@ def generate_order_book_table(auction):
 def generate_trade_history_table(auction):
     headers = ['Trade ID', 'Buyer ID', 'Seller ID', 'Price', 'Quantity']
     rows = []
-    for trade in auction.get_trade_history():
+    for trade in auction.trade_history:
         rows.append([
             trade.trade_id,
-            trade.buyer_id,
-            trade.seller_id,
+            trade.bid.agent_id,
+            trade.ask.agent_id,
             f"${trade.price:.2f}",
             trade.quantity
         ])
@@ -274,11 +296,16 @@ def generate_trade_history_table(auction):
     ], className="table table-striped table-hover")
 
 def generate_supply_demand_chart(env):
-    # Calculate theoretical supply and demand
-    demand_x, demand_y, supply_x, supply_y = env.calculate_theoretical_supply_demand()
+    # Get the initial supply and demand curves
+    initial_demand_curve = env.initial_demand_curve
+    initial_supply_curve = env.initial_supply_curve
+
+    # Get x and y values for demand and supply curves
+    demand_x, demand_y = initial_demand_curve.get_x_y_values()
+    supply_x, supply_y = initial_supply_curve.get_x_y_values()
 
     # Calculate equilibrium values
-    ce_price, ce_quantity, _, _, _ = env.calculate_equilibrium()
+    ce_price, ce_quantity, _, _, _ = env.calculate_equilibrium(initial=True)
 
     fig = go.Figure()
     

@@ -1,159 +1,197 @@
-from typing import List
-import matplotlib.pyplot as plt
-from environment import Environment, generate_agents
-from ziagents import Order, Trade
-from plotter import analyze_and_plot_auction_results
+import logging
+from typing import List, Optional
+from pydantic import BaseModel, Field, computed_field
+from environment import Environment, generate_market_agents
+from ziagents import Order, Trade, ZIAgent, Bid, Ask, MarketInfo
 
-class DoubleAuction:
-    def __init__(self, environment: Environment, max_rounds: int):
-        self.environment = environment
-        self.max_rounds = max_rounds
-        self.current_round = 0
-        self.successful_trades: List[Trade] = []
-        self.total_surplus_extracted = 0.0
-        self.average_prices: List[float] = []
-        self.order_book = []  # Store current order book
-        self.trade_history = []  # Store trade history
-        self.trade_counter = 0
+from colorama import Fore, Style
 
-    def match_orders(self, bids: List[Order], asks: List[Order], round_num: int) -> List[Trade]:
+# Set up logger
+logger = logging.getLogger(__name__)
+
+class OrderBook(BaseModel):
+    bids: List[Bid] = Field(default_factory=list, description="List of current bids")
+    asks: List[Ask] = Field(default_factory=list, description="List of current asks")
+
+    def add_bid(self, bid: Bid):
+        self.bids.append(bid)
+
+    def add_ask(self, ask: Ask):
+        self.asks.append(ask)
+
+    def match_orders(self, round_num: int) -> List[Trade]:
         trades = []
-        bids.sort(key=lambda x: x.price, reverse=True)  # Highest bids first
-        asks.sort(key=lambda x: x.price)  # Lowest asks first
-
-        while bids and asks and bids[0].price >= asks[0].price:
-            bid = bids.pop(0)
-            ask = asks.pop(0)
-            trade_price = (bid.price + ask.price) / 2  # Midpoint price
-            trade_quantity = min(bid.quantity, ask.quantity)
-            trade = Trade(
-                trade_id=self.trade_counter,
-                buyer_id=bid.agent_id,
-                seller_id=ask.agent_id,
-                quantity=trade_quantity,
-                price=trade_price,
-                buyer_value=bid.base_value,
-                seller_cost=ask.base_cost,
-                round=round_num
-            )
-            trades.append(trade)
-            self.trade_counter += 1
-            self.order_book.append({'price': trade_price, 'shares': trade_quantity, 'total': trade_price * trade_quantity})  # Update order book
+        trade_counter = 0
+        
+        # Sort bids and asks
+        sorted_bids = sorted(self.bids, key=lambda x: x.market_action.price, reverse=True)
+        sorted_asks = sorted(self.asks, key=lambda x: x.market_action.price)
+        
+        bid_index = 0
+        ask_index = 0
+        
+        while bid_index < len(sorted_bids) and ask_index < len(sorted_asks):
+            bid = sorted_bids[bid_index]
+            ask = sorted_asks[ask_index]
+            
+            if bid.market_action.price >= ask.market_action.price:
+                trade_price = (bid.market_action.price + ask.market_action.price) / 2  # Midpoint price
+                trade = Trade(
+                    trade_id=trade_counter,
+                    bid=bid,
+                    ask=ask,
+                    price=trade_price,
+                    round=round_num,
+                    quantity=1
+                )
+                trades.append(trade)
+                trade_counter += 1
+                bid_index += 1
+                ask_index += 1
+            else:
+                # If no match, move to the next bid or ask
+                if bid.market_action.price < ask.market_action.price:
+                    bid_index += 1
+                else:
+                    ask_index += 1
+        
+        # Remove matched orders from the original lists
+        matched_bid_ids = set((trade.bid.agent_id, trade.bid.market_action.price) for trade in trades)
+        matched_ask_ids = set((trade.ask.agent_id, trade.ask.market_action.price) for trade in trades)
+        
+        self.bids = [bid for bid in self.bids if (bid.agent_id, bid.market_action.price) not in matched_bid_ids]
+        self.asks = [ask for ask in self.asks if (ask.agent_id, ask.market_action.price) not in matched_ask_ids]
+        
         return trades
+
+class DoubleAuction(BaseModel):
+    environment: Environment = Field(..., description="The market environment")
+    max_rounds: int = Field(..., description="Maximum number of auction rounds")
+    current_round: int = Field(default=0, description="Current round number")
+    successful_trades: List[Trade] = Field(default_factory=list, description="List of successful trades")
+    total_surplus_extracted: float = Field(default=0.0, description="Total surplus extracted from trades")
+    average_prices: List[float] = Field(default_factory=list, description="List of average prices per round")
+    order_book: OrderBook = Field(default_factory=OrderBook, description="Current order book")
+    trade_history: List[Trade] = Field(default_factory=list, description="Complete trade history")
+
+    @computed_field
+    @property
+    def trade_counter(self) -> int:
+        return len(self.trade_history)
 
     def execute_trades(self, trades: List[Trade]):
         for trade in trades:
-            buyer = self.environment.get_agent(trade.buyer_id)
-            seller = self.environment.get_agent(trade.seller_id)
+            buyer = self.environment.get_agent(trade.bid.agent_id)
+            seller = self.environment.get_agent(trade.ask.agent_id)
 
-            buyer_surplus = trade.buyer_value - trade.price
-            seller_surplus = trade.price - trade.seller_cost
+            assert buyer is not None, "Buyer not found"
+            assert seller is not None, "Seller not found"
 
-            if buyer_surplus < 0 or seller_surplus < 0:
-                print(f"Trade rejected due to negative surplus: Buyer Surplus = {buyer_surplus}, Seller Surplus = {seller_surplus}")
-                continue
-
-            buyer.finalize_trade(trade)
-            seller.finalize_trade(trade)
-            self.total_surplus_extracted += buyer_surplus + seller_surplus
+            buyer.finalize_bid(trade)
+            seller.finalize_ask(trade)
+            self.total_surplus_extracted += trade.total_surplus
             self.average_prices.append(trade.price)
             self.successful_trades.append(trade)
-            self.trade_history.append(trade)  # Update trade history
+            self.trade_history.append(trade)
 
-            print(f"Executing trade: Buyer {buyer.id} - Surplus: {buyer_surplus:.2f}, Seller {seller.id} - Surplus: {seller_surplus:.2f}")
+            logger.info(f"Executing trade: Buyer {buyer.id} - Surplus: {trade.buyer_surplus:.2f}, Seller {seller.id} - Surplus: {trade.seller_surplus:.2f}")
 
+    def generate_bids(self, market_info: MarketInfo) -> List[Bid]:
+        bids = []
+        for buyer in self.environment.buyers:
+            bid = buyer.generate_bid(market_info)
+            if bid:
+                bids.append(bid)
+                logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.market_action.price:.2f}{Fore.BLUE} for 1 unit(s){Style.RESET_ALL}")
+        return bids
+    
+    def generate_asks(self, market_info: MarketInfo) -> List[Ask]:
+        asks = []
+        for seller in self.environment.sellers:
+            ask = seller.generate_ask(market_info)
+            if ask:
+                asks.append(ask)
+                logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.id}{Fore.RED} ask: ${Fore.GREEN}{ask.market_action.price:.2f}{Fore.RED} for 1 unit(s){Style.RESET_ALL}")
+        return asks
+    
     def run_auction(self):
         if self.current_round >= self.max_rounds:
-            print("Max rounds reached. Auction has ended.")
+            logger.info("Max rounds reached. Auction has ended.")
             return
         
         for round_num in range(self.current_round + 1, self.max_rounds + 1):
-            print(f"\n=== Round {round_num} ===")
+            logger.info(f"\n=== Round {round_num} ===")
             self.current_round = round_num
 
+            # Prepare market info
+            market_info = self._get_market_info()
+
             # Generate bids from buyers
-            bids = []
-            for buyer in self.environment.buyers:
-                if buyer.allocation.goods < buyer.preference_schedule.values.get(len(buyer.preference_schedule.values), 0):
-                    bid = buyer.generate_bid()
-                    if bid:
-                        bids.append(bid)
-                        print(f"Buyer {buyer.id} bid: ${bid.price:.2f} for {bid.quantity} unit(s)")
-
+            bids = self.generate_bids(market_info)
             # Generate asks from sellers
-            asks = []
-            for seller in self.environment.sellers:
-                if seller.allocation.goods > 0:
-                    ask = seller.generate_bid()
-                    if ask:
-                        asks.append(ask)
-                        print(f"Seller {seller.id} ask: ${ask.price:.2f} for {ask.quantity} unit(s)")
+            asks = self.generate_asks(market_info)
 
-            trades = self.match_orders(bids, asks, round_num)
+            # Add bids and asks to the order book
+            for bid in bids:
+                self.order_book.add_bid(bid)
+            for ask in asks:
+                self.order_book.add_ask(ask)
+
+            trades = self.order_book.match_orders(round_num)
             if trades:
                 self.execute_trades(trades)
-            self.current_round += 1
 
         self.summarize_results()
+
+    def _get_market_info(self) -> MarketInfo:
+        last_trade_price = self.average_prices[-1] if self.average_prices else None
+        average_price = sum(self.average_prices) / len(self.average_prices) if self.average_prices else None
+        
+        # If no trades have occurred, use the midpoint of buyer and seller base values - this is a crime leaking hidden information
+        if last_trade_price is None or average_price is None:
+            buyer_base_value = max(agent.base_value for agent in self.environment.buyers)
+            seller_base_value = min(agent.base_value for agent in self.environment.sellers)
+            initial_price_estimate = (buyer_base_value + seller_base_value) / 2
+            
+            last_trade_price = last_trade_price or initial_price_estimate
+            average_price = average_price or initial_price_estimate
+
+        return MarketInfo(
+            last_trade_price=last_trade_price,
+            average_price=average_price,
+            total_trades=len(self.successful_trades),
+            current_round=self.current_round,
+        )
 
     def summarize_results(self):
         total_trades = len(self.successful_trades)
         avg_price = sum(self.average_prices) / total_trades if total_trades > 0 else 0
 
-        print(f"\n=== Auction Summary ===")
-        print(f"Total Successful Trades: {total_trades}")
-        print(f"Total Surplus Extracted: {self.total_surplus_extracted:.2f}")
-        print(f"Average Price: {avg_price:.2f}")
+        logger.info(f"\n=== Auction Summary ===")
+        logger.info(f"Total Successful Trades: {total_trades}")
+        logger.info(f"Total Surplus Extracted: {self.total_surplus_extracted:.2f}")
+        logger.info(f"Average Price: {avg_price:.2f}")
 
         # Compare theoretical and practical surplus
         ce_price, ce_quantity, theoretical_buyer_surplus, theoretical_seller_surplus, theoretical_total_surplus = self.environment.calculate_equilibrium()
-        print(f"\n=== Theoretical vs. Practical Surplus ===")
-        print(f"Theoretical Total Surplus: {theoretical_total_surplus:.2f}")
-        print(f"Practical Total Surplus: {self.total_surplus_extracted:.2f}")
-        print(f"Difference (Practical - Theoretical): {self.total_surplus_extracted - theoretical_total_surplus:.2f}")
-
-        # Detecting and explaining potential negative surplus
-        if self.total_surplus_extracted < 0:
-            print(f"Warning: Negative practical surplus detected. Possible causes include:")
-            print(f"  1. Mismatch between bid/ask values and agent utilities.")
-            print(f"  2. Overestimated initial utilities.")
-            print(f"  3. High frictions or spread preventing trades.")
-
-    def get_order_book(self):
-        return self.order_book
-
-    def get_trade_history(self):
-        return self.trade_history
-
-def run_market_simulation(num_buyers: int, num_sellers: int, num_units: int, buyer_base_value: int, seller_base_value: int, spread: float, max_rounds: int):
-    # Generate test agents
-    agents = generate_agents(num_agents=num_buyers + num_sellers, num_units=num_units, buyer_base_value=buyer_base_value, seller_base_value=seller_base_value, spread=spread)
-    
-    # Create the environment
-    env = Environment(agents=agents)
-
-    # Print initial market state
-    env.print_market_state()
-
-    # Calculate and print initial utilities
-    print("\nInitial Utilities:")
-    for agent in env.agents:
-        initial_utility = env.get_agent_utility(agent)
-        print(f"Agent {agent.id} ({'Buyer' if agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
-
-    # Run the auction
-    auction = DoubleAuction(environment=env, max_rounds=max_rounds)
-    auction.run_auction()
-
-    # Analyze the auction results and plot
-    analyze_and_plot_auction_results(auction, env)
+        logger.info(f"\n=== Theoretical vs. Practical Surplus ===")
+        logger.info(f"Theoretical Total Surplus: {theoretical_total_surplus:.2f}")
+        logger.info(f"Practical Total Surplus: {self.total_surplus_extracted:.2f}")
+        logger.info(f"Difference (Practical - Theoretical): {self.total_surplus_extracted - theoretical_total_surplus:.2f}")
 
 if __name__ == "__main__":
-    # Generate test agents
-    num_buyers = 50
-    num_sellers = 50
+    # Generate ZI agents
+    num_buyers = 5
+    num_sellers = 5
     spread = 0.5
-    agents = generate_agents(num_agents=num_buyers + num_sellers, num_units=5, buyer_base_value=100, seller_base_value=90, spread=spread)
+
+    agents = generate_market_agents(
+        num_agents=num_buyers + num_sellers, 
+        num_units=5, 
+        buyer_base_value=100, 
+        seller_base_value=80, 
+        spread=spread
+    )
     
     # Create the environment
     env = Environment(agents=agents)
@@ -161,15 +199,10 @@ if __name__ == "__main__":
     # Print initial market state
     env.print_market_state()
 
-    # Calculate and print initial utilities
-    print("\nInitial Utilities:")
-    for agent in env.agents:
-        initial_utility = env.get_agent_utility(agent)
-        print(f"Agent {agent.id} ({'Buyer' if agent.preference_schedule.is_buyer else 'Seller'}): {initial_utility:.2f}")
-
     # Run the auction
-    auction = DoubleAuction(environment=env, max_rounds=50)
+    auction = DoubleAuction(environment=env, max_rounds=5)
     auction.run_auction()
 
     # Analyze and plot results
+    from analysis import analyze_and_plot_auction_results
     analyze_and_plot_auction_results(auction, env)
