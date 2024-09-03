@@ -1,0 +1,15 @@
+data_sources:
+  - type: text
+    path: /path/to/text/file.txt
+    format: plain
+  - type: json
+    path: /path/to/json/file.json
+    format: json
+  - type: documents
+    path: /path/to/document/folder
+    format: markdown
+index_path: /path/to/save/index.pkl
+chunk_size: 1000
+overlap: 200
+ensemble_weight: 0.7
+num_workers: 4
