@@ -1,12 +1,20 @@
 # Adding gitignore for
 .venv
-
+market
 # Env files
 .env
 .env.local
-
+market
 #Cache files
 __pycache__
 
 # log files
 llm_agents/logs*
+
+# Any and all venv folders anywhere in the project
+**/venv
+**/venv/*
+**/venv/**
+venv
+venv/*
+venv/**
