@@ -330,6 +330,7 @@ class GeneratedJsonObject(BaseModel):
 
 class LLMOutput(BaseModel):
     raw_result: Union[str, dict, ChatCompletion, AnthropicMessage, PromptCachingBetaMessage]
+    completion_kwargs: Optional[Dict[str, Any]] = None
 
 
     @computed_field
@@ -527,11 +528,10 @@ class AIUtilities:
             }
             
 
-            print(completion_kwargs)
             response: ChatCompletion = client.chat.completions.create(**completion_kwargs)
-            return LLMOutput(raw_result=response)
+            return LLMOutput(raw_result=response, completion_kwargs=completion_kwargs)
         except Exception as e:
-            return LLMOutput(raw_result=f"Error: {str(e)}")
+            return LLMOutput(raw_result=f"Error: {str(e)}", completion_kwargs=completion_kwargs)
 
     def run_anthropic_completion(self, anthropic: Anthropic, prompt: HistoPrompt):
         
@@ -549,11 +549,10 @@ class AIUtilities:
             }
             
 
-            print(completion_kwargs)
             response = anthropic.beta.prompt_caching.messages.create(**completion_kwargs)
-            return LLMOutput(raw_result=response)
+            return LLMOutput(raw_result=response, completion_kwargs=completion_kwargs)
         except Exception as e:
-            return LLMOutput(raw_result=str(e))
+            return LLMOutput(raw_result=str(e), completion_kwargs=completion_kwargs)
 
 
         
@@ -577,27 +576,26 @@ class AIUtilities:
         client = OpenAI(api_key=self.openai_key)
         
         
-        # try:
-        assert prompt.structured_output is not None, "Tool is not set"
-        
-        completion_kwargs = {
-            "model":  prompt.llm_config.model or self.openai_model,
-            "messages": prompt.oai_messages,
-            "max_tokens": prompt.llm_config.max_tokens,
-            "temperature": prompt.llm_config.temperature,
-        }
+        try:
+            assert prompt.structured_output is not None, "Tool is not set"
+            
+            completion_kwargs = {
+                "model":  prompt.llm_config.model or self.openai_model,
+                "messages": prompt.oai_messages,
+                "max_tokens": prompt.llm_config.max_tokens,
+                "temperature": prompt.llm_config.temperature,
+            }
 
-        tool = prompt.get_tool()
-        if tool:
-            completion_kwargs["tools"] = [tool]
-            completion_kwargs["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
-        
-        print(completion_kwargs)
-        response : ChatCompletion = client.chat.completions.create(**completion_kwargs)
+            tool = prompt.get_tool()
+            if tool:
+                completion_kwargs["tools"] = [tool]
+                completion_kwargs["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
+            
+            response : ChatCompletion = client.chat.completions.create(**completion_kwargs)
 
-        return LLMOutput(raw_result=response)
-        # except Exception as e:
-        #     return LLMOutput(raw_result=str(e))
+            return LLMOutput(raw_result=response, completion_kwargs=completion_kwargs)
+        except Exception as e:
+            return LLMOutput(raw_result=str(e), completion_kwargs=completion_kwargs)
 
     def run_anthropic_tool_completion(
         self,
@@ -622,9 +620,8 @@ class AIUtilities:
             if tool and prompt.structured_output is not None:
                 completion_kwargs["tools"] = [tool]
                 completion_kwargs["tool_choice"] = ToolChoiceToolChoiceTool(name=prompt.structured_output.schema_name, type="tool")
-            print(completion_kwargs)
             response = client.beta.prompt_caching.messages.create(**completion_kwargs)
-            return LLMOutput(raw_result=response)
+            return LLMOutput(raw_result=response, completion_kwargs=completion_kwargs)
         except Exception as e:
-            return LLMOutput(raw_result=str(e))
+            return LLMOutput(raw_result=str(e), completion_kwargs=completion_kwargs)
 
