@@ -65,7 +65,7 @@ class Agent(BaseModel):
     def execute(self, task: Optional[str] = None) -> Union[str, Dict[str, Any]]:
         """Execute a task and return the result."""
         prompt_context = self._prepare_prompt_context(task)
-        agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.dict(), indent=2)}")
+        agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
 
         return self._run_ai_inference(prompt_context)
 
@@ -151,7 +151,7 @@ class Agent(BaseModel):
         interaction = {
             "id": self.id,
             "name": self.role,
-            "prompt_context": prompt.dict(),
+            "prompt_context": prompt.model_dump(),
             "response": response,
             "timestamp": datetime.now().isoformat()
         }

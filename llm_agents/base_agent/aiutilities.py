@@ -214,7 +214,7 @@ class LLMConfig(BaseModel):
    
 
 
-class HistoPrompt(BaseModel):
+class LLMPromptContext(BaseModel):
     system_string: Optional[str] = None
     history: Optional[List[Dict[str, str]]] = None
     new_message: str
@@ -289,16 +289,16 @@ class HistoPrompt(BaseModel):
     def anthropic_messages(self) -> Tuple[List[PromptCachingBetaTextBlockParam],List[MessageParam]]:
         return msg_dict_to_anthropic(self.messages, use_cache=self.llm_config.use_cache)
         
-    def update_llm_config(self,llm_config:LLMConfig) -> 'HistoPrompt':
+    def update_llm_config(self,llm_config:LLMConfig) -> 'LLMPromptContext':
         
         return self.model_copy(update={"llm_config":llm_config})
        
     
-    def update_history(self,history:List[Dict[str, Any]]) -> 'HistoPrompt':
+    def update_history(self,history:List[Dict[str, Any]]) -> 'LLMPromptContext':
         return self.model_copy(update={"history":history})
         
     
-    def append_to_history(self,new_message:Dict[str, Any]) -> 'HistoPrompt':
+    def append_to_history(self,new_message:Dict[str, Any]) -> 'LLMPromptContext':
         if  self.history:
             return self.model_copy(update={"history":self.history.append(new_message)})
         else:
@@ -501,7 +501,7 @@ class AIUtilities:
         self.anthropic_model = os.getenv("ANTHROPIC_MODEL")
     
 
-    def run_ai_completion(self, prompt: HistoPrompt):
+    def run_ai_completion(self, prompt: LLMPromptContext):
         if prompt.llm_config.client == "openai":
             assert self.openai_key is not None, "OpenAI API key is not set"
             client = OpenAI(api_key=self.openai_key)
@@ -515,7 +515,7 @@ class AIUtilities:
         else:
             return "Invalid AI vendor"
     
-    def run_openai_completion(self, client: OpenAI, prompt: HistoPrompt):
+    def run_openai_completion(self, client: OpenAI, prompt: LLMPromptContext):
         try:
             
 
@@ -533,7 +533,7 @@ class AIUtilities:
         except Exception as e:
             return LLMOutput(raw_result=f"Error: {str(e)}", completion_kwargs=completion_kwargs)
 
-    def run_anthropic_completion(self, anthropic: Anthropic, prompt: HistoPrompt):
+    def run_anthropic_completion(self, anthropic: Anthropic, prompt: LLMPromptContext):
         
         system_content, anthropic_messages = prompt.anthropic_messages
         model = prompt.llm_config.model or self.anthropic_model
@@ -558,7 +558,7 @@ class AIUtilities:
         
     def run_ai_tool_completion(
         self,
-        prompt: HistoPrompt,
+        prompt: LLMPromptContext,
         
     ):
         if prompt.llm_config.client == "openai":
@@ -570,7 +570,7 @@ class AIUtilities:
 
     def run_openai_tool_completion(
         self,
-        prompt: HistoPrompt,
+        prompt: LLMPromptContext,
         
     ):
         client = OpenAI(api_key=self.openai_key)
@@ -599,7 +599,7 @@ class AIUtilities:
 
     def run_anthropic_tool_completion(
         self,
-        prompt: HistoPrompt,
+        prompt: LLMPromptContext,
     ):  
         system_content , anthropic_messages = prompt.anthropic_messages
         client = Anthropic(api_key=self.anthropic_api_key)
