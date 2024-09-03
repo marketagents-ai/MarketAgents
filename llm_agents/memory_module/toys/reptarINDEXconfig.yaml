@@ -1,0 +1,23 @@
+# Configuration for the graph-based document processing and retrieval system
+
+# Summary generation settings
+summary_system_prompt: "You are a helpful assistant that generates concise summaries."
+summary_user_prompt: "Summarize the following text in a single paragraph:\n\n{text}"
+
+# Embedding settings
+embedding_model: "all-minilm"
+
+# Clustering settings
+max_depth: 3
+min_cluster_size: 5
+max_clusters: 10
+
+# Chunking settings
+chunk_size: 512
+overlap: 50
+
+# Model settings
+summary_model: "qwen2:0.5b-instruct-fp16"
+
+# Search settings
+search_results_limit: 10
