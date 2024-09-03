@@ -256,7 +256,7 @@ def generate_order_book_table(auction):
         rows.append([
             'Bid',
             bid.agent_id,
-            f"${bid.market_action.price:.2f}"
+            bid.market_action.price
         ])
     
     # Add asks to the table
@@ -264,11 +264,14 @@ def generate_order_book_table(auction):
         rows.append([
             'Ask',
             ask.agent_id,
-            f"${ask.market_action.price:.2f}"
+            ask.market_action.price
         ])
     
     # Sort rows by price (descending for bids, ascending for asks)
-    rows.sort(key=lambda x: (-x[2] if x[0] == 'Bid' else x[2]))
+    rows.sort(key=lambda x: (-float(x[2]) if x[0] == 'Bid' else float(x[2])))
+    
+    # Format price as string after sorting
+    rows = [[row[0], row[1], f"${float(row[2]):.2f}"] for row in rows]
     
     return html.Table([
         html.Thead(html.Tr([html.Th(col) for col in headers]), className="thead-light"),

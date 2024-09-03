@@ -3,8 +3,9 @@ import json
 import logging
 import traceback
 from typing import List, Optional, Dict, Any
+from colorama import Fore, Style
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from acl_message.acl_message import ACLMessage, AgentID, Performative
 from zi_agent.ziagents import MarketAction, ZIAgent, Order, Trade, create_zi_agent, MarketInfo
@@ -70,32 +71,12 @@ class MarketAgent(BaseModel):
         return cls(zi_agent=zi_agent, llm_agent=llm_agent, use_llm=use_llm, address=f"agent_{agent_id}")
 
     def generate_bid(self, market_info: MarketInfo, round_num: int) -> Optional[ACLMessage]:
-        """
-        Generate a bid based on the current market information.
-
-        Args:
-            market_info (MarketInfo): Current market information.
-            round_num (int): Current round number.
-
-        Returns:
-            Optional[ACLMessage]: The generated bid as an ACL message, or None if no bid is made.
-        """
         if self.use_llm:
             return self._generate_llm_bid(market_info, round_num)
         else:
             return self._generate_zi_bid(market_info, round_num)
-        
+
     def _generate_llm_bid(self, market_info: MarketInfo, round_num: int) -> Optional[ACLMessage]:
-        """
-        Generate a bid using the LLM-based strategy.
-
-        Args:
-            market_info (MarketInfo): Current market information.
-            round_num (int): Current round number.
-
-        Returns:
-            Optional[ACLMessage]: The generated bid as an ACL message, or None if no bid is made.
-        """
         try:
             market_info_str = self._get_market_info(market_info)
             recent_memories = self.get_recent_memories(2)
@@ -110,38 +91,56 @@ class MarketAgent(BaseModel):
 
             self.log_interaction(round_num, task_prompt, llm_response)
 
-            logger.info("---LLM JSON RESPONSE---")
-            logger.info(json.dumps(llm_response))
+            logger.info(f"{Fore.CYAN}---LLM JSON RESPONSE---{Style.RESET_ALL}")
+            logger.info(f"{Fore.YELLOW}{json.dumps(llm_response, indent=2)}{Style.RESET_ALL}")
 
-            market_action = MarketActionSchema(**llm_response)
+            try:
+                market_action = MarketActionSchema(**llm_response)
+            except ValidationError as e:
+                logger.error(f"{Fore.RED}Validation error in LLM response: {e}{Style.RESET_ALL}")
+                return None
+
             if market_action.action == "hold":
-                logger.info("LLM decided to hold, returning None")
+                logger.info(f"{Fore.GREEN}LLM decided to hold, returning None{Style.RESET_ALL}")
                 return None
             
             bid = market_action.bid
 
             if bid is None:
-                logger.info("No bid in market action, returning None")
+                logger.info(f"{Fore.RED}No bid in market action, returning None{Style.RESET_ALL}")
                 return None
 
-            return self._create_acl_message(bid.acl_message.action, bid.acl_message.price, bid.acl_message.quantity)
+            # Set quantity to 1 for now
+            bid.acl_message.quantity = 1
+
+            sender_id = AgentID(name=str(self.zi_agent.id), address=self.address)
+            receiver_id = AgentID(name="market", address=MARKET_ADDRESS)
+
+            content = DoubleAuctionMessage(
+                action=bid.acl_message.action,
+                price=bid.acl_message.price,
+                quantity=bid.acl_message.quantity
+            )
+
+            acl_message = ACLMessage(
+                performative=Performative.PROPOSE,
+                sender=sender_id,
+                receivers=[receiver_id],
+                content=content,
+                protocol="double-auction",
+                ontology="market-ontology",
+                conversation_id=f"{content.action}-{datetime.now().isoformat()}"
+            )
+
+            logger.info(f"{Fore.MAGENTA}Generated ACL message: {acl_message}{Style.RESET_ALL}")
+            return acl_message
         
         except Exception as e:
-            logger.error(f"Error in _generate_llm_bid: {e}")
-            logger.error(traceback.format_exc())
+            logger.error(f"{Fore.RED}Error in _generate_llm_bid: {e}{Style.RESET_ALL}")
+            logger.error(f"{Fore.RED}{traceback.format_exc()}{Style.RESET_ALL}")
             return None
 
     def _generate_zi_bid(self, market_info: MarketInfo, round_num: int) -> Optional[ACLMessage]:
-        """
-        Generate a bid using the Zero Intelligence strategy.
-
-        Args:
-            market_info (MarketInfo): Current market information.
-            round_num (int): Current round number.
-
-        Returns:
-            Optional[ACLMessage]: The generated bid as an ACL message, or None if no bid is made.
-        """
         zi_bid = self.zi_agent.generate_bid()
         if zi_bid is None:
             return None
@@ -178,8 +177,9 @@ class MarketAgent(BaseModel):
             conversation_id=f"{action}-{datetime.now().isoformat()}"
         )
 
-        logger.info(f"Generated ACL message: {acl_message}")
+        logger.info(f"{Fore.MAGENTA}Generated ACL message: {acl_message}{Style.RESET_ALL}")
         return acl_message
+
     def receive_message(self, message: ACLMessage) -> None:
         """
         Process a received ACL message.
@@ -187,14 +187,14 @@ class MarketAgent(BaseModel):
         Args:
             message (ACLMessage): The received ACL message.
         """
-        logger.info(f"Agent {self.zi_agent.id} received message: {message}")
+        logger.info(f"{Fore.BLUE}Agent {self.zi_agent.id} received message: {message}{Style.RESET_ALL}")
         if message.performative == Performative.INFORM and message.protocol == "double-auction":
-            logger.info(f"Agent {self.zi_agent.id} processing trade information")
+            logger.info(f"{Fore.GREEN}Agent {self.zi_agent.id} processing trade information{Style.RESET_ALL}")
             self.log_trade_information(message.content)
             self._process_trade_execution(message.content)
         else:
-            logger.warning(f"Agent {self.zi_agent.id} received unexpected message type: "
-                           f"{message.performative} with protocol: {message.protocol}")
+            logger.warning(f"{Fore.YELLOW}Agent {self.zi_agent.id} received unexpected message type: "
+                           f"{message.performative} with protocol: {message.protocol}{Style.RESET_ALL}")
     
     def _process_trade_execution(self, trade_info: Dict[str, Any]) -> None:
         """
@@ -205,9 +205,9 @@ class MarketAgent(BaseModel):
         """
         trade = Trade(
             trade_id=trade_info['trade_id'],
-            bid=Order(agent_id=self.zi_agent.id, price=trade_info['price'], 
+            bid=Order(agent_id=trade_info['buyer_id'], price=trade_info['price'], 
                       quantity=trade_info['quantity'], is_buy=True),
-            ask=Order(agent_id=self.zi_agent.id, price=trade_info['price'], 
+            ask=Order(agent_id=trade_info['seller_id'], price=trade_info['price'], 
                       quantity=trade_info['quantity'], is_buy=False),
             price=trade_info['price'],
             quantity=trade_info['quantity'],
@@ -299,7 +299,7 @@ class MarketAgent(BaseModel):
         Args:
             trade_info (Dict[str, Any]): Information about the trade.
         """
-        logger.info(f"Agent {self.zi_agent.id} logged trade information: {trade_info}")
+        logger.info(f"{Fore.GREEN}Agent {self.zi_agent.id} logged trade information: {trade_info}{Style.RESET_ALL}")
 
     def calculate_trade_surplus(self, trade: Trade) -> float:
         """

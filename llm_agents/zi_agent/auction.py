@@ -1,10 +1,12 @@
 import logging
+import traceback
 from typing import List, Optional
-from pydantic import BaseModel, Field, computed_field
+
+from pydantic import BaseModel, Field, computed_field, ValidationError
 from colorama import Fore, Style
 
 from zi_agent.environment import Environment, generate_market_agents
-from ziagents import Order, Trade, ZIAgent, Bid, Ask, MarketInfo
+from ziagents import Order, Trade, ZIAgent, Bid, Ask, MarketInfo, MarketAction
 from acl_message.acl_message import ACLMessage, Performative
 
 # Set up logger
@@ -12,13 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class OrderBook(BaseModel):
-    """
-    Represents the order book for the double auction.
-
-    Attributes:
-        bids (List[Bid]): List of current bids.
-        asks (List[Ask]): List of current asks.
-    """
+    """Represents the order book for the double auction."""
 
     bids: List[Bid] = Field(default_factory=list, description="List of current bids")
     asks: List[Ask] = Field(default_factory=list, description="List of current asks")
@@ -32,14 +28,13 @@ class OrderBook(BaseModel):
         self.asks.append(ask)
 
     def match_orders(self, round_num: int) -> List[Trade]:
-        """
-        Match bids and asks to create trades.
+        """Match bids and asks to create trades.
 
         Args:
-            round_num (int): The current round number.
+            round_num: The current round number.
 
         Returns:
-            List[Trade]: A list of matched trades.
+            A list of matched trades.
         """
         trades = []
         trade_counter = 0
@@ -60,7 +55,9 @@ class OrderBook(BaseModel):
                     ask=ask,
                     price=trade_price,
                     round=round_num,
-                    quantity=1
+                    quantity=1,
+                    buyer_value=bid.base_value,
+                    seller_cost=ask.base_cost
                 )
                 trades.append(trade)
                 trade_counter += 1
@@ -77,11 +74,10 @@ class OrderBook(BaseModel):
         return trades
 
     def _remove_matched_orders(self, trades: List[Trade]) -> None:
-        """
-        Remove matched orders from the order book.
+        """Remove matched orders from the order book.
 
         Args:
-            trades (List[Trade]): List of executed trades.
+            trades: List of executed trades.
         """
         matched_bid_ids = set((trade.bid.agent_id, trade.bid.market_action.price) for trade in trades)
         matched_ask_ids = set((trade.ask.agent_id, trade.ask.market_action.price) for trade in trades)
@@ -91,19 +87,7 @@ class OrderBook(BaseModel):
 
 
 class DoubleAuction(BaseModel):
-    """
-    Represents a double auction mechanism.
-
-    Attributes:
-        environment (Environment): The market environment.
-        max_rounds (int): Maximum number of auction rounds.
-        current_round (int): Current round number.
-        successful_trades (List[Trade]): List of successful trades.
-        total_surplus_extracted (float): Total surplus extracted from trades.
-        average_prices (List[float]): List of average prices per round.
-        order_book (OrderBook): Current order book.
-        trade_history (List[Trade]): Complete trade history.
-    """
+    """Represents a double auction mechanism."""
 
     environment: Environment = Field(..., description="The market environment")
     max_rounds: int = Field(..., description="Maximum number of auction rounds")
@@ -121,11 +105,10 @@ class DoubleAuction(BaseModel):
         return len(self.trade_history)
 
     def execute_trades(self, trades: List[Trade]) -> None:
-        """
-        Execute a list of trades.
+        """Execute a list of trades.
 
         Args:
-            trades (List[Trade]): List of trades to execute.
+            trades: List of trades to execute.
         """
         for trade in trades:
             buyer = self.environment.get_agent(trade.bid.agent_id)
@@ -150,57 +133,76 @@ class DoubleAuction(BaseModel):
             seller.receive_message(seller_message)
 
     def generate_bids(self, market_info: MarketInfo) -> List[Bid]:
-        """
-        Generate bids from buyers.
+        """Generate bids from buyers.
 
         Args:
-            market_info (MarketInfo): Current market information.
+            market_info: Current market information.
 
         Returns:
-            List[Bid]: List of generated bids.
+            List of generated bids.
         """
         bids = []
         for buyer in self.environment.buyers:
-            bid = buyer.generate_bid(market_info, self.current_round)
-            if bid:
-                bids.append(bid)
-                logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: "
-                            f"${Fore.GREEN}{bid.market_action.price:.2f}{Fore.BLUE} for 1 unit(s){Style.RESET_ALL}")
+            try:
+                if buyer.zi_agent.allocation.goods < buyer.zi_agent.preference_schedule.values.get(len(buyer.zi_agent.preference_schedule.values), 0):
+                    bid = buyer.generate_bid(market_info, self.current_round)
+                    if bid and isinstance(bid, ACLMessage):
+                        market_action = MarketAction(action='bid', price=bid.content.price, quantity=bid.content.quantity)
+                        base_value = buyer.zi_agent.preference_schedule.get_value(buyer.zi_agent.allocation.goods + 1)
+                        bids.append(Bid(agent_id=buyer.zi_agent.id, market_action=market_action, base_value=base_value, base_cost=0))
+                        logger.info(f"{Fore.BLUE}Buyer {Fore.CYAN}{buyer.zi_agent.id}{Fore.BLUE} bid: ${Fore.GREEN}{bid.content.price:.2f}{Fore.BLUE} for {Fore.YELLOW}{bid.content.quantity}{Fore.BLUE} unit(s){Style.RESET_ALL}")
+            except Exception as e:
+                logger.error(f"Error generating bid for buyer {buyer.zi_agent.id}: {e}")
+                logger.error(traceback.format_exc())
         return bids
-    
+
     def generate_asks(self, market_info: MarketInfo) -> List[Ask]:
-        """
-        Generate asks from sellers.
+        """Generate asks from sellers.
 
         Args:
-            market_info (MarketInfo): Current market information.
+            market_info: Current market information.
 
         Returns:
-            List[Ask]: List of generated asks.
+            List of generated asks.
         """
         asks = []
         for seller in self.environment.sellers:
-            ask = seller.generate_bid(market_info, self.current_round)
-            if ask:
-                asks.append(ask)
-                logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: "
-                            f"${Fore.GREEN}{ask.market_action.price:.2f}{Fore.RED} for 1 unit(s){Style.RESET_ALL}")
+            try:
+                if seller.zi_agent.allocation.goods > 0:
+                    ask = seller.generate_bid(market_info, self.current_round)
+                    if ask and isinstance(ask, ACLMessage):
+                        market_action = MarketAction(action='ask', price=ask.content.price, quantity=ask.content.quantity)
+                        base_cost = seller.zi_agent.preference_schedule.get_value(seller.zi_agent.allocation.goods)
+                        try:
+                            new_ask = Ask(agent_id=seller.zi_agent.id, market_action=market_action, base_value=0, base_cost=base_cost)
+                            if new_ask.market_action.price >= new_ask.base_cost:
+                                asks.append(new_ask)
+                                logger.info(f"{Fore.RED}Seller {Fore.CYAN}{seller.zi_agent.id}{Fore.RED} ask: ${Fore.GREEN}{ask.content.price:.2f}{Fore.RED} for {Fore.YELLOW}{ask.content.quantity}{Fore.RED} unit(s){Style.RESET_ALL}")
+                            else:
+                                logger.warning(f"Ask price ${ask.content.price:.2f} is lower than base cost ${base_cost:.2f} for seller {seller.zi_agent.id}. Skipping this ask.")
+                        except ValidationError as ve:
+                            logger.error(f"Validation error for seller {seller.zi_agent.id}: {ve}")
+            except Exception as e:
+                logger.error(f"Error generating ask for seller {seller.zi_agent.id}: {e}")
+                logger.error(traceback.format_exc())
         return asks
     
-    def run_auction(self) -> None:
-        """Run the double auction for the specified number of rounds."""
+    def run_auction(self):
+        """Run the double auction simulation."""
         if self.current_round >= self.max_rounds:
             logger.info("Max rounds reached. Auction has ended.")
             return
         
         for round_num in range(self.current_round + 1, self.max_rounds + 1):
-            logger.info(f"\n=== Round {round_num} ===")
+            logger.info(f"\n=== Starting Round {round_num} ===")
             self.current_round = round_num
 
             market_info = self._get_market_info()
 
             bids = self.generate_bids(market_info)
             asks = self.generate_asks(market_info)
+
+            logger.info(f"Generated {len(bids)} bids and {len(asks)} asks")
 
             for bid in bids:
                 self.order_book.add_bid(bid)
@@ -210,15 +212,17 @@ class DoubleAuction(BaseModel):
             trades = self.order_book.match_orders(round_num)
             if trades:
                 self.execute_trades(trades)
+            
+            logger.info(f"=== Finished Round {round_num} ===\n")
 
+        logger.info("Auction completed. Summarizing results.")
         self.summarize_results()
 
     def _get_market_info(self) -> MarketInfo:
-        """
-        Get current market information.
+        """Get current market information.
 
         Returns:
-            MarketInfo: Current market information.
+            Current market information.
         """
         last_trade_price = self.average_prices[-1] if self.average_prices else None
         average_price = sum(self.average_prices) / len(self.average_prices) if self.average_prices else None
@@ -259,15 +263,14 @@ class DoubleAuction(BaseModel):
                     f"{self.total_surplus_extracted - theoretical_total_surplus:.2f}")
 
     def create_trade_message(self, trade: Trade, is_buyer: bool) -> ACLMessage:
-        """
-        Create a trade message for the given trade.
+        """Create a trade message for the given trade.
 
         Args:
-            trade (Trade): The trade to create a message for.
-            is_buyer (bool): Whether the message is for the buyer or seller.
+            trade: The trade to create a message for.
+            is_buyer: Whether the message is for the buyer or seller.
 
         Returns:
-            ACLMessage: The created trade message.
+            The created trade message.
         """
         content = {
             "trade_id": trade.trade_id,
@@ -289,7 +292,7 @@ class DoubleAuction(BaseModel):
         return message
 
 
-def main():
+def run_simulation():
     """Run a sample double auction simulation."""
     num_buyers = 5
     num_sellers = 5
@@ -312,6 +315,5 @@ def main():
     from analysis import analyze_and_plot_auction_results
     analyze_and_plot_auction_results(auction, env)
 
-
 if __name__ == "__main__":
-    main()
+    run_simulation()
