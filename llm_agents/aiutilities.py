@@ -131,6 +131,149 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
         
         return system_message, [msg for msg in converted_messages if msg is not None]
 
+
+
+class StructuredTool(BaseModel):
+    json_schema: Optional[Dict[str, Any]] = None
+    schema_name: str = Field(default = "generate_structured_output")
+    schema_description: str = Field(default ="Generate a structured output based on the provided JSON schema.")
+    instruction_string: str = Field(default = "Please follow this JSON schema for your response:")
+
+    @computed_field
+    @property
+    def schema_instruction(self) -> str:
+        return f"{self.instruction_string}: {self.json_schema}"
+
+    def get_openai_tool(self) -> Optional[ChatCompletionToolParam]:
+        if self.json_schema:
+            return ChatCompletionToolParam(
+                type="function",
+                function=FunctionDefinition(
+                    name=self.schema_name,
+                    description=self.schema_description,
+                    parameters=self.json_schema
+                )
+            )
+        return None
+
+    def get_anthropic_tool(self) -> Optional[ToolParam]:
+        if self.json_schema:
+            return PromptCachingBetaToolParam(
+                name=self.schema_name,
+                description=self.schema_description,
+                input_schema=self.json_schema,
+                cache_control=PromptCachingBetaCacheControlEphemeralParam(type='ephemeral')
+            )
+        return None
+    
+class LLMConfig(BaseModel):
+    client: Literal["openai", "azure_openai", "anthropic", "vllm"]
+    model: Optional[str] = None
+    max_tokens: int = 4096
+    temperature: float = 0
+    response_format: Literal["json", "text","json_object","tool"] = "text"
+    use_cache: bool = True
+
+    @computed_field
+    @property
+    def oai_response_format(self) -> Optional[ResponseFormat]:
+        if self.response_format == "text":
+            return ResponseFormatText(type="text")
+        elif self.response_format == "json_object" or self.response_format == "json" or self.response_format =="tool":
+            return ResponseFormatJSONObject(type="json_object")
+        else:
+            return None
+
+
+class HistoPrompt(BaseModel):
+    system_string: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = None
+    new_message: str
+    prefill: str = Field(default="Here's the valid JSON object response:```json", description="prefill assistant response with an instruction")
+    postfill: str = Field(default="\n\nPlease provide your response in JSON format.", description="postfill user response with an instruction")
+    structured_output : Optional[StructuredTool] = None
+    use_schema_instruction: bool = False
+    llm_config: LLMConfig
+
+
+    @computed_field
+    @property
+    def use_prefill(self) -> bool:
+        if self.llm_config.client == 'anthropic' and 'json' in self.llm_config.response_format:
+            return True
+        else:
+            return False
+        
+    @computed_field
+    @property
+    def use_postfill(self) -> bool:
+        if self.llm_config.client == 'openai' and 'json' in self.llm_config.response_format:
+            return True
+        elif self.llm_config.client == 'openai' and 'tool' in self.llm_config.response_format and not self.use_schema_instruction:
+            return True
+        else:
+            return False
+        
+    @computed_field
+    @property
+    def system_message(self) -> Optional[Dict[str, str]]:
+        content= self.system_string if self.system_string  else ""
+        if self.use_schema_instruction and self.structured_output:
+            content = "\n".join([content,self.structured_output.schema_instruction])
+        return {"role":"system","content":content} if len(content)>0 else None
+    
+    @computed_field
+    @property
+    def messages(self)-> List[Dict[str, Any]]:
+        messages = [self.system_message] if self.system_message is not None else []
+        if self.history:
+            messages+=self.history
+        messages.append({"role":"user","content":self.new_message})
+        if self.use_prefill:
+            messages.append({"role":"assistant","content":self.prefill})
+        elif self.use_postfill:
+            messages[-1]["content"] = messages[-1]["content"] + self.postfill
+
+        return messages
+    
+    @computed_field
+    @property
+    def oai_messages(self)-> List[ChatCompletionMessageParam]:
+        return msg_dict_to_oai(self.messages)
+    
+    @computed_field
+    @property
+    def anthropic_messages(self) -> Tuple[List[PromptCachingBetaTextBlockParam],List[MessageParam]]:
+        return msg_dict_to_anthropic(self.messages, use_cache=self.llm_config.use_cache)
+        
+    def update_llm_config(self,llm_config:LLMConfig) -> 'HistoPrompt':
+        
+        return self.model_copy(update={"llm_config":llm_config})
+       
+    
+    def update_history(self,history:List[Dict[str, Any]]) -> 'HistoPrompt':
+        return self.model_copy(update={"history":history})
+        
+    
+    def append_to_history(self,new_message:Dict[str, Any]) -> 'HistoPrompt':
+        if  self.history:
+            return self.model_copy(update={"history":self.history.append(new_message)})
+        else:
+            assert not self.history
+            return self.update_history(history=[new_message])
+       
+    
+    def get_tool(self) -> Union[ChatCompletionToolParam, ToolParam, None]:
+        if not self.structured_output:
+            return None
+        if self.llm_config.client == "openai":
+            return self.structured_output.get_openai_tool()
+        elif self.llm_config.client == "anthropic":
+            return self.structured_output.get_anthropic_tool()
+        else:
+            return None
+
+    
 class Usage(BaseModel):
     prompt_tokens: int
     completion_tokens: int
@@ -144,6 +287,22 @@ class GeneratedJsonObject(BaseModel):
 
 class LLMOutput(BaseModel):
     raw_result: Union[str, dict, ChatCompletion, AnthropicMessage, PromptCachingBetaMessage]
+
+
+    @computed_field
+    @property
+    def str_content(self) -> Optional[str]:
+        return self._parse_result()[0]
+
+    @computed_field
+    @property
+    def json_object(self) -> Optional[GeneratedJsonObject]:
+        return self._parse_result()[1]
+
+    @computed_field
+    @property
+    def usage(self) -> Optional[Usage]:
+        return self._parse_result()[2]
 
     @computed_field
     @property
@@ -266,20 +425,7 @@ class LLMOutput(BaseModel):
 
         return content, json_object, usage
 
-    @computed_field
-    @property
-    def str_content(self) -> Optional[str]:
-        return self._parse_result()[0]
-
-    @computed_field
-    @property
-    def json_object(self) -> Optional[GeneratedJsonObject]:
-        return self._parse_result()[1]
-
-    @computed_field
-    @property
-    def usage(self) -> Optional[Usage]:
-        return self._parse_result()[2]
+    
 
     def _parse_result(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
         if isinstance(self.raw_result, str):
@@ -295,147 +441,6 @@ class LLMOutput(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-
-class StructuredTool(BaseModel):
-    json_schema: Optional[Dict[str, Any]] = None
-    schema_name: str = Field(default = "generate_structured_output")
-    schema_description: str = Field(default ="Generate a structured output based on the provided JSON schema.")
-    instruction_string: str = Field(default = "Please follow this JSON schema for your response:")
-
-    @computed_field
-    @property
-    def schema_instruction(self) -> str:
-        return f"{self.instruction_string}: {self.json_schema}"
-
-    def get_openai_tool(self) -> Optional[ChatCompletionToolParam]:
-        if self.json_schema:
-            return ChatCompletionToolParam(
-                type="function",
-                function=FunctionDefinition(
-                    name=self.schema_name,
-                    description=self.schema_description,
-                    parameters=self.json_schema
-                )
-            )
-        return None
-
-    def get_anthropic_tool(self) -> Optional[ToolParam]:
-        if self.json_schema:
-            return PromptCachingBetaToolParam(
-                name=self.schema_name,
-                description=self.schema_description,
-                input_schema=self.json_schema,
-                cache_control=PromptCachingBetaCacheControlEphemeralParam(type='ephemeral')
-            )
-        return None
-    
-class LLMConfig(BaseModel):
-    client: Literal["openai", "azure_openai", "anthropic", "vllm"]
-    model: Optional[str] = None
-    max_tokens: int = 4096
-    temperature: float = 0
-    response_format: Literal["json", "text","json_object","tool"] = "text"
-    use_cache: bool = True
-
-    @computed_field
-    @property
-    def oai_response_format(self) -> Optional[ResponseFormat]:
-        if self.response_format == "text":
-            return ResponseFormatText(type="text")
-        elif self.response_format == "json_object" or self.response_format == "json" or self.response_format =="tool":
-            return ResponseFormatJSONObject(type="json_object")
-        else:
-            return None
-
-
-class HistoPrompt(BaseModel):
-    system_string: Optional[str] = None
-    history: Optional[List[Dict[str, str]]] = None
-    new_message: str
-    prefill: str = Field(default="Here's the valid JSON object response:```json", description="prefill assistant response with an instruction")
-    postfill: str = Field(default="\n\nPlease provide your response in JSON format.", description="postfill user response with an instruction")
-    structured_output : Optional[StructuredTool] = None
-    use_schema_instruction: bool = False
-    llm_config: LLMConfig
-
-
-    @computed_field
-    @property
-    def use_prefill(self) -> bool:
-        if self.llm_config.client == 'anthropic' and 'json' in self.llm_config.response_format:
-            return True
-        else:
-            return False
-        
-    @computed_field
-    @property
-    def use_postfill(self) -> bool:
-        if self.llm_config.client == 'openai' and 'json' in self.llm_config.response_format:
-            return True
-        elif self.llm_config.client == 'openai' and 'tool' in self.llm_config.response_format and not self.use_schema_instruction:
-            return True
-        else:
-            return False
-        
-    @computed_field
-    @property
-    def system_message(self) -> Optional[Dict[str, str]]:
-        content= self.system_string if self.system_string  else ""
-        if self.use_schema_instruction and self.structured_output:
-            content = "\n".join([content,self.structured_output.schema_instruction])
-        return {"role":"system","content":content} if len(content)>0 else None
-        
-    def update_llm_config(self,llm_config:LLMConfig) -> 'HistoPrompt':
-        
-        return self.model_copy(update={"llm_config":llm_config})
-       
-    
-    def update_history(self,history:List[Dict[str, Any]]) -> 'HistoPrompt':
-        return self.model_copy(update={"history":history})
-        
-    
-    def append_to_history(self,new_message:Dict[str, Any]) -> 'HistoPrompt':
-        if  self.history:
-            return self.model_copy(update={"history":self.history.append(new_message)})
-        else:
-            assert not self.history
-            return self.update_history(history=[new_message])
-       
-    
-    def get_tool(self) -> Union[ChatCompletionToolParam, ToolParam, None]:
-        if not self.structured_output:
-            return None
-        if self.llm_config.client == "openai":
-            return self.structured_output.get_openai_tool()
-        elif self.llm_config.client == "anthropic":
-            return self.structured_output.get_anthropic_tool()
-        else:
-            return None
-
-    @computed_field
-    @property
-    def messages(self)-> List[Dict[str, Any]]:
-        messages = [self.system_message] if self.system_message is not None else []
-        if self.history:
-            messages+=self.history
-        messages.append({"role":"user","content":self.new_message})
-        if self.use_prefill:
-            messages.append({"role":"assistant","content":self.prefill})
-        elif self.use_postfill:
-            messages[-1]["content"] = messages[-1]["content"] + self.postfill
-
-        return messages
-    
-    @computed_field
-    @property
-    def oai_messages(self)-> List[ChatCompletionMessageParam]:
-        return msg_dict_to_oai(self.messages)
-    
-    @computed_field
-    @property
-    def anthropic_messages(self) -> Tuple[List[PromptCachingBetaTextBlockParam],List[MessageParam]]:
-        return msg_dict_to_anthropic(self.messages, use_cache=self.llm_config.use_cache)
-        
 
 
     

@@ -85,7 +85,7 @@ def test_ai_utilities():
     print("\n7. Anthropic Completion Result (JSON, with schema):")
     print(f"{result}\n")
 
-    # 7. Anthropic with tool completion
+    # 8. Anthropic with tool completion
     prompt = prompt.update_llm_config(LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool"))
     result = ai_utilities.run_ai_tool_completion(prompt)
     prompt.use_schema_instruction = True
