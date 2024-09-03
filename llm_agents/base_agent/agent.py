@@ -1,4 +1,3 @@
-import importlib
 import uuid
 import json
 import logging
@@ -8,9 +7,10 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
-from base_agent.aiutilities import AIUtilities, LLMConfig
+from base_agent.aiutilities import AIUtilities, LLMConfig, LLMPromptContext, StructuredTool, LLMOutput
 from base_agent.prompter import PromptManager
-from base_agent.schemas import BaseSchema
+from base_agent.utils import extract_json_from_response
+from base_agent.schemas import *
 
 agent_logger = logging.getLogger(__name__)
 
@@ -25,21 +25,21 @@ class Agent(BaseModel):
         task (Optional[str]): Current task assigned to the agent.
         tools (Optional[Dict[str, Any]]): Tools available to the agent.
         output_format (Optional[Union[Dict[str, Any], str]]): Expected output format.
-        llm_config (Dict[str, Any]): Configuration for the language model.
+        llm_config (LLMConfig): Configuration for the language model.
         max_retries (int): Maximum number of retry attempts for AI inference.
         metadata (Optional[Dict[str, Any]]): Additional metadata for the agent.
         interactions (List[Dict[str, Any]]): History of agent interactions.
 
     Methods:
-        execute(task: Optional[str] = None) -> str:
+        execute(task: Optional[str] = None) -> Union[str, Dict[str, Any]]:
             Execute a task and return the result.
         _load_output_schema() -> None:
             Load the output schema based on the output_format.
-        _prepare_messages(task: Optional[str]) -> List[Dict[str, str]]:
-            Prepare messages for AI inference.
-        _run_ai_inference(messages: List[Dict[str, str]]) -> str:
+        _prepare_prompt_context(task: Optional[str]) -> LLMPromptContext:
+            Prepare LLMPromptContext for AI inference.
+        _run_ai_inference(prompt_context: LLMPromptContext) -> Union[str, Dict[str, Any]]:
             Run AI inference with retry logic.
-        _log_interaction(prompt: List[Dict[str, str]], response: str) -> None:
+        _log_interaction(prompt: LLMPromptContext, response: Union[str, Dict[str, Any]]) -> None:
             Log an interaction between the agent and the AI.
     """
 
@@ -49,42 +49,43 @@ class Agent(BaseModel):
     task: Optional[str] = None
     tools: Optional[Dict[str, Any]] = None
     output_format: Optional[Union[Dict[str, Any], str]] = None
-    llm_config: Dict[str, Any] = Field(default_factory=dict)
-    max_retries: int = Field(default=2, ge=1)
+    llm_config: LLMConfig = Field(default_factory=LLMConfig)
+    max_retries: int = 2
     metadata: Optional[Dict[str, Any]] = None
     interactions: List[Dict[str, Any]] = Field(default_factory=list)
 
     class Config:
-        arbitrary_types_allowed = True
+        extra = "allow"
 
     def __init__(self, **data: Any):
         super().__init__(**data)
         self.ai_utilities = AIUtilities()
         self._load_output_schema()
 
-    def execute(self, task: Optional[str] = None) -> str:
+    def execute(self, task: Optional[str] = None) -> Union[str, Dict[str, Any]]:
         """Execute a task and return the result."""
-        messages = self._prepare_prompt_messages(task)
-        agent_logger.debug(f"Prepared messages:\n{json.dumps(messages, indent=2)}")
+        prompt_context = self._prepare_prompt_context(task)
+        agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.dict(), indent=2)}")
 
-        return self._run_ai_inference(messages)
+        return self._run_ai_inference(prompt_context)
 
     def _load_output_schema(self) -> None:
         """Load the output schema based on the output_format."""
         if isinstance(self.output_format, str):
             try:
                 schema_class = globals().get(self.output_format)
-                if schema_class and issubclass(schema_class, BaseSchema):
+                if schema_class and issubclass(schema_class, BaseModel):
                     self.output_format = schema_class.model_json_schema()
                 else:
                     raise ValueError(f"Invalid schema: {self.output_format}")
-            except ImportError:
-                agent_logger.warning(f"Could not import schema: {self.output_format}")
+            except (ImportError, AttributeError, ValueError) as e:
+                agent_logger.warning(f"Could not load schema: {self.output_format}. Error: {str(e)}")
+                self.output_format = None
         elif not isinstance(self.output_format, dict):
             self.output_format = None
 
-    def _prepare_prompt_messages(self, task: Optional[str]) -> List[Dict[str, str]]:
-        """Prepare messages for AI inference."""
+    def _prepare_prompt_context(self, task: Optional[str]) -> LLMPromptContext:
+        """Prepare LLMPromptContext for AI inference."""
         execution_task = task if task is not None else self.task
         prompt_manager = PromptManager(
             role=self.role,
@@ -94,48 +95,63 @@ class Agent(BaseModel):
             char_limit=1000
         )
 
-        messages = [
-            {"role": "system", "content": prompt_manager.generate_system_prompt()}
-        ]
+        prompt_messages = prompt_manager.generate_prompt_messages()
+        system_message = prompt_messages["messages"][0]["content"]
+        user_message = prompt_messages["messages"][1]["content"]
 
-        if execution_task:
-            messages.append({
-                "role": "user",
-                "content": prompt_manager.generate_task_prompt()
-            })
+        structured_output = None
+        if self.output_format:
+            structured_output = StructuredTool(json_schema=self.output_format)
 
-        return messages
-
+        return LLMPromptContext(
+            system_string=system_message,
+            new_message=user_message,
+            llm_config=self.llm_config,
+            structured_output=structured_output
+        )
+    
     @retry(
         wait=wait_random_exponential(multiplier=1, max=30),
         stop=stop_after_attempt(max_retries)
     )
-    def _run_ai_inference(self, messages: List[Dict[str, str]]) -> str:
+    def _run_ai_inference(self, prompt_context: LLMPromptContext) -> Union[str, Dict[str, Any]]:
         """Run AI inference with retry logic."""
         try:
-            agent_logger.info(f"Running inference with {self.llm_config.get('client')}")
-            llm_config = LLMConfig(**self.llm_config)
+            agent_logger.info(f"Running inference with {prompt_context.llm_config.client}")
             
             if self.tools:
-                completion = self.ai_utilities.run_ai_tool_completion(messages, self.tools, llm_config)
+                completion = self.ai_utilities.run_ai_tool_completion(prompt_context)
             else:
-                completion = self.ai_utilities.run_ai_completion(messages, llm_config)
+                completion = self.ai_utilities.run_ai_completion(prompt_context)
             
-            agent_logger.debug(f"Assistant Message:\n{completion}")
-            messages.append({"role": "assistant", "content": completion})
-            self._log_interaction(messages, completion)
+            llm_output = LLMOutput(raw_result=completion.raw_result)
+            agent_logger.debug(f"Assistant Message:\n{llm_output}")
+            
+            if prompt_context.llm_config.response_format in ["json", "json_object", "tool"]:
+                if llm_output.json_object:
+                    result = llm_output.json_object.object
+                elif llm_output.str_content:
+                    try:
+                        result = json.loads(llm_output.str_content)
+                    except json.JSONDecodeError:
+                        result = extract_json_from_response(llm_output.str_content)
+                else:
+                    result = {}
+            else:
+                result = llm_output.str_content or str(llm_output.raw_result)
+            
+            self._log_interaction(prompt_context, result)
+            return result
         except Exception as e:
             agent_logger.error(f"Error during AI inference: {e}")
             raise
 
-        return completion
-
-    def _log_interaction(self, prompt: List[Dict[str, str]], response: str) -> None:
+    def _log_interaction(self, prompt: LLMPromptContext, response: Union[str, Dict[str, Any]]) -> None:
         """Log an interaction between the agent and the AI."""
         interaction = {
             "id": self.id,
             "name": self.role,
-            "messages": prompt,
+            "prompt_context": prompt.dict(),
             "response": response,
             "timestamp": datetime.now().isoformat()
         }
