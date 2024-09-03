@@ -37,7 +37,13 @@ class PreferenceSchedule(BaseModel):
         return cls(values=values, is_buyer=is_buyer, initial_endowment=initial_endowment)
 
     def get_value(self, quantity: int) -> float:
-        return self.values.get(quantity, 0.0)
+        return self.values.get(quantity, 0)
+
+    def get_cost(self, quantity: int) -> float:
+        if self.is_buyer:
+            return 0  # Buyers don't have a cost
+        else:
+            return sum(self.get_value(i) for i in range(1, quantity + 1))
 
     def plot_schedule(self):
         quantities = list(self.values.keys())

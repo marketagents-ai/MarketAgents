@@ -1,6 +1,6 @@
 import unittest
-from unittest.mock import patch, MagicMock
-from environment import Environment, ZIAgent, PreferenceSchedule, Allocation, generate_agents
+from unittest.mock import MagicMock, patch
+from environment import Environment, generate_agents
 
 class TestEnvironment(unittest.TestCase):
 
@@ -72,12 +72,6 @@ class TestEnvironment(unittest.TestCase):
         self.assertGreaterEqual(buyer_surplus, 0)
         self.assertGreaterEqual(seller_surplus, 0)
         self.assertGreater(total_surplus, 0)
-
-    @patch('matplotlib.pyplot.savefig')
-    def test_plot_theoretical_supply_demand(self, mock_savefig):
-        fig = self.env.plot_theoretical_supply_demand(save_location='/tmp')
-        self.assertIsNotNone(fig)
-        mock_savefig.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

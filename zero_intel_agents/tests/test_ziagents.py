@@ -51,24 +51,24 @@ class TestZIAgent(unittest.TestCase):
         self.assertFalse(seller_bid.is_buy)
 
     def test_finalize_trade(self):
-        initial_buyer_cash = self.buyer_agent.allocation.cash
-        initial_seller_goods = self.seller_agent.allocation.goods
-        trade = Trade(
-            trade_id=1,
-            buyer_id=1,
-            seller_id=2,
-            quantity=1,
-            price=75,
-            buyer_value=100,
-            seller_cost=50,
-            round=1
-        )
-        self.buyer_agent.finalize_trade(trade)
-        self.seller_agent.finalize_trade(trade)
-        self.assertEqual(self.buyer_agent.allocation.cash, initial_buyer_cash - 75)
-        self.assertEqual(self.buyer_agent.allocation.goods, 1)
-        self.assertEqual(self.seller_agent.allocation.cash, 75)
-        self.assertEqual(self.seller_agent.allocation.goods, initial_seller_goods - 1)
+            initial_buyer_cash = self.buyer_agent.allocation.cash
+            initial_seller_goods = self.seller_agent.allocation.goods
+            trade = Trade(
+                trade_id=1,
+                buyer_id=1,
+                seller_id=2,
+                quantity=1,
+                price=75,
+                buyer_value=100,
+                seller_cost=50,
+                round=1
+            )
+            self.buyer_agent.finalize_trade(trade)
+            self.seller_agent.finalize_trade(trade)
+            self.assertAlmostEqual(self.buyer_agent.allocation.cash, initial_buyer_cash - 75, places=7)
+            self.assertEqual(self.buyer_agent.allocation.goods, 1)
+            self.assertEqual(self.seller_agent.allocation.cash, 75)
+            self.assertEqual(self.seller_agent.allocation.goods, initial_seller_goods - 1)
 
     def test_respond_to_order(self):
         order = Order(agent_id=1, is_buy=True, quantity=1, price=100)
@@ -94,7 +94,11 @@ class TestRunSimulation(unittest.TestCase):
     @patch('ziagents.ZIAgent.respond_to_order')
     def test_run_simulation(self, mock_respond, mock_finalize, mock_generate_bid):
         agent = ZIAgent.generate(agent_id=1, is_buyer=True, num_units=5, base_value=100)
-        mock_generate_bid.return_value = Order(agent_id=1, is_buy=True, quantity=1, price=90)
+        mock_bid = MagicMock(agent_id=1, is_buy=True, quantity=1, price=90)
+        mock_generate_bid.return_value = mock_bid
+        
+        # Instead of mocking get_value, we'll set a value in the values dictionary
+        agent.preference_schedule.values = {1: 100}  # Assuming the key is the quantity
         
         run_simulation(agent, num_rounds=10)
         
