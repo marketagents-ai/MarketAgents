@@ -1,12 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 
-class RandomNumberGenerator(BaseModel):
-    num: int
-
-class TestSchema(BaseModel):
-    test: str = "schema"
-
 class BidSchema(BaseModel):
     bid_action: Literal["buy", "sell"] = Field(..., description="The type of action: 'buy' for purchasing or 'sell' for offering goods")
     price: float = Field(..., description="The proposed price for the bid or ask. Round off to 2 decimal places")

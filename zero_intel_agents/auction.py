@@ -15,28 +15,53 @@ class OrderBook(BaseModel):
 
     def add_bid(self, bid: Bid):
         self.bids.append(bid)
-        self.bids.sort(key=lambda x: x.market_action.price, reverse=True)
 
     def add_ask(self, ask: Ask):
         self.asks.append(ask)
-        self.asks.sort(key=lambda x: x.market_action.price)
 
     def match_orders(self, round_num: int) -> List[Trade]:
         trades = []
         trade_counter = 0
-        while self.bids and self.asks and self.bids[0].market_action.price >= self.asks[0].market_action.price:
-            bid = self.bids.pop(0)
-            ask = self.asks.pop(0)
-            trade_price = (bid.market_action.price + ask.market_action.price) / 2  # Midpoint price
-            trade = Trade(
-                trade_id=trade_counter,
-                bid=bid,
-                ask=ask,
-                price=trade_price,
-                round=round_num
-            )
-            trades.append(trade)
-            trade_counter += 1
+        
+        # Sort bids and asks
+        sorted_bids = sorted(self.bids, key=lambda x: x.market_action.price, reverse=True)
+        sorted_asks = sorted(self.asks, key=lambda x: x.market_action.price)
+        
+        bid_index = 0
+        ask_index = 0
+        
+        while bid_index < len(sorted_bids) and ask_index < len(sorted_asks):
+            bid = sorted_bids[bid_index]
+            ask = sorted_asks[ask_index]
+            
+            if bid.market_action.price >= ask.market_action.price:
+                trade_price = (bid.market_action.price + ask.market_action.price) / 2  # Midpoint price
+                trade = Trade(
+                    trade_id=trade_counter,
+                    bid=bid,
+                    ask=ask,
+                    price=trade_price,
+                    round=round_num,
+                    quantity=1
+                )
+                trades.append(trade)
+                trade_counter += 1
+                bid_index += 1
+                ask_index += 1
+            else:
+                # If no match, move to the next bid or ask
+                if bid.market_action.price < ask.market_action.price:
+                    bid_index += 1
+                else:
+                    ask_index += 1
+        
+        # Remove matched orders from the original lists
+        matched_bid_ids = set((trade.bid.agent_id, trade.bid.market_action.price) for trade in trades)
+        matched_ask_ids = set((trade.ask.agent_id, trade.ask.market_action.price) for trade in trades)
+        
+        self.bids = [bid for bid in self.bids if (bid.agent_id, bid.market_action.price) not in matched_bid_ids]
+        self.asks = [ask for ask in self.asks if (ask.agent_id, ask.market_action.price) not in matched_ask_ids]
+        
         return trades
 
 class DoubleAuction(BaseModel):

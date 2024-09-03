@@ -20,7 +20,8 @@ class PromptManager:
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.char_limit = char_limit
         self.prompt_vars = self.create_vars_dict(task, resources, output_schema)
-        self.prompt_path = os.path.join(self.script_dir,'configs', 'prompts', f"{self.role}_prompt.yaml")
+        self.prompt_path = os.path.join(self.script_dir, '..', 'configs', 'prompts', f"{self.role}_prompt.yaml")
+        self.default_prompt_path = os.path.join(self.script_dir, '..', 'configs', 'prompts', "default_prompt.yaml")
         self.prompt_schema = self.read_yaml_file(self.prompt_path)
         
     def format_yaml_prompt(self) -> str:
@@ -35,7 +36,11 @@ class PromptManager:
             with open(file_path, 'r') as file:
                 yaml_content = yaml.safe_load(file)
         except FileNotFoundError:
-            raise FileNotFoundError(f"The YAML file at {file_path} was not found. Please check the file path and ensure it exists.")
+            try:
+                with open(self.default_prompt_path, 'r') as file:
+                    yaml_content = yaml.safe_load(file)
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Neither the role-specific prompt file at {file_path} nor the default prompt file at {self.default_prompt_path} were found.")
         except yaml.YAMLError as e:
             raise ValueError(f"Error parsing YAML file: {e}")
         
