@@ -15,8 +15,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from zi_agent.environment import Environment, generate_llm_market_agents
-from zi_agent.auction import DoubleAuction
+from llm_agents.environments.environment import Environment, generate_llm_market_agents
+from llm_agents.environments.auction import DoubleAuction
 
 from base_agent.utils import setup_logger  # Import the setup_logger function
 from base_agent.aiutilities import LLMConfig  # Import LLMConfig from aiutilities
