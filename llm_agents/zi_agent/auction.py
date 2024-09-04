@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, computed_field, ValidationError
 from colorama import Fore, Style
 
 from zi_agent.environment import Environment, generate_market_agents
-from ziagents import Order, Trade, ZIAgent, Bid, Ask, MarketInfo, MarketAction
+from zi_agent.ziagents import Order, Trade, ZIAgent, Bid, Ask, MarketInfo, MarketAction
 from acl_message.acl_message import ACLMessage, Performative
 
 # Set up logger

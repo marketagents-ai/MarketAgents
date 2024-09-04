@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from pydantic import BaseModel, Field, computed_field, model_validator
 
 from market_agent.market_agents import MarketAgent
-from ziagents import ZIAgent, create_zi_agent
+from zi_agent.ziagents import ZIAgent, create_zi_agent
 
 # Set up logger
 logger = logging.getLogger(__name__)
