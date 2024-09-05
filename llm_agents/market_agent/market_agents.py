@@ -6,7 +6,7 @@ from colorama import Fore, Style
 
 from pydantic import Field, ValidationError
 
-from acl_message.acl_message import ACLMessage, AgentID, Performative
+from protocols.acl_message import ACLMessage, AgentID, Performative
 from econ_agents.econ_agent import EconomicAgent, create_economic_agent
 from base_agent.agent import Agent as LLMAgent
 from market_agent.market_schemas import DoubleAuctionMessage, MarketActionSchema

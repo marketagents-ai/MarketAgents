@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Optional, Dict, Any, List, Generic, TypeVar
 from pydantic import BaseModel, Field
 from datetime import datetime
+from protocols.protocol import Protocol
 
 T = TypeVar('T')
 
@@ -32,7 +33,7 @@ class AgentID(BaseModel):
     address: Optional[str] = None
 
 
-class ACLMessage(BaseModel, Generic[T]):
+class ACLMessage(Protocol, Generic[T]):
     """
     Represents an ACL message with various attributes and creation methods.
 
@@ -50,10 +51,10 @@ class ACLMessage(BaseModel, Generic[T]):
         reply_by (Optional[datetime]): The deadline for replying to this message.
     """
 
-    performative: Performative
-    sender: AgentID
-    receivers: List[AgentID]
-    content: T
+    performative: Optional[Performative] = None
+    sender: Optional[AgentID] = None
+    receivers: Optional[List[AgentID]] = None
+    content: Optional[T] = None
     reply_with: Optional[str] = None
     in_reply_to: Optional[str] = None
     conversation_id: Optional[str] = None
@@ -64,6 +65,32 @@ class ACLMessage(BaseModel, Generic[T]):
 
     class Config:
         use_enum_values = True
+
+    def parse_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Parse an action into a format the environment can use.
+
+        Args:
+            action (Dict[str, Any]): The action to parse.
+
+        Returns:
+            Dict[str, Any]: The parsed action.
+        """
+        # Implement parsing logic here
+        return action
+
+    def generate_message(self, *args, **kwargs) -> 'ACLMessage':
+        """
+        Generate a new ACLMessage based on the provided arguments.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ACLMessage: A new ACLMessage instance.
+        """
+        return self.create_message(*args, **kwargs)
 
     @classmethod
     def create_bid(cls, sender: AgentID, receiver: AgentID, bid_price: float, bid_quantity: int) -> 'ACLMessage':
@@ -227,3 +254,27 @@ class ACLMessage(BaseModel, Generic[T]):
             ACLMessage: A new ACLMessage instance created from the dictionary data.
         """
         return cls(**data)
+    
+    def parse_to_market_action(self) -> Dict[str, Any]:
+        """
+        Parse the ACL message content into a market action.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the parsed market action.
+        """
+        if self.performative != Performative.PROPOSE:
+            raise ValueError(f"Unexpected performative: {self.performative}")
+        
+        content = self.content
+        if not isinstance(content, dict):
+            raise ValueError(f"Unexpected content type: {type(content)}")
+        
+        action_type = content.get("type")
+        if action_type not in ["bid", "ask"]:
+            raise ValueError(f"Invalid action type: {action_type}")
+        
+        return {
+            "type": action_type,
+            "price": content.get("price"),
+            "quantity": content.get("quantity")
+        }

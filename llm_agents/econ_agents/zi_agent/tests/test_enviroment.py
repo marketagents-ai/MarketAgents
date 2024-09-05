@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from llm_agents.environments.environment import Environment, generate_market_agents
+from llm_agents.environments.auction.auction_environment import Environment, generate_market_agents
 import math
 
 class TestEnvironment(unittest.TestCase):

@@ -5,7 +5,7 @@ from econ_agents.econ_agent import create_economic_agent
 from base_agent.agent import Agent as LLMAgent
 from base_agent.aiutilities import LLMConfig
 from market_agent.market_schemas import MarketActionSchema, DoubleAuctionMessage
-from acl_message.acl_message import ACLMessage
+from protocols.acl_message import ACLMessage
 import warnings
 
 # Set up logging
