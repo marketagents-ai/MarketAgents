@@ -4,6 +4,7 @@ from collections import defaultdict
 from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from market_agent.market_schemas import MarketActionSchema
 from pydantic import BaseModel, Field, computed_field, model_validator
 
 from market_agent.market_agent_todo import MarketAgent
@@ -425,6 +426,10 @@ class AuctionEnvironment(Environment):
         self.current_step += 1
         
         return self.get_global_state()
+
+    def get_action_schema(self) -> Dict[str, Any]:
+        """Return the JSON schema for the MarketActionSchema."""
+        return MarketActionSchema.model_json_schema()
 
 def generate_llm_market_agents(num_agents: int, num_units: int, buyer_base_value: int, seller_base_value: int, spread: float, use_llm: bool = False, llm_config: Dict[str, Any] = None, initial_cash: float = 1000, initial_goods: int = 0, noise_factor: float = 0.1) -> List[MarketAgent]:
     agents = []
