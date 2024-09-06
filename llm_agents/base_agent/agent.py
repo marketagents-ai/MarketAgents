@@ -31,11 +31,11 @@ class Agent(BaseModel):
         interactions (List[Dict[str, Any]]): History of agent interactions.
 
     Methods:
-        execute(task: Optional[str] = None) -> Union[str, Dict[str, Any]]:
+        execute(task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str]] = None) -> Union[str, Dict[str, Any]]:
             Execute a task and return the result.
-        _load_output_schema() -> None:
+        _load_output_schema(output_format: Optional[Union[Dict[str, Any], str]]) -> Optional[Dict[str, Any]]:
             Load the output schema based on the output_format.
-        _prepare_prompt_context(task: Optional[str]) -> LLMPromptContext:
+        _prepare_prompt_context(task: Optional[str], output_format: Optional[Dict[str, Any]]) -> LLMPromptContext:
             Prepare LLMPromptContext for AI inference.
         _run_ai_inference(prompt_context: LLMPromptContext) -> Union[str, Dict[str, Any]]:
             Run AI inference with retry logic.
@@ -60,38 +60,51 @@ class Agent(BaseModel):
     def __init__(self, **data: Any):
         super().__init__(**data)
         self.ai_utilities = AIUtilities()
-        self._load_output_schema()
 
-    def execute(self, task: Optional[str] = None) -> Union[str, Dict[str, Any]]:
+    def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str]] = None) -> Union[str, Dict[str, Any]]:
         """Execute a task and return the result."""
-        prompt_context = self._prepare_prompt_context(task)
+        execution_task = task if task is not None else self.task
+        execution_output_format = output_format if output_format is not None else (self.output_format or "plain_text")
+        execution_output_format = self._load_output_schema(execution_output_format)
+        
+        # Update llm_config based on output_format
+        if execution_output_format is None or execution_output_format == "text":
+            self.llm_config.response_format = "text"
+        else:
+            self.llm_config.response_format = "json_object"
+        
+        prompt_context = self._prepare_prompt_context(execution_task, execution_output_format)
         agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
 
         return self._run_ai_inference(prompt_context)
 
-    def _load_output_schema(self) -> None:
+    def _load_output_schema(self, output_format: Optional[Union[Dict[str, Any], str]] = None) -> Optional[Dict[str, Any]]:
         """Load the output schema based on the output_format."""
-        if isinstance(self.output_format, str):
-            try:
-                schema_class = globals().get(self.output_format)
-                if schema_class and issubclass(schema_class, BaseModel):
-                    self.output_format = schema_class.model_json_schema()
-                else:
-                    raise ValueError(f"Invalid schema: {self.output_format}")
-            except (ImportError, AttributeError, ValueError) as e:
-                agent_logger.warning(f"Could not load schema: {self.output_format}. Error: {str(e)}")
-                self.output_format = None
-        elif not isinstance(self.output_format, dict):
-            self.output_format = None
+        if output_format is None:
+            output_format = self.output_format
 
-    def _prepare_prompt_context(self, task: Optional[str]) -> LLMPromptContext:
+        if isinstance(output_format, str):
+            try:
+                schema_class = globals().get(output_format)
+                if schema_class and issubclass(schema_class, BaseModel):
+                    return schema_class.model_json_schema()
+                else:
+                    raise ValueError(f"Invalid schema: {output_format}")
+            except (ImportError, AttributeError, ValueError) as e:
+                agent_logger.warning(f"Could not load schema: {output_format}. Error: {str(e)}")
+                return None
+        elif isinstance(output_format, dict):
+            return output_format
+        else:
+            return None
+
+    def _prepare_prompt_context(self, task: Optional[str], output_format: Optional[Dict[str, Any]] = None) -> LLMPromptContext:
         """Prepare LLMPromptContext for AI inference."""
-        execution_task = task if task is not None else self.task
         prompt_manager = PromptManager(
             role=self.role,
-            task=execution_task,
+            task=task,
             resources=None,
-            output_schema=self.output_format,
+            output_schema=output_format,
             char_limit=1000
         )
 
@@ -100,8 +113,8 @@ class Agent(BaseModel):
         user_message = prompt_messages["messages"][1]["content"]
 
         structured_output = None
-        if self.output_format:
-            structured_output = StructuredTool(json_schema=self.output_format)
+        if output_format:
+            structured_output = StructuredTool(json_schema=output_format)
 
         return LLMPromptContext(
             system_string=system_message,
@@ -127,7 +140,7 @@ class Agent(BaseModel):
             llm_output = LLMOutput(raw_result=completion.raw_result)
             agent_logger.debug(f"Assistant Message:\n{llm_output}")
             
-            if prompt_context.llm_config.response_format in ["json", "json_object", "tool"]:
+            if prompt_context.structured_output:
                 if llm_output.json_object:
                     result = llm_output.json_object.object
                 elif llm_output.str_content:
