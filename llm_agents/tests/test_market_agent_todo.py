@@ -20,10 +20,17 @@ class TestMarketAgentBase(unittest.TestCase):
         # Suppress deprecation warnings
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         
+        #llm_config = LLMConfig(
+        #    client="anthropic",
+        #    model="claude-3-5-sonnet-20240620",
+        #    response_format="json_beg",
+        #    temperature=0.7
+        #)
+
         llm_config = LLMConfig(
-            client="anthropic",
-            model="claude-3-5-sonnet-20240620",
-            response_format="json_beg",
+            client="openai",
+            model="gpt-4o-mini",
+            response_format="json_object",
             temperature=0.7
         )
         
@@ -95,6 +102,17 @@ class TestMarketAgentBase(unittest.TestCase):
         self.assertIsNotNone(action)
         self.assertIsInstance(action, dict)
         print(f"{Fore.GREEN}LLM output for generate_action: {action}{Style.RESET_ALL}")
+        
+        # Log and print the action prompt
+        action_prompt = self.agent.prompt_manager.get_action_prompt({
+            "environment_name": "auction",
+            "perception": self.agent.perceive("auction"),
+            "environment_info": self.auction_env.get_global_state(),
+            "recent_memories": self.agent.memory[-5:] if self.agent.memory else 'No recent memories',
+            "action_space": self.auction_env.get_action_space()
+        })
+        logger.info(f"Action prompt: {action_prompt}")
+        print(f"{Fore.CYAN}Action prompt: {action_prompt}{Style.RESET_ALL}")
 
     def test_perceive(self):
         # Update the auction environment with some dummy data
@@ -105,6 +123,15 @@ class TestMarketAgentBase(unittest.TestCase):
         self.assertIsNotNone(perception)
         self.assertIsInstance(perception, str)
         print(f"{Fore.BLUE}LLM output for perception: {perception}{Style.RESET_ALL}")
+        
+        # Log and print the perception prompt
+        perception_prompt = self.agent.prompt_manager.get_perception_prompt({
+            "environment_name": "auction",
+            "environment_info": self.auction_env.get_global_state(),
+            "recent_memories": self.agent.memory[-5:] if self.agent.memory else 'No recent memories'
+        })
+        logger.info(f"Perception prompt: {perception_prompt}")
+        print(f"{Fore.MAGENTA}Perception prompt: {perception_prompt}{Style.RESET_ALL}")
 
     def test_reflect(self):
         self.agent.reflect("auction")
@@ -113,6 +140,18 @@ class TestMarketAgentBase(unittest.TestCase):
         last_memory = self.agent.memory[-1]
         self.assertEqual(last_memory["type"], "reflection")
         print(f"{Fore.YELLOW}LLM output for memory update: {last_memory['content']}{Style.RESET_ALL}")
+        
+        # Log and print the reflection prompt
+        reflection_prompt = self.agent.prompt_manager.get_reflection_prompt({
+            "environment_name": "auction",
+            "observation": self.auction_env.get_observation(self.agent.id),
+            "environment_info": self.auction_env.get_global_state(),
+            "last_action": self.agent.last_action,
+            "reward": self.auction_env.get_observation(self.agent.id).content.get('reward', 0),
+            "previous_strategy": self.agent.memory[-2].get('strategy_update', 'No previous strategy') if len(self.agent.memory) > 1 else 'No previous strategy'
+        })
+        logger.info(f"Reflection prompt: {reflection_prompt}")
+        print(f"{Fore.WHITE}Reflection prompt: {reflection_prompt}{Style.RESET_ALL}")
 
 if __name__ == '__main__':
     unittest.main()
