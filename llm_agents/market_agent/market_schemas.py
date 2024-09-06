@@ -20,3 +20,7 @@ class DoubleAuctionMessage(BaseModel):
     action: Literal["bid", "ask"]
     price: float
     quantity: int
+
+class ReflectionSchema(BaseModel):
+    reflection: str = Field(..., description="Reflection on the observation and surplus based on the last action")
+    strategy_update: str = Field(..., description="Updated strategy based on the reflection, surplus, and previous strategy")
