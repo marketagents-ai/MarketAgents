@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Type, Union
 from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,11 @@ class Environment(BaseModel, ABC):
     @abstractmethod
     def get_action_space(self) -> Any:
         """Return the action space of the environment."""
+        pass
+
+    @abstractmethod
+    def get_action_schema(self) -> Type[BaseModel]:
+        """Return the Pydantic model for the action schema of this environment."""
         pass
 
     @abstractmethod
