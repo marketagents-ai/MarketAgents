@@ -1,11 +1,13 @@
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
+from market_agent.market_schemas import ReflectionSchema
 from pydantic import Field
 from base_agent.agent import Agent as LLMAgent
 from base_agent.aiutilities import LLMConfig
 from econ_agents.econ_agent import EconomicAgent, create_economic_agent
 from environments.environment import Environment
 from protocols.protocol import Protocol
+from market_agent.market_agent_prompter import MarketAgentPromptManager
 
 class MarketAgent(LLMAgent, EconomicAgent):
     memory: List[Dict[str, Any]] = Field(default_factory=list)
@@ -13,6 +15,7 @@ class MarketAgent(LLMAgent, EconomicAgent):
     environments: Dict[str, Environment] = Field(default_factory=dict)
     protocol: Protocol = Field(..., description="Communication protocol eg. ACL")
     address: str = Field(default="", description="Agent's address")
+    prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
 
     @classmethod
     def create(cls, agent_id: int, is_buyer: bool, num_units: int, base_value: float, use_llm: bool,
@@ -55,37 +58,43 @@ class MarketAgent(LLMAgent, EconomicAgent):
 
         environment_info = self.environments[environment_name].get_global_state()
         recent_memories = self.memory[-5:] if self.memory else []
-        prompt = f"""Perceive the current state of the {environment_name} environment:
-
-        Environment State: {environment_info}
-        Recent Memories: {recent_memories if recent_memories else 'No recent memories'}
-
-        Generate a brief monologue about your current perception of this environment."""
         
-        return self.execute(prompt)
+        variables = {
+            "environment_name": environment_name,
+            "environment_info": environment_info,
+            "recent_memories": recent_memories if recent_memories else 'No recent memories'
+        }
+        
+        prompt = self.prompt_manager.get_perception_prompt(variables)
+        
+        return self.execute(prompt, output_format="text")
 
     def generate_action(self, environment_name: str) -> Dict[str, Any]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
+        environment = self.environments[environment_name]
         perception = self.perceive(environment_name)
-        environment_info = self.environments[environment_name].get_global_state()
-        action_space = self.environments[environment_name].get_action_space()
+        environment_info = environment.get_global_state()
+        action_space = environment.get_action_space()
         recent_memories = self.memory[-5:] if self.memory else []
         
-        prompt = f"""Generate an action for the {environment_name} environment based on the following:
-
-        Perception: {perception}
-        Environment State: {environment_info}
-        Recent Memories: {recent_memories if recent_memories else 'No recent memories'}
-        Available Actions: {action_space}
-
-        Choose an appropriate action for this environment. Respond with a JSON object containing 'type' (either 'bid' or 'ask'), 'price', and 'quantity'."""
+        variables = {
+            "environment_name": environment_name,
+            "perception": perception,
+            "environment_info": environment_info,
+            "recent_memories": recent_memories if recent_memories else 'No recent memories',
+            "action_space": action_space
+        }
         
-        response = self.execute(prompt)
+        prompt = self.prompt_manager.get_action_prompt(variables)
+        
+        action_schema = environment.get_action_schema()
+        
+        response = self.execute(prompt, output_format=action_schema)
         
         action = {
-            "sender": self.address,
+            "sender": self.id,
             "content": response,
         }
         self.last_action = response
@@ -96,33 +105,27 @@ class MarketAgent(LLMAgent, EconomicAgent):
             raise ValueError(f"Environment {environment_name} not found")
         
         observation = self.environments[environment_name].get_observation(self.id)
-        print(observation)
         environment_info = self.environments[environment_name].get_global_state()
         reward = observation.content.get('reward', 0)
         previous_strategy = self.memory[-1].get('strategy_update', 'No previous strategy') if self.memory else 'No previous strategy'
         
-        prompt = f"""Reflect on this observation from the {environment_name} environment:
-
-        Observation: {observation}
-        Environment State: {environment_info}
-        Last Action: {self.last_action}
-        Reward: {reward}
-
-        Actions:
-        1. Reflect on the observation and surplus based on your last action
-        2. Update strategy based on this reflection, the surplus, and your previous strategy
-
-        Previous strategy: {previous_strategy}"""
+        variables = {
+            "environment_name": environment_name,
+            "observation": observation,
+            "environment_info": environment_info,
+            "last_action": self.last_action,
+            "reward": reward,
+            "previous_strategy": previous_strategy
+        }
         
-        response = self.execute(prompt)
+        prompt = self.prompt_manager.get_reflection_prompt(variables)
         
-        # Split the response into reflection and strategy update
-        reflection, strategy_update = response.split('\n\n', 1) if '\n\n' in response else (response, '')
+        response = self.execute(prompt, output_format=ReflectionSchema.schema())
         
         self.memory.append({
             "type": "reflection",
-            "content": reflection,
-            "strategy_update": strategy_update,
+            "content": response["reflection"],
+            "strategy_update": response["strategy_update"],
             "observation": observation,
             "reward": reward,
             "timestamp": datetime.now().isoformat()
