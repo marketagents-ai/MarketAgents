@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from environments.auction.auction import DoubleAuction
 from pydantic import BaseModel, Field
 
-from market_agent.market_agent_todo import MarketAgent
+from llm_agents.market_agent.market_agents import MarketAgent
 from environments.environment import Environment
 from environments.auction.auction_environment import AuctionEnvironment
 # from environments.group_chat.group_chat_environment import GroupChatEnvironment

@@ -4,7 +4,7 @@ import logging
 from colorama import Fore, Style
 from environments.auction.auction import DoubleAuction
 from orchestrator import Orchestrator, OrchestratorConfig
-from market_agent.market_agent_todo import MarketAgent
+from llm_agents.market_agent.market_agents import MarketAgent
 from environments.auction.auction_environment import AuctionEnvironment
 from protocols.acl_message import ACLMessage
 from simulation_app import create_dashboard

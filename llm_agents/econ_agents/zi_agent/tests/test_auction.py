@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import Mock, patch
 from typing import List
+<<<<<<< HEAD
 from llm_agents.environments.auction.auction import DoubleAuction, Environment, OrderBook, Trade
+=======
+from llm_agents.environments.auction import DoubleAuction, Environment, OrderBook, Trade
+>>>>>>> main
 from ziagents import Order, MarketAction, Bid, Ask, MarketInfo
 
 class TestDoubleAuction(unittest.TestCase):
