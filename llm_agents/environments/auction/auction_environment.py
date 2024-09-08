@@ -2,7 +2,7 @@ import os
 import logging
 from collections import defaultdict
 from functools import cached_property
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from market_agent.market_schemas import MarketActionSchema
 from pydantic import BaseModel, Field, computed_field, model_validator
@@ -69,11 +69,25 @@ class AuctionEnvironment(Environment):
     """Represents the auction environment with agents and market dynamics."""
 
     agents: List[MarketAgent] = Field(..., description="List of agents in the environment")
-    current_step: int = Field(0, description="Current step in the auction")
-    max_steps: int = Field(100, description="Maximum number of steps in the auction")
-    auction: DoubleAuction = Field(..., description="The double auction mechanism")
+    max_steps: int = Field(..., description="Maximum number of steps in the auction")
     protocol: Protocol = Field(..., description="Base protocol for agent communication")
+    auction_type: Literal['double'] = Field(..., description="Type of auction")
+    current_step: int = Field(default=0, description="Current step in the auction")
+    auction: Any = Field(None, description="The auction mechanism")
 
+    class Config:
+        arbitrary_types_allowed = True
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.auction = self._create_auction()
+
+    def _create_auction(self):
+        if self.auction_type == 'double':
+            return DoubleAuction(agents=self.agents, max_rounds=self.max_steps)
+        else:
+            raise ValueError(f"Unsupported auction type: {self.auction_type}")
+        
     @property
     def buyers(self) -> List[MarketAgent]:
         """Get all buyer agents in the environment."""
@@ -330,18 +344,19 @@ class AuctionEnvironment(Environment):
 
         return ce_price, ce_quantity, buyer_surplus, seller_surplus, total_surplus
 
-    def update(self, agent_actions: Dict[str, Any]) -> Dict[str, Any]:
+    def step(self, agent_actions: Dict[str, Any]) -> Dict[str, Any]:
         """Update the global state based on agent actions."""
         # Process agent actions and update the auction
-        self.auction.process_actions(agent_actions)
+        parsed_actions = {agent_id: self.parse_action(action) for agent_id, action in agent_actions.items()}
+        self.auction.process_actions(parsed_actions)
         
         # Execute trades
         trades = self.auction.execute_trades()
         
         # Update agent observations based on trade results
         for agent in self.agents:
-            observation = self.auction.get_observation(agent.id)
-            self._send_observation(agent, observation)
+            observation = self.get_observation(agent.id)
+            agent.perceive(observation)
         
         # Update the environment state
         self.current_step += 1
