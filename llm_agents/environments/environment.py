@@ -6,6 +6,8 @@ class Environment(BaseModel, ABC):
     name: str = Field(..., description="Name of the environment")
     address: str = Field(..., description="Address of the environment for orchestrator linking")
     global_state: Dict[str, Any] = Field(default_factory=dict, description="Global state of the environment")
+    current_step: int = Field(default=0, description="Current step/round of the simulation")
+    max_steps: int = Field(..., description="Maximum number of steps/rounds for this environment")
 
     @abstractmethod
     def update(self, agent_actions: Dict[str, Any]) -> Dict[str, Any]:
@@ -30,17 +32,7 @@ class Environment(BaseModel, ABC):
         Return a summary of the global state, including metrics like last trade price, average price, etc.
         """
         pass
-
-    @abstractmethod
-    def reset(self) -> Dict[str, Any]:
-        """Reset the environment and return the initial global state."""
-        pass
-
-    @abstractmethod
-    def render(self):
-        """Render the environment."""
-        pass
-
+    
     @abstractmethod
     def get_action_space(self) -> Any:
         """Return the action space of the environment."""
@@ -57,8 +49,14 @@ class Environment(BaseModel, ABC):
         pass
 
     @abstractmethod
-    def get_global_state(self) -> Dict[str, Any]:
-        """Return the current global state of the environment."""
+    def reset(self) -> Dict[str, Any]:
+        """Reset the environment and return the initial global state."""
+        self.current_step = 0
+        return self.get_global_state()
+
+    @abstractmethod
+    def render(self):
+        """Render the environment."""
         pass
 
     @abstractmethod
@@ -68,6 +66,22 @@ class Environment(BaseModel, ABC):
         This method should be flexible to accommodate different message protocols (e.g., ACL).
         """
         pass
+
+    @abstractmethod
+    def step(self) -> Dict[str, Any]:
+        """
+        Advance the environment by one step/round.
+        This method should be called by the orchestrator to progress the simulation.
+        """
+        if self.current_step < self.max_steps:
+            self.current_step += 1
+        return self.get_global_state()
+
+    def get_current_step(self) -> int:
+        """
+        Return the current step/round of the simulation.
+        """
+        return self.current_step
 
     class Config:
         arbitrary_types_allowed = True
