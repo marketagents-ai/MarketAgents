@@ -27,7 +27,7 @@ class TestMarketAgentBase(unittest.TestCase):
         #    temperature=0.7
         #)
 
-        llm_config = LLMConfig(
+        self.llm_config = LLMConfig(
             client="openai",
             model="gpt-4o-mini",
             response_format="json_object",
@@ -42,27 +42,22 @@ class TestMarketAgentBase(unittest.TestCase):
             seller_base_value=80.0,
             spread=0.2,
             use_llm=True,
-            llm_config=llm_config,
-            initial_cash=1000.0,
-            initial_goods=0,
+            llm_config=self.llm_config,
+            initial_cash=1000,
+            initial_goods=5,
             noise_factor=0.1
         )
-        
-        self.agent = self.agents[0]  # Use the first agent for individual tests
 
-        # Create a DoubleAuction instance
-        self.auction = DoubleAuction(max_rounds=100)
-
-        # Create a dummy auction environment
         self.auction_env = AuctionEnvironment(
-            name="TestAuction",
-            address="test_auction_address",
             agents=self.agents,
-            current_step=0,
-            max_steps=100,
-            auction=self.auction,  # Pass the DoubleAuction instance
-            protocol=ACLMessage()  # Pass the ACLMessage class as the protocol
+            max_steps=5,
+            protocol=ACLMessage(),
+            name="TestAuction",
+            address="test_auction_1",
+            auction_type='double'
         )
+
+        self.agent = self.agents[0]   # Use the first agent for individual tests
 
         # Add the auction environment to the agent's environments
         self.agent.environments = {"auction": self.auction_env}
