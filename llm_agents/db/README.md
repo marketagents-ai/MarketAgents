@@ -125,4 +125,48 @@ Here are some example queries for common operations:
 
 3. Test your recovery process regularly to ensure data can be restored successfully.
 
+## Docker Setup and Database Initialization
+
+To set up and run the PostgreSQL database using Docker:
+
+1. Ensure Docker and Docker Compose are installed on your system.
+
+2. Navigate to the directory containing the `docker-compose.yaml` file.
+
+3. Build and start the Docker containers:
+
+   ```bash
+   docker-compose up --build
+   ```
+
+   This command will:
+   - Build the Docker images if they don't exist
+   - Start the PostgreSQL database container
+   - Start the application container, which will run the setup script
+
+4. Wait for the setup to complete. You should see output indicating that the database and tables have been created successfully.
+
+5. The database is now ready for use with the following connection details:
+   - Host: localhost
+   - Port: 5433
+   - Database: market_simulation
+   - Username: db_user
+   - Password: db_pwd@123
+
+6. To stop the containers, use:
+
+   ```bash
+   docker-compose down
+   ```
+
+7. If you need to reset the database completely, remove the volume:
+
+   ```bash
+   docker-compose down -v
+   ```
+
+   Then, rebuild and start the containers again using step 3.
+
+These steps will set up your PostgreSQL database in a Docker container and initialize it with the necessary tables and data.
+
 For any questions or issues, please open an issue in the repository or contact the database administrator.

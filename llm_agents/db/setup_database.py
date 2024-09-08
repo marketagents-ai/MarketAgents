@@ -1,5 +1,6 @@
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+import os
 
 # Database connection parameters
 DB_NAME = "market_simulation"
@@ -11,10 +12,11 @@ DB_PORT = "5432"
 def create_database():
     # Connect to PostgreSQL server
     conn = psycopg2.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
+        dbname=os.environ.get('DB_NAME', 'market_simulation'),
+        user=os.environ.get('DB_USER', 'db_user'),
+        password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
+        host=os.environ.get('DB_HOST', 'db'),  # Use 'db' instead of 'localhost'
+        port=os.environ.get('DB_PORT', '5432')
     )
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cursor = conn.cursor()
@@ -34,11 +36,11 @@ def create_database():
 def create_tables():
     # Connect to the market_simulation database
     conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
+        dbname=os.environ.get('DB_NAME', 'market_simulation'),
+        user=os.environ.get('DB_USER', 'db_user'),
+        password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
+        host=os.environ.get('DB_HOST', 'db'),
+        port=os.environ.get('DB_PORT', '5432')
     )
     cursor = conn.cursor()
 

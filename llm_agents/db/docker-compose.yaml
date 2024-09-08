@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: market_simulation
+      POSTGRES_USER: db_user
+      POSTGRES_PASSWORD: db_pwd@123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  app:
+    build: .
+    environment:
+      DB_NAME: market_simulation
+      DB_USER: db_user
+      DB_PASSWORD: db_pwd@123
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
