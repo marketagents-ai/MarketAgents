@@ -3,8 +3,8 @@ from unittest.mock import Mock, patch
 import logging
 from colorama import Fore, Style
 from environments.auction.auction import DoubleAuction
-from orchestrator import Orchestrator, OrchestratorConfig
-from llm_agents.market_agent.market_agents import MarketAgent
+from orchestrator import Orchestrator, OrchestratorConfig, AgentConfig, AuctionConfig, LLMConfig
+from market_agent.market_agents import MarketAgent
 from environments.auction.auction_environment import AuctionEnvironment
 from protocols.acl_message import ACLMessage
 from simulation_app import create_dashboard
@@ -19,30 +19,30 @@ class TestOrchestrator(unittest.TestCase):
         self.config = OrchestratorConfig(
             num_agents=5,
             max_rounds=3,
-            agent_config={
-                'num_units': 5,
-                'base_value': 100,
-                'use_llm': True,
-                'initial_cash': 1000,
-                'initial_goods': 0,
-                'noise_factor': 0.1,
-                'max_relative_spread': 0.2
-            },
-            llm_config={
-                'client': 'openai',
-                'model': 'gpt-4-0613',
-                'temperature': 0.5,
-                'response_format': 'json_object',
-                'max_tokens': 4096,
-                'use_cache': True
-            },
+            agent_config=AgentConfig(
+                num_units=5,
+                base_value=100,
+                use_llm=True,
+                initial_cash=1000,
+                initial_goods=0,
+                noise_factor=0.1,
+                max_relative_spread=0.2
+            ),
+            llm_config=LLMConfig(
+                client='openai',
+                model='gpt-4-0613',
+                temperature=0.5,
+                response_format='json_object',
+                max_tokens=4096,
+                use_cache=True
+            ),
             environment_configs={
-                'auction': {
-                    'name': 'Auction',
-                    'address': 'auction_env_1',
-                    'auction_type': 'double',
-                    'max_steps': 5,
-                }
+                'auction': AuctionConfig(
+                    name='Auction',
+                    address='auction_env_1',
+                    auction_type='double',
+                    max_steps=5,
+                )
             },
             protocol=ACLMessage,
             database_config={
@@ -53,7 +53,7 @@ class TestOrchestrator(unittest.TestCase):
         self.orchestrator = Orchestrator(self.config)
         logger.info(f"{Fore.GREEN}TestOrchestrator setup complete.{Style.RESET_ALL}")
 
-    @patch('market_agent.market_agent_todo.MarketAgent.create')
+    @patch('market_agent.market_agents.MarketAgent.create')
     def test_generate_agents(self, mock_create):
         logger.info(f"{Fore.YELLOW}Testing generate_agents method...{Style.RESET_ALL}")
         logger.info("This test ensures that the correct number of agents are created and they are of the right type.")
@@ -122,21 +122,17 @@ class TestOrchestrator(unittest.TestCase):
 
     def test_run_environment(self):
         logger.info(f"{Fore.YELLOW}Testing run_environment method...{Style.RESET_ALL}")
-        logger.info("This test ensures that the environment steps correctly and agents perceive and generate actions.")
+        logger.info("This test ensures that the environment steps correctly and agents generate actions.")
         mock_env = Mock(spec=AuctionEnvironment)
         mock_env.step.return_value = Mock()
-        mock_env.get_observation.return_value = Mock()
         self.orchestrator.environments = {'auction': mock_env}
         self.orchestrator.agents = [Mock(spec=MarketAgent, id=f"agent_{i}") for i in range(self.config.num_agents)]
         
         self.orchestrator.run_environment('auction')
         
         mock_env.step.assert_called_once()
-        self.assertEqual(mock_env.get_observation.call_count, self.config.num_agents)
-        self.assertEqual(mock_env.update.call_count, self.config.num_agents)
         for agent in self.orchestrator.agents:
-            agent.perceive.assert_called_once()
-            agent.generate_action.assert_called_once()
+            agent.generate_action.assert_called_once_with('auction')
         logger.info(f"{Fore.GREEN}run_environment test passed successfully.{Style.RESET_ALL}")
 
 if __name__ == '__main__':
