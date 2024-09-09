@@ -1,0 +1,12 @@
+title: "# Custom Memory Module for Agent Context"
+sections:
+  - name: "Conversation Log"
+    content: "${conversation_history}"
+  - name: "Recent Observations"
+    content: "${short_term_memory}"
+  - name: "Relevant Long-term Memories"
+    content: "${long_term_memory}"
+  - name: "Additional Resources"
+    content: "${external_references}"
+  - name: "Metadata"
+    content: "${context_metadata}"

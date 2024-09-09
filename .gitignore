@@ -18,3 +18,12 @@ llm_agents/logs*
 venv
 venv/*
 venv/**
+
+#toy folder configs
+cognitive_modules/memory/retrieval_toys/bm25/config.yaml
+cognitive_modules/memory/retrieval_toys/long_term_prototype/config.yaml
+
+# ignore toy DOCS with .md in these are for injesting and testing the toys
+cognitive_modules/memory/retrieval_toys/DOCS
+cognitive_modules/memory/retrieval_toys/DOCS/*
+cognitive_modules/memory/retrieval_toys/DOCS/** 

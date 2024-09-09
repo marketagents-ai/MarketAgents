@@ -4,6 +4,8 @@ from data_loader import load_data
 from indexer import Indexer
 from searcher import Searcher
 from config import Config
+import aiofiles
+
 
 async def main():
     parser = argparse.ArgumentParser(description="Advanced Distributed Search System")
