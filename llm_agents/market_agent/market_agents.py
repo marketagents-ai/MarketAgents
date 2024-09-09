@@ -1,7 +1,10 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Type
 from datetime import datetime
-from market_agent.market_schemas import ReflectionSchema
+from market_agent.market_schemas import PerceptionSchema, ReflectionSchema
 from pydantic import Field
+from base_agent.agent import Agent as LLMAgent
+from base_agent.aiutilities import LLMConfig
+from econ_agents.econ_agent import EconomicAgent, create_economic_agent
 from base_agent.agent import Agent as LLMAgent
 from base_agent.aiutilities import LLMConfig
 from econ_agents.econ_agent import EconomicAgent, create_economic_agent
@@ -13,7 +16,7 @@ class MarketAgent(LLMAgent, EconomicAgent):
     memory: List[Dict[str, Any]] = Field(default_factory=list)
     last_action: Optional[Dict[str, Any]] = None
     environments: Dict[str, Environment] = Field(default_factory=dict)
-    protocol: Protocol = Field(..., description="Communication protocol eg. ACL")
+    protocol: Type[Protocol]
     address: str = Field(default="", description="Agent's address")
     prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
 
@@ -52,9 +55,57 @@ class MarketAgent(LLMAgent, EconomicAgent):
             # Add any other necessary fields from llm_agent here
         )
 
-    def perceive(self, environment_name: str) -> str:
-        if environment_name not in self.environments:
-            raise ValueError(f"Environment {environment_name} not found")
+    def _generate_llm_bid(self, market_info: Dict[str, Any], round_num: int) -> Optional[ACLMessage]:
+        market_info_str = self._get_market_info(market_info)
+        recent_memories = self.get_recent_memories(2)
+        memory_str = self._format_memories(recent_memories)
+
+        task_prompt = f"Generate a market action based on the following market information: {market_info_str}"
+        
+        if memory_str:
+            task_prompt += f"\n\nRecent market activities:\n{memory_str}"
+        
+        llm_response = self.execute(task_prompt)
+
+        self.log_interaction(round_num, task_prompt, llm_response)
+
+        try:
+            market_action = MarketActionSchema(**llm_response)
+        except ValidationError as e:
+            logger.error(f"{Fore.RED}Validation error in LLM response: {e}{Style.RESET_ALL}")
+            return None
+
+        if market_action.action == "hold" or market_action.bid is None:
+            return None
+        
+        return self._create_acl_message(market_action.bid.acl_message.action, 
+                                        market_action.bid.acl_message.price, 1)
+
+    def _generate_econ_bid(self, market_info: Dict[str, Any], round_num: int) -> Optional[ACLMessage]:
+        econ_bid = self.generate_bid(market_info)
+        if econ_bid is None:
+            return None
+        return self._create_acl_message("bid" if self.is_buyer else "ask", econ_bid["price"], econ_bid["quantity"])
+
+    def _create_acl_message(self, action: str, price: float, quantity: int) -> ACLMessage:
+        sender_id = AgentID(name=str(self.id), address=self.address)
+        receiver_id = AgentID(name="market", address=MARKET_ADDRESS)
+
+        content = DoubleAuctionMessage(
+            action=action,
+            price=price,
+            quantity=quantity
+        )
+
+        return ACLMessage(
+            performative=Performative.PROPOSE,
+            sender=sender_id,
+            receivers=[receiver_id],
+            content=content,
+            protocol="double-auction",
+            ontology="market-ontology",
+            conversation_id=f"{action}-{datetime.now().isoformat()}"
+        )
 
         environment_info = self.environments[environment_name].get_global_state()
         recent_memories = self.memory[-5:] if self.memory else []
@@ -67,14 +118,15 @@ class MarketAgent(LLMAgent, EconomicAgent):
         
         prompt = self.prompt_manager.get_perception_prompt(variables)
         
-        return self.execute(prompt, output_format="text")
+        return self.execute(prompt, output_format=PerceptionSchema.schema())
 
-    def generate_action(self, environment_name: str) -> Dict[str, Any]:
+    def generate_action(self, environment_name: str, perception: Optional[str] = None) -> Dict[str, Any]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
         environment = self.environments[environment_name]
-        perception = self.perceive(environment_name)
+        if perception is None:
+            perception = self.perceive(environment_name)
         environment_info = environment.get_global_state()
         action_space = environment.get_action_space()
         recent_memories = self.memory[-5:] if self.memory else []
@@ -130,3 +182,5 @@ class MarketAgent(LLMAgent, EconomicAgent):
             "reward": reward,
             "timestamp": datetime.now().isoformat()
         })
+
+        return response["reflection"]
