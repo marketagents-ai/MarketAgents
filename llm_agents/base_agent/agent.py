@@ -65,13 +65,14 @@ class Agent(BaseModel):
         """Execute a task and return the result."""
         execution_task = task if task is not None else self.task
         execution_output_format = output_format if output_format is not None else (self.output_format or "plain_text")
-        execution_output_format = self._load_output_schema(execution_output_format)
         
         # Update llm_config based on output_format
-        if execution_output_format is None or execution_output_format == "text":
+        if execution_output_format == "plain_text":
             self.llm_config.response_format = "text"
         else:
             self.llm_config.response_format = "json_object"
+            execution_output_format = self._load_output_schema(execution_output_format)
+
         
         prompt_context = self._prepare_prompt_context(execution_task, execution_output_format)
         agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
@@ -111,9 +112,9 @@ class Agent(BaseModel):
         prompt_messages = prompt_manager.generate_prompt_messages()
         system_message = prompt_messages["messages"][0]["content"]
         user_message = prompt_messages["messages"][1]["content"]
-
+       
         structured_output = None
-        if output_format:
+        if output_format and isinstance(output_format, dict):
             structured_output = StructuredTool(json_schema=output_format)
 
         return LLMPromptContext(
@@ -127,34 +128,33 @@ class Agent(BaseModel):
         wait=wait_random_exponential(multiplier=1, max=30),
         stop=stop_after_attempt(max_retries)
     )
-    def _run_ai_inference(self, prompt_context: LLMPromptContext) -> Union[str, Dict[str, Any]]:
-        """Run AI inference with retry logic."""
+    @retry(
+        wait=wait_random_exponential(multiplier=1, max=30),
+        stop=stop_after_attempt(2),  # Limit to 2 attempts
+        reraise=True  # Reraise the last exception
+    )
+    def _run_ai_inference(self, prompt_context: LLMPromptContext) -> Any:
         try:
-            agent_logger.info(f"Running inference with {prompt_context.llm_config.client}")
+            llm_output = self.ai_utilities.run_ai_completion(prompt_context)
             
-            if self.tools:
-                completion = self.ai_utilities.run_ai_tool_completion(prompt_context)
-            else:
-                completion = self.ai_utilities.run_ai_completion(prompt_context)
-            
-            llm_output = LLMOutput(raw_result=completion.raw_result)
-            agent_logger.debug(f"Assistant Message:\n{llm_output}")
-            
-            if prompt_context.structured_output:
+            if prompt_context.llm_config.response_format == "text":
+                return llm_output.str_content or str(llm_output.raw_result)
+            elif prompt_context.llm_config.response_format in ["json_beg", "json_object", "structured_output"]:
                 if llm_output.json_object:
-                    result = llm_output.json_object.object
+                    return llm_output.json_object.object
                 elif llm_output.str_content:
                     try:
-                        result = json.loads(llm_output.str_content)
+                        return json.loads(llm_output.str_content)
                     except json.JSONDecodeError:
-                        result = extract_json_from_response(llm_output.str_content)
-                else:
-                    result = {}
-            else:
-                result = llm_output.str_content or str(llm_output.raw_result)
+                        return extract_json_from_response(llm_output.str_content)
+            elif prompt_context.llm_config.response_format == "tool":
+                # Handle tool response format if needed
+                pass
             
-            self._log_interaction(prompt_context, result)
-            return result
+            # If no specific handling or parsing failed, return the raw output
+            agent_logger.warning(f"No parsing logic for response format '{prompt_context.llm_config.response_format}'. Returning raw output.")
+            return llm_output.raw_result
+        
         except Exception as e:
             agent_logger.error(f"Error during AI inference: {e}")
             raise
