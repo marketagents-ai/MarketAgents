@@ -1,9 +1,17 @@
 import unittest
 from tool_caller.tool_calling_engine import ToolCallingEngine, FunctionCall
 
+# Declare mock functions
+def get_rain_probability(location: str) -> float:
+    return 0.3
+
+def get_current_temperature(location: str, unit: str) -> float:
+    return 72.5
+
 class TestToolCallingEngine(unittest.TestCase):
     def setUp(self):
         self.engine = ToolCallingEngine()
+        self.engine.register_tools([get_rain_probability, get_current_temperature])
 
     def test_parse_tool_calls(self):
         tool_calls = [
@@ -38,14 +46,6 @@ class TestToolCallingEngine(unittest.TestCase):
         self.assertEqual(parsed_calls[1].parameters, {"location": "San Francisco, CA", "unit": "Fahrenheit"})
 
     def test_process_tool_calls(self):
-        # Mock the execute_tool_call method to return a predefined result
-        def mock_execute_tool_call(tool_call):
-            if tool_call.name == "get_rain_probability":
-                return 0.3
-            elif tool_call.name == "get_current_temperature":
-                return 72.5
-
-        self.engine.execute_tool_call = mock_execute_tool_call
 
         tool_calls = [
             {
