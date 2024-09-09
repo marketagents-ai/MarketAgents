@@ -34,10 +34,15 @@ class FunctionCall(BaseModel):
 
     name: str
         The name of the function.
-    parameters: list[Parameter]
+    parameters: dict[str, ValidParameter]
         The parameters of the function.
     returns: Optional[list[Parameter]]
         The return values of the function. 
+        
+        If the used function call format does not 
+        support the "returns" field, this schema 
+        will still be valid.
+
     """
     name: str
     parameters: dict[str, ValidParameter]
@@ -52,7 +57,7 @@ class OpenAIFunction(BaseModel):
     name: str
         The name of the function.
     """
-    arguments: Dict[str, ValidParameter]
+    arguments: dict[str, ValidParameter]
     name: str
 
 class OpenAIToolCall(BaseModel):
@@ -89,6 +94,16 @@ class ToolCallingEngine:
         """
         self.tools[name] = function
         self.engine.add_functions([function])
+
+    def register_tools(self, tools: List[Callable]):
+        """
+        Register a list of tools with their schemas and functions.
+
+        Args:
+            tools (List[Callable]): A list of tools to be registered.
+        """
+        for tool in tools:
+            self.register_tool(tool.__name__, tool)
 
     def parse_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[FunctionCall]:
         """
@@ -254,6 +269,21 @@ class FunctionCallingEngine:
             outputs.append(output)
         return outputs
     
+    def _convert_openai_tool_call(self, tool_call: dict) -> FunctionCall:
+        """
+        Convert an OpenAI tool call to a FunctionCall.
+
+        tool_call: dict
+            The OpenAI tool call to be converted.
+        """
+        function = tool_call['function']
+        arguments = json.loads(function['arguments'])
+        return FunctionCall(
+            name=function['name'],
+            parameters=arguments,
+            returns=None  # OpenAI tool calls do not specify returns
+        )
+
     def parse_function_calls(self, function_calls: Union[dict, list[dict]]) -> list[FunctionCall]:
         """
         Parse either a single function call or
@@ -267,10 +297,17 @@ class FunctionCallingEngine:
         elif not isinstance(function_calls, list):
             raise TypeError("Input must be a dictionary or a list of dictionaries")
 
-        try:
-            return [FunctionCall(**function_call) for function_call in function_calls]
-        except Exception:
-            raise ValueError(INVALID_FUNCTION_CALL_ERROR)
+        parsed_calls = []
+        for call in function_calls:
+            if 'id' in call and 'function' in call and 'type' in call:
+                parsed_calls.append(self._convert_openai_tool_call(call))
+            else:
+                try:
+                    parsed_calls.append(FunctionCall(**call))
+                except Exception:
+                    raise ValueError(INVALID_FUNCTION_CALL_ERROR)
+        
+        return parsed_calls
 
     def parse_and_call_functions(
             self, 
