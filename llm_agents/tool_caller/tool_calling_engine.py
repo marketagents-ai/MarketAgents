@@ -123,7 +123,7 @@ class ToolCallingEngine:
                     function_call = FunctionCall(
                         name=tool_call['function']['name'],
                         parameters=parameters,
-                        returns=None 
+                        returns=None
                     )
                     function_calls.append(function_call)
                 except json.JSONDecodeError as e:
@@ -175,6 +175,8 @@ class ToolCallingEngine:
 
         return self.engine.call_function(tool_call)
 
+# Sourced from AtakanTekparmak/tiny_fnc_engine
+# https://github.com/AtakanTekparmak/tiny_fnc_engine/blob/main/tiny_fnc_engine/engine.py
 class FunctionCallingEngine:
     """
     Engine to call functions extracted 
