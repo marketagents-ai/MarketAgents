@@ -1,7 +1,11 @@
 import os
 import datetime
 import matplotlib.pyplot as plt
-from environment import Environment
+<<<<<<< HEAD
+from llm_agents.environments.auction.auction_environment import Environment
+=======
+from llm_agents.environments.environment import Environment
+>>>>>>> main
 from ziagents import Trade, ZIAgent
 
 def create_report_folder():

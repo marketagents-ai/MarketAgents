@@ -332,6 +332,13 @@ class LLMOutput(BaseModel):
     raw_result: Union[str, dict, ChatCompletion, AnthropicMessage, PromptCachingBetaMessage]
     completion_kwargs: Optional[Dict[str, Any]] = None
 
+    def __str__(self):
+        if isinstance(self.raw_result, str):
+            return self.raw_result
+        elif hasattr(self.raw_result, '__dict__'):
+            return json.dumps(self.raw_result.__dict__, indent=2, default=str)
+        else:
+            return str(self.raw_result)
 
     @computed_field
     @property

@@ -1,0 +1,32 @@
+# Market Agent Prompts
+perception: |
+  Perceive the current state of the {environment_name} environment:
+
+  Environment State: {environment_info}
+  Recent Memories: {recent_memories}
+
+  Generate a brief monologue about your current perception of this environment.
+
+action: |
+  Generate an action for the {environment_name} environment based on the following:
+
+  Perception: {perception}
+  Environment State: {environment_info}
+  Recent Memories: {recent_memories}
+  Available Actions: {action_space}
+
+  Choose an appropriate action for this environment.
+
+reflection: |
+  Reflect on this observation from the {environment_name} environment:
+
+  Observation: {observation}
+  Environment State: {environment_info}
+  Last Action: {last_action}
+  Reward: {reward}
+
+  Actions:
+  1. Reflect on the observation and surplus based on your last action
+  2. Update strategy based on this reflection, the surplus, and your previous strategy
+
+  Previous strategy: {previous_strategy}

@@ -28,7 +28,7 @@ class PromptManager:
     """
 
     def __init__(self, role: str, task: Union[str, List[str]], resources: Optional[Any],
-                 output_schema: str, char_limit: int):
+                 output_schema: Optional[Union[str, Dict[str, Any]]], char_limit: int):
         """
         Initialize the PromptManager.
 
@@ -36,7 +36,7 @@ class PromptManager:
             role (str): The role of the AI agent.
             task (Union[str, List[str]]): The task or list of tasks for the agent.
             resources (Optional[Any]): Additional resources for prompt generation.
-            output_schema (str): The schema for the expected output.
+            output_schema (Optional[Union[str, Dict[str, Any]]]): The schema for the expected output or output format.
             char_limit (int): Character limit for the prompts.
         """
         self.role = role
@@ -90,14 +90,14 @@ class PromptManager:
         return yaml_content
 
     def _create_prompt_vars_dict(self, task: Union[str, List[str]], resources: Optional[Any],
-                          output_schema: str) -> Dict[str, Any]:
+                          output_schema: Optional[Union[str, Dict[str, Any]]]) -> Dict[str, Any]:
         """
         Create a dictionary of variables for prompt formatting.
 
         Args:
             task (Union[str, List[str]]): The task or list of tasks.
             resources (Optional[Any]): Additional resources.
-            output_schema (str): The output schema.
+            output_schema (Optional[Union[str, Dict[str, Any]]]): The output schema or format.
 
         Returns:
             Dict[str, Any]: Dictionary of variables for prompt formatting.
@@ -109,13 +109,18 @@ class PromptManager:
         if resources is not None:
             # TODO: @interstellarninja implement document/memory retrieval methods
             raise NotImplementedError("Document retrieval is not implemented yet.")
+        
+        pydantic_schema = output_schema if isinstance(output_schema, dict) else None
+        output_format = output_schema if isinstance(output_schema, str) else "json_object"
+        
         input_vars = {
             "role": self.role,
             "objectives": None,
             "task": task,
             "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "doc_list": documents,
-            "pydantic_schema": output_schema,
+            "pydantic_schema": json.dumps(pydantic_schema) if pydantic_schema else None,
+            "output_format": output_format
         }
 
         return input_vars
@@ -130,8 +135,11 @@ class PromptManager:
         system_content = (
             f"Role: {self.prompt_schema['Role'].format(**self.prompt_vars)}\n"
             f"Objectives: {self.prompt_schema['Objectives'].format(**self.prompt_vars)}\n"
-            f"Output_schema: {self.prompt_schema['Output_schema'].format(**self.prompt_vars)}"
         )
+        if self.prompt_vars['pydantic_schema']:
+            system_content += f"Output_schema: {self.prompt_schema['Output_schema'].format(**self.prompt_vars)}"
+        else:
+            system_content += f"Output_format: {self.prompt_vars['output_format']}"
         return system_content
 
     def generate_task_prompt(self) -> str:
@@ -220,3 +228,16 @@ if __name__ == "__main__":
 
     print("\nUser Prompt:")
     print(user_prompt)
+
+    # Example with plain text output
+    prompt_manager_plain = PromptManager(
+        role="default",
+        task=task.tasks,
+        resources=None,
+        output_schema="plain_text",
+        char_limit=1000
+    )
+
+    prompt_messages_plain = prompt_manager_plain.generate_prompt_messages()
+    print("\nGenerated Prompt Messages (Plain Text):")
+    print(json.dumps(prompt_messages_plain, indent=2))

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict, Any
 
 class ACLContent(BaseModel):
     action: Literal["bid", "ask"]
@@ -20,3 +20,11 @@ class DoubleAuctionMessage(BaseModel):
     action: Literal["bid", "ask"]
     price: float
     quantity: int
+
+class ReflectionSchema(BaseModel):
+    reflection: str = Field(..., description="Reflection on the observation and surplus based on the last action")
+    strategy_update: str = Field(..., description="Updated strategy based on the reflection, surplus, and previous strategy")
+
+class PerceptionSchema(BaseModel):
+    monologue: str = Field(..., description="Agent's internal monologue about the perceived market situation")
+    strategy: str= Field(..., description="Agent's strategy given the current market situation")
