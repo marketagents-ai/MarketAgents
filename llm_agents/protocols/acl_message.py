@@ -6,10 +6,8 @@ from protocols.protocol import Protocol
 
 T = TypeVar('T')
 
-
 class Performative(Enum):
     """Enumeration of ACL message performatives."""
-
     ACCEPT_PROPOSAL = "accept-proposal"
     CALL_FOR_PROPOSAL = "cfp"
     PROPOSE = "propose"
@@ -19,38 +17,13 @@ class Performative(Enum):
     QUERY_IF = "query-if"
     NOT_UNDERSTOOD = "not-understood"
 
-
 class AgentID(BaseModel):
-    """
-    Represents the identity of an agent.
-
-    Attributes:
-        name (str): The name of the agent.
-        address (Optional[str]): The address of the agent, if applicable.
-    """
-
+    """Represents the identity of an agent."""
     name: str
     address: Optional[str] = None
 
-
-class ACLMessage(Protocol, Generic[T]):
-    """
-    Represents an ACL message with various attributes and creation methods.
-
-    Attributes:
-        performative (Performative): The type of performative for the message.
-        sender (AgentID): The sender of the message.
-        receivers (List[AgentID]): The list of receivers for the message.
-        content (T): The content of the message.
-        reply_with (Optional[str]): An identifier for the message to be used in replies.
-        in_reply_to (Optional[str]): The identifier of the message this is replying to.
-        conversation_id (Optional[str]): An identifier for the conversation this message is part of.
-        protocol (str): The protocol being used (default is "double-auction").
-        language (str): The language of the message content (default is "JSON").
-        ontology (str): The ontology used for the message content (default is "market-ontology").
-        reply_by (Optional[datetime]): The deadline for replying to this message.
-    """
-
+class ACLMessage(Protocol, BaseModel, Generic[T]):
+    """Represents an ACL message with various attributes and creation methods."""
     performative: Optional[Performative] = None
     sender: Optional[AgentID] = None
     receivers: Optional[List[AgentID]] = None
@@ -66,18 +39,37 @@ class ACLMessage(Protocol, Generic[T]):
     class Config:
         use_enum_values = True
 
-    def parse_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Parse an action into a format the environment can use.
+    @classmethod
+    def create_observation(cls, sender: str, agent_id: str, content: Any, step: int):
+        """Create an observation message."""
+        return cls(
+            performative=Performative.INFORM,  # Use the enum value directly
+            sender=AgentID(name=sender),
+            receivers=[AgentID(name=agent_id)],
+            content=content,
+            protocol="double-auction",
+            ontology="market-ontology",
+            conversation_id=f"observation-{step}-{agent_id}"
+        )
 
-        Args:
-            action (Dict[str, Any]): The action to parse.
-
-        Returns:
-            Dict[str, Any]: The parsed action.
-        """
-        # Implement parsing logic here
-        return action
+    def parse_action(self) -> Dict[str, Any]:
+        """Parse the ACL message content into a market action."""
+        if self.performative not in [Performative.PROPOSE, Performative.REQUEST]:
+            return {"type": "hold", "price": 0, "quantity": 0}
+        
+        content = self.content
+        if not isinstance(content, dict):
+            return {"type": "hold", "price": 0, "quantity": 0}
+        
+        action_type = content.get("type", "hold")
+        if action_type not in ["bid", "ask", "hold"]:
+            return {"type": "hold", "price": 0, "quantity": 0}
+        
+        return {
+            "type": action_type,
+            "price": float(content.get("price", 0)),
+            "quantity": int(content.get("quantity", 0))
+        }
 
     def generate_message(self, *args, **kwargs) -> 'ACLMessage':
         """
@@ -256,25 +248,20 @@ class ACLMessage(Protocol, Generic[T]):
         return cls(**data)
     
     def parse_to_market_action(self) -> Dict[str, Any]:
-        """
-        Parse the ACL message content into a market action.
-        
-        Returns:
-            Dict[str, Any]: A dictionary containing the parsed market action.
-        """
-        if self.performative != Performative.PROPOSE:
-            raise ValueError(f"Unexpected performative: {self.performative}")
+        """Parse the ACL message content into a market action."""
+        if self.performative not in [Performative.PROPOSE, Performative.REQUEST]:
+            return {"type": "hold", "price": 0, "quantity": 0}
         
         content = self.content
         if not isinstance(content, dict):
-            raise ValueError(f"Unexpected content type: {type(content)}")
+            return {"type": "hold", "price": 0, "quantity": 0}
         
-        action_type = content.get("type")
-        if action_type not in ["bid", "ask"]:
-            raise ValueError(f"Invalid action type: {action_type}")
+        action_type = content.get("type", "hold")
+        if action_type not in ["bid", "ask", "hold"]:
+            return {"type": "hold", "price": 0, "quantity": 0}
         
         return {
             "type": action_type,
-            "price": content.get("price"),
-            "quantity": content.get("quantity")
+            "price": float(content.get("price", 0)),
+            "quantity": int(content.get("quantity", 0))
         }
