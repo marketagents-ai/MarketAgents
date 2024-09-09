@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Union, Literal
 from pydantic import BaseModel, Field, computed_field
 import random
 from functools import cached_property
@@ -127,6 +127,12 @@ class EconomicAgent(BaseModel):
     def _calculate_seller_surplus(self) -> float:
         goods_cost = sum(self.preference_schedule.get_value(q) for q in range(1, self.endowment.initial_goods - self.endowment.goods + 1))
         return self.endowment.cash - self.endowment.initial_cash - goods_cost
+    
+    def update_state(self, observation: Dict[str, Any]):
+        if 'cash' in observation:
+            self.endowment.cash = observation['cash']
+        if 'goods' in observation:
+            self.endowment.goods = observation['goods']
 
 def create_economic_agent(
     agent_id: int,
