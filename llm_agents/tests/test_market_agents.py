@@ -1,22 +1,13 @@
 import unittest
 from market_agent.market_agents import MarketAgent
 from base_agent.aiutilities import LLMConfig
-from environments.auction.auction_environment import AuctionEnvironment, generate_llm_market_agents
-from environments.auction.auction import DoubleAuction
-from protocols.acl_message import ACLMessage
-import logging
-from market_agent.market_agents import MarketAgent
-from econ_agents.econ_agent import create_economic_agent
-from base_agent.agent import Agent as LLMAgent
-from base_agent.aiutilities import LLMConfig
-from environments.auction.auction_environment import AuctionEnvironment, generate_llm_market_agents
-from environments.auction.auction import DoubleAuction
+from environments.auction.auction_environment import AuctionEnvironment
 from protocols.acl_message import ACLMessage
 import logging
 import warnings
-import json
 from colorama import Fore, Style
 from datetime import datetime, timedelta
+from econ_agents.econ_agent import create_economic_agent
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -28,13 +19,6 @@ class TestMarketAgentBase(unittest.TestCase):
         # Suppress deprecation warnings
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         
-        #llm_config = LLMConfig(
-        #    client="anthropic",
-        #    model="claude-3-5-sonnet-20240620",
-        #    response_format="json_beg",
-        #    temperature=0.7
-        #)
-
         self.llm_config = LLMConfig(
             client="openai",
             model="gpt-4o-mini",
@@ -42,30 +26,29 @@ class TestMarketAgentBase(unittest.TestCase):
             temperature=0.7
         )
         
-        # Generate a list of market agents
-        self.agents = generate_llm_market_agents(
-            num_agents=2,
+        # Create a single market agent for testing
+        self.agent = MarketAgent.create(
+            agent_id=0,
+            is_buyer=True,
             num_units=5,
-            buyer_base_value=100.0,
-            seller_base_value=80.0,
-            spread=0.2,
+            base_value=100.0,
             use_llm=True,
-            llm_config=self.llm_config,
             initial_cash=1000,
             initial_goods=5,
-            noise_factor=0.1
+            noise_factor=0.1,
+            max_relative_spread=0.2,
+            llm_config=self.llm_config,
+            protocol=ACLMessage
         )
 
         self.auction_env = AuctionEnvironment(
-            agents=self.agents,
+            agents=[self.agent],
             max_steps=5,
-            protocol=ACLMessage(),
+            protocol=ACLMessage,
             name="TestAuction",
             address="test_auction_1",
             auction_type='double'
         )
-
-        self.agent = self.agents[0]   # Use the first agent for individual tests
 
         # Add the auction environment to the agent's environments
         self.agent.environments = {"auction": self.auction_env}
@@ -85,7 +68,9 @@ class TestMarketAgentBase(unittest.TestCase):
             {
                 "type": "reflection",
                 "content": "The last trade was at $100. I should consider increasing my bid price.",
+                "strategy_update": "Increase bid price by 2%",
                 "observation": {"last_trade_price": 100},
+                "reward": 0,
                 "timestamp": (datetime.now() - timedelta(minutes=10)).isoformat()
             }
         ]
@@ -93,14 +78,15 @@ class TestMarketAgentBase(unittest.TestCase):
     def test_create(self):
         self.assertIsInstance(self.agent, MarketAgent)
         self.assertTrue(self.agent.is_buyer)
-        self.assertEqual(self.agent.address, "agent_0_address")
+        self.assertEqual(self.agent.id, "0")
         self.assertTrue(self.agent.use_llm)
 
     def test_generate_action(self):
         # Create a dummy auction state
         self.auction_env.current_step = 5
         
-        action = self.agent.generate_action("auction")
+        perception = self.agent.perceive("auction")
+        action = self.agent.generate_action("auction", perception)
         
         self.assertIsNotNone(action)
         self.assertIsInstance(action, dict)
@@ -109,10 +95,11 @@ class TestMarketAgentBase(unittest.TestCase):
         # Log and print the action prompt
         action_prompt = self.agent.prompt_manager.get_action_prompt({
             "environment_name": "auction",
-            "perception": self.agent.perceive("auction"),
             "environment_info": self.auction_env.get_global_state(),
             "recent_memories": self.agent.memory[-5:] if self.agent.memory else 'No recent memories',
-            "action_space": self.auction_env.get_action_space()
+            "observation": perception,
+            "action_space": self.auction_env.get_action_space(),
+            "last_action": self.agent.last_action
         })
         logger.info(f"Action prompt: {action_prompt}")
         print(f"{Fore.CYAN}Action prompt: {action_prompt}{Style.RESET_ALL}")
@@ -124,7 +111,7 @@ class TestMarketAgentBase(unittest.TestCase):
         perception = self.agent.perceive("auction")
         
         self.assertIsNotNone(perception)
-        self.assertIsInstance(perception, str)
+        self.assertIsInstance(perception, dict)
         print(f"{Fore.BLUE}LLM output for perception: {perception}{Style.RESET_ALL}")
         
         # Log and print the perception prompt
@@ -147,8 +134,8 @@ class TestMarketAgentBase(unittest.TestCase):
         # Log and print the reflection prompt
         reflection_prompt = self.agent.prompt_manager.get_reflection_prompt({
             "environment_name": "auction",
-            "observation": self.auction_env.get_observation(self.agent.id),
             "environment_info": self.auction_env.get_global_state(),
+            "observation": self.auction_env.get_observation(self.agent.id),
             "last_action": self.agent.last_action,
             "reward": self.auction_env.get_observation(self.agent.id).content.get('reward', 0),
             "previous_strategy": self.agent.memory[-2].get('strategy_update', 'No previous strategy') if len(self.agent.memory) > 1 else 'No previous strategy'
