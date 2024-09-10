@@ -4,6 +4,8 @@ from environments.auction.auction import DoubleAuction
 from pydantic import BaseModel, Field
 from colorama import Fore, Style
 import threading
+import os
+import yaml
 
 from market_agent.market_agents import MarketAgent
 from environments.environment import Environment
@@ -14,6 +16,7 @@ from protocols.protocol import Protocol
 from protocols.acl_message import ACLMessage
 from simulation_app import create_dashboard
 from logger_utils import *
+from personas.persona import generate_persona, save_persona_to_file, Persona
 
 logger = setup_logger(__name__)
 
@@ -52,19 +55,41 @@ class Orchestrator:
         self.simulation_data: List[Dict[str, Any]] = []
         self.latest_data = None
 
+    def load_or_generate_personas(self) -> List[Persona]:
+        personas_dir = "./personas/generated_personas"
+        existing_personas = []
+
+        # Check if the directory exists and load existing personas
+        if os.path.exists(personas_dir):
+            for filename in os.listdir(personas_dir):
+                if filename.endswith(".yaml"):
+                    with open(os.path.join(personas_dir, filename), 'r') as file:
+                        persona_data = yaml.safe_load(file)
+                        existing_personas.append(Persona(**persona_data))
+
+        # Generate additional personas if needed
+        while len(existing_personas) < self.config.num_agents:
+            new_persona = generate_persona()
+            existing_personas.append(new_persona)
+            save_persona_to_file(new_persona, os.path.join(personas_dir))
+
+        return existing_personas[:self.config.num_agents]
+
     def generate_agents(self):
         log_section(logger, "INITIALIZING MARKET AGENTS")
-        for i in range(self.config.num_agents):
+        personas = self.load_or_generate_personas()
+        for i, persona in enumerate(personas):
             agent = MarketAgent.create(
                 agent_id=i,
-                is_buyer=i % 2 == 0,
+                is_buyer=persona.role.lower() == "buyer",
                 **self.config.agent_config.dict(),
                 llm_config=self.config.llm_config,
                 protocol=self.config.protocol,
-                environments=self.environments
+                environments=self.environments,
+                persona=persona
             )
             self.agents.append(agent)
-            log_agent_init(logger, i, i % 2 == 0)
+            log_agent_init(logger, i, persona.role.lower() == "buyer")
         
         logger.info(f"Generated {len(self.agents)} agents")
 
@@ -127,6 +152,7 @@ class Orchestrator:
         log_running(logger, env_name)
         agent_actions = {}
         for agent in self.agents:
+            log_section(logger, f"Current Agent:\nAgent {agent.id} with persona:\n{agent.persona}")
             perception = agent.perceive(env_name)
             log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
 
