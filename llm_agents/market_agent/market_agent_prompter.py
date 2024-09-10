@@ -1,7 +1,17 @@
 from pydantic import BaseModel, Field
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import yaml
 import os
+
+class AgentPromptVariables(BaseModel):
+    environment_name: str
+    environment_info: Any
+    recent_memories: List[Dict[str, Any]] = Field(default_factory=list)
+    observation: Optional[Any] = None
+    action_space: Dict[str, Any] = None
+    last_action: Optional[Any] = None
+    reward: Optional[float] = None
+    previous_strategy: Optional[str] = None
 
 class MarketAgentPromptManager(BaseModel):
     prompts: Dict[str, str] = Field(default_factory=dict)
