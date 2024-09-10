@@ -1,4 +1,53 @@
-# Personas
+# Library of Personas
+
+## Objective
+
+Create a library of personas for populating the market framework. This will be defined as a `persona_class` in the llm_agent framework. 
+
+## INITIAL TASK: 
+
+Generate an initial set of simple personas for populating the market framework.
+
+- create a dictionary of names
+- create a dictionary of genders
+- create a dictionary of ages
+- create a dictionary of professions
+
+Define certain bounds for the distribution of the above attributes. 
+
+## Inital Simple Schema
+
+```
+name:
+gender:
+age:
+profession:
+```
+
+## Verbose Schema
+
+## CORE TASK: 
+
+Create a library of synthetic personas with the verbose schema.
+
+```
+name:
+gender:
+age:
+profession:
+ethnicity:
+location:
+family: 
+personality:
+training:
+interests:
+challenges:
+adaptations:
+```
+
+---
+
+# Personas 
 
 Syntheticaly generate diverse personas for populating the market framework. `personas` will be used for contextualizing their `memories` and their attitude and behavirours when acting in the market. 
 

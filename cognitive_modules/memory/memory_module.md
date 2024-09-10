@@ -1,225 +1,94 @@
-# Memory Module for adding Context to Agents
----
+# Memory
 
-This project aims to create a drop in memory module solution for scalable agent frameworks. Using lightweight search and database technologies to construct an augemented `system_prompt` and additional `context augemented inference prompt` to ensure agents stay grounded to their context and concerns.
+The current agent paradigm is defined by a `Perceive <-> Reflection <-> Action` framework based on FIPA (http://www.fipa.org/specs/fipa00023/SC00023J.html). The `Memory Module` should ingest relevent information contextually into these prompts. 
 
-# Context and Memory 
+For a separate memory module, we would need to track the following key elements:
 
-LLMs are goldfish. You have to provide their full context within the prompt, this includes the request, AND the potential answer formatted to align to the users need. Temporality remains a blank single state for the goldfish, meaning if you want an account of time passing and changing contexts you'll need to compress this duration into a single step ( a conversation history of previous Question and Answer pairs provided under a instruction like "Here is your ongoing conversation with the user... q: text \n a: text \n q: text \n a: text \n..." ). Conversation histories become sliding windows of the conversation, grounded context get piped in with a relevenace metric derived from your search algorithm, your have to re-center your query so the request isn't lost in the style of your ingested knowledge... 
+`memory: List[Dict[str, Any]]` This is the main memory storage, containing a list of dictionaries representing various memory entries.
 
-Typical Example of a Memory Schema:
+`last_action: Optional[Dict[str, Any]]` Stores the most recent action taken by the agent.
 
-```md
-# Memory Module for Agent Context
+Implement the following functionalities:
 
-## Conversation History
+1. `add_memory(entry: Dict[str, Any]) -> None`
+   Add a new memory entry to the storage.
+
+2. `get_recent_memories(n: int) -> List[Dict[str, Any]]`
+   Retrieve the n most recent memory entries.
+
+3. `update_last_action(action: Dict[str, Any]) -> None`
+   Update the last action taken by the agent.
+
+4. `get_last_action() -> Optional[Dict[str, Any]]`
+   Retrieve the last action taken by the agent.
+
+5. `get_memory_summary() -> str`
+   Generate a summary of recent memories for use in prompts.
+
+6. `clear_memory() -> None`
+   Clear all stored memories (if needed for resets or new episodes).
+
+The memory entries should include:
+   - Type of memory (e.g., "reflection", "action", "perception")
+   - Content (specific to the type of memory)
+   - Timestamp
+   - Associated environment (if applicable)
+   - Reward (if applicable)
+   - Strategy updates (for reflections)
+
+Integrate a new `memory_module` class to work with the `generate_actions` def in `agent_module.py`. 
+
+The `memory_module` should have the following features:
+
+**Database Integration and Retrieval Modes**
+
+1. **Database Integration**:
+   - Collaborate with @QuantumQuester to integrate the memory module with the PostgreSQL database they are building.
+   - Explore integration with a vector database, ensuring seamless interaction between the two systems.
+   - Assign @Bexboy and @QuantumQuester to work together on the integration and testing of the database integration.
+
+2. **Retrieval Modes**:
+   - **BM25 Index**: Implement a BM25 index for efficient text-based retrieval. This should be accompanied by a separate script for testing purposes. The system should allow for toggling between BM25 and BM25+cosine vector search modes, with or without embeddings.
+   - **BM25+Cosine Vector Search**: This mode combines the BM25 index with cosine vector search for more advanced retrieval capabilities.
+   - **Hyde**: Implement the Hyde retrieval mode, which summarizes chunks of data and uses cosine similarity to identify the most relevant chunks.
+   - **Raptor**: The Raptor mode utilizes a graph database and clusters generated summaries to find the most relevant chunks by isolating the search space.
+
+3. **Chunking Strategy**:
+   - Develop an appropriate chunking strategy for each file format and content type to ensure efficient data processing and retrieval.
+
+**Current target prompt-schema for poking the memory variables into the agent prompts:**
+
+```yaml
+# Market Agent Prompts
+perception: |
+  Perceive the current state of the {environment_name} environment:
+
+  Environment State: {environment_info}
+  Recent Memories: {recent_memories}
+
+  Generate a brief monologue about your current perception of this environment.
+
+action: |
+  Generate an action for the {environment_name} environment based on the following:
+
+  Perception: {perception}
+  Environment State: {environment_info}
+  Recent Memories: {recent_memories}
+  Available Actions: {action_space}
+
+  Choose an appropriate action for this environment.
+
+reflection: |
+  Reflect on this observation from the {environment_name} environment:
+
+  Observation: {observation}
+  Environment State: {environment_info}
+  Last Action: {last_action}
+  Reward: {reward}
+
+  Actions:
+  1. Reflect on the observation and surplus based on your last action
+  2. Update strategy based on this reflection, the surplus, and your previous strategy
+
+  Previous strategy: {previous_strategy}
 ```
-q: [User's most recent question]
-a: [Agent's most recent answer]
-q: [User's current question]
-```
-
-## Relevant Context
-1. [Most relevant piece of context]
-2. [Second most relevant piece of context]
-3. [Third most relevant piece of context]
-
-## Short-term Memory
-- [Recent key information 1]
-- [Recent key information 2]
-- [Recent key information 3]
-
-## Long-term Memory
-- [Persistent fact 1]
-- [Persistent fact 2]
-- [Persistent fact 3]
-
-## External References
-1. [Title 1](URL1)
-2. [Title 2](URL2)
-
-## Context Metadata
-- Last Updated: [Timestamp]
-- Relevance Score: [Score]
-
-## Current Query
-- [User's current question]
-
-## Styled Answer Request
-- [Agent's current answer]
-
-```
-
----
-
-# Proposed Abstracted Architecture for a Contextual Memory Module
-
-These memories should serve as objects for the llm to reason on, so the formatting, chunking and metadata should only relate to ensuring the quality of knowledge ingestion.
-
-- Short term memory for recalling the most recent key information
-- Long term memory for recalling persistent facts
-- External references for recalling specific grounded information
-- Context metadata for filtering and scoring the relevance of the information
-- Temporial/relevency frequency pruning of decaying memories
-
-Because we are looking to potential scale from 5 agents to 100,000 we need to look at a basic system level approach to memory. Relying on "off the shelf" embeddings has the potential to expodentially add to compute and cost. A conservative token count and terse prompts will be key as well as using appropriately lightweight retrieval methods. 
-
-## Short-term Memory
-
-A sliding window of last n rounds.
-
-## Long-term Memory
-
-Recalled items from a db.
-
----
-
-Initial Proposed Toolset:
-
-- python, tiktoken, a basic handrolled or easy library for db
-- Index or BM25 search over the database
-- 0.0 - 1.0 scores for relevancy
-- Filtering based on metadata
-- regex and conditional formatting to create a .md memory artifact
-- Forgetting algorithm to remove old or irrelevant memories
-
----
-
-```mermaid
-graph TD
-    A[Start] --> B[Index or BM25 search over database]
-    B --> C[Calculate relevancy scores 0.0 - 1.0]
-    C --> D[Filter based on metadata]
-    D --> E[Apply regex and conditional formatting]
-    E --> F[Create .md memory artifact]
-    F --> G[Apply forgetting algorithm]
-    G --> H[Remove old or irrelevant memories]
-    H --> I[End]
-
-    subgraph "Memory Module Process"
-    B
-    C
-    D
-    E
-    F
-    G
-    H
-    end
-```
-
-TODO:
-
-- Implement a simple command line tool that searches a relevent database and injests json formated chatlogs into a single memory object.
-- Simplify this artifact down to a single md file with a header and a bulleted list of key information.
-- Detail forgetting algorithm for removing old or irrelevant memories.
-- Create a basic system prompt for the agent to use the memory in a conversation.
-- Create a basic prompt for the agent to use the memory in a conversation.
-
-
-```markdown:cognitive_modules/memory/memory_module.md
-# Memory Module for adding Context to Agents
----
-
-This project aims to create a drop in memory module solution for scalable agent frameworks. Using lightweight search and database technologies to construct an augmented `system_prompt` and additional `context augmented inference prompt` to ensure agents stay grounded to their context and concerns.
-
-# Context and Memory 
-
-LLMs are goldfish. You have to provide their full context within the prompt, this includes the request, AND the potential answer formatted to align to the users need. Temporality remains a blank single state for the goldfish, meaning if you want an account of time passing and changing contexts you'll need to compress this duration into a single step ( a conversation history of previous Question and Answer pairs provided under a instruction like "Here is your ongoing conversation with the user... q: text \n a: text \n q: text \n a: text \n..." ). Conversation histories become sliding windows of the conversation, grounded context get piped in with a relevance metric derived from your search algorithm, your have to re-center your query so the request isn't lost in the style of your ingested knowledge... 
-
-# Implemented Memory Module
-
-## Core Components
-
-```python
-
-```
-
-## Proposed Abstracted Architecture for a Contextual Memory Module
-
-These memories should serve as objects for the LLM to reason on, so the formatting, chunking and metadata should only relate to ensuring the quality of knowledge ingestion.
-
-- Short term memory for recalling the most recent key information
-- Long term memory for recalling persistent facts
-- External references for recalling specific grounded information
-- Context metadata for filtering and scoring the relevance of the information
-- Temporal/relevancy frequency pruning of decaying memories
-
-Because we are looking to potentially scale from 5 agents to 100,000 we need to look at a basic system level approach to memory. Relying on "off the shelf" embeddings has the potential to exponentially add to compute and cost. A conservative token count and terse prompts will be key as well as using appropriately lightweight retrieval methods. 
-
-## Short-term Memory
-
-A sliding window of last n rounds.
-
-## Long-term Memory
-
-Recalled items from a db.
-
----
-
-Initial Proposed Toolset:
-
-- python, tiktoken, a basic handrolled or easy library for db
-- Index or BM25 search over the database
-- 0.0 - 1.0 scores for relevancy
-- Filtering based on metadata
-- regex and conditional formatting to create a .md memory artifact
-- Forgetting algorithm to remove old or irrelevant memories
-
----
-
-```mermaid
-graph TD
-    A[Start] --> B[Index or BM25 search over database]
-    B --> C[Calculate relevancy scores 0.0 - 1.0]
-    C --> D[Filter based on metadata]
-    D --> E[Apply regex and conditional formatting]
-    E --> F[Create .md memory artifact]
-    F --> G[Apply forgetting algorithm]
-    G --> H[Remove old or irrelevant memories]
-    H --> I[End]
-
-    subgraph "Memory Module Process"
-    B
-    C
-    D
-    E
-    F
-    G
-    H
-    end
-```
-
-TODO:
-
-- Implement a simple command line tool that searches a relevant database and ingests json formatted chatlogs into a single memory object.
-- Simplify this artifact down to a single md file with a header and a bulleted list of key information.
-- Detail forgetting algorithm for removing old or irrelevant memories.
-- Create a basic system prompt for the agent to use the memory in a conversation.
-- Create a basic prompt for the agent to use the memory in a conversation.
-
-## External References
-
-Related papers and links to thoughts on working memory in humans and LLMs:
-
-[Add relevant papers and links here]
-
-```
-
-This implementation provides a basic structure for the Memory Module, including:
-
-1. A `MemoryModule` class with methods for adding conversations, short-term memories, long-term memories, and external references.
-2. A method to generate a memory artifact in the specified markdown format.
-3. Placeholder methods for calculating relevance scores and applying a forgetting algorithm.
-
-
-
-1. Implement the database integration for long-term memory storage and retrieval.
-2. Develop the BM25 or other lightweight search algorithm for efficient memory retrieval.
-3. Implement the forgetting algorithm to manage memory decay.
-4. Create the command-line tool for searching the database and ingesting JSON chat logs.
-5. Develop the system and conversation prompts for the agent to effectively use the memory module.
-
-
-## External References
-
-Related papers and links to thoughts on working memory in humans and llms:
