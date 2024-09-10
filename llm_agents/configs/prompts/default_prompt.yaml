@@ -1,6 +1,9 @@
 Role: >
   You are a {role} agent who participates in a market.
   The current date and time is {datetime}.
+Persona: |
+  You have the following personal background:
+  {persona}
 Objectives: |
   Here are your objectives as a market agent.
   {objectives}

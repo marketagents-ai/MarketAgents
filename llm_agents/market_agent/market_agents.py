@@ -8,6 +8,7 @@ from econ_agents.econ_agent import EconomicAgent, create_economic_agent
 from environments.environment import Environment
 from protocols.protocol import Protocol
 from market_agent.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
+from personas.persona import Persona
 
 class MarketAgent(LLMAgent, EconomicAgent):
     memory: List[Dict[str, Any]] = Field(default_factory=list)
@@ -21,7 +22,8 @@ class MarketAgent(LLMAgent, EconomicAgent):
     def create(cls, agent_id: int, is_buyer: bool, num_units: int, base_value: float, use_llm: bool,
             initial_cash: float, initial_goods: int, noise_factor: float = 0.1,
             max_relative_spread: float = 0.2, llm_config: Optional[LLMConfig] = None,
-            environments: Dict[str, Environment] = None, protocol: Protocol = None) -> 'MarketAgent':
+            environments: Dict[str, Environment] = None, protocol: Protocol = None,
+            persona: Persona = None) -> 'MarketAgent':
         econ_agent = create_economic_agent(
             agent_id=agent_id,
             is_buyer=is_buyer,
@@ -34,7 +36,13 @@ class MarketAgent(LLMAgent, EconomicAgent):
             max_relative_spread=max_relative_spread
         )
         role = "buyer" if is_buyer else "seller"
-        llm_agent = LLMAgent(id=str(agent_id), role=role, llm_config=llm_config or LLMConfig())
+        llm_agent = LLMAgent(
+            id=str(agent_id),
+            role=role,
+            persona=persona.persona,
+            objectives=persona.objectives,
+            llm_config=llm_config or LLMConfig()
+        )
 
         return cls(
             id=str(agent_id),
@@ -48,6 +56,8 @@ class MarketAgent(LLMAgent, EconomicAgent):
             environments=environments or {},
             protocol=protocol,
             role=llm_agent.role,
+            persona=llm_agent.persona,
+            objectives=llm_agent.objectives,
             llm_config=llm_agent.llm_config,
         )
 

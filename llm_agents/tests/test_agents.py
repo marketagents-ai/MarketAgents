@@ -48,7 +48,7 @@ class TestAgent(unittest.TestCase):
 
     def test_agent_with_task(self):
         agent = Agent(
-            role="default",
+            role="tasK-agent",
             system="You are a task execution agent. Respond with a brief confirmation.",
             task="Confirm that you received this task.",
             llm_config=LLMConfig(client="openai", model="gpt-3.5-turbo")
@@ -63,8 +63,9 @@ class TestAgent(unittest.TestCase):
     def test_load_output_schema(self):
         agent = Agent(role="test_role", output_format="TestSchema", llm_config=LLMConfig(client="openai", model="gpt-3.5-turbo"))
         logger.debug(f"Agent output format: {agent.output_format}")
-        self.assertIsInstance(agent.output_format, dict)
-        self.assertEqual(agent.output_format.get("title"), "TestSchema")
+        loaded_schema = agent._load_output_schema(agent.output_format)
+        self.assertIsInstance(loaded_schema, dict)
+        self.assertEqual(loaded_schema.get("title"), "TestSchema")
 
     def test_react_agent_with_real_llm_call(self):
         agent = Agent(
