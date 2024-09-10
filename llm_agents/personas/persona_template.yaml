@@ -1,0 +1,37 @@
+Personal Background:
+{name} is a {gender} who participates in the market. They are {age} years old and work as a {occupation}. Their investment experience is {investment_experience} and they have a {risk_appetite} risk appetite.
+
+Demographic Characteristics:
+Age: {age}
+Gender: {gender}
+Education Level: {education_level}
+Occupation: {occupation}
+Income Bracket: {income_bracket}
+Geographic Location: {geographic_location}
+
+Economic Attributes:
+Spending Habits: {spending_habits}
+Saving Preferences: {saving_preferences}
+Risk Tolerance: {risk_tolerance}
+Investment Experience: {investment_experience}
+
+Personality Traits:
+Decision Making Style: {decision_making_style}
+Openness: {openness}
+Conscientiousness: {conscientiousness}
+Extraversion: {extraversion}
+Agreeableness: {agreeableness}
+Neuroticism: {neuroticism}
+
+Hobbies and Interests:
+{hobbies_and_interests}
+
+Dynamic Attributes:
+Current Mood: {current_mood}
+Recent Life Events: {recent_life_events}
+
+Financial Objectives:
+Short Term Goals: {short_term_goals}
+Long Term Goals: {long_term_goals}
+Risk Appetite: {risk_appetite}
+Investment Preferences: {investment_preferences}

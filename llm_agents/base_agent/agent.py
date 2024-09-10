@@ -2,7 +2,7 @@ import uuid
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_random_exponential
@@ -21,6 +21,7 @@ class Agent(BaseModel):
     Attributes:
         id (str): Unique identifier for the agent.
         role (str): Role of the agent in the system.
+        persona(str): Personal characteristics of the agent.
         system (Optional[str]): System instructions for the agent.
         task (Optional[str]): Current task assigned to the agent.
         tools (Optional[Dict[str, Any]]): Tools available to the agent.
@@ -45,6 +46,7 @@ class Agent(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     role: str
+    persona: Optional[str] = None
     system: Optional[str] = None
     task: Optional[str] = None
     tools: Optional[Dict[str, Any]] = None
@@ -61,10 +63,13 @@ class Agent(BaseModel):
         super().__init__(**data)
         self.ai_utilities = AIUtilities()
 
-    def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str]] = None) -> Union[str, Dict[str, Any]]:
+    def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None) -> Union[str, Dict[str, Any]]:
         """Execute a task and return the result."""
         execution_task = task if task is not None else self.task
-        execution_output_format = output_format if output_format is not None else (self.output_format or "plain_text")
+        if execution_task is None:
+            raise ValueError("No task provided. Agent needs a task to execute.")
+        
+        execution_output_format = output_format if output_format is not None else self.output_format
         
         # Update llm_config based on output_format
         if execution_output_format == "plain_text":
@@ -73,13 +78,14 @@ class Agent(BaseModel):
             self.llm_config.response_format = "json_object"
             execution_output_format = self._load_output_schema(execution_output_format)
 
-        
         prompt_context = self._prepare_prompt_context(execution_task, execution_output_format)
         agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
 
-        return self._run_ai_inference(prompt_context)
+        result = self._run_ai_inference(prompt_context)
+        self._log_interaction(prompt_context, result)
+        return result
 
-    def _load_output_schema(self, output_format: Optional[Union[Dict[str, Any], str]] = None) -> Optional[Dict[str, Any]]:
+    def _load_output_schema(self, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None) -> Optional[Dict[str, Any]]:
         """Load the output schema based on the output_format."""
         if output_format is None:
             output_format = self.output_format
@@ -96,6 +102,8 @@ class Agent(BaseModel):
                 return None
         elif isinstance(output_format, dict):
             return output_format
+        elif isinstance(output_format, type) and issubclass(output_format, BaseModel):
+            return output_format.model_json_schema()
         else:
             return None
 
@@ -103,6 +111,7 @@ class Agent(BaseModel):
         """Prepare LLMPromptContext for AI inference."""
         prompt_manager = PromptManager(
             role=self.role,
+            persona=self.persona,
             task=task,
             resources=None,
             output_schema=output_format,
