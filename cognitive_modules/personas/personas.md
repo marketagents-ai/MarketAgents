@@ -4,7 +4,7 @@
 
 Create a library of personas for populating the market framework. This will be defined as a `persona_class` in the llm_agent framework. 
 
-## INITIAL TASK: 
+** INITIAL TASK: **
 
 Generate an initial set of simple personas for populating the market framework.
 
@@ -24,9 +24,25 @@ age:
 profession:
 ```
 
+**name**: 
+
+A unique dictionary of First and Last names. To sample from this dictionary, we can use the `random.choice()` function initially. 
+
+**gender**: 
+
+A dictionary of genders based on a weighted ditribution from pseudo realworld stats. 
+
+**age**: 
+
+Bounded assignment of appropriate ages per persona.
+
+**profession**: 
+
+A dictionary of professions. 
+
 ## Verbose Schema
 
-## CORE TASK: 
+** CORE TASK: **
 
 Create a library of synthetic personas with the verbose schema.
 
@@ -45,9 +61,12 @@ challenges:
 adaptations:
 ```
 
+
+
+
 ---
 
-# Personas 
+# Persona Generation via Wikipedia
 
 Syntheticaly generate diverse personas for populating the market framework. `personas` will be used for contextualizing their `memories` and their attitude and behavirours when acting in the market. 
 
