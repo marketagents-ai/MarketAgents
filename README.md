@@ -428,6 +428,34 @@ The Information Board serves as a centralized repository for economic news and s
 
 The Information Board allows for the study of how information flow affects market dynamics and agent decision-making, providing a more realistic simulation of information asymmetry and its effects on economic outcomes.
 
+#### Information Board General Design & Requirements
+
+##### Tables:
+- **Users** (linked to Agent, or can be just the Agent table)
+- **Posts** (Information Board Messages), which has the fields:
+   - **Title**
+   - **Content**
+   - **Tags** (comma-separated list of tags)
+   - **Datetime Posted**
+   - **Author** (linked to Agent)
+   - **Comments** 
+- **Comments** (on Posts), has the fields:
+   - **Content**
+   - **Author** (linked to Agent)
+   - **Datetime Posted**
+
+##### Methods
+- **add_post(post: BoardMessage)**: Adds a new post to the Information Board.
+- **get_posts(tags: List[str] = [], limit: int = LIMIT_CONST)**: Get latest *LIMIT_CONST* posts with *tags*, both optional fields to be set by the agent for querying.
+- **get_posts_by_title(query: str, limit: int = LIMIT_CONST)**: Get latest *LIMIT_CONST* posts with *query* in title.
+- **get_relevant_posts(relevant_topics: List[str], limit: int = LIMIT_CONST)**: Get latest *LIMIT_CONST* posts with *relevant_topics*.
+
+###### Optional / To be discussed
+- **subscribe_to_tags(tags: List[str])**: Subscribe to posts with *tags*.
+- **unsubscribe_from_tags(tags: List[str])**: Unsubscribe from posts with *tags*.
+- **get_subscribed_posts()**: Get posts that contain the tags the agent has subscribed to.
+
+
 ### Social Network Graph
 The social network component in the MarketAgents framework models the interconnections and relationships between agents in the simulated economy. It plays a crucial role in capturing the effects of social interactions, information diffusion, and network externalities on market dynamics. The social network influences how information spreads, how agents form opinions, and how they make economic decisions based on their connections.
 
