@@ -1,5 +1,5 @@
 Metadata-Version: 2.1
-Name: llm_agents
+Name: market_agents
 Version: 0.1.0
 Requires-Dist: pydantic
 Requires-Dist: asyncio

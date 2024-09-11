@@ -1,7 +1,7 @@
 import asyncio
 from dotenv import load_dotenv
-from llm_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
-from llm_agents.inference.message_models import LLMPromptContext, LLMConfig, StructuredTool
+from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
+from market_agents.inference.message_models import LLMPromptContext, LLMConfig, StructuredTool
 from typing import Literal, List
 import time
 

@@ -1,11 +1,6 @@
 from plotter import create_report_folder, save_figure, plot_price_vs_trade, plot_cumulative_quantity_and_surplus, generate_agent_allocation_table
-<<<<<<< HEAD
-from llm_agents.environments.auction.auction_environment import Environment
-from llm_agents.environments.auction.auction import DoubleAuction
-=======
-from llm_agents.environments.environment import Environment
-from llm_agents.environments.auction import DoubleAuction
->>>>>>> main
+from market_agents.environments.environment import Environment
+from market_agents.environments.auction import DoubleAuction
 import os
 
 def analyze_and_plot_auction_results(auction: DoubleAuction, env: Environment):
