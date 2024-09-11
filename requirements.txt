@@ -7,3 +7,5 @@ openai==1.42.0
 python-dotenv==1.0.1
 colorama==0.4.6
 names==0.3.0
+tiktoken
+aiohttp

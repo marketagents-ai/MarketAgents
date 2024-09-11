@@ -1,11 +1,8 @@
 import logging
 from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
-from market_agent.market_schemas import MarketActionSchema
 from pydantic import BaseModel, Field, computed_field, model_validator
 from environments.environment import Environment
 from environments.auction.auction import Ask, Bid, DoubleAuction, MarketAction
-from protocols.acl_message import ACLMessage, AgentID, Performative
-from protocols.protocol import Protocol
 
 logger = logging.getLogger(__name__)
 
