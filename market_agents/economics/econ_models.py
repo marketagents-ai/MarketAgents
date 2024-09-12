@@ -3,6 +3,7 @@ from functools import cached_property
 from typing import List, Dict
 import random
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 class MarketAction(BaseModel):
     price: float = Field(..., description="Price of the order")
@@ -31,13 +32,10 @@ class Basket(BaseModel):
     cash: float
     goods: List[Good]
 
-
     @computed_field
     @cached_property
-    def goods_dict(self) -> Dict[str, float]:
-        return {good.name: good.quantity for good in self.goods}
-
-
+    def goods_dict(self) -> Dict[str, int]:
+        return {good.name: int(good.quantity) for good in self.goods}
 
     def update_good(self, name: str, quantity: float):
         for good in self.goods:
@@ -57,20 +55,20 @@ class Endowment(BaseModel):
     @computed_field
     @property
     def current_basket(self) -> Basket:
-        current_cash = self.initial_basket.cash
-        current_goods = {good.name: good.quantity for good in self.initial_basket.goods}
+        temp_basket = deepcopy(self.initial_basket)
 
         for trade in self.trades:
             if trade.buyer_id == self.agent_id:
-                current_cash -= trade.price * trade.quantity
-                current_goods[trade.good_name] = current_goods.get(trade.good_name, 0) + trade.quantity
+                temp_basket.cash -= trade.price * trade.quantity
+                temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) + trade.quantity)
             elif trade.seller_id == self.agent_id:
-                current_cash += trade.price * trade.quantity
-                current_goods[trade.good_name] = current_goods.get(trade.good_name, 0) - trade.quantity
+                temp_basket.cash += trade.price * trade.quantity
+                temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) - trade.quantity)
 
+        # Create a new Basket instance with the calculated values
         return Basket(
-            cash=current_cash,
-            goods=[Good(name=name, quantity=quantity) for name, quantity in current_goods.items()]
+            cash=temp_basket.cash,
+            goods=[Good(name=good.name, quantity=good.quantity) for good in temp_basket.goods]
         )
 
     def add_trade(self, trade: Trade):
@@ -79,7 +77,17 @@ class Endowment(BaseModel):
         if 'current_basket' in self.__dict__:
             del self.__dict__['current_basket']
 
+    def simulate_trade(self, trade: Trade) -> Basket:
+        temp_basket = deepcopy(self.current_basket)
 
+        if trade.buyer_id == self.agent_id:
+            temp_basket.cash -= trade.price * trade.quantity
+            temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) + trade.quantity)
+        elif trade.seller_id == self.agent_id:
+            temp_basket.cash += trade.price * trade.quantity
+            temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) - trade.quantity)
+
+        return temp_basket
 
 class PreferenceSchedule(BaseModel):
     num_units: int = Field(..., description="Number of units")
@@ -123,11 +131,11 @@ class BuyerPreferenceSchedule(PreferenceSchedule):
         current_value = self.base_value
         for i in range(1, self.num_units + 1):
             noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
-            new_value = max(1, current_value + noise)  # Ensure no zero values
+            new_value = max(1, current_value + noise)
             if i > 1:
                 new_value = min(new_value, values[i-1])  # Ensure monotonicity
             values[i] = new_value
-            current_value *= random.uniform(0.95, 1.0)
+            current_value *= random.uniform(0.95, 1.0)  # Decrease value slightly
         return values
 
     @computed_field
@@ -144,11 +152,11 @@ class SellerPreferenceSchedule(PreferenceSchedule):
         current_value = self.base_value
         for i in range(1, self.num_units + 1):
             noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
-            new_value = max(1, current_value + noise)  # Ensure no zero values
+            new_value = max(1, current_value + noise)
             if i > 1:
                 new_value = max(new_value, values[i-1])  # Ensure monotonicity
             values[i] = new_value
-            current_value *= random.uniform(1.0, 1.05)
+            current_value *= random.uniform(1.0, 1.05)  # Increase value slightly
         return values
 
     @computed_field

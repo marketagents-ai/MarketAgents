@@ -36,7 +36,7 @@ async def main():
                     LLMPromptContext(
                         system_string="You are a helpful assistant that tells programmer jokes.",
                         new_message=f"Tell me a programmer joke about the number {i}.",
-                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=250),
+                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=4000),
                         structured_output=structured_tool,
                         
                     )
