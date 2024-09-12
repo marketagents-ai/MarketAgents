@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field, computed_field
 from functools import cached_property
 from typing import List, Dict
+import random
+import matplotlib.pyplot as plt
 
 class MarketAction(BaseModel):
     price: float = Field(..., description="Price of the order")
@@ -76,3 +78,80 @@ class Endowment(BaseModel):
         # Clear the cached property to ensure it's recalculated
         if 'current_basket' in self.__dict__:
             del self.__dict__['current_basket']
+
+
+
+class PreferenceSchedule(BaseModel):
+    num_units: int = Field(..., description="Number of units")
+    base_value: float = Field(..., description="Base value for the first unit")
+    noise_factor: float = Field(default=0.1, description="Noise factor for value generation")
+    is_buyer: bool = Field(default=True, description="Whether the agent is a buyer")
+
+    @computed_field
+    @cached_property
+    def values(self) -> Dict[int, float]:
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @computed_field
+    @cached_property
+    def initial_endowment(self) -> float:
+        raise NotImplementedError("Subclasses must implement this method")
+
+    def get_value(self, quantity: int) -> float:
+        return self.values.get(quantity, 0.0)
+
+    def plot_schedule(self, block=False):
+        quantities = list(self.values.keys())
+        values = list(self.values.values())
+        
+        plt.figure(figsize=(10, 6))
+        plt.plot(quantities, values, marker='o')
+        plt.title(f"{'Demand' if isinstance(self, BuyerPreferenceSchedule) else 'Supply'} Schedule")
+        plt.xlabel("Quantity")
+        plt.ylabel("Value/Cost")
+        plt.grid(True)
+        plt.show(block=block)
+
+class BuyerPreferenceSchedule(PreferenceSchedule):
+    endowment_factor: float = Field(default=1.2, description="Factor to calculate initial endowment")
+    is_buyer: bool = Field(default=True, description="Whether the agent is a buyer")
+
+    @computed_field
+    @cached_property
+    def values(self) -> Dict[int, float]:
+        values = {}
+        current_value = self.base_value
+        for i in range(1, self.num_units + 1):
+            noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
+            new_value = max(1, current_value + noise)  # Ensure no zero values
+            if i > 1:
+                new_value = min(new_value, values[i-1])  # Ensure monotonicity
+            values[i] = new_value
+            current_value *= random.uniform(0.95, 1.0)
+        return values
+
+    @computed_field
+    @cached_property
+    def initial_endowment(self) -> float:
+        return sum(self.values.values()) * self.endowment_factor
+
+class SellerPreferenceSchedule(PreferenceSchedule):
+    is_buyer: bool = Field(default=False, description="Whether the agent is a buyer")
+    @computed_field
+    @cached_property
+    def values(self) -> Dict[int, float]:
+        values = {}
+        current_value = self.base_value
+        for i in range(1, self.num_units + 1):
+            noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
+            new_value = max(1, current_value + noise)  # Ensure no zero values
+            if i > 1:
+                new_value = max(new_value, values[i-1])  # Ensure monotonicity
+            values[i] = new_value
+            current_value *= random.uniform(1.0, 1.05)
+        return values
+
+    @computed_field
+    @cached_property
+    def initial_endowment(self) -> float:
+        return sum(self.values.values())

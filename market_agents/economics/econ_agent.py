@@ -3,32 +3,25 @@ from pydantic import BaseModel, Field, computed_field
 import random
 from functools import cached_property
 
-from market_agents.economics.utility import (
-    UtilityFunction, CostFunction,
-    create_utility_function, create_cost_function
-)
-
-from market_agents.economics.econ_models import MarketAction, Bid, Ask, Trade, Endowment, Basket, Good
+from market_agents.economics.econ_models import MarketAction, Bid, Ask, Trade, Endowment, Basket, Good, BuyerPreferenceSchedule, SellerPreferenceSchedule
 
 class EconomicAgent(BaseModel):
     id: str
     is_buyer: bool
     endowment: Endowment
-    utility_function: UtilityFunction
-    cost_function: Optional[CostFunction] = None
+    value_schedules: Dict[str, BuyerPreferenceSchedule]
+    cost_schedules: Dict[str, SellerPreferenceSchedule]
     max_relative_spread: float = Field(default=0.2)
 
     @computed_field
     @cached_property
     def marginal_value(self) -> Dict[str, float]:
         if self.is_buyer:
-            return {good.name: self.utility_function.marginal_utility(self.endowment.current_basket, good.name) 
-                    for good in self.endowment.current_basket.goods}
+            return {good_name: schedule.get_value(int(self.endowment.current_basket.get_good_quantity(good_name) + 1))
+                    for good_name, schedule in self.value_schedules.items()}
         else:
-            if self.cost_function is None:
-                raise ValueError("Seller agent must have a cost function")
-            return {good.name: self.cost_function.marginal_cost(self.endowment.current_basket, good.name) 
-                    for good in self.endowment.current_basket.goods}
+            return {good_name: schedule.get_value(int(self.endowment.current_basket.get_good_quantity(good_name) + 1))
+                    for good_name, schedule in self.cost_schedules.items()}
 
     def get_role(self) -> str:
         return "buyer" if self.is_buyer else "seller"
@@ -49,7 +42,11 @@ class EconomicAgent(BaseModel):
         self.endowment.add_trade(trade)
 
     def calculate_utility(self) -> float:
-        return self.utility_function.evaluate(self.endowment.current_basket)
+        if self.is_buyer:
+            return sum(schedule.get_value(int(self.endowment.current_basket.get_good_quantity(good_name)))
+                       for good_name, schedule in self.value_schedules.items())
+        else:
+            return self.endowment.current_basket.cash
 
     def calculate_individual_surplus(self) -> float:
         return self._calculate_buyer_surplus() if self.is_buyer else self._calculate_seller_surplus()
@@ -80,9 +77,8 @@ class EconomicAgent(BaseModel):
         return self.calculate_utility() - (self.endowment.initial_basket.cash - self.endowment.current_basket.cash)
 
     def _calculate_seller_surplus(self) -> float:
-        if self.cost_function is None:
-            raise ValueError("Seller agent must have a cost function")
-        production_cost = self.cost_function.evaluate(self.endowment.current_basket)
+        production_cost = sum(schedule.get_value(int(self.endowment.current_basket.get_good_quantity(good_name)))
+                              for good_name, schedule in self.cost_schedules.items())
         return self.endowment.current_basket.cash - self.endowment.initial_basket.cash - production_cost
 
 def create_economic_agent(
@@ -92,13 +88,9 @@ def create_economic_agent(
     base_values: Dict[str, float],
     initial_cash: float,
     initial_goods: Dict[str, float],
-    utility_function_type: Literal["stepwise", "cobb-douglas"],
-    cost_function_type: Literal["stepwise", "quadratic"],
     num_units: int = 10,
     noise_factor: float = 0.1,
-    cash_weight: float = 1.0,
     max_relative_spread: float = 0.2,
-    cobb_douglas_scale: float = 100  # Add this parameter
 ) -> EconomicAgent:
     initial_goods_list = [Good(name=name, quantity=quantity) for name, quantity in initial_goods.items()]
     initial_basket = Basket(
@@ -110,22 +102,31 @@ def create_economic_agent(
         agent_id=agent_id
     )
 
-    utility_function = create_utility_function(
-        utility_function_type, goods, base_values, num_units, noise_factor, cash_weight, cobb_douglas_scale
-    )
-    
-    cost_function = None
-    if not is_buyer:
-        cost_function = create_cost_function(
-            cost_function_type, goods, base_values, num_units, noise_factor
-        )
+    if is_buyer:
+        value_schedules = {
+            good: BuyerPreferenceSchedule(
+                num_units=num_units,
+                base_value=base_values[good],
+                noise_factor=noise_factor
+            ) for good in goods
+        }
+        cost_schedules = {}
+    else:
+        value_schedules = {}
+        cost_schedules = {
+            good: SellerPreferenceSchedule(
+                num_units=num_units,
+                base_value=base_values[good],
+                noise_factor=noise_factor
+            ) for good in goods
+        }
 
     return EconomicAgent(
         id=agent_id,
         is_buyer=is_buyer,
         endowment=endowment,
-        utility_function=utility_function,
-        cost_function=cost_function,
+        value_schedules=value_schedules,
+        cost_schedules=cost_schedules,
         max_relative_spread=max_relative_spread
     )
 
@@ -138,9 +139,6 @@ if __name__ == "__main__":
     base_values = {"apple": 10.0, "banana": 8.0}
     initial_cash = 100.0
     initial_goods = {"apple": 2.0, "banana": 3.0}
-    utility_function_type = "cobb-douglas"
-    cost_function_type = "quadratic"
-    cobb_douglas_scale = 10  # Add this line
 
     # Create an economic agent
     agent = create_economic_agent(
@@ -150,9 +148,6 @@ if __name__ == "__main__":
         base_values=base_values,
         initial_cash=initial_cash,
         initial_goods=initial_goods,
-        utility_function_type=utility_function_type,
-        cost_function_type=cost_function_type,
-        cobb_douglas_scale=cobb_douglas_scale  # Add this line
     )
 
     # Print agent information
