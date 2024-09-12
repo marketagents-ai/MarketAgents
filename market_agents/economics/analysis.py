@@ -4,8 +4,11 @@ from market_agents.economics.plotter import create_report_folder, save_figure, p
 from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.economics.equilibrium import Equilibrium
 
-def analyze_and_plot_market_results(trades: List, agents: List[EconomicAgent], equilibrium: Equilibrium, goods: List[str], max_rounds: int):
+def analyze_and_plot_market_results(trades: List, agents: List[EconomicAgent], equilibrium: Equilibrium, goods: List[str], max_rounds: int,
+                                    cumulative_quantities: List[int], cumulative_surplus: List[float]):
     report_folder = create_report_folder()
+
+    
     
     # Assuming we only have one good for simplicity
     good = goods[0]
@@ -74,24 +77,8 @@ def analyze_and_plot_market_results(trades: List, agents: List[EconomicAgent], e
     else:
         with open(os.path.join(report_folder, report_markdown), "a") as f:
             f.write(f"\n\n## Price vs Trade Number\n\nNo trades occurred.")
-
-    # Plot cumulative quantity and surplus
-    cumulative_quantities = []
-    cumulative_surplus = []
-    total_quantity = 0
-
-    surplus_over_time = []
-    surplus_values = []
-
-    for i, trade in enumerate(trades, start=1):
-        total_quantity += trade.quantity
-        cumulative_quantities.append(total_quantity)
-        # Agents' surplus after each trade
-        total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in agents if agent.is_buyer(good))
-        total_seller_surplus = sum(agent.calculate_individual_surplus() for agent in agents if agent.is_seller(good))
-        total_surplus = total_buyer_surplus + total_seller_surplus
-        cumulative_surplus.append(total_surplus)
-
+    
+    
     if cumulative_quantities and cumulative_surplus:
         fig = plot_cumulative_quantity_and_surplus(
             cumulative_quantities,

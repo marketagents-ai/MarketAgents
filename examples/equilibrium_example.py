@@ -21,7 +21,7 @@ if __name__ == "__main__":
             buy_goods=goods,
             sell_goods=[],
             base_values={"apple": 100},
-            initial_cash=1000,
+            initial_cash=500,
             initial_goods={"apple": 0},
             num_units=num_units_per_agent,
             noise_factor=0.1,
@@ -66,6 +66,12 @@ if __name__ == "__main__":
     trades = []
     trade_id = 1
     max_rounds = 100  # Number of trading rounds
+    # Initialize variables to track cumulative surplus
+    cumulative_quantities = []
+    cumulative_surplus = []
+    total_quantity = 0
+    total_surplus = 0.0
+
     for round_num in range(max_rounds):
         # Collect bids and asks from agents
         bids = []
@@ -88,6 +94,10 @@ if __name__ == "__main__":
             highest_bidder, highest_bid = bids[0]
             lowest_asker, lowest_ask = asks[0]
             if highest_bid.price >= lowest_ask.price:
+                # Compute utilities before the trade for surplus calculation
+                buyer_utility_before = highest_bidder.calculate_utility(highest_bidder.endowment.current_basket)
+                seller_utility_before = lowest_asker.calculate_utility(lowest_asker.endowment.current_basket)
+                
                 # Execute trade
                 trade_price = (highest_bid.price + lowest_ask.price) / 2
                 trade = Trade(
@@ -102,6 +112,19 @@ if __name__ == "__main__":
                 buyer_success = highest_bidder.process_trade(trade)
                 seller_success = lowest_asker.process_trade(trade)
                 if buyer_success and seller_success:
+                    # Compute utilities after the trade
+                    buyer_utility_after = highest_bidder.calculate_utility(highest_bidder.endowment.current_basket)
+                    seller_utility_after = lowest_asker.calculate_utility(lowest_asker.endowment.current_basket)
+                    
+                    # Compute surplus changes
+                    buyer_surplus_change = buyer_utility_after - buyer_utility_before
+                    seller_surplus_change = seller_utility_after - seller_utility_before
+                    trade_surplus = buyer_surplus_change + seller_surplus_change
+                    total_surplus += trade_surplus
+                    total_quantity += trade.quantity
+                    cumulative_surplus.append(total_surplus)
+                    cumulative_quantities.append(total_quantity)
+                    
                     trades.append(trade)
                     trade_id += 1
                     # Remove the bid and ask since they have been fulfilled
@@ -130,9 +153,16 @@ if __name__ == "__main__":
 
     print("\nGenerating market report...")
     analyze_and_plot_market_results(
-    trades=trades,
+        trades=trades,
         agents=all_agents,
         equilibrium=equilibrium,
         goods=goods,
-        max_rounds=max_rounds
-)
+        max_rounds=max_rounds,
+        cumulative_quantities=cumulative_quantities,
+        cumulative_surplus=cumulative_surplus
+    )
+        
+
+
+
+    
