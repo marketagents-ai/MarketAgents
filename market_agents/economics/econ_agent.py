@@ -1,14 +1,23 @@
-from typing import List, Dict, Any, Optional, Union, Mapping
-from pydantic import BaseModel, Field, computed_field, model_validator
+from typing import List, Dict, Optional
+from pydantic import BaseModel, Field, model_validator
 import random
-from functools import cached_property
 import logging
-import math
 
-from market_agents.economics.econ_models import MarketAction, Bid, Ask, Trade, Endowment, Basket, Good, BuyerPreferenceSchedule, SellerPreferenceSchedule
+from market_agents.economics.econ_models import (
+    MarketAction,
+    Bid,
+    Ask,
+    Trade,
+    Endowment,
+    Basket,
+    Good,
+    BuyerPreferenceSchedule,
+    SellerPreferenceSchedule,
+)
 
+# Set up logging for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 class EconomicAgent(BaseModel):
     id: str
@@ -19,22 +28,10 @@ class EconomicAgent(BaseModel):
 
     @model_validator(mode='after')
     def validate_schedules(self):
-        for good in set(self.value_schedules.keys()) & set(self.cost_schedules.keys()):
-            raise ValueError(f"Agent cannot be both buyer and seller of the same good: {good}")
+        overlapping_goods = set(self.value_schedules.keys()) & set(self.cost_schedules.keys())
+        if overlapping_goods:
+            raise ValueError(f"Agent cannot be both buyer and seller of the same good(s): {overlapping_goods}")
         return self
-
-    @computed_field
-    @cached_property
-    def marginal_value(self) -> Dict[str, float]:
-        values = {}
-        for good_name, schedule in self.value_schedules.items():
-            quantity = int(self.endowment.current_basket.get_good_quantity(good_name))
-            values[good_name] = schedule.get_value(quantity + 1)
-        for good_name, schedule in self.cost_schedules.items():
-            quantity = int(self.endowment.current_basket.get_good_quantity(good_name))
-            values[good_name] = schedule.get_value(quantity) if quantity > 0 else schedule.get_value(1)
-        logger.debug(f"Agent {self.id} marginal values: {values}")
-        return values
 
     def is_buyer(self, good_name: str) -> bool:
         return good_name in self.value_schedules
@@ -43,96 +40,90 @@ class EconomicAgent(BaseModel):
         return good_name in self.cost_schedules
 
     def generate_bid(self, good_name: str, market_info: Optional[Dict] = None) -> Optional[Bid]:
-        logger.debug(f"Agent {self.id} attempting to generate bid for {good_name}")
         if not self._can_generate_bid(good_name):
-            logger.debug(f"Agent {self.id} cannot generate bid for {good_name}")
             return None
         price = self._calculate_bid_price(good_name)
-        logger.debug(f"Agent {self.id} generated bid for {good_name}: price={price}")
-        return Bid(price=price, quantity=1)
+        return Bid(price=price, quantity=1) if price is not None else None
 
     def generate_ask(self, good_name: str, market_info: Optional[Dict] = None) -> Optional[Ask]:
-        logger.debug(f"Agent {self.id} attempting to generate ask for {good_name}")
         if not self._can_generate_ask(good_name):
-            logger.debug(f"Agent {self.id} cannot generate ask for {good_name}")
             return None
         price = self._calculate_ask_price(good_name)
-        logger.debug(f"Agent {self.id} generated ask for {good_name}: price={price}")
-        return Ask(price=price, quantity=1)
+        return Ask(price=price, quantity=1) if price is not None else None
 
-    def process_trade(self, trade: Trade):
-        # Calculate current utility
-        current_utility = self.calculate_utility(self.endowment.current_basket.goods_dict, self.endowment.current_basket.cash)
-        
-        # Simulate the trade
+    def process_trade(self, trade: Trade) -> bool:
+        current_utility = self.calculate_utility(self.endowment.current_basket)
         new_basket = self.endowment.simulate_trade(trade)
-        
-        # Calculate new utility
-        new_utility = self.calculate_utility(new_basket.goods_dict, new_basket.cash)
+        new_utility = self.calculate_utility(new_basket)
         
         if new_utility < current_utility:
-            raise ValueError(f"Trade would reduce utility for Agent {self.id}")
+            logger.warning(f"Trade would reduce utility for Agent {self.id}. Skipping this trade.")
+            return False
         
-        # Apply the trade
         self.endowment.add_trade(trade)
-        logger.debug(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}")
+        logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}")
+        return True
 
-    def calculate_utility(self, allocation: Mapping[str, int], cash: float) -> float:
-        utility = cash
-        logger.debug(f"Agent {self.id} calculating utility. Initial cash: {utility}")
+    def calculate_utility(self, basket: Basket) -> float:
+        utility = basket.cash
         
-        for good, quantity in allocation.items():
-            if good in self.value_schedules:
+        for good, quantity in basket.goods_dict.items():
+            if self.is_buyer(good):
                 schedule = self.value_schedules[good]
-                value_sum = sum(schedule.get_value(q) for q in range(1, quantity + 1))
+                value_sum = sum(schedule.get_value(q) for q in range(1, int(quantity) + 1))
                 utility += value_sum
-                logger.debug(f"Buyer utility for {good}: +{value_sum:.2f} (value)")
-            elif good in self.cost_schedules:
+            elif self.is_seller(good):
                 schedule = self.cost_schedules[good]
-                inventory_value = sum(schedule.get_value(q) for q in range(1, quantity + 1))
-                utility += inventory_value
-                logger.debug(f"Seller utility for {good}: +{inventory_value:.2f} (inventory value)")
-
-        logger.debug(f"Agent {self.id} final utility: {utility:.2f}")
+                initial_quantity = self.endowment.initial_basket.get_good_quantity(good)
+                units_sold = initial_quantity - quantity
+                # Correctly sum the costs of unsold units
+                value_sum = sum(schedule.get_value(q) for q in range(int(units_sold + 1), int(initial_quantity + 1)))
+                utility += value_sum
+        
         return utility
 
     def calculate_individual_surplus(self) -> float:
-        current_utility = self.calculate_utility(self.endowment.current_basket.goods_dict, self.endowment.current_basket.cash)
-        initial_utility = self.calculate_utility(self.endowment.initial_basket.goods_dict, self.endowment.initial_basket.cash)
-        print(f"current_utility: {current_utility}, initial_utility: {initial_utility}")
+        current_utility = self.calculate_utility(self.endowment.current_basket)
+        initial_utility = self.calculate_utility(self.endowment.initial_basket)
         surplus = current_utility - initial_utility
-        logger.debug(f"Agent {self.id} calculated surplus: {surplus}")
+        logger.info(f"Agent {self.id} calculated surplus: {surplus:.2f}")
         return surplus
 
     def _can_generate_bid(self, good_name: str) -> bool:
-        can_bid = (self.is_buyer(good_name) and 
-                   self.endowment.current_basket.cash > 0)
-        logger.debug(f"Agent {self.id} can generate bid for {good_name}: {can_bid}")
-        return can_bid
+        return (
+            self.is_buyer(good_name)
+            and self.endowment.current_basket.cash > 0
+            and self.endowment.current_basket.get_good_quantity(good_name) < self.value_schedules[good_name].num_units
+        )
 
     def _can_generate_ask(self, good_name: str) -> bool:
-        can_ask = (self.is_seller(good_name) and 
-                   self.marginal_value[good_name] > 0 and
-                   self.endowment.current_basket.get_good_quantity(good_name) > 0)
-        logger.debug(f"Agent {self.id} can generate ask for {good_name}: {can_ask}")
-        return can_ask
-
-    def _calculate_bid_price(self, good_name: str) -> float:
-        max_bid = min(self.endowment.current_basket.cash, self.marginal_value[good_name])
-        price = random.uniform(
-            max_bid * (1 - self.max_relative_spread),
-            max_bid
+        return (
+            self.is_seller(good_name)
+            and self.endowment.current_basket.get_good_quantity(good_name) > 0
         )
-        logger.debug(f"Agent {self.id} calculated bid price for {good_name}: {price}")
+
+    def _calculate_bid_price(self, good_name: str) -> Optional[float]:
+        schedule = self.value_schedules[good_name]
+        current_quantity = self.endowment.current_basket.get_good_quantity(good_name)
+        next_unit = current_quantity + 1  # The next unit to buy
+        if next_unit > schedule.num_units:
+            return None  # Already bought maximum desired units
+        max_bid = min(self.endowment.current_basket.cash, schedule.get_value(int(next_unit)))
+        # Bias towards max_bid
+        price = random.uniform(max_bid * (1 - self.max_relative_spread / 2), max_bid)
         return price
 
-    def _calculate_ask_price(self, good_name: str) -> float:
-        min_price = self.marginal_value[good_name]
-        price = random.uniform(
-            min_price,
-            min_price * (1 + self.max_relative_spread)
-        )
-        logger.debug(f"Agent {self.id} calculated ask price for {good_name}: {price}")
+    def _calculate_ask_price(self, good_name: str) -> Optional[float]:
+        schedule = self.cost_schedules[good_name]
+        initial_quantity = self.endowment.initial_basket.get_good_quantity(good_name)
+        current_quantity = self.endowment.current_basket.get_good_quantity(good_name)
+        units_sold = initial_quantity - current_quantity
+        next_unit = units_sold + 1  # The next unit to be sold
+        if next_unit > schedule.num_units:
+            return None  # No more units to sell
+        min_ask = schedule.get_value(int(next_unit))
+        # Bias towards min_ask
+        price = random.uniform(min_ask, min_ask * (1 + self.max_relative_spread / 2))
         return price
 
     def print_status(self):
@@ -140,20 +131,9 @@ class EconomicAgent(BaseModel):
         print(f"Current Endowment:")
         print(f"  Cash: {self.endowment.current_basket.cash:.2f}")
         print(f"  Goods: {self.endowment.current_basket.goods_dict}")
-        for good in self.value_schedules.keys() | self.cost_schedules.keys():
-            if self.is_buyer(good):
-                print(f"Buyer Values for {good}:")
-                schedule = self.value_schedules[good]
-                for quantity, value in schedule.values.items():
-                    print(f"  Quantity: {quantity}, Value: {value:.2f}")
-            elif self.is_seller(good):
-                print(f"Seller Costs for {good}:")
-                schedule = self.cost_schedules[good]
-                for quantity, cost in schedule.values.items():
-                    print(f"  Quantity: {quantity}, Cost: {cost:.2f}")
-        current_utility = self.calculate_utility(self.endowment.current_basket.goods_dict, self.endowment.current_basket.cash)
+        current_utility = self.calculate_utility(self.endowment.current_basket)
         print(f"Current Utility: {current_utility:.2f}")
-        print(f"Current Surplus: {self.calculate_individual_surplus():.2f}")
+        self.calculate_individual_surplus()
 
 def create_economic_agent(
     agent_id: str,
@@ -163,7 +143,7 @@ def create_economic_agent(
     base_values: Dict[str, float],
     initial_cash: float,
     initial_goods: Dict[str, int],
-    num_units: int = 10,
+    num_units: int = 20,
     noise_factor: float = 0.1,
     max_relative_spread: float = 0.2,
 ) -> EconomicAgent:
@@ -187,7 +167,7 @@ def create_economic_agent(
     cost_schedules = {
         good: SellerPreferenceSchedule(
             num_units=num_units,
-            base_value=base_values[good] * 0.8,  # Set seller base value lower than buyer base value
+            base_value=base_values[good] * 0.7,  # Set seller base value lower than buyer base value
             noise_factor=noise_factor
         ) for good in sell_goods
     }
@@ -200,12 +180,17 @@ def create_economic_agent(
         max_relative_spread=max_relative_spread
     )
 
-# Example usage
 if __name__ == "__main__":
+    # Set up logging for the main script
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # Set random seed for reproducibility
+    random.seed(42)
+    
     # Define parameters for creating economic agents
     goods = ["apple", "banana"]
-    base_values = {"apple": 10.0, "banana": 8.0}
-    initial_cash = 100.0
+    base_values = {"apple": 20.0, "banana": 16.0}  # Increased base values for buyers
+    initial_cash = 10000.0
     initial_goods = {"apple": 0, "banana": 0}
 
     # Create agents
@@ -217,6 +202,9 @@ if __name__ == "__main__":
         base_values=base_values,
         initial_cash=initial_cash,
         initial_goods=initial_goods,
+        num_units=20,
+        noise_factor=0.05,
+        max_relative_spread=0.2
     )
 
     seller = create_economic_agent(
@@ -224,9 +212,12 @@ if __name__ == "__main__":
         goods=goods,
         buy_goods=[],
         sell_goods=["apple", "banana"],
-        base_values={good: value * 0.8 for good, value in base_values.items()},  # Lower base values for seller
+        base_values={"apple": 15.0, "banana": 12.0},  # Lower base values for sellers
         initial_cash=0,
-        initial_goods={"apple": 10, "banana": 10},
+        initial_goods={"apple": 20, "banana": 20},
+        num_units=20,
+        noise_factor=0.05,
+        max_relative_spread=0.2
     )
 
     # Print initial status
@@ -236,7 +227,7 @@ if __name__ == "__main__":
 
     # Generate bids and asks until a match is found or max attempts reached
     trade_id = 1
-    max_attempts = 10
+    max_attempts = 1000
     for good in goods:
         print(f"\nTrading {good}:")
         for attempt in range(max_attempts):
@@ -244,8 +235,6 @@ if __name__ == "__main__":
             ask = seller.generate_ask(good)
             
             if bid and ask:
-                print(f"  Attempt {attempt + 1}: Bid = {bid.price:.2f}, Ask = {ask.price:.2f}")
-                
                 if bid.price >= ask.price:
                     trade_price = (bid.price + ask.price) / 2
                     trade = Trade(
@@ -258,17 +247,10 @@ if __name__ == "__main__":
                     )
                     print(f"  Trade executed: Price = {trade_price:.2f}, Quantity = 1")
                     
-                    try:
-                        buyer.process_trade(trade)
-                        seller.process_trade(trade)
-                        trade_id += 1
-                        break
-                    except ValueError as e:
-                        print(f"  Trade failed: {str(e)}")
-            else:
-                print(f"  Attempt {attempt + 1}: No valid bid or ask generated")
-        
-        if attempt == max_attempts - 1:
+                    buyer.process_trade(trade)
+                    seller.process_trade(trade)
+                    trade_id += 1
+        else:
             print(f"  No successful trade for {good} after {max_attempts} attempts")
 
     # Print final status

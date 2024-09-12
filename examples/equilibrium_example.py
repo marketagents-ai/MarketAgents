@@ -1,0 +1,138 @@
+from market_agents.economics.equilibrium import Equilibrium
+from market_agents.economics.econ_agent import create_economic_agent
+from market_agents.economics.analysis import analyze_and_plot_market_results
+from market_agents.economics.econ_models import Trade
+import random
+
+if __name__ == "__main__":
+   # Set random seed for reproducibility
+    random.seed(42)
+    
+    # Create multiple buyers and sellers
+    num_buyers = 10
+    num_sellers = 10
+    num_units_per_agent = 10
+    goods = ["apple"]
+    
+    buyers = [
+        create_economic_agent(
+            agent_id=f"buyer_{i}",
+            goods=goods,
+            buy_goods=goods,
+            sell_goods=[],
+            base_values={"apple": 100},
+            initial_cash=1000,
+            initial_goods={"apple": 0},
+            num_units=num_units_per_agent,
+            noise_factor=0.1,
+            max_relative_spread=0.2
+        ) for i in range(num_buyers)
+    ]
+    
+    sellers = [
+        create_economic_agent(
+            agent_id=f"seller_{i}",
+            goods=goods,
+            buy_goods=[],
+            sell_goods=goods,
+            base_values={"apple": 80},
+            initial_cash=0,
+            initial_goods={"apple": num_units_per_agent},
+            num_units=num_units_per_agent,
+            noise_factor=0.1,
+            max_relative_spread=0.2
+        ) for i in range(num_sellers)
+    ]
+    
+    # Create the Equilibrium object
+    equilibrium = Equilibrium(agents=buyers + sellers, goods=goods)
+    
+    # Calculate and print the theoretical equilibrium
+    result = equilibrium.calculate_equilibrium()
+    print("Theoretical Equilibrium Results:")
+    for good, data in result.items():
+        print(f"\nGood: {good}")
+        for key, value in data.items():
+            print(f"  {key}: {value}")
+    theoretical_total_surplus = sum(data['total_surplus'] for data in result.values())
+    print(f"\nTheoretical Total Surplus: {theoretical_total_surplus:.2f}")
+    
+    # Plot the supply and demand curves
+    equilibrium.plot_supply_demand("apple")
+    
+    # Simulate the market trading process
+    print("\nSimulating market trading...")
+    all_agents = buyers + sellers
+    trades = []
+    trade_id = 1
+    max_rounds = 100  # Number of trading rounds
+    for round_num in range(max_rounds):
+        # Collect bids and asks from agents
+        bids = []
+        asks = []
+        for agent in all_agents:
+            for good in goods:
+                bid = agent.generate_bid(good)
+                if bid:
+                    bids.append((agent, bid))
+                ask = agent.generate_ask(good)
+                if ask:
+                    asks.append((agent, ask))
+        
+        # Sort bids and asks by price
+        bids.sort(key=lambda x: x[1].price, reverse=True)  # Highest bids first
+        asks.sort(key=lambda x: x[1].price)  # Lowest asks first
+        
+        # Attempt to match bids and asks
+        while bids and asks:
+            highest_bidder, highest_bid = bids[0]
+            lowest_asker, lowest_ask = asks[0]
+            if highest_bid.price >= lowest_ask.price:
+                # Execute trade
+                trade_price = (highest_bid.price + lowest_ask.price) / 2
+                trade = Trade(
+                    trade_id=trade_id,
+                    buyer_id=highest_bidder.id,
+                    seller_id=lowest_asker.id,
+                    price=trade_price,
+                    quantity=1,
+                    good_name=good
+                )
+                # Process trade for both buyer and seller
+                buyer_success = highest_bidder.process_trade(trade)
+                seller_success = lowest_asker.process_trade(trade)
+                if buyer_success and seller_success:
+                    trades.append(trade)
+                    trade_id += 1
+                    # Remove the bid and ask since they have been fulfilled
+                    bids.pop(0)
+                    asks.pop(0)
+                else:
+                    # If trade was not successful, remove the bid/ask and continue
+                    bids.pop(0)
+                    asks.pop(0)
+            else:
+                # No more matches possible in this round
+                break
+    
+    # After trading rounds, compute the empirical surplus
+    print("\nComputing empirical surplus...")
+    total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in buyers)
+    total_seller_surplus = sum(agent.calculate_individual_surplus() for agent in sellers)
+    total_empirical_surplus = total_buyer_surplus + total_seller_surplus
+    print(f"Total Empirical Buyer Surplus: {total_buyer_surplus:.2f}")
+    print(f"Total Empirical Seller Surplus: {total_seller_surplus:.2f}")
+    print(f"Total Empirical Surplus: {total_empirical_surplus:.2f}")
+    
+    # Compute and print the empirical efficiency (% of theoretical surplus achieved)
+    efficiency = (total_empirical_surplus / theoretical_total_surplus) * 100 if theoretical_total_surplus > 0 else 0
+    print(f"\nEmpirical Efficiency: {efficiency:.2f}%")
+
+    print("\nGenerating market report...")
+    analyze_and_plot_market_results(
+    trades=trades,
+        agents=all_agents,
+        equilibrium=equilibrium,
+        goods=goods,
+        max_rounds=max_rounds
+)

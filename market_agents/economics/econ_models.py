@@ -2,8 +2,8 @@ from pydantic import BaseModel, Field, computed_field
 from functools import cached_property
 from typing import List, Dict
 import random
-import matplotlib.pyplot as plt
 from copy import deepcopy
+from datetime import datetime
 
 class MarketAction(BaseModel):
     price: float = Field(..., description="Price of the order")
@@ -15,7 +15,6 @@ class Bid(MarketAction):
 class Ask(MarketAction):
     is_buyer: bool = False
 
-
 class Trade(BaseModel):
     trade_id: int = Field(..., description="Unique identifier for the trade")
     buyer_id: str = Field(..., description="ID of the buyer")
@@ -23,6 +22,7 @@ class Trade(BaseModel):
     price: float = Field(..., description="The price at which the trade was executed")
     quantity: int = Field(default=1, description="The quantity traded")
     good_name: str = Field(default="consumption_good", description="The name of the good traded")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp of the trade")
 
 class Good(BaseModel):
     name: str
@@ -46,7 +46,7 @@ class Basket(BaseModel):
 
     def get_good_quantity(self, name: str) -> float:
         return next((good.quantity for good in self.goods if good.name == name), 0)
-    
+
 class Endowment(BaseModel):
     initial_basket: Basket
     trades: List[Trade] = Field(default_factory=list)
@@ -112,9 +112,10 @@ class PreferenceSchedule(BaseModel):
         quantities = list(self.values.keys())
         values = list(self.values.values())
         
+        import matplotlib.pyplot as plt
         plt.figure(figsize=(10, 6))
         plt.plot(quantities, values, marker='o')
-        plt.title(f"{'Demand' if isinstance(self, BuyerPreferenceSchedule) else 'Supply'} Schedule")
+        plt.title(f"{'Demand' if self.is_buyer else 'Supply'} Schedule")
         plt.xlabel("Quantity")
         plt.ylabel("Value/Cost")
         plt.grid(True)
@@ -130,12 +131,12 @@ class BuyerPreferenceSchedule(PreferenceSchedule):
         values = {}
         current_value = self.base_value
         for i in range(1, self.num_units + 1):
+            # Decrease current_value by 2% to 5% plus noise
+            decrement = current_value * random.uniform(0.02, 0.05)
             noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
-            new_value = max(1, current_value + noise)
-            if i > 1:
-                new_value = min(new_value, values[i-1])  # Ensure monotonicity
+            new_value = max(1, current_value - decrement + noise)
             values[i] = new_value
-            current_value *= random.uniform(0.95, 1.0)  # Decrease value slightly
+            current_value = new_value
         return values
 
     @computed_field
@@ -151,12 +152,12 @@ class SellerPreferenceSchedule(PreferenceSchedule):
         values = {}
         current_value = self.base_value
         for i in range(1, self.num_units + 1):
+            # Increase current_value by 2% to 5% plus noise
+            increment = current_value * random.uniform(0.02, 0.05)
             noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
-            new_value = max(1, current_value + noise)
-            if i > 1:
-                new_value = max(new_value, values[i-1])  # Ensure monotonicity
+            new_value = max(current_value + increment + noise, values.get(i-1, current_value))
             values[i] = new_value
-            current_value *= random.uniform(1.0, 1.05)  # Increase value slightly
+            current_value = new_value
         return values
 
     @computed_field

@@ -2,11 +2,12 @@ from typing import List, Dict, Tuple
 from pydantic import BaseModel
 import matplotlib.pyplot as plt
 import logging
+import random
 from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
-
+from market_agents.economics.econ_models import Trade
 # Set up logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 class Equilibrium(BaseModel):
     agents: List[EconomicAgent]
@@ -86,68 +87,160 @@ class Equilibrium(BaseModel):
 
     def plot_supply_demand(self, good: str):
         demand_prices, supply_prices = self._aggregate_curves(good)
-        # Build cumulative quantities for plotting
-        demand_quantities = [0] + list(range(1, len(demand_prices) + 1))
+
+        # Build cumulative quantities for demand and supply
+        demand_quantities = [i for i in range(len(demand_prices) + 1)]
+        supply_quantities = [i for i in range(len(supply_prices) + 1)]
+
+        # Adjust prices for plotting
         demand_prices_plot = [demand_prices[0]] + demand_prices
-        supply_quantities = [0] + list(range(1, len(supply_prices) + 1))
         supply_prices_plot = [supply_prices[0]] + supply_prices
-        plt.figure(figsize=(10, 6))
-        plt.step(demand_quantities, demand_prices_plot, where='post', label='Aggregate Demand', color='blue')
-        plt.step(supply_quantities, supply_prices_plot, where='post', label='Aggregate Supply', color='red')
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        # Plot demand and supply curves using 'steps-pre'
+        ax.step(demand_quantities, demand_prices_plot, where='pre', label='Aggregate Demand', color='blue')
+        ax.step(supply_quantities, supply_prices_plot, where='pre', label='Aggregate Supply', color='red')
+
+        # Plot equilibrium point
         equilibrium = self.calculate_equilibrium()[good]
-        plt.plot([equilibrium['quantity']], [equilibrium['price']], 'go', label='Equilibrium')
-        plt.title(f'Aggregate Supply and Demand Curves for {good}')
-        plt.xlabel('Quantity')
-        plt.ylabel('Price')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+        equilibrium_quantity = equilibrium['quantity']
+        equilibrium_price = equilibrium['price']
+
+        ax.plot([equilibrium_quantity], [equilibrium_price], 'go', label='Equilibrium')
+
+        ax.set_title(f'Aggregate Supply and Demand Curves for {good}')
+        ax.set_xlabel('Quantity')
+        ax.set_ylabel('Price')
+        ax.legend()
+        ax.grid(True)
+        
+        return fig  # Return the figure object
 
 if __name__ == "__main__":
     # Set up logging for the main script
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
-    # Create some test agents
+    # Set random seed for reproducibility
+    random.seed(42)
+    
+    # Create multiple buyers and sellers
+    num_buyers = 10
+    num_sellers = 10
+    num_units_per_agent = 10
+    goods = ["apple"]
+    
     buyers = [
         create_economic_agent(
             agent_id=f"buyer_{i}",
-            goods=["apple"],
-            buy_goods=["apple"],
+            goods=goods,
+            buy_goods=goods,
             sell_goods=[],
             base_values={"apple": 100},
             initial_cash=1000,
             initial_goods={"apple": 0},
-            num_units=10,
+            num_units=num_units_per_agent,
             noise_factor=0.1,
             max_relative_spread=0.2
-        ) for i in range(5)
+        ) for i in range(num_buyers)
     ]
     
     sellers = [
         create_economic_agent(
             agent_id=f"seller_{i}",
-            goods=["apple"],
+            goods=goods,
             buy_goods=[],
-            sell_goods=["apple"],
+            sell_goods=goods,
             base_values={"apple": 80},
             initial_cash=0,
-            initial_goods={"apple": 10},
-            num_units=10,
+            initial_goods={"apple": num_units_per_agent},
+            num_units=num_units_per_agent,
             noise_factor=0.1,
             max_relative_spread=0.2
-        ) for i in range(5)
+        ) for i in range(num_sellers)
     ]
     
     # Create the Equilibrium object
-    equilibrium = Equilibrium(agents=buyers + sellers, goods=["apple"])
+    equilibrium = Equilibrium(agents=buyers + sellers, goods=goods)
     
-    # Calculate and print the equilibrium
+    # Calculate and print the theoretical equilibrium
     result = equilibrium.calculate_equilibrium()
-    print("Equilibrium Results:")
+    print("Theoretical Equilibrium Results:")
     for good, data in result.items():
         print(f"\nGood: {good}")
         for key, value in data.items():
             print(f"  {key}: {value}")
+    theoretical_total_surplus = sum(data['total_surplus'] for data in result.values())
+    print(f"\nTheoretical Total Surplus: {theoretical_total_surplus:.2f}")
     
     # Plot the supply and demand curves
     equilibrium.plot_supply_demand("apple")
+    
+    # Simulate the market trading process
+    print("\nSimulating market trading...")
+    all_agents = buyers + sellers
+    trades = []
+    trade_id = 1
+    max_rounds = 100  # Number of trading rounds
+    for round_num in range(max_rounds):
+        # Collect bids and asks from agents
+        bids = []
+        asks = []
+        for agent in all_agents:
+            for good in goods:
+                bid = agent.generate_bid(good)
+                if bid:
+                    bids.append((agent, bid))
+                ask = agent.generate_ask(good)
+                if ask:
+                    asks.append((agent, ask))
+        
+        # Sort bids and asks by price
+        bids.sort(key=lambda x: x[1].price, reverse=True)  # Highest bids first
+        asks.sort(key=lambda x: x[1].price)  # Lowest asks first
+        
+        # Attempt to match bids and asks
+        while bids and asks:
+            highest_bidder, highest_bid = bids[0]
+            lowest_asker, lowest_ask = asks[0]
+            if highest_bid.price >= lowest_ask.price:
+                # Execute trade
+                trade_price = (highest_bid.price + lowest_ask.price) / 2
+                trade = Trade(
+                    trade_id=trade_id,
+                    buyer_id=highest_bidder.id,
+                    seller_id=lowest_asker.id,
+                    price=trade_price,
+                    quantity=1,
+                    good_name=good
+                )
+                # Process trade for both buyer and seller
+                buyer_success = highest_bidder.process_trade(trade)
+                seller_success = lowest_asker.process_trade(trade)
+                if buyer_success and seller_success:
+                    trades.append(trade)
+                    trade_id += 1
+                    # Remove the bid and ask since they have been fulfilled
+                    bids.pop(0)
+                    asks.pop(0)
+                else:
+                    # If trade was not successful, remove the bid/ask and continue
+                    bids.pop(0)
+                    asks.pop(0)
+            else:
+                # No more matches possible in this round
+                break
+    
+    # After trading rounds, compute the empirical surplus
+    print("\nComputing empirical surplus...")
+    total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in buyers)
+    total_seller_surplus = sum(agent.calculate_individual_surplus() for agent in sellers)
+    total_empirical_surplus = total_buyer_surplus + total_seller_surplus
+    print(f"Total Empirical Buyer Surplus: {total_buyer_surplus:.2f}")
+    print(f"Total Empirical Seller Surplus: {total_seller_surplus:.2f}")
+    print(f"Total Empirical Surplus: {total_empirical_surplus:.2f}")
+    
+    # Compute and print the empirical efficiency (% of theoretical surplus achieved)
+    efficiency = (total_empirical_surplus / theoretical_total_surplus) * 100 if theoretical_total_surplus > 0 else 0
+    print(f"\nEmpirical Efficiency: {efficiency:.2f}%")
+
