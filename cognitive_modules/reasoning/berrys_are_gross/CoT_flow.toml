@@ -1,0 +1,95 @@
+[system]
+role = "assistant"
+description = """
+You are an AI language model that leverages chain-of-thought reasoning to provide detailed, step-by-step solutions to user queries. Your role is to break down complex problems, analyze them methodically, and generate comprehensive, accurate, and user-friendly responses. You must adapt to various user inputs, preferences, and contexts while maintaining a focus on clarity, relevance, and reliability. Ensure all interactions are secure, ethical, and compliant with data privacy regulations.
+"""
+
+[settings]
+enable_chain_of_thought = true  # Enable multi-step reasoning to provide well-structured answers.
+max_reasoning_steps = 20  # Maximum number of reasoning steps to take for complex queries.
+reasoning_styles = ["sequential", "parallel", "hierarchical"]  # Supported reasoning styles.
+default_reasoning_style = "sequential"  # Default style to be used if not specified otherwise.
+enable_error_handling = true  # Manage errors effectively for robust interactions.
+enable_logging = true  # Log interactions and errors for transparency and improvement.
+language = "en"  # Primary language for communication.
+
+[chain_of_thought]
+# Outline of structured reasoning steps with placeholders for inputs and outputs.
+steps = [
+    { step_number = 1, action = "Comprehend the user's question.", input = "", output = "" },
+    { step_number = 2, action = "Identify key concepts and entities.", input = "", output = "" },
+    { step_number = 3, action = "Retrieve relevant knowledge or information.", input = "", output = "" },
+    { step_number = 4, action = "Evaluate possible solutions or answers.", input = "", output = "" },
+    { step_number = 5, action = "Select the most appropriate response based on relevance and accuracy.", input = "", output = "" },
+    { step_number = 6, action = "Structure the response logically, ensuring it flows coherently.", input = "", output = "" },
+    { step_number = 7, action = "Review the response for accuracy, completeness, and clarity.", input = "", output = "" },
+    { step_number = 8, action = "Format the response according to user preferences and context.", input = "", output = "" }
+    # Additional steps can be dynamically added based on the complexity of the task.
+]
+
+[variables]
+# Contextual variables and external resources utilized during the reasoning process.
+user_context = { location = "", time = "", preferences = "" }  # Context such as location, time, and user preferences.
+external_resources = ["knowledge_base", "web_search", "databases"]  # External resources for retrieving information.
+
+[input_handling]
+# Configuration for handling different input types and their preprocessing.
+supported_input_types = ["text", "image", "audio"]
+input_preprocessing = { 
+    text = "sanitize",  # Ensure text inputs are sanitized for safe processing.
+    image = "OCR",  # Convert image inputs to text using Optical Character Recognition.
+    audio = "speech_to_text"  # Convert audio inputs to text for understanding.
+}
+
+[output_handling]
+# Configuration for different output formats and their postprocessing.
+supported_output_types = ["text", "summary", "bullet_points", "chart"]  # Types of responses that can be generated.
+default_output_type = "text"  # Default format for output unless specified otherwise.
+output_postprocessing = { 
+    text = "grammar_check",  # Ensure generated text is grammatically correct.
+    summary = "abstract_generation"  # Generate concise summaries when needed.
+}
+
+[error_handling]
+# Define strategies for managing errors during processing.
+on_error = "retry"  # Default strategy is to retry on error.
+max_retries = 3  # Maximum number of retries to attempt on errors.
+error_logging = true  # Log errors for future reference and system improvement.
+
+[logging]
+# Logging settings for monitoring and transparency.
+log_level = "info"  # Log levels can be set to "debug", "info", "warning", "error".
+log_destination = "/var/log/assistant.log"  # Destination for log files.
+log_format = "json"  # Format for logging information.
+
+[user_preferences]
+# Preferences that determine the style and tone of responses.
+tone = "formal"  # Default tone for responses.
+detail_level = "comprehensive"  # Level of detail in responses: "brief", "detailed", "comprehensive".
+language_style = "professional"  # Style of language: "casual", "professional".
+
+[security]
+# Security settings to ensure safe and compliant interactions.
+enable_input_sanitization = true  # Sanitize all inputs to prevent harmful content.
+max_input_length = 10000  # Maximum allowed length for user inputs.
+data_privacy_compliance = ["GDPR", "CCPA"]  # Compliance with data privacy regulations like GDPR and CCPA.
+
+[metadata]
+# Metadata settings for temporal context and knowledge limitations.
+knowledge_cutoff = "2023-10"  # Date after which the AI model does not have knowledge.
+current_date = "2024-09-13"  # Current date for context in responses.
+
+[extensions]
+# Additional plugins or extensions enabled for specific functionalities.
+enabled_extensions = ["math_solver", "language_translator", "code_executor"]  # Extensions to enhance capabilities.
+extension_settings = {
+    math_solver = { precision = "high", mode = "symbolic" },
+    language_translator = { target_language = "en" },
+    code_executor = { sandbox_mode = true }
+}
+
+[performance]
+# Performance settings to balance speed, accuracy, and resource usage.
+max_response_time = 5.0  # Maximum time allowed for generating a response, in seconds.
+resource_limits = { cpu = "80%", memory = "8GB" }  # Resource usage limits for processing.
+optimization_level = "balanced"  # Optimization preference: "speed", "accuracy", "balanced".

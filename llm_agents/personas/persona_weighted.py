@@ -100,7 +100,9 @@ class PersonaGenerator:
         if attribute in self.relationships.relationships and 'relationships' in self.relationships.relationships[attribute]:
             for relation in self.relationships.relationships[attribute]['relationships']:
                 secondary_attr = relation['secondary_attribute']
-                weighted_value, weight = self.relationships.get_weighted_value(attribute, value, secondary_attr, persona_data)
+                weighted_value, weight = self.relationships.get_weighted_value(
+                    attribute, value, secondary_attr, persona_data
+                )
                 if random.random() < weight:
                     if isinstance(weighted_value, str):
                         value = weighted_value
@@ -115,9 +117,20 @@ class PersonaGenerator:
                             if 'range' in attr_config:
                                 min_val, max_val = map(float, attr_config['range'].split('-'))
                                 value = min_val + max_val - weighted_value
+                                # Cast value to int if the attribute expects an integer
+                                if attribute not in ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']:
+                                    value = int(round(value))
                     else:
                         value = weighted_value
+                        # Cast value to int if the attribute expects an integer
+                        if isinstance(value, float) and attribute not in ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']:
+                            value = int(round(value))
+        # Ensure float values are rounded to two decimal places
+        if isinstance(value, float):
+            value = round(value, 2)
         return value
+
+
 
 
     def format_persona(self, persona_data: Dict[str, Any], name: str) -> str:
@@ -152,5 +165,6 @@ if __name__ == "__main__":
     options = AttributeOptions('config/01/attribute_options.yaml')
     generator = PersonaGenerator(relationships, options)
     output_dir = Path("output")
-    generate_and_save_personas(10, output_dir, generator)
-    print(f"Generated 10 personas in {output_dir}")
+    num_personas = 100
+    generate_and_save_personas(num_personas, output_dir, generator)
+    print(f"Generated {num_personas} personas in {output_dir}")

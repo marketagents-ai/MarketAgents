@@ -6,6 +6,47 @@ The project aims to generate realistic personas for market simulation, taking in
 3. Persona Generator: Creates personas based on the options and relationships
 4. Main Script: Orchestrates the generation process and saves the results
 
+```mermaid
+flowchart TD
+    A[Start] --> B[Load Attribute Options]
+    B --> C[Load Attribute Relationships]
+    C --> D[Initialize Empty Persona]
+    D --> E{For Each Attribute}
+    E -->|Select Value| F[Attribute Options]
+    F --> G[Check for Relationships]
+    G --> H{Conditions Met?}
+    H -->|Yes| I[Modify Attribute Value]
+    H -->|No| J[Use Selected Value]
+    I --> K[Update Persona]
+    J --> K
+    K --> E
+    E -->|All Attributes Processed| L[Format Persona]
+    L --> M[Complete Persona]
+    M --> N[End]
+
+```
+
+```mermaid
+flowchart TD
+    Start --> LoadConfigs[Load Options and Relationships]
+    LoadConfigs --> AssignRiskTolerance[Assign 'Risk Tolerance']
+    AssignRiskTolerance --> CheckInvestmentPrefs[Assign 'Investment Preferences']
+
+    subgraph Investment Preferences Assignment
+        direction LR
+        CheckInvestmentPrefs --> HasRelation{Does 'Risk Tolerance' affect 'Investment Preferences'?}
+        HasRelation -->|Yes| EvaluateCondition[Is 'Risk Tolerance' >= 70?]
+        EvaluateCondition -->|Yes| AssignCrypto[Assign 'Investment Preferences' = 'Cryptocurrency']
+        EvaluateCondition -->|No| EvaluateCondition2[Is 'Risk Tolerance' <= 30?]
+        EvaluateCondition2 -->|Yes| AssignSavings[Assign 'Investment Preferences' = 'Savings Account']
+        EvaluateCondition2 -->|No| AssignDefaultInvestment[Assign 'Investment Preferences' Normally]
+        HasRelation -->|No| AssignDefaultInvestment
+    end
+
+    AssignCrypto & AssignSavings & AssignDefaultInvestment --> UpdatePersonaData[Update Persona Data]
+    UpdatePersonaData --> End
+```
+
 Now, let's examine each step in more detail:
 
 1. Input:
