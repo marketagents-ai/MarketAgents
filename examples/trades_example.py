@@ -44,7 +44,7 @@ def calculate_efficiency(agents: list[EconomicAgent], equilibrium: Equilibrium) 
 def run_trades_example():
     print("\n=== Simplified Trades Example ===\n")
     
-    num_rounds = 1000
+    num_rounds = 15
     agents = create_agents()
     buyer, seller = agents
     
@@ -71,6 +71,8 @@ def run_trades_example():
     
     for round in range(num_rounds):
         # Generate bid and ask
+        buyer.reset_pending_orders("apple")
+        seller.reset_pending_orders("apple")
         bid = buyer.generate_bid("apple")
         ask = seller.generate_ask("apple")
         

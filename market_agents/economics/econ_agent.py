@@ -78,9 +78,7 @@ class EconomicAgent(BaseModel):
         """ returns the quantity of the good that the agent has pending orders for"""
         return sum(order.quantity for order in self.pending_orders.get(good_name, []) if isinstance(order, Ask))
     
-    def get_current_value(self, good_name: str) -> Optional[float]:
-        """ returns the current value of the next unit of the good  for buyers only
-        it takes in consideration both the current inventory and the pending orders"""
+    def get_quantity_for_bid(self, good_name: str) -> Optional[int]:
         if not self.is_buyer(good_name):
             return None
         current_quantity = self.endowment.current_basket.get_good_quantity(good_name)
@@ -88,7 +86,25 @@ class EconomicAgent(BaseModel):
         total_quantity = int(current_quantity + pending_quantity)
         if total_quantity > self.value_schedules[good_name].num_units:
             return None
+        return total_quantity
+
+    
+    def get_current_value(self, good_name: str) -> Optional[float]:
+        """ returns the current value of the next unit of the good  for buyers only
+        it takes in consideration both the current inventory and the pending orders"""
+        total_quantity = self.get_quantity_for_bid(good_name)
+        if total_quantity is None:
+            return None
         return self.value_schedules[good_name].get_value(total_quantity+1)
+    
+    def get_previous_value(self, good_name: str) -> Optional[float]:
+        """ returns the previous value of the good for buyers only
+        it takes in consideration both the current inventory and the pending orders"""
+        total_quantity = self.get_quantity_for_bid(good_name)
+        if total_quantity is None:
+            return None
+        return self.value_schedules[good_name].get_value(total_quantity)
+    
     
     def get_current_cost(self, good_name: str) -> Optional[float]:
         """ returns the current cost of the good for sellers only
@@ -134,7 +150,7 @@ class EconomicAgent(BaseModel):
     
     def would_accept_trade(self, trade: Trade) -> bool:
         if self.is_buyer(trade.good_name) and trade.buyer_id == self.id:
-            marginal_value = self.get_current_value(trade.good_name)
+            marginal_value = self.get_previous_value(trade.good_name)
             if marginal_value is None:
                 print("trade rejected because marginal_value is None")
                 return False
@@ -179,6 +195,13 @@ class EconomicAgent(BaseModel):
         self.endowment.add_trade(trade)
         new_utility = self.calculate_utility(self.endowment.current_basket)
         logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}")
+
+    def reset_pending_orders(self,good_name:str):
+        self.pending_orders[good_name] = []
+
+    def reset_all_pending_orders(self):
+        self.pending_orders = {}
+        
 
     def calculate_utility(self, basket: Basket) -> float:
         utility = basket.cash
