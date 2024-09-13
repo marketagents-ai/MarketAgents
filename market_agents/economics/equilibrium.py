@@ -181,7 +181,7 @@ if __name__ == "__main__":
     all_agents = buyers + sellers
     trades = []
     trade_id = 1
-    max_rounds = 100  # Number of trading rounds
+    max_rounds = 1000  # Number of trading rounds
     for round_num in range(max_rounds):
         # Collect bids and asks from agents
         bids = []
@@ -212,7 +212,9 @@ if __name__ == "__main__":
                     seller_id=lowest_asker.id,
                     price=trade_price,
                     quantity=1,
-                    good_name=good
+                    good_name=good,
+                    ask_price=lowest_ask.price,
+                    bid_price=highest_bid.price
                 )
                 # Process trade for both buyer and seller
                 buyer_success = highest_bidder.process_trade(trade)

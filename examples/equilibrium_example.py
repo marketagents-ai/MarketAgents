@@ -1,8 +1,10 @@
 from market_agents.economics.equilibrium import Equilibrium
-from market_agents.economics.econ_agent import create_economic_agent
+from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
 from market_agents.economics.analysis import analyze_and_plot_market_results
 from market_agents.economics.econ_models import Trade
 import random
+from typing import Tuple, List
+from market_agents.economics.econ_models import Bid, Ask
 
 if __name__ == "__main__":
    # Set random seed for reproducibility
@@ -74,8 +76,8 @@ if __name__ == "__main__":
 
     for round_num in range(max_rounds):
         # Collect bids and asks from agents
-        bids = []
-        asks = []
+        bids : List[Tuple[EconomicAgent, Bid]] = []
+        asks :List[Tuple[EconomicAgent, Ask]] = []
         for agent in all_agents:
             for good in goods:
                 bid = agent.generate_bid(good)
@@ -88,8 +90,8 @@ if __name__ == "__main__":
         # Sort bids and asks by price
         bids.sort(key=lambda x: x[1].price, reverse=True)  # Highest bids first
         asks.sort(key=lambda x: x[1].price)  # Lowest asks first
-        
         # Attempt to match bids and asks
+        
         while bids and asks:
             highest_bidder, highest_bid = bids[0]
             lowest_asker, lowest_ask = asks[0]
@@ -106,12 +108,17 @@ if __name__ == "__main__":
                     seller_id=lowest_asker.id,
                     price=trade_price,
                     quantity=1,
-                    good_name=good
+                    good_name=good,
+                    ask_price=lowest_ask.price,
+                    bid_price=highest_bid.price
                 )
                 # Process trade for both buyer and seller
-                buyer_success = highest_bidder.process_trade(trade)
-                seller_success = lowest_asker.process_trade(trade)
+                buyer_success = highest_bidder.would_accept_trade(trade)
+                seller_success = lowest_asker.would_accept_trade(trade)
+                
                 if buyer_success and seller_success:
+                    highest_bidder.process_trade(trade)
+                    lowest_asker.process_trade(trade)
                     # Compute utilities after the trade
                     buyer_utility_after = highest_bidder.calculate_utility(highest_bidder.endowment.current_basket)
                     seller_utility_after = lowest_asker.calculate_utility(lowest_asker.endowment.current_basket)
@@ -127,16 +134,21 @@ if __name__ == "__main__":
                     
                     trades.append(trade)
                     trade_id += 1
+                    print(f"Round {round_num + 1}: Trade executed at price {trade_price:.2f}")
                     # Remove the bid and ask since they have been fulfilled
                     bids.pop(0)
                     asks.pop(0)
                 else:
+                    print(f"buyer_success: {buyer_success}, seller_success: {seller_success}")
                     # If trade was not successful, remove the bid/ask and continue
                     bids.pop(0)
                     asks.pop(0)
             else:
                 # No more matches possible in this round
+                
                 break
+        else:
+            print(f"Round {round_num + 1}: No trade executed")
     
     # After trading rounds, compute the empirical surplus
     print("\nComputing empirical surplus...")
@@ -146,7 +158,7 @@ if __name__ == "__main__":
     print(f"Total Empirical Buyer Surplus: {total_buyer_surplus:.2f}")
     print(f"Total Empirical Seller Surplus: {total_seller_surplus:.2f}")
     print(f"Total Empirical Surplus: {total_empirical_surplus:.2f}")
-    
+
     # Compute and print the empirical efficiency (% of theoretical surplus achieved)
     efficiency = (total_empirical_surplus / theoretical_total_surplus) * 100 if theoretical_total_surplus > 0 else 0
     print(f"\nEmpirical Efficiency: {efficiency:.2f}%")
@@ -161,8 +173,8 @@ if __name__ == "__main__":
         cumulative_quantities=cumulative_quantities,
         cumulative_surplus=cumulative_surplus
     )
-        
+    print(trade_id)
 
 
 
-    
+

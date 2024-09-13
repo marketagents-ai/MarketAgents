@@ -1,13 +1,14 @@
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 from functools import cached_property
 from typing import List, Dict
 import random
 from copy import deepcopy
 from datetime import datetime
+import uuid
 
 class MarketAction(BaseModel):
     price: float = Field(..., description="Price of the order")
-    quantity: int = Field(default=1, ge=1, description="Quantity of the order")
+    quantity: int = Field(default=1, ge=1,le=1, description="Quantity of the order")
 
 class Bid(MarketAction):
     is_buyer: bool = True
@@ -20,10 +21,18 @@ class Trade(BaseModel):
     buyer_id: str = Field(..., description="ID of the buyer")
     seller_id: str = Field(..., description="ID of the seller")
     price: float = Field(..., description="The price at which the trade was executed")
+    ask_price: float = Field(ge=0, description="The price at which the ask was executed")
+    bid_price: float = Field(ge=0, description="The price at which the bid was executed")
     quantity: int = Field(default=1, description="The quantity traded")
     good_name: str = Field(default="consumption_good", description="The name of the good traded")
     timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp of the trade")
 
+    @model_validator(mode='after')
+    def rational_trade(self):
+        if self.ask_price > self.bid_price:
+            raise ValueError(f"Ask price {self.ask_price} is more than bid price {self.bid_price}")
+        return self
+    
 class Good(BaseModel):
     name: str
     quantity: float
@@ -44,8 +53,8 @@ class Basket(BaseModel):
                 return
         self.goods.append(Good(name=name, quantity=quantity))
 
-    def get_good_quantity(self, name: str) -> float:
-        return next((good.quantity for good in self.goods if good.name == name), 0)
+    def get_good_quantity(self, name: str) -> int:
+        return int(next((good.quantity for good in self.goods if good.name == name), 0))
 
 class Endowment(BaseModel):
     initial_basket: Basket
@@ -132,9 +141,9 @@ class BuyerPreferenceSchedule(PreferenceSchedule):
         current_value = self.base_value
         for i in range(1, self.num_units + 1):
             # Decrease current_value by 2% to 5% plus noise
-            decrement = current_value * random.uniform(0.02, 0.05)
-            noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
-            new_value = max(1, current_value - decrement + noise)
+            decrement = current_value * random.uniform(0.02, self.noise_factor)
+            
+            new_value = current_value-decrement
             values[i] = new_value
             current_value = new_value
         return values
@@ -153,9 +162,8 @@ class SellerPreferenceSchedule(PreferenceSchedule):
         current_value = self.base_value
         for i in range(1, self.num_units + 1):
             # Increase current_value by 2% to 5% plus noise
-            increment = current_value * random.uniform(0.02, 0.05)
-            noise = random.uniform(-self.noise_factor, self.noise_factor) * current_value
-            new_value = max(current_value + increment + noise, values.get(i-1, current_value))
+            increment = current_value * random.uniform(0.02, self.noise_factor)
+            new_value = current_value+increment
             values[i] = new_value
             current_value = new_value
         return values

@@ -4,7 +4,7 @@ from market_agents.economics.econ_models import Trade
 import logging
 
 # Set up logging
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def create_agents() -> list[EconomicAgent]:
@@ -34,35 +34,35 @@ def create_agents() -> list[EconomicAgent]:
     )
     return [buyer, seller]
 
-def calculate_efficiency(agents: list[EconomicAgent], equilibrium: Equilibrium, actual_quantity: int) -> float:
+def calculate_efficiency(agents: list[EconomicAgent], equilibrium: Equilibrium) -> float:
     practical_total_surplus = sum(agent.calculate_individual_surplus() for agent in agents)
     theoretical_results = equilibrium.calculate_equilibrium()["apple"]
     theoretical_total_surplus = theoretical_results["total_surplus"]
-    theoretical_quantity = theoretical_results["quantity"]
     
-    # Adjust theoretical surplus based on the actual quantity traded
-    adjusted_theoretical_surplus = (theoretical_total_surplus / theoretical_quantity) * actual_quantity if theoretical_quantity > 0 else 0
-    
-    return (practical_total_surplus / adjusted_theoretical_surplus) * 100 if adjusted_theoretical_surplus > 0 else 0
+    return (practical_total_surplus / theoretical_total_surplus) * 100 if theoretical_total_surplus > 0 else 0
 
 def run_trades_example():
     print("\n=== Simplified Trades Example ===\n")
     
-    num_rounds = 200
+    num_rounds = 1000
     agents = create_agents()
     buyer, seller = agents
     
     # Create Equilibrium object for analysis
     equilibrium = Equilibrium(agents=agents, goods=["apple"])
     
-    # Calculate initial equilibrium
-    eq_results = equilibrium.calculate_equilibrium()["apple"]
-    ce_price, ce_quantity = eq_results["price"], int(eq_results["quantity"])
-    theoretical_total_surplus = eq_results["total_surplus"]
+    print("Theoretical Equilibrium Results:")
+    result = equilibrium.calculate_equilibrium()
+    for good, data in result.items():
+        print(f"\nGood: {good}")
+        for key, value in data.items():
+            print(f"  {key}: {value}")
+    theoretical_total_surplus = sum(data['total_surplus'] for data in result.values())
+    print(f"\nTheoretical Total Surplus: {theoretical_total_surplus:.2f}")
     
-    print(f"Competitive Equilibrium Price: {ce_price:.2f}")
-    print(f"Competitive Equilibrium Quantity: {ce_quantity}")
-    print(f"Theoretical Total Surplus: {theoretical_total_surplus:.2f}")
+    # Print initial utilities
+    print(f"Initial utility of buyer: {buyer.initial_utility:.2f}")
+    print(f"Initial utility of seller: {seller.initial_utility:.2f}")
     
     # Run trades
     trade_id = 1
@@ -82,22 +82,44 @@ def run_trades_example():
                 seller_id=seller.id,
                 price=trade_price,
                 quantity=1,
-                good_name="apple"
+                good_name="apple",
+                bid_price=bid.price,
+                ask_price=ask.price
             )
             
-            buyer_success = buyer.process_trade(trade)
-            seller_success = seller.process_trade(trade)
+            buyer_utility_before = buyer.calculate_utility(buyer.endowment.current_basket)
+            seller_utility_before = seller.calculate_utility(seller.endowment.current_basket)
             
-            if buyer_success and seller_success:
+            buyer_accepts = buyer.would_accept_trade(trade)
+            seller_accepts = seller.would_accept_trade(trade)
+            
+            if buyer_accepts and seller_accepts:
+                buyer.process_trade(trade)
+                seller.process_trade(trade)
+                
+                buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
+                seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
+                
+                buyer_surplus = buyer_utility_after - buyer_utility_before
+                seller_surplus = seller_utility_after - seller_utility_before
+                
+                print(f"Round {round + 1}: Trade executed at price {trade_price:.2f}")
+                print(f"  Buyer surplus: {buyer_surplus:.2f}")
+                print(f"  Seller surplus: {seller_surplus:.2f}")
+                
                 trade_id += 1
                 successful_trades += 1
                 total_trade_price += trade_price
+        else:
+            print(f"Round {round + 1}: No trade executed")
 
     # Calculate final efficiency
-    final_efficiency = calculate_efficiency(agents, equilibrium, successful_trades)
+    final_efficiency = calculate_efficiency(agents, equilibrium)
     print("\nFinal agent states:")
     for agent in agents:
         agent.print_status()
+        surplus = agent.calculate_individual_surplus()
+        print(f"Agent {agent.id} surplus: {surplus:.2f}")
 
     # Print summary statistics
     print("\nTrade Summary:")
@@ -105,7 +127,6 @@ def run_trades_example():
     print(f"Successful Trades: {successful_trades}")
     print(f"Average Trade Price: {total_trade_price / successful_trades:.2f}" if successful_trades else "No trades occurred")
     print(f"\nFinal Efficiency: {final_efficiency:.2f}%")
-
 
 if __name__ == "__main__":
     run_trades_example()
