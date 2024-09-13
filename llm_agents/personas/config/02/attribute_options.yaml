@@ -1,0 +1,144 @@
+openness:
+  range: '0-100'
+
+conscientiousness:
+  range: '0-100'
+
+extraversion:
+  range: '0-100'
+
+agreeableness:
+  range: '0-100'
+
+neuroticism:
+  range: '0-100'
+
+gender:
+  options:
+    - value: Male
+      distribution: 49
+    - value: Female
+      distribution: 49
+    - value: Non-binary
+      distribution: 2
+
+
+age:
+  range: '18-80'
+
+education_level:
+  options:
+    - 'No Formal Education'
+    - 'High School'
+    - 'Vocational Training'
+    - "Bachelor's Degree"
+    - "Master's Degree"
+    - 'PhD'
+
+occupation:
+  options:
+    - Student
+    - Engineer
+    - Teacher
+    - Doctor
+    - Artist
+    - Entrepreneur
+    - Unemployed
+    - Retired
+
+income:
+  range: '20000-150000'
+
+hobbies_and_interests:
+  options:
+    - Reading
+    - Traveling
+    - Cooking
+    - Sports
+    - Music
+    - Arts
+    - Gaming
+    - Gardening
+    - Socializing
+    - Volunteering
+
+values:
+  options:
+    - Family
+    - Career
+    - Wealth
+    - Health
+    - Happiness
+    - Knowledge
+    - Freedom
+    - Security
+    - Justice
+    - Creativity
+    - Harmony
+
+life_events:
+  options:
+    - Graduated
+    - Married
+    - Divorced
+    - Had a child
+    - Changed career
+    - Moved to a new city
+    - Lost a loved one
+    - Started a business
+
+short_term_goals:
+  options:
+    - Learn a new skill
+    - Get a promotion
+    - Save money
+    - Travel to a new country
+    - Buy a house
+    - Improve health
+    - Start a hobby
+    - Volunteer
+
+long_term_goals:
+  options:
+    - Retire early
+    - Start a family
+    - Become financially independent
+    - Achieve a high-level position
+    - Make a significant contribution to society
+    - Travel the world
+    - Write a book
+    - Start a foundation
+
+investment_preferences:
+  options:
+    - Stocks
+    - Bonds
+    - Real Estate
+    - Cryptocurrency
+    - Savings Account
+    - Mutual Funds
+    - Commodities
+    - None
+
+stress_level:
+  range: '0-100'
+
+risk_tolerance:
+  range: '0-100'
+
+emotional_intelligence:
+  range: '0-100'
+
+cognitive_style:
+  options:
+    - Analytical
+    - Creative
+    - Practical
+    - Logical
+    - Intuitive
+    - Reflective
+
+role:
+  options:
+    - Buyer
+    - Seller

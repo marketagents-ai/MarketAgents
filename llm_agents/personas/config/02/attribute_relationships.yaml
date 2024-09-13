@@ -1,0 +1,133 @@
+openness:
+  relationships:
+    - secondary_attribute: hobbies_and_interests
+      conditions:
+        - 'openness >= 70'
+      weight: 0.9
+      value: Arts
+    - secondary_attribute: hobbies_and_interests
+      conditions:
+        - 'openness <= 30'
+      weight: 0.9
+      value: Gardening
+    - secondary_attribute: cognitive_style
+      conditions:
+        - 'openness >= 70'
+      weight: 0.9
+      value: Creative
+    - secondary_attribute: cognitive_style
+      conditions:
+        - 'openness <= 30'
+      weight: 0.9
+      value: Practical
+
+conscientiousness:
+  relationships:
+    - secondary_attribute: occupation
+      conditions:
+        - 'conscientiousness >= 70'
+      weight: 0.9
+      value: Engineer
+    - secondary_attribute: education_level
+      conditions:
+        - 'conscientiousness >= 70'
+      weight: 0.8
+      value: "Bachelor's Degree"
+    - secondary_attribute: risk_tolerance
+      conditions:
+        - 'conscientiousness >= 70'
+      weight: 1.0
+      value: 30
+    - secondary_attribute: risk_tolerance
+      conditions:
+        - 'conscientiousness <= 30'
+      weight: 1.0
+      value: 70
+
+extraversion:
+  relationships:
+    - secondary_attribute: hobbies_and_interests
+      conditions:
+        - 'extraversion >= 70'
+      weight: 0.9
+      value: Socializing
+    - secondary_attribute: hobbies_and_interests
+      conditions:
+        - 'extraversion <= 30'
+      weight: 0.9
+      value: Reading
+    - secondary_attribute: cognitive_style
+      conditions:
+        - 'extraversion >= 70'
+      weight: 0.9
+      value: Intuitive
+    - secondary_attribute: cognitive_style
+      conditions:
+        - 'extraversion <= 30'
+      weight: 0.9
+      value: Reflective
+
+agreeableness:
+  relationships:
+    - secondary_attribute: values
+      conditions:
+        - 'agreeableness >= 70'
+      weight: 0.9
+      value: Harmony
+    - secondary_attribute: values
+      conditions:
+        - 'agreeableness <= 30'
+      weight: 0.9
+      value: Wealth
+
+neuroticism:
+  relationships:
+    - secondary_attribute: stress_level
+      conditions:
+        - 'neuroticism >= 70'
+      weight: 1.0
+      value: 80
+    - secondary_attribute: stress_level
+      conditions:
+        - 'neuroticism <= 30'
+      weight: 1.0
+      value: 20
+
+age:
+  relationships:
+    - secondary_attribute: life_events
+      conditions:
+        - 'age >= 25'
+      weight: 0.7
+      value: Married
+    - secondary_attribute: life_events
+      conditions:
+        - 'age >= 30'
+      weight: 0.5
+      value: 'Had a child'
+
+income:
+  relationships:
+    - secondary_attribute: occupation
+      conditions:
+        - 'income >= 100000'
+      weight: 0.8
+      value: Entrepreneur
+    - secondary_attribute: occupation
+      conditions:
+        - 'income <= 40000'
+      weight: 0.8
+      value: Unemployed
+
+risk_tolerance:
+  relationships:
+    - secondary_attribute: investment_preferences
+      conditions:
+        - 'risk_tolerance >= 70'
+      weight: 0.9
+      value: Cryptocurrency
+    - secondary_attribute: investment_preferences
+      conditions:
+        - 'risk_tolerance <= 30'
+      weight: 0.9
+      value: 'Savings Account'

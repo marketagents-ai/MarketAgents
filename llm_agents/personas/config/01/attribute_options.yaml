@@ -1,0 +1,307 @@
+gender:
+  options:
+    - value: Male
+      distribution: 49
+    - value: Female
+      distribution: 49
+    - value: Non-binary
+      distribution: 2
+
+
+role:
+  options:
+    - value: Buyer
+      distribution: 0.5
+    - value: Seller
+      distribution: 0.5
+
+education_level:
+  options:
+    - value: No Formal Education
+      distribution: 0.05
+    - value: High School
+      distribution: 0.3
+    - value: Some College
+      distribution: 0.2
+    - value: Associate's Degree
+      distribution: 0.1
+    - value: Bachelor's Degree
+      distribution: 0.2
+    - value: Master's Degree
+      distribution: 0.1
+    - value: PhD
+      distribution: 0.05
+
+occupation:
+  options:
+    - value: Student
+      income_potential: Low
+      distribution: 0.1
+    - value: Entry-level Worker
+      income_potential: Low
+      distribution: 0.15
+    - value: Engineer
+      income_potential: Medium-High
+      distribution: 0.1
+    - value: Teacher
+      income_potential: Medium-Low
+      distribution: 0.1
+    - value: Doctor
+      income_potential: High
+      distribution: 0.05
+    - value: Artist
+      income_potential: Low
+      distribution: 0.05
+    - value: Business Owner
+      income_potential: High
+      distribution: 0.1
+    - value: Sales Representative
+      income_potential: Medium
+      distribution: 0.1
+    - value: Service Worker
+      income_potential: Low
+      distribution: 0.15
+    - value: Manager
+      income_potential: Medium-High
+      distribution: 0.1
+    - value: Skilled Tradesperson
+      income_potential: Medium
+      distribution: 0.1
+    - value: Unemployed
+      income_potential: Low
+      distribution: 0.05
+    - value: Retired
+      income_potential: Varies
+      distribution: 0.1
+
+income_bracket:
+  options:
+    - value: Very Low
+      distribution: 0.1
+    - value: Low
+      distribution: 0.2
+    - value: Medium-Low
+      distribution: 0.2
+    - value: Medium
+      distribution: 0.2
+    - value: Medium-High
+      distribution: 0.15
+    - value: High
+      distribution: 0.1
+    - value: Very High
+      distribution: 0.05
+
+geographic_location:
+  options:
+    - value: Urban
+      distribution: 0.5
+    - value: Suburban
+      distribution: 0.3
+    - value: Rural
+      distribution: 0.2
+
+spending_habits:
+  options:
+    - value: Very Frugal
+      distribution: 0.1
+    - value: Frugal
+      distribution: 0.2
+    - value: Moderate
+      distribution: 0.4
+    - value: Liberal
+      distribution: 0.2
+    - value: Lavish
+      distribution: 0.1
+
+saving_preferences:
+  options:
+    - value: Very Low
+      distribution: 0.1
+    - value: Low
+      distribution: 0.2
+    - value: Medium
+      distribution: 0.4
+    - value: High
+      distribution: 0.2
+    - value: Very High
+      distribution: 0.1
+
+investment_experience:
+  options:
+    - value: None
+      distribution: 0.3
+    - value: Novice
+      distribution: 0.4
+    - value: Intermediate
+      distribution: 0.2
+    - value: Expert
+      distribution: 0.08
+    - value: Professional
+      distribution: 0.02
+
+decision_making_style:
+  options:
+    - value: Rational
+      distribution: 0.3
+    - value: Emotional
+      distribution: 0.2
+    - value: Impulsive
+      distribution: 0.2
+    - value: Collaborative
+      distribution: 0.2
+    - value: Intuitive
+      distribution: 0.1
+
+hobbies_and_interests:
+  options:
+    - value: Reading
+    - value: Sports
+    - value: Cooking
+    - value: Travel
+    - value: Music
+    - value: Gardening
+    - value: Photography
+    - value: Video Games
+    - value: Art
+    - value: Technology
+    - value: Outdoor Activities
+    - value: Fitness
+    - value: Volunteering
+    - value: Collecting
+    - value: DIY Projects
+
+mood:
+  options:
+    - value: Happy
+      distribution: 0.2
+    - value: Sad
+      distribution: 0.1
+    - value: Neutral
+      distribution: 0.3
+    - value: Excited
+      distribution: 0.15
+    - value: Anxious
+      distribution: 0.15
+    - value: Frustrated
+      distribution: 0.05
+    - value: Content
+      distribution: 0.05
+
+life_events:
+  options:
+    - value: Got a promotion
+    - value: Moved to a new city
+    - value: Got married
+    - value: Had a child
+    - value: Started a new job
+    - value: Experienced a loss
+    - value: Graduated from school
+    - value: Bought a house
+    - value: Started a business
+    - value: Retired
+    - value: Overcame a health challenge
+    - value: Learned a new skill
+
+short_term_goals:
+  options:
+    - value: Build emergency fund
+    - value: Pay off credit card debt
+    - value: Save for vacation
+    - value: Invest in stocks
+    - value: Start a side business
+    - value: Learn a new skill
+    - value: Improve health and fitness
+    - value: Declutter living space
+    - value: Network for career opportunities
+    - value: Save for a major purchase
+
+long_term_goals:
+  options:
+    - value: Save for retirement
+    - value: Buy a house
+    - value: Start a business
+    - value: Achieve financial independence
+    - value: Fund children's education
+    - value: Change careers
+    - value: Travel the world
+    - value: Write a book
+    - value: Contribute to community
+    - value: Master a craft or skill
+
+risk_appetite:
+  options:
+    - value: Very Conservative
+      distribution: 0.1
+    - value: Conservative
+      distribution: 0.2
+    - value: Moderate
+      distribution: 0.4
+    - value: Aggressive
+      distribution: 0.2
+    - value: Very Aggressive
+      distribution: 0.1
+
+risk_tolerance:
+  options:
+    - value: Very Low
+      distribution: 0.1
+    - value: Low
+      distribution: 0.2
+    - value: Medium
+      distribution: 0.4
+    - value: High
+      distribution: 0.2
+    - value: Very High
+      distribution: 0.1
+
+investment_preferences:
+  options:
+    - value: Stocks
+    - value: Bonds
+    - value: Real Estate
+    - value: Cryptocurrencies
+    - value: Mutual Funds
+    - value: ETFs
+    - value: Commodities
+    - value: Peer-to-Peer Lending
+    - value: Startups
+    - value: Index Funds
+
+age:
+  range: 18-100
+  value_type: int
+
+openness:
+  range: 0-1
+  value_type: float
+
+conscientiousness:
+  range: 0-1
+  value_type: float
+
+extraversion:
+  range: 0-1
+  value_type: float
+
+agreeableness:
+  range: 0-1
+  value_type: float
+
+neuroticism:
+  range: 0-1
+  value_type: float
+
+relationship_status:
+  options:
+    - value: Single
+      distribution: 0.3
+    - value: In a relationship
+      distribution: 0.2
+    - value: Married
+      distribution: 0.3
+    - value: Divorced
+      distribution: 0.1
+    - value: Widowed
+      distribution: 0.05
+    - value: Separated
+      distribution: 0.05

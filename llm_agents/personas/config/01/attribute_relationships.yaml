@@ -1,0 +1,293 @@
+age:
+  relationships:
+    - secondary_attribute: education_level
+      weight: 0.9
+      conditions: [age<18]
+    - secondary_attribute: education_level
+      weight: 0.8
+      conditions: [age>=18, age<22]
+    - secondary_attribute: education_level
+      weight: 0.7
+      conditions: [age>=22, age<26]
+    - secondary_attribute: education_level
+      weight: 0.6
+      conditions: [age>=26]
+    - secondary_attribute: occupation
+      weight: 0.7
+      conditions: []
+    - secondary_attribute: occupation
+      weight: 0.9
+      conditions: [age>=65]
+      value: Retired
+    - secondary_attribute: income_bracket
+      weight: 0.6
+      conditions: [age>25]
+    - secondary_attribute: investment_experience
+      weight: 0.5
+      conditions: [age>30]
+    - secondary_attribute: relationship_status
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: risk_appetite
+      weight: 0.3
+      conditions: [age>50]
+
+education_level:
+  relationships:
+    - secondary_attribute: occupation
+      weight: 0.7
+      conditions: []
+    - secondary_attribute: income_bracket
+      weight: 0.6
+      conditions: [age>25]
+    - secondary_attribute: investment_experience
+      weight: 0.4
+      conditions: []
+
+occupation:
+  relationships:
+    - secondary_attribute: age
+      weight: 0.8
+      conditions: []
+    - secondary_attribute: education_level
+      weight: 0.7
+      conditions: []
+    - secondary_attribute: income_bracket
+      weight: 0.7
+      conditions: [age>25]
+    - secondary_attribute: geographic_location
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: age
+      weight: 0.9
+      conditions: [age>=65]
+      value: Retired
+
+income_bracket:
+  relationships:
+    - secondary_attribute: age
+      weight: 0.7
+      conditions: [age>25]
+    - secondary_attribute: education_level
+      weight: 0.6
+      conditions: [age>22]
+    - secondary_attribute: occupation
+      weight: 0.8
+      conditions: [age>22]
+    - secondary_attribute: occupation
+      weight: 0.7
+      conditions: [age>=60]
+      value: Retired
+    - secondary_attribute: geographic_location
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: investment_experience
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: spending_habits
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: saving_preferences
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: risk_tolerance
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: investment_preferences
+      weight: 0.5
+      conditions: []
+
+geographic_location:
+  relationships:
+    - secondary_attribute: income_bracket
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: occupation
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: hobbies_and_interests
+      weight: 0.3
+      conditions: []
+
+investment_experience:
+  relationships:
+    - secondary_attribute: age
+      weight: 0.8
+      conditions: []
+    - secondary_attribute: occupation
+      weight: 0.6
+      conditions: [age>25]
+    - secondary_attribute: education_level
+      weight: 0.5
+      conditions: [age>22]
+    - secondary_attribute: risk_tolerance
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: investment_preferences
+      weight: 0.7
+      conditions: []
+
+openness:
+  relationships:
+    - secondary_attribute: risk_tolerance
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: spending_habits
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: investment_preferences
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: hobbies_and_interests
+      weight: 0.6
+      conditions: []
+
+conscientiousness:
+  relationships:
+    - secondary_attribute: saving_preferences
+      weight: 0.7
+      conditions: []
+    - secondary_attribute: income_bracket
+      weight: 0.5
+      conditions: [age>30]
+    - secondary_attribute: investment_experience
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: spending_habits
+      weight: 0.5
+      conditions: []
+
+extraversion:
+  relationships:
+    - secondary_attribute: spending_habits
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: occupation
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: hobbies_and_interests
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: decision_making_style
+      weight: 0.4
+      conditions: []
+
+agreeableness:
+  relationships:
+    - secondary_attribute: income_bracket
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: decision_making_style
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: risk_tolerance
+      weight: 0.3
+      conditions: []
+
+neuroticism:
+  relationships:
+    - secondary_attribute: risk_tolerance
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: saving_preferences
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: mood
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: decision_making_style
+      weight: 0.5
+      conditions: []
+
+risk_tolerance:
+  relationships:
+    - secondary_attribute: spending_habits
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: saving_preferences
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: investment_preferences
+      weight: 0.7
+      conditions: []
+    - secondary_attribute: risk_appetite
+      weight: 0.8
+      conditions: []
+
+risk_appetite:
+  relationships:
+    - secondary_attribute: risk_tolerance
+      weight: 0.8
+      conditions: []
+    - secondary_attribute: investment_preferences
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: short_term_goals
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: long_term_goals
+      weight: 0.5
+      conditions: []
+
+decision_making_style:
+  relationships:
+    - secondary_attribute: risk_appetite
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: investment_preferences
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: spending_habits
+      weight: 0.5
+      conditions: []
+
+mood:
+  relationships:
+    - secondary_attribute: spending_habits
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: risk_tolerance
+      weight: 0.2
+      conditions: []
+    - secondary_attribute: short_term_goals
+      weight: 0.4
+      conditions: []
+
+life_events:
+  relationships:
+    - secondary_attribute: mood
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: short_term_goals
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: long_term_goals
+      weight: 0.4
+      conditions: []
+
+relationship_status:
+  relationships:
+    - secondary_attribute: spending_habits
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: saving_preferences
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: long_term_goals
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: short_term_goals
+      weight: 0.3
+      conditions: []
+
+hobbies_and_interests:
+  relationships:
+    - secondary_attribute: spending_habits
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: geographic_location
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: short_term_goals
+      weight: 0.3
+      conditions: []

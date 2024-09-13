@@ -27,8 +27,8 @@ Hobbies and Interests:
 {hobbies_and_interests}
 
 Dynamic Attributes:
-Current Mood: {current_mood}
-Recent Life Events: {recent_life_events}
+Current Mood: {mood}
+Recent Life Events: {life_events}
 
 Financial Objectives:
 Short Term Goals: {short_term_goals}
