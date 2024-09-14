@@ -17,33 +17,48 @@ class TestPersonaGenerator(unittest.TestCase):
         self.generator = PersonaGenerator(self.mock_relationships, self.mock_options)
 
     def test_generate_persona(self):
-        # Mock the necessary methods and attributes
+        # Update the mock options to include all required attributes
         self.mock_options.options = {
-            'gender': {'options': ['Male', 'Female']},
-            'role': {'options': ['Buyer', 'Seller']},
             'age': {'range': '18-80'},
+            'gender': {'options': ['Male', 'Female']},
+            'education_level': {'options': ['High School', 'Bachelor', 'Master']},
+            'occupation': {'options': [{'value': 'Engineer', 'min_age': 22, 'valid_education': ['Bachelor', 'Master'], 'valid_income_range': [50000, 150000]}]},
+            'income': {'range': '20000-200000'},
+            'role': {'options': ['Buyer', 'Seller']},
             'hobbies_and_interests': {'options': ['Reading', 'Sports', 'Cooking']},
             'life_events': {'options': ['Graduation', 'Marriage', 'Career change']},
             'short_term_goals': {'options': ['Save money', 'Learn a skill', 'Travel']},
             'long_term_goals': {'options': ['Buy a house', 'Start a business', 'Retire early']},
-            'investment_preferences': {'options': ['Stocks', 'Real estate', 'Bonds']}
+            'investment_preferences': {'options': ['Stocks', 'Real estate', 'Bonds']},
+            'openness': {'range': '0-1'},
+            'conscientiousness': {'range': '0-1'},
+            'extraversion': {'range': '0-1'},
+            'agreeableness': {'range': '0-1'},
+            'neuroticism': {'range': '0-1'}
         }
+
+        # Update the side_effect to return appropriate values for all attributes
         self.mock_options.get_random_option.side_effect = [
-            'Male',  # gender
-            'Buyer',  # role
             30,  # age
+            'Male',  # gender
+            'Bachelor',  # education_level
+            {'value': 'Engineer', 'min_age': 22, 'valid_education': ['Bachelor', 'Master'], 'valid_income_range': [50000, 150000]},  # occupation
+            75000,  # income
+            'Buyer',  # role
             'Reading', 'Sports', 'Cooking',  # hobbies_and_interests (3 times)
             'Graduation', 'Marriage', 'Career change',  # life_events (3 times)
             'Save money', 'Learn a skill', 'Travel',  # short_term_goals (3 times)
             'Buy a house', 'Start a business', 'Retire early',  # long_term_goals (3 times)
-            'Stocks', 'Real estate', 'Bonds'  # investment_preferences (3 times)
+            'Stocks', 'Real estate', 'Bonds',  # investment_preferences (3 times)
+            0.7, 0.6, 0.5, 0.8, 0.4  # personality traits
         ]
+
         self.mock_relationships.relationships = {}
+        self.mock_relationships.get_weighted_value.return_value = ['TestValue', 1.0]
         
-        # Mock the attributes list to include 'gender'
-        self.generator.attributes = ['gender'] + [attr for attr in self.mock_options.options.keys() if attr != 'gender']
+        # Update the attributes list to match the new order in the script
+        self.generator.attributes = ['age', 'gender', 'education_level', 'occupation', 'income', 'role', 'hobbies_and_interests', 'life_events', 'short_term_goals', 'long_term_goals', 'investment_preferences', 'openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']
         
-        # Instead, mock the format_persona method to return a string
         self.generator.format_persona = MagicMock(return_value="Mocked formatted persona")
         
         with patch('persona_weighted.names.get_full_name', return_value='John Doe'):
