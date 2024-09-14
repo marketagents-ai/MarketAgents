@@ -6,7 +6,6 @@ from .message_models import LLMPromptContext, LLMOutput, LLMConfig
 from .oai_parallel import process_api_requests_from_file, OAIApiFromFileConfig
 import os
 from dotenv import load_dotenv
-#Import time
 import time
 from openai.types.chat import ChatCompletionToolParam
 from anthropic.types.beta.prompt_caching import PromptCachingBetaToolParam
@@ -18,13 +17,28 @@ class RequestLimits(BaseModel):
     provider: Literal["openai", "anthropic"] = Field(default="openai",description="The provider of the API")
 
 class ParallelAIUtilities:
-    def __init__(self, oai_request_limits: Optional[RequestLimits] = RequestLimits(), anthropic_request_limits: RequestLimits = RequestLimits(provider="anthropic"), local_cache: bool = True):
+    def __init__(self, oai_request_limits: Optional[RequestLimits] = RequestLimits(), 
+                 anthropic_request_limits: RequestLimits = RequestLimits(provider="anthropic"), 
+                 local_cache: bool = True,
+                 cache_folder: Optional[str] = None):
         load_dotenv()
         self.openai_key = os.getenv("OPENAI_KEY")
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         self.oai_request_limits = oai_request_limits if oai_request_limits else RequestLimits(max_requests_per_minute=500,max_tokens_per_minute=200000,provider="openai")
         self.anthropic_request_limits = anthropic_request_limits if anthropic_request_limits else RequestLimits(max_requests_per_minute=50,max_tokens_per_minute=40000,provider="anthropic")
         self.local_cache = local_cache
+        self.cache_folder = self._setup_cache_folder(cache_folder)
+
+    def _setup_cache_folder(self, cache_folder: Optional[str]) -> str:
+        if cache_folder:
+            full_path = os.path.abspath(cache_folder)
+        else:
+            # Corrected path: Go up two levels instead of three
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            full_path = os.path.join(repo_root, 'outputs', 'inference_cache')
+        
+        os.makedirs(full_path, exist_ok=True)
+        return full_path
 
     async def run_parallel_ai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         openai_prompts = [p for p in prompts if p.llm_config.client == "openai"]
@@ -43,8 +57,9 @@ class ParallelAIUtilities:
 
     async def _run_openai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        requests_file = self._prepare_requests_file(prompts, "openai")
-        results_file = f'openai_results_{timestamp}.jsonl'
+        requests_file = os.path.join(self.cache_folder, f'openai_requests_{timestamp}.jsonl')
+        results_file = os.path.join(self.cache_folder, f'openai_results_{timestamp}.jsonl')
+        self._prepare_requests_file(prompts, "openai", requests_file)
         config = self._create_oai_completion_config(prompts[0], requests_file, results_file)
         if config:
             try:
@@ -57,8 +72,9 @@ class ParallelAIUtilities:
 
     async def _run_anthropic_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        requests_file = self._prepare_requests_file(prompts, "anthropic")
-        results_file = f'anthropic_results_{timestamp}.jsonl'
+        requests_file = os.path.join(self.cache_folder, f'anthropic_requests_{timestamp}.jsonl')
+        results_file = os.path.join(self.cache_folder, f'anthropic_results_{timestamp}.jsonl')
+        self._prepare_requests_file(prompts, "anthropic", requests_file)
         config = self._create_anthropic_completion_config(prompts[0], requests_file, results_file)
         if config:
             try:
@@ -69,21 +85,17 @@ class ParallelAIUtilities:
                     self._delete_files(requests_file, results_file)
         return []
 
-    def _prepare_requests_file(self, prompts: List[LLMPromptContext], client: str) -> str:
-        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    def _prepare_requests_file(self, prompts: List[LLMPromptContext], client: str, filename: str):
         requests = []
         for prompt in prompts:
             request = self._convert_prompt_to_request(prompt, client)
             if request:
                 requests.append(request)
         
-        filename = f'{client}_requests_{timestamp}.jsonl'
-
         with open(filename, 'w') as f:
             for request in requests:
                 json.dump(request, f)
                 f.write('\n')
-        return filename
 
     def _convert_prompt_to_request(self, prompt: LLMPromptContext, client: str) -> Optional[Dict[str, Any]]:
         if client == "openai":
@@ -183,6 +195,4 @@ class ParallelAIUtilities:
                 os.remove(file)
             except OSError as e:
                 print(f"Error deleting file {file}: {e}")
-
-\
 

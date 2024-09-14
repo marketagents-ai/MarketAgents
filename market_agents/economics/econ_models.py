@@ -11,10 +11,16 @@ class MarketAction(BaseModel):
     quantity: int = Field(default=1, ge=1,le=1, description="Quantity of the order")
 
 class Bid(MarketAction):
-    is_buyer: bool = True
+    @computed_field
+    @property
+    def is_buyer(self) -> bool:
+        return True
 
 class Ask(MarketAction):
-    is_buyer: bool = False
+    @computed_field
+    @property
+    def is_buyer(self) -> bool:
+        return False
 
 class Trade(BaseModel):
     trade_id: int = Field(..., description="Unique identifier for the trade")
