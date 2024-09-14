@@ -172,24 +172,24 @@ class MarketOrchestrator():
         relevant_agents = [agent for agent in self.agents if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
         
         all_trades : List[Trade] = []
-        cumulative_quantities : List[int] = []
-        per_round_surplus : List[float] = []
+        per_trade_surplus : List[float] = []
+        per_trade_quantities : List[int] = []
 
         for round in range(max_rounds):
             logger.info(f"Round {round + 1}")
             
             # Run one step of the orchestrator
             step_result, surplus = await self.run_auction_step(good_name)
-            per_round_surplus.extend(surplus)
+            per_trade_surplus.extend(surplus)
             # Process trades
             global_observation  = step_result.global_observation
             assert isinstance(global_observation, AuctionGlobalObservation)
             new_trades = global_observation.all_trades
             all_trades.extend(new_trades)
-            
+            quantities = [trade.quantity for trade in new_trades]
+            per_trade_quantities.extend(quantities)
             # Update cumulative quantities and surplus
-            total_quantity = sum(trade.quantity for trade in all_trades)
-            cumulative_quantities.append(total_quantity)
+            
            
             
             if new_trades:
@@ -204,7 +204,9 @@ class MarketOrchestrator():
         # Reset pending orders for all agents
         for agent in relevant_agents:
             agent.reset_all_pending_orders()
-        cumulative_surplus = [sum(per_round_surplus[:i+1]) for i in range(len(per_round_surplus))]
+        cumulative_surplus = [sum(per_trade_surplus[:i+1]) for i in range(len(per_trade_surplus))]
+        cumulative_quantities = [sum(per_trade_quantities[:i+1]) for i in range(len(per_trade_quantities))]
+        assert len(cumulative_quantities) == len(cumulative_surplus)
         # Generate market report
         self.generate_market_report(all_trades, relevant_agents, good_name, max_rounds, cumulative_quantities, cumulative_surplus)
 

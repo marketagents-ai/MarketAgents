@@ -23,10 +23,12 @@ async def main():
     apple = Good(name="apple", quantity=0)
 
     # Create LLM configs
-    buyer_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
-    seller_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
-    num_buyers = 3
-    num_sellers = 3
+    # buyer_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
+    # seller_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
+    buyer_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
+    seller_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
+    num_buyers = 20
+    num_sellers = 20
     # Create simple agents
     buyers = [
         create_simple_agent(
