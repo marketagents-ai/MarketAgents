@@ -1,283 +1,131 @@
+from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
+from market_agents.economics.econ_models import Basket, Good, Trade, Bid, Ask
+from market_agents.environments.environment import MultiAgentEnvironment
+from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation
+
+#import llm context and ai utiliteis from 
+
+from market_agents.inference.parallel_inference import ParallelAIUtilities
+from market_agents.inference.message_models import LLMPromptContext, LLMOutput
+from market_agents.simple_agent import SimpleAgent
+from typing import List, Tuple, Optional, Dict,Union
 import logging
-from typing import List, Dict, Any, Type
-from environments.auction.auction import DoubleAuction
-from pydantic import BaseModel, Field
-from colorama import Fore, Style
-import threading
-import os
-import yaml
 
-from market_agent.market_agents import MarketAgent
-from environments.environment import Environment
-from environments.auction.auction_environment import AuctionEnvironment
-from base_agent.aiutilities import LLMConfig
-from base_agent.agent import Agent
-from protocols.protocol import Protocol
-from protocols.acl_message import ACLMessage
-from simulation_app import create_dashboard
-from logger_utils import *
-from personas.persona import generate_persona, save_persona_to_file, Persona
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-logger = setup_logger(__name__)
+class MarketOrchestrator():
+    def __init__(self, agents: List[Union[SimpleAgent, EconomicAgent]], markets: List[MultiAgentEnvironment], ai_utils: ParallelAIUtilities):
+        self.agents = agents
+        self.markets = markets
+        self.ai_utils = ai_utils
+        self.markets_dict = self.create_markets_dict(markets)
 
-class AgentConfig(BaseModel):
-    num_units: int
-    base_value: float
-    use_llm: bool
-    initial_cash: float
-    initial_goods: int
-    noise_factor: float = Field(default=0.1)
-    max_relative_spread: float = Field(default=0.2)
 
-class AuctionConfig(BaseModel):
-    name: str
-    address: str
-    auction_type: str
-    max_steps: int
-
-class OrchestratorConfig(BaseModel):
-    num_agents: int
-    max_rounds: int
-    agent_config: AgentConfig
-    llm_config: LLMConfig
-    environment_configs: Dict[str, AuctionConfig]
-    protocol: Type[Protocol]
-    database_config: Dict[str, Any]
-
-class Orchestrator:
-    def __init__(self, config: OrchestratorConfig):
-        self.config = config
-        self.agents: List[MarketAgent] = []
-        self.environments: Dict[str, Environment] = {}
-        self.dashboard = None
-        self.database = None
-        self.simulation_order = ['auction']
-        self.simulation_data: List[Dict[str, Any]] = []
-        self.latest_data = None
-
-    def load_or_generate_personas(self) -> List[Persona]:
-        personas_dir = "./personas/generated_personas"
-        existing_personas = []
-
-        # Check if the directory exists and load existing personas
-        if os.path.exists(personas_dir):
-            for filename in os.listdir(personas_dir):
-                if filename.endswith(".yaml"):
-                    with open(os.path.join(personas_dir, filename), 'r') as file:
-                        persona_data = yaml.safe_load(file)
-                        existing_personas.append(Persona(**persona_data))
-
-        # Generate additional personas if needed
-        while len(existing_personas) < self.config.num_agents:
-            new_persona = generate_persona()
-            existing_personas.append(new_persona)
-            save_persona_to_file(new_persona, os.path.join(personas_dir))
-
-        return existing_personas[:self.config.num_agents]
-
-    def generate_agents(self):
-        log_section(logger, "INITIALIZING MARKET AGENTS")
-        personas = self.load_or_generate_personas()
-        for i, persona in enumerate(personas):
-            agent = MarketAgent.create(
-                agent_id=i,
-                is_buyer=persona.role.lower() == "buyer",
-                **self.config.agent_config.dict(),
-                llm_config=self.config.llm_config,
-                protocol=self.config.protocol,
-                environments=self.environments,
-                persona=persona
-            )
-            self.agents.append(agent)
-            log_agent_init(logger, i, persona.role.lower() == "buyer")
-        
-        logger.info(f"Generated {len(self.agents)} agents")
-
-    def setup_environments(self):
-        log_section(logger, "CONFIGURING MARKET ENVIRONMENTS")
-        for env_name, env_config in self.config.environment_configs.items():
-            if env_name == 'auction':
-                env = AuctionEnvironment(
-                    agents=self.agents,
-                    max_steps=env_config.max_steps,
-                    protocol=self.config.protocol,
-                    name=env_config.name,
-                    address=env_config.address,
-                    auction_type=env_config.auction_type
-                )
-                self.environments[env_name] = env
-                log_environment_setup(logger, env_name)
-            else:
-                logger.warning(f"Unknown environment type: {env_name}")
-
-        logger.info(f"Set up {len(self.environments)} environments")
-
-        for agent in self.agents:
-            agent.environments = self.environments
-
-    def setup_dashboard(self):
-        log_section(logger, "INITIALIZING DASHBOARD")
-        self.dashboard = create_dashboard(self.data_source)
-        logger.info("Dashboard setup complete")
-
-    def setup_database(self):
-        log_section(logger, "CONFIGURING SIMULATION DATABASE")
-        logger.info("Database setup skipped")
-
-    def run_simulation(self):
-        log_section(logger, "SIMULATION COMMENCING")
-        
-        for round_num in range(1, self.config.max_rounds + 1):
-            log_round(logger, round_num)
-            
-            for env_name in self.simulation_order:
-                env_state = self.run_environment(env_name)
-                self.update_simulation_state(env_name, env_state)
-            
-            for agent in self.agents:
-                reflection = agent.reflect(env_name)
-                if reflection:
-                    log_reflection(logger, int(agent.id), f"{Fore.MAGENTA}{reflection}{Style.RESET_ALL}")
-                else:
-                    logger.warning(f"Agent {agent.id} returned empty reflection")
-            
-            self.save_round_data(round_num)
-            self.update_dashboard()
-        
-        log_completion(logger, "SIMULATION COMPLETED")
-
-    def run_environment(self, env_name: str):
-        env = self.environments[env_name]
-        
-        log_running(logger, env_name)
-        agent_actions = {}
-        for agent in self.agents:
-            log_section(logger, f"Current Agent:\nAgent {agent.id} with persona:\n{agent.persona}")
-            perception = agent.perceive(env_name)
-            log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
-
-            action = agent.generate_action(env_name, perception)
-            agent_actions[agent.id] = action
-            action_type = action['content'].get('action', 'Unknown')
-            if action_type == 'bid':
-                color = Fore.BLUE
-            elif action_type == 'ask':
-                color = Fore.GREEN
-            else:
-                color = Fore.YELLOW
-            log_action(logger, int(agent.id), f"{color}{action_type}: {action['content']}{Style.RESET_ALL}")
-        
-        env_state = env.update(agent_actions)
-        logger.info(f"Completed {env_name} step")
-        return env_state
-
-    def update_simulation_state(self, env_name: str, env_state: Dict[str, Any]):
-        # Update agent states based on the environment state
-        for agent in self.agents:
-            agent_observation = env_state['observations'].get(agent.id)
-            if agent_observation:
-                # Convert the observation to a dictionary if it's not already
-                if not isinstance(agent_observation, dict):
-                    agent_observation = agent_observation.dict()
-                # Call the EconomicAgent's update_state method directly
-                agent.update_state(agent_observation)
-
-        # Create a new state dictionary for this round if it doesn't exist
-        if not self.simulation_data or 'state' not in self.simulation_data[-1]:
-            self.simulation_data.append({'state': {}})
-
-        # Update the simulation state
-        self.simulation_data[-1]['state'][env_name] = env_state.get('market_info', {})
-        self.simulation_data[-1]['state']['trade_info'] = env_state.get('trade_info', {})
-
-    def save_round_data(self, round_num):
-        round_data = {
-            'round': round_num,
-            'agent_states': [{
-                'id': agent.id,
-                'is_buyer': agent.is_buyer,
-                'cash': agent.endowment.cash,
-                'goods': agent.endowment.goods,
-                'last_action': agent.last_action,
-                'memory': agent.memory[-1] if agent.memory else None
-            } for agent in self.agents],
-            'environment_states': {name: env.get_global_state() for name, env in self.environments.items()},
-        }
-        
-        # Add the state data if it exists
-        if self.simulation_data and 'state' in self.simulation_data[-1]:
-            round_data['state'] = self.simulation_data[-1]['state']
-        
-        self.simulation_data.append(round_data)
-
-    def data_source(self):
-        env = self.environments['auction']
-        return env.get_global_state()
-
-    def update_dashboard(self):
-        if self.dashboard:
-            logger.info("Updating dashboard data...")
-            self.latest_data = self.data_source()
-
-    def run_dashboard(self):
-        if self.dashboard:
-            log_section(logger, "LAUNCHING DASHBOARD UI")
-            self.dashboard.run_server(debug=True, use_reloader=False)
-
-    def start(self):
-        log_section(logger, "MARKET SIMULATION INITIALIZING")
-        self.generate_agents()
-        self.setup_environments()
-        self.setup_dashboard()
-        self.setup_database()
-
-        # Start the dashboard in a separate thread
-        if self.dashboard:
-            dashboard_thread = threading.Thread(target=self.run_dashboard)
-            dashboard_thread.start()
-
-        # Run the simulation
-        self.run_simulation()
-
-        # Wait for the dashboard thread to finish if it's running
-        if self.dashboard:
-            dashboard_thread.join()
-
-if __name__ == "__main__":
-    config = OrchestratorConfig(
-        num_agents=2,
-        max_rounds=2,
-        agent_config=AgentConfig(
-            num_units=5,
-            base_value=100,
-            use_llm=True,
-            initial_cash=1000,
-            initial_goods=0,
-            noise_factor=0.1,
-            max_relative_spread=0.2
-        ),
-        llm_config=LLMConfig(
-            client='openai',
-            model='gpt-4o-mini',
-            temperature=0.5,
-            response_format='json_object',
-            max_tokens=4096,
-            use_cache=True
-        ),
-        environment_configs={
-            'auction': AuctionConfig(
-                name='Auction',
-                address='auction_env_1',
-                auction_type='double',
-                max_steps=5,
-            ),
-        },
-        protocol=ACLMessage,
-        database_config={
-            'db_type': 'postgres',
-            'db_name': 'market_simulation'
-        }
-    )
+    def create_markets_dict(self,markets: List[MultiAgentEnvironment]):
+        markets_dict = {}
+        for market in markets:
+            if not isinstance(market.mechanism, DoubleAuction):
+                raise ValueError(f"Market {market.mechanism} is not a DoubleAuction")
+            markets_dict[market.mechanism.good_name] = market
+        return markets_dict
     
-    orchestrator = Orchestrator(config)
-    orchestrator.start()
+    def execute_trade(self, trade: Trade) -> Optional[float]:
+        buyer = next(agent for agent in self.agents if agent.id == trade.buyer_id)
+        seller = next(agent for agent in self.agents if agent.id == trade.seller_id)
+        if buyer is None or seller is None:
+            raise ValueError(f"Trade {trade} has invalid agent IDs")
+        if buyer.would_accept_trade(trade) and seller.would_accept_trade(trade):
+            buyer_utility_before = buyer.calculate_utility(buyer.endowment.current_basket)
+            seller_utility_before = seller.calculate_utility(seller.endowment.current_basket)
+            buyer.process_trade(trade)
+            seller.process_trade(trade)
+            buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
+            seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
+            trade_surplus = buyer_utility_after - buyer_utility_before + seller_utility_after - seller_utility_before
+            return trade_surplus
+        else:
+            raise ValueError(f"Trade {trade} was not accepted by either buyer {buyer.would_accept_trade(trade)} and seller {seller.would_accept_trade(trade)}")
+    
+    def get_zero_intelligence_agents(self):
+        return [agent for agent in self.agents if not isinstance(agent, SimpleAgent)]
+    
+    def get_llm_agents(self):
+        return [agent for agent in self.agents if isinstance(agent, LLMPromptContext)]
+    
+    def create_local_actions_zero_intelligence(self, good_name: str) -> Dict[str, AuctionAction]:
+        actions = {}
+        agents = [agent for agent in self.get_zero_intelligence_agents() if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
+        for agent in self.get_zero_intelligence_agents():
+            bid = agent.generate_bid(good_name)
+            ask = agent.generate_ask(good_name)
+            if bid:
+                actions[agent.id] = AuctionAction(agent_id=agent.id, action=bid)
+            elif ask:
+                actions[agent.id] = AuctionAction(agent_id=agent.id, action=ask)
+        return actions
+    
+    async def run_parallel_ai_completion(self, prompts: List[SimpleAgent]) -> List[LLMOutput]:
+        typed_prompts : List[LLMPromptContext] = [p for p in prompts if isinstance(p, LLMPromptContext)]
+        return await self.ai_utils.run_parallel_ai_completion(typed_prompts)
+    
+    def create_local_actions_llm(self, good_name: str) -> Dict[str, AuctionAction]:
+        #filter agents for those that have the good name in their cost or sell schedule
+        agents = [agent for agent in self.get_llm_agents() if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
+        llm_outputs = self.run_parallel_ai_completion(agents)
+        assert isinstance(llm_outputs, list)
+        typed_outputs : List[LLMOutput] = [p for p in llm_outputs if isinstance(p, LLMOutput)]
+        actions = {}
+        for output,agent in zip(typed_outputs,agents):
+            market_action = None
+            if output.json_object is not None and output.json_object.name == "Bid":
+                market_action = Bid.model_validate(output.json_object)
+                agent.add_chat_turn_history(output)
+            elif output.json_object is not None and output.json_object.name == "Ask":
+                market_action = Ask.model_validate(output.json_object)
+            if market_action is not None:
+                agent.add_chat_turn_history(output)
+                actions[agent.id] = AuctionAction(agent_id=agent.id, action=market_action)
+        return actions
+    
+    def process_trades(self, global_observation: AuctionGlobalObservation) -> List[float]:
+        surplus = []
+        new_trades = global_observation.all_trades
+        new_trades.sort(key=lambda x: x.trade_id)
+        for trade in new_trades:
+            trade_surplus = self.execute_trade(trade)
+            if trade_surplus is not None:
+                surplus.append(trade_surplus)
+        return surplus
+    
+    def update_llm_new_message(self, global_observation: AuctionGlobalObservation):
+        for agent in self.get_llm_agents():
+            agent.update_local(global_observation.observations[agent.id])
+
+    
+    def run_auction(self, good_name: str, max_rounds: int) -> Tuple[List[Trade], Dict[int,List[float]]]:
+        environment = self.markets_dict[good_name]    
+        all_trades = []
+        surplus_by_round : Dict[int,List[float]] = {}
+
+        for round_num in range(max_rounds):
+            zero_intelligence_actions = self.create_local_actions_zero_intelligence(good_name)
+            llm_actions = self.create_local_actions_llm(good_name)
+            actions = {**zero_intelligence_actions, **llm_actions}
+            if not actions:
+                logger.info(f"No more actions generated. Ending auction at round {round_num}")
+                break
+
+            global_action = GlobalAuctionAction(actions=actions)
+            environment_step = environment.step(global_action)
+            
+            assert isinstance(environment_step.global_observation, AuctionGlobalObservation)
+            all_trades.extend(environment_step.global_observation.all_trades)
+            surplus_by_round[round_num] = self.process_trades(environment_step.global_observation)
+            self.update_llm_new_message(environment_step.global_observation)
+                
+
+        return all_trades, surplus_by_round
+
+

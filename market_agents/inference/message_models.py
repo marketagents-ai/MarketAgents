@@ -101,7 +101,7 @@ class LLMPromptContext(BaseModel):
     prefill: str = Field(default="Here's the valid JSON object response:```json", description="prefill assistant response with an instruction")
     postfill: str = Field(default="\n\nPlease provide your response in JSON format.", description="postfill user response with an instruction")
     structured_output : Optional[StructuredTool] = None
-    use_schema_instruction: bool = False
+    use_schema_instruction: bool = Field(default=False, description="Whether to use the schema instruction")
     llm_config: LLMConfig
 
 
@@ -174,19 +174,19 @@ class LLMPromptContext(BaseModel):
         return self.model_copy(update={"llm_config":llm_config})
        
     
-    def update_history(self,history:List[Dict[str, Any]]) -> 'LLMPromptContext':
+    def update_history_safely(self,history:List[Dict[str, Any]]) -> 'LLMPromptContext':
         return self.model_copy(update={"history":history})
         
     
-    def append_to_history(self,new_message:Dict[str, Any]) -> 'LLMPromptContext':
+    def append_to_history_safely(self,new_message:Dict[str, Any]) -> 'LLMPromptContext':
         if  self.history:
             return self.model_copy(update={"history":self.history.append(new_message)})
         else:
             assert not self.history
-            return self.update_history(history=[new_message])
+            return self.update_history_safely(history=[new_message])
         
     
-    def add_chat_turn_history(self, llm_output:'LLMOutput') -> 'LLMPromptContext':
+    def add_chat_turn_history_safely(self, llm_output:'LLMOutput') -> 'LLMPromptContext':
         """
         Safely adds a user-assistant chat turn to the history based on the LLMOutput.
         
@@ -216,7 +216,13 @@ class LLMPromptContext(BaseModel):
             return self.model_copy(update={"history": new_turn})
         else:
             return self.model_copy(update={"history": self.history + new_turn})
-       
+        
+    def add_chat_turn_history(self, llm_output:'LLMOutput'):
+        """ add a chat turn to the history without safely model copy just normal append """
+        if self.history is None:
+            self.history = []
+        self.history.append({"role": "user", "content": self.new_message})
+        self.history.append({"role": "assistant", "content": llm_output.str_content or json.dumps(llm_output.json_object.object) if llm_output.json_object else "{}"})
     
     def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
