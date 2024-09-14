@@ -4,7 +4,7 @@ from market_agents.inference.parallel_inference import ParallelAIUtilities
 from market_agents.inference.message_models import LLMPromptContext, StructuredTool
 from market_agents.environments.mechanisms.auction import AuctionLocalObservation, AuctionGlobalObservation
 from typing import Optional, Union
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator, computed_field
 
 bid_tool = StructuredTool(
     schema_name="Bid",
@@ -25,6 +25,44 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
     system_string: str = Field(default="You are a market agent that can bid and ask for a single good in the market, your objective is to maximize your utility from cash and goods deoending on your evaluation of the goods it might be worth trading in the market for cash or buying more.")
     structured_output: Union[Bid, Ask] = Field(default=Bid, description="The action to take in the market")
     use_schema_instruction: bool = Field(default=True, description="Whether to use the schema instruction")
+
+    @field_validator("cost_schedules")
+    def validate_cost_schedules(cls, v):
+        if len(v.keys()) > 1:
+            raise ValueError("Simple agent can only have one cost schedule")
+        return v
+    
+    @field_validator("value_schedules")
+    def validate_value_schedules(cls, v):
+        if len(v.keys()) > 1:
+            raise ValueError("Simple agent can only have one value schedule")
+        return v
+    
+    @model_validator(mode='after')
+    def either_or(self):
+        if len(self.cost_schedules.keys()) == 0 and len(self.value_schedules.keys()) == 0:
+            raise ValueError("Simple agent must have either a cost schedule or a value schedule with at least one good")
+        if len(self.cost_schedules.keys()) > 0 and len(self.value_schedules.keys()) > 0:
+            raise ValueError("Simple agent cannot have both a cost schedule and a value schedule")
+        return self
+    
+    @computed_field
+    @property
+    def good_name(self):
+        if len(self.cost_schedules.keys()) > 0:
+            return list(self.cost_schedules.keys())[0]
+        else:
+            return list(self.value_schedules.keys())[0]
+    
+    @computed_field
+    @property
+    def is_buyer(self):
+        return len(self.value_schedules.keys()) > 0
+    
+    @computed_field
+    @property
+    def is_seller(self):
+        return len(self.cost_schedules.keys()) > 0
 
    
     def update_local(self, local_observation: AuctionLocalObservation):

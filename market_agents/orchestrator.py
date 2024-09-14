@@ -31,23 +31,6 @@ class MarketOrchestrator():
             markets_dict[market.mechanism.good_name] = market
         return markets_dict
     
-    def execute_trade(self, trade: Trade) -> Optional[float]:
-        buyer = next(agent for agent in self.agents if agent.id == trade.buyer_id)
-        seller = next(agent for agent in self.agents if agent.id == trade.seller_id)
-        if buyer is None or seller is None:
-            raise ValueError(f"Trade {trade} has invalid agent IDs")
-        if buyer.would_accept_trade(trade) and seller.would_accept_trade(trade):
-            buyer_utility_before = buyer.calculate_utility(buyer.endowment.current_basket)
-            seller_utility_before = seller.calculate_utility(seller.endowment.current_basket)
-            buyer.process_trade(trade)
-            seller.process_trade(trade)
-            buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
-            seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
-            trade_surplus = buyer_utility_after - buyer_utility_before + seller_utility_after - seller_utility_before
-            return trade_surplus
-        else:
-            raise ValueError(f"Trade {trade} was not accepted by either buyer {buyer.would_accept_trade(trade)} and seller {seller.would_accept_trade(trade)}")
-    
     def get_zero_intelligence_agents(self):
         return [agent for agent in self.agents if not isinstance(agent, SimpleAgent)]
     
@@ -57,7 +40,7 @@ class MarketOrchestrator():
     def create_local_actions_zero_intelligence(self, good_name: str) -> Dict[str, AuctionAction]:
         actions = {}
         agents = [agent for agent in self.get_zero_intelligence_agents() if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
-        for agent in self.get_zero_intelligence_agents():
+        for agent in agents:
             bid = agent.generate_bid(good_name)
             ask = agent.generate_ask(good_name)
             if bid:
@@ -88,6 +71,23 @@ class MarketOrchestrator():
                 agent.add_chat_turn_history(output)
                 actions[agent.id] = AuctionAction(agent_id=agent.id, action=market_action)
         return actions
+    
+    def execute_trade(self, trade: Trade) -> Optional[float]:
+        buyer = next(agent for agent in self.agents if agent.id == trade.buyer_id)
+        seller = next(agent for agent in self.agents if agent.id == trade.seller_id)
+        if buyer is None or seller is None:
+            raise ValueError(f"Trade {trade} has invalid agent IDs")
+        if buyer.would_accept_trade(trade) and seller.would_accept_trade(trade):
+            buyer_utility_before = buyer.calculate_utility(buyer.endowment.current_basket)
+            seller_utility_before = seller.calculate_utility(seller.endowment.current_basket)
+            buyer.process_trade(trade)
+            seller.process_trade(trade)
+            buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
+            seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
+            trade_surplus = buyer_utility_after - buyer_utility_before + seller_utility_after - seller_utility_before
+            return trade_surplus
+        else:
+            raise ValueError(f"Trade {trade} was not accepted by either buyer {buyer.would_accept_trade(trade)} and seller {seller.would_accept_trade(trade)}")
     
     def process_trades(self, global_observation: AuctionGlobalObservation) -> List[float]:
         surplus = []
