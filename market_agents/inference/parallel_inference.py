@@ -33,17 +33,25 @@ class ParallelAIUtilities:
         if cache_folder:
             full_path = os.path.abspath(cache_folder)
         else:
-            # Corrected path: Go up two levels instead of three
+            # Go up two levels from the current file's directory to reach the project root
             repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
             full_path = os.path.join(repo_root, 'outputs', 'inference_cache')
         
         os.makedirs(full_path, exist_ok=True)
         return full_path
 
-    async def run_parallel_ai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
+    def _create_prompt_hashmap(self, prompts: List[LLMPromptContext]) -> Dict[str, LLMPromptContext]:
+        return {p.id: p for p in prompts}
+    
+    def _update_prompt_history(self, prompts: List[LLMPromptContext], llm_outputs: List[LLMOutput]):
+        prompt_hashmap = self._create_prompt_hashmap(prompts)
+        for output in llm_outputs:
+            prompt_hashmap[output.source_id].add_chat_turn_history(output)
+        return list(prompt_hashmap.values())
+
+    async def run_parallel_ai_completion(self, prompts: List[LLMPromptContext],update_history:bool=True) -> List[LLMOutput]:
         openai_prompts = [p for p in prompts if p.llm_config.client == "openai"]
         anthropic_prompts = [p for p in prompts if p.llm_config.client == "anthropic"]
-
         tasks = []
         if openai_prompts:
             tasks.append(self._run_openai_completion(openai_prompts))
@@ -51,9 +59,12 @@ class ParallelAIUtilities:
             tasks.append(self._run_anthropic_completion(anthropic_prompts))
 
         results = await asyncio.gather(*tasks)
+        flattened_results = [item for sublist in results for item in sublist]
+        if update_history:
+            prompts = self._update_prompt_history(prompts, flattened_results)
         
         # Flatten the results list
-        return [item for sublist in results for item in sublist]
+        return flattened_results
 
     async def _run_openai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -90,7 +101,13 @@ class ParallelAIUtilities:
         for prompt in prompts:
             request = self._convert_prompt_to_request(prompt, client)
             if request:
-                requests.append(request)
+                metadata = {
+                    "prompt_context_id": prompt.id,
+                    "start_time": time.time(),
+                    "end_time": None,
+                    "total_time": None
+                }
+                requests.append([metadata, request])
         
         with open(filename, 'w') as f:
             for request in requests:
@@ -164,30 +181,30 @@ class ParallelAIUtilities:
     def _parse_results_file(self, filepath: str, original_prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         results = []
         with open(filepath, 'r') as f:
-            for line, original_prompt in zip(f, original_prompts):
+            for line in f:
                 try:
                     result = json.loads(line)
-                    llm_output = self._convert_result_to_llm_output(result, original_prompt)
+                    llm_output = self._convert_result_to_llm_output(result)
                     results.append(llm_output)
                 except json.JSONDecodeError:
                     print(f"Error decoding JSON: {line}")
-                    results.append(LLMOutput(raw_result={"error": "JSON decode error"}, completion_kwargs={}))
+                    results.append(LLMOutput(raw_result={"error": "JSON decode error"}, completion_kwargs={}, start_time=time.time(), end_time=time.time(), source_id="error"))
                 except Exception as e:
                     print(f"Error processing result: {e}")
-                    results.append(LLMOutput(raw_result={"error": str(e)}, completion_kwargs={}))
+                    results.append(LLMOutput(raw_result={"error": str(e)}, completion_kwargs={}, start_time=time.time(), end_time=time.time(), source_id="error"))
         return results
 
-    def _convert_result_to_llm_output(self, result: List[Dict[str, Any]], original_prompt: LLMPromptContext) -> LLMOutput:
-        request_data, response_data = result
-
+    def _convert_result_to_llm_output(self, result: List[Dict[str, Any]]) -> LLMOutput:
+        metadata, request_data, response_data = result
+        print(metadata)
         
-        if original_prompt.llm_config.client == "openai":
-            return LLMOutput(raw_result=response_data, completion_kwargs=request_data)
-        elif original_prompt.llm_config.client == "anthropic":
-            # Convert Anthropic response format to match LLMOutput expectations
-            return LLMOutput(raw_result=response_data, completion_kwargs=request_data)
-        else:
-            return LLMOutput(raw_result={"error": "Unexpected client type"}, completion_kwargs=request_data)
+        return LLMOutput(
+            raw_result=response_data,
+            completion_kwargs=request_data,
+            start_time=metadata["start_time"],
+            end_time=metadata["end_time"] or time.time(),
+            source_id=metadata["prompt_context_id"]
+        )
 
     def _delete_files(self, *files):
         for file in files:
@@ -195,4 +212,5 @@ class ParallelAIUtilities:
                 os.remove(file)
             except OSError as e:
                 print(f"Error deleting file {file}: {e}")
+
 

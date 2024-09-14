@@ -34,9 +34,10 @@ async def main():
             for i in range(count):
                 prompts.append(
                     LLMPromptContext(
+                        id=f"{client}_{model}_{response_format}_{i}",
                         system_string="You are a helpful assistant that tells programmer jokes.",
                         new_message=f"Tell me a programmer joke about the number {i}.",
-                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=4000),
+                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=400),
                         structured_output=structured_tool,
                         
                     )
@@ -44,12 +45,12 @@ async def main():
         return prompts
 
     # OpenAI prompts
-    openai_prompts = create_prompts("openai", "gpt-4o-mini",["text","json_beg","json_object","structured_output","tool"],20)
+    openai_prompts = create_prompts("openai", "gpt-4o-mini",["text","json_beg","json_object","structured_output","tool"],1)
 
 
 
     # Anthropic prompts
-    anthropic_prompts = create_prompts("anthropic", "claude-3-haiku-20240307", ["json_beg", "text","tool"],10)
+    anthropic_prompts = create_prompts("anthropic", "claude-3-haiku-20240307", ["json_beg", "text","tool"],1)
     # Run parallel completions
     print("Running parallel completions...")
     all_prompts = openai_prompts + anthropic_prompts

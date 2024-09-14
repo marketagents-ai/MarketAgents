@@ -73,6 +73,21 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
         self.new_message = "\n The market summary of the last round is: " + str(local_observation.observation.market_summary)
         self.new_message += "\n You had the following succesful trades during the last round: " + str(local_observation.observation.trades)
         self.new_message += "\n You currently have the following orders still in the market ledger: " + str(local_observation.observation.waiting_orders)
+        self.new_message += "\n You currently have the following basket: " + str(self.endowment.current_basket)
+        if self.is_seller(self.good_name):
+            current_cost = self.get_current_cost(self.good_name)
+            if current_cost is not None:
+                self.new_message += "\n Your evaluation of the good to sell is: " + str(self.get_current_cost(self.good_name)) 
+                self.new_message += "\n You can make a profit by selling at " + str(current_cost*1.01) + " or higher"
+            else:
+                self.new_message += "\n You are not currently buying or selling " + self.good_name
+        else:
+            current_value = self.get_current_value(self.good_name)
+            if current_value is not None:
+                self.new_message += "\n Your evaluation of the good to buy is: " + str(self.get_current_value(self.good_name)) 
+                self.new_message += "\n You can make a profit by buying at " + str(current_value*0.99) + " or lower"
+            else:
+                self.new_message += "\n You are not currently buying or selling " + self.good_name
         
 
 
@@ -81,13 +96,13 @@ def create_simple_agent(agent_id: str, llm_config: LLMConfig, good: Good, is_buy
         value_schedule = BuyerPreferenceSchedule(num_units=num_units, base_value=starting_value)
         cost_schedules = {}
         value_schedules = {good.name: value_schedule}
-        new_message = f"You are a buyer of {good.name} and your value schedule is {value_schedule}, this is the first round of the market so the are not bids or asks yet."
+        new_message = f"You are a buyer of {good.name} and your current value is {value_schedule.get_value(1)}, this is the first round of the market so the are not bids or asks yet. You can make a profit by buying at " + str(value_schedule.get_value(1)*0.99) + " or lower"
         structured_output = BidTool()
     else:
         value_schedules = {}
         cost_schedule = SellerPreferenceSchedule(num_units=num_units, base_value=starting_value)
         cost_schedules = {good.name: cost_schedule}
-        new_message = f"You are a seller of {good.name} and your cost schedule is {cost_schedule}, this is the first round of the market so the are not bids or asks yet."
+        new_message = f"You are a seller of {good.name} and your current cost is {cost_schedule.get_value(1)}, this is the first round of the market so the are not bids or asks yet. You can make a profit by selling at " + str(cost_schedule.get_value(1)*1.01) + " or higher"
         structured_output = AskTool()
     return SimpleAgent(id=agent_id, llm_config=llm_config,structured_output=structured_output, endowment=endowment, value_schedules=value_schedules, cost_schedules=cost_schedules, new_message=new_message)
 

@@ -117,17 +117,21 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
                 raise ValueError("Invalid content type")
             
             return MessageParam(role=role, content=content)
-        
         converted_messages = []
         system_message = []
         num_messages = len(messages)
+        if use_cache:
+            use_cache_ids = set([num_messages - 1, max(0, num_messages - 3)])
+        else:
+            use_cache_ids = set()
         for i,message in enumerate(messages):
             if message["role"] == "system":
                 system_message= create_anthropic_system_message(message,use_cache=use_cache)
             else:
-                history_delta = 2 if use_prefill is False else 3
-                last_messages = True if i < (num_messages-1-history_delta) and num_messages>=history_delta else False
-                converted_messages.append(convert_message(message,use_cache= use_cache if last_messages else False))
+                
+                use_cache_final = use_cache if  i in use_cache_ids else False
+                print(f"use_cache_final: {use_cache_final} for message {i} out of {num_messages-1}")
+                converted_messages.append(convert_message(message,use_cache= use_cache_final))
 
         
         return system_message, [msg for msg in converted_messages if msg is not None]

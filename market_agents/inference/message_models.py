@@ -86,7 +86,7 @@ class StructuredTool(BaseModel):
 class LLMConfig(BaseModel):
     client: Literal["openai", "azure_openai", "anthropic", "vllm"]
     model: Optional[str] = None
-    max_tokens: int = 4096
+    max_tokens: int = Field(default=400)
     temperature: float = 0
     response_format: Literal["json_beg", "text","json_object","structured_output","tool"] = "text"
     use_cache: bool = True
@@ -95,6 +95,7 @@ class LLMConfig(BaseModel):
 
 
 class LLMPromptContext(BaseModel):
+    id: str
     system_string: Optional[str] = None
     history: Optional[List[Dict[str, str]]] = None
     new_message: str
@@ -103,6 +104,7 @@ class LLMPromptContext(BaseModel):
     structured_output : Optional[StructuredTool] = None
     use_schema_instruction: bool = Field(default=False, description="Whether to use the schema instruction")
     llm_config: LLMConfig
+    
 
 
     @computed_field
@@ -219,6 +221,8 @@ class LLMPromptContext(BaseModel):
         
     def add_chat_turn_history(self, llm_output:'LLMOutput'):
         """ add a chat turn to the history without safely model copy just normal append """
+        if llm_output.source_id != self.id:
+            raise ValueError(f"LLMOutput source_id {llm_output.source_id} does not match the prompt context id {self.id}")
         if self.history is None:
             self.history = []
         self.history.append({"role": "user", "content": self.new_message})
@@ -249,8 +253,9 @@ class GeneratedJsonObject(BaseModel):
 class LLMOutput(BaseModel):
     raw_result: Union[str, dict, ChatCompletion, AnthropicMessage, PromptCachingBetaMessage]
     completion_kwargs: Optional[Dict[str, Any]] = None
-    start_time: float = Field(default_factory=time.time)
-    end_time: float = Field(default_factory=time.time)
+    start_time: float
+    end_time: float
+    source_id: str
 
     @property
     def time_taken(self) -> float:

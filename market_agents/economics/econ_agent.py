@@ -86,7 +86,8 @@ class EconomicAgent(BaseModel):
         total_quantity = int(current_quantity + pending_quantity)
         if total_quantity > self.value_schedules[good_name].num_units:
             return None
-        return total_quantity
+        print(f"total_quantity: {total_quantity}")
+        return total_quantity+1
 
     
     def get_current_value(self, good_name: str) -> Optional[float]:
@@ -95,7 +96,8 @@ class EconomicAgent(BaseModel):
         total_quantity = self.get_quantity_for_bid(good_name)
         if total_quantity is None:
             return None
-        return self.value_schedules[good_name].get_value(total_quantity+1)
+        current_value = self.value_schedules[good_name].get_value(total_quantity)
+        return current_value if current_value  > 0 else None
     
     def get_previous_value(self, good_name: str) -> Optional[float]:
         """ returns the previous value of the good for buyers only
@@ -103,7 +105,7 @@ class EconomicAgent(BaseModel):
         total_quantity = self.get_quantity_for_bid(good_name)
         if total_quantity is None:
             return None
-        return self.value_schedules[good_name].get_value(total_quantity)
+        return self.value_schedules[good_name].get_value(total_quantity+1)
     
     
     def get_current_cost(self, good_name: str) -> Optional[float]:
@@ -116,6 +118,16 @@ class EconomicAgent(BaseModel):
         pending_quantity = self.get_pending_ask_quantity(good_name)
         total_quantity = int(starting_quantity - current_quantity + pending_quantity)+1
 
+        return self.cost_schedules[good_name].get_value(total_quantity)
+    def get_previous_cost(self, good_name: str) -> Optional[float]:
+        """ returns the previous cost of the good for sellers only
+        it takes in consideration both the current inventory and the pending orders"""
+        if not self.is_seller(good_name):
+            return None
+        starting_quantity = self.endowment.initial_basket.get_good_quantity(good_name)
+        current_quantity = self.endowment.current_basket.get_good_quantity(good_name)
+        pending_quantity = self.get_pending_ask_quantity(good_name)
+        total_quantity = int(starting_quantity - current_quantity + pending_quantity)
         return self.cost_schedules[good_name].get_value(total_quantity)
 
     def is_buyer(self, good_name: str) -> bool:
@@ -154,14 +166,14 @@ class EconomicAgent(BaseModel):
             if marginal_value is None:
                 print("trade rejected because marginal_value is None")
                 return False
-            print(f"marginal_value: {marginal_value}, trade.price: {trade.price}")
+            print(f"Buyer {self.id} would accept trade with marginal_value: {marginal_value}, trade.price: {trade.price}")
             return marginal_value >= trade.price
         elif self.is_seller(trade.good_name) and trade.seller_id == self.id:
-            marginal_cost = self.get_current_cost(trade.good_name)
+            marginal_cost = self.get_previous_cost(trade.good_name)
             if marginal_cost is None:
                 print("trade rejected because marginal_cost is None")
                 return False
-            print(f"marginal_cost: {marginal_cost}, trade.price: {trade.price}")
+            print(f"Seller {self.id} would accept trade with marginal_cost: {marginal_cost}, trade.price: {trade.price}")
             return trade.price >= marginal_cost
         else:
             self_type = "buyer" if self.is_buyer(trade.good_name) else "seller"

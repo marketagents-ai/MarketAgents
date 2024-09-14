@@ -1,15 +1,18 @@
 import os
-from typing import List
+from typing import List, Union
+from datetime import datetime
 from market_agents.economics.plotter import create_report_folder, save_figure, plot_price_vs_trade, plot_cumulative_quantity_and_surplus
 from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.economics.equilibrium import Equilibrium
+from market_agents.simple_agent import SimpleAgent
 
-def analyze_and_plot_market_results(trades: List, agents: List[EconomicAgent], equilibrium: Equilibrium, goods: List[str], max_rounds: int,
+def analyze_and_plot_market_results(trades: List, agents: List[Union[EconomicAgent, SimpleAgent]], equilibrium: Equilibrium, goods: List[str], max_rounds: int,
                                     cumulative_quantities: List[int], cumulative_surplus: List[float]):
-    report_folder = create_report_folder()
+    # Create a timestamped folder for this specific market report
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_folder = os.path.join("outputs", "reports", f"market_report_{timestamp}")
+    os.makedirs(report_folder, exist_ok=True)
 
-    
-    
     # Assuming we only have one good for simplicity
     good = goods[0]
 
@@ -51,7 +54,7 @@ def analyze_and_plot_market_results(trades: List, agents: List[EconomicAgent], e
 - **Difference (Practical - Theoretical)**: {surplus_difference:.2f}
 - **Final Efficiency**: {final_efficiency:.2f}%"""
 
-    report_markdown = "report.md"
+    report_markdown = "market_report.md"
     with open(os.path.join(report_folder, report_markdown), "w") as f:
         f.write(summary_text)
 
@@ -101,20 +104,21 @@ def analyze_and_plot_market_results(trades: List, agents: List[EconomicAgent], e
 
     print(f"Markdown report saved as {os.path.join(report_folder, report_markdown)}")
 
-def generate_agent_allocation_table(agents: List[EconomicAgent], good: str, max_agents_display=50):
-    table_header = "| Agent ID | Role   | Initial Goods | Initial Cash | Final Goods | Final Cash | Surplus |\n"
-    table_header += "|----------|--------|---------------|--------------|-------------|------------|---------|\n"
+def generate_agent_allocation_table(agents: List[Union[EconomicAgent, SimpleAgent]], good: str, max_agents_display=50):
+    table_header = "| Agent ID | Agent Type | Role   | Initial Goods | Initial Cash | Final Goods | Final Cash | Surplus |\n"
+    table_header += "|----------|------------|--------|---------------|--------------|-------------|------------|---------|\n"
     table_rows = []
 
     for agent in agents[:max_agents_display]:
         role = "Buyer" if agent.is_buyer(good) else "Seller"
+        agent_type = "SimpleAgent" if isinstance(agent, SimpleAgent) else "EconomicAgent"
         initial_goods = agent.endowment.initial_basket.get_good_quantity(good)
         initial_cash = agent.endowment.initial_basket.cash
         final_goods = agent.endowment.current_basket.get_good_quantity(good)
         final_cash = agent.endowment.current_basket.cash
         surplus = agent.calculate_individual_surplus()
 
-        row = f"| {agent.id} | {role} | {initial_goods} | {initial_cash:.2f} | {final_goods} | {final_cash:.2f} | {surplus:.2f} |"
+        row = f"| {agent.id} | {agent_type} | {role} | {initial_goods} | {initial_cash:.2f} | {final_goods} | {final_cash:.2f} | {surplus:.2f} |"
         table_rows.append(row)
 
     return table_header + "\n".join(table_rows)

@@ -153,14 +153,15 @@ async def process_api_requests_from_file(
                         try:
                             # get new request
                             request_json = json.loads(next(requests))
+                            metadata, actual_request = request_json  # Unpack the list
                             next_request = APIRequest(
                                 task_id=next(task_id_generator),
-                                request_json=request_json,
+                                request_json=actual_request,
                                 token_consumption=num_tokens_consumed_from_request(
-                                    request_json, api_endpoint, token_encoding_name
+                                    actual_request, api_endpoint, token_encoding_name
                                 ),
                                 attempts_left=max_attempts,
-                                metadata=request_json.pop("metadata", None),
+                                metadata=metadata,
                             )
                             status_tracker.num_tasks_started += 1
                             status_tracker.num_tasks_in_progress += 1
@@ -372,20 +373,16 @@ class APIRequest:
                 logging.error(
                     f"Request {self.request_json} failed after all attempts. Saving errors: {self.result}"
                 )
-                data = (
-                    [self.request_json, [str(e) for e in self.result], self.metadata]
-                    if self.metadata
-                    else [self.request_json, [str(e) for e in self.result]]
-                )
+                self.metadata["end_time"] = time.time()
+                self.metadata["total_time"] = self.metadata["end_time"] - self.metadata["start_time"]
+                data = [self.metadata, self.request_json, {"error": str(error)}]
                 append_to_jsonl(data, save_filepath)
                 status_tracker.num_tasks_in_progress -= 1
                 status_tracker.num_tasks_failed += 1
         else:
-            data = (
-                [self.request_json, response, self.metadata]
-                if self.metadata
-                else [self.request_json, response]
-            )
+            self.metadata["end_time"] = time.time()
+            self.metadata["total_time"] = self.metadata["end_time"] - self.metadata["start_time"]
+            data = [self.metadata, self.request_json, response]
             append_to_jsonl(data, save_filepath)
             status_tracker.num_tasks_in_progress -= 1
             status_tracker.num_tasks_succeeded += 1
