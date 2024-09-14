@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
 from abc import ABC, abstractmethod
-from bm25wcosine.bm25_cosine import BM25CosineEnsemble, SearchableCollection
+from retrieval_toys.bm25wcosine.bm25_cosine import BM25CosineEnsemble, SearchableCollection
 
 class MemoryType(Enum):
     REFLECTION = "reflection"
