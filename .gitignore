@@ -21,3 +21,5 @@ venv/**
 /market_agents.egg-info
 /reports
 /outputs
+/vscode
+/.vscode
