@@ -66,15 +66,7 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
         else:
             return list(self.value_schedules.keys())[0]
     
-    @computed_field
-    @property
-    def is_buyer(self) -> bool:
-        return len(self.value_schedules.keys()) > 0
-    
-    @computed_field
-    @property
-    def is_seller(self) -> bool:
-        return len(self.cost_schedules.keys()) > 0
+
 
    
     def update_local(self, local_observation: AuctionLocalObservation):
