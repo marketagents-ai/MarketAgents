@@ -37,11 +37,11 @@ class MemoryModule:
         for memory in recent_memories:
             content = memory['content']
             if memory['type'] == MemoryType.PERCEPTION:
-                summary += f"- Perception: {content['monologue'][:50]}...\n"
-                summary += f"  Strategy: {content['strategy'][:50]}...\n"
+                summary += f"- Perception: {content['monologue']}...\n"
+                summary += f"  Strategy: {content['strategy']}...\n"
             elif memory['type'] == MemoryType.REFLECTION:
-                summary += f"- Reflection: {content['reflection'][:50]}...\n"
-                summary += f"  Strategy Update: {content['strategy_update'][:50]}...\n"
+                summary += f"- Reflection: {content['reflection']}...\n"
+                summary += f"  Strategy Update: {content['strategy_update']}...\n"
         return summary
 
     def clear_memory(self) -> None:
