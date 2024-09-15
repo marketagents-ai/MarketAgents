@@ -46,6 +46,9 @@ def log_running(logger: logging.Logger, env_name: str):
 def log_perception(logger: logging.Logger, agent_id: int, perception: str):
     logger.info(f"👁️ Agent {agent_id:02d} perceives: {perception}")
 
+def log_raw_action(Logger: logging.Logger, agent_id: int, action: dict):
+    Logger.info(f"🔧 Agent {agent_id:02d} executes: {action}")
+
 def log_action(logger: logging.Logger, agent_id: int, action: str):
     emojis = ["💡", "🔧", "🚀", "🔬", "🔑", "🎯", "🧠", "⚡"]
     logger.info(f"{random.choice(emojis)} Agent {agent_id:02d} executes: {action}")

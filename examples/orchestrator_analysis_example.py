@@ -6,7 +6,7 @@ from market_agents.simple_agent import SimpleAgent, create_simple_agent
 from market_agents.economics.econ_models import Good, Endowment, Basket
 from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionActionSpace, AuctionObservationSpace
 from market_agents.environments.environment import MultiAgentEnvironment
-from market_agents.orchestrator import MarketOrchestrator
+from market_agents.market_orchestrator import MarketOrchestrator
 
 async def main():
     load_dotenv()

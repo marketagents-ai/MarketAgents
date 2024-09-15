@@ -59,7 +59,7 @@ def generate_persona() -> Persona:
         "investment_preferences": ["Stocks", "Bonds", "Real Estate"]
     }
     
-    with open('./personas/persona_template.yaml', 'r') as file:
+    with open('./market_agents/agents/personas/persona_template.yaml', 'r') as file:
         template = file.read()
     
     persona = template.format(
@@ -85,9 +85,10 @@ def generate_persona() -> Persona:
     )
 
 def save_persona_to_file(persona: Persona, output_dir: Path):
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(output_dir / f"{persona.name.replace(' ', '_')}.yaml", "w") as f:
-        yaml.dump(persona.dict(), f)
+        yaml.dump(persona.model_dump(), f)
 
 def generate_and_save_personas(num_personas: int, output_dir: Path):
     for _ in range(num_personas):
@@ -95,6 +96,6 @@ def generate_and_save_personas(num_personas: int, output_dir: Path):
         save_persona_to_file(persona, output_dir)
 
 if __name__ == "__main__":
-    output_dir = Path("./personas/generated_personas")
+    output_dir = Path("./market_agents/agents/personas/generated_personas")
     generate_and_save_personas(10, output_dir)
     print(f"Generated 10 personas in {output_dir}")

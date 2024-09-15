@@ -1,225 +1,369 @@
-from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
-from market_agents.economics.econ_models import Basket, Good, Trade, Bid, Ask
-from market_agents.economics.equilibrium import Equilibrium
-from market_agents.environments.environment import MultiAgentEnvironment
-from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation
-
-#import llm context and ai utiliteis from 
-from market_agents.environments.environment import EnvironmentStep
-from market_agents.economics.analysis import analyze_and_plot_market_results
-
-from market_agents.inference.parallel_inference import ParallelAIUtilities
-from market_agents.inference.message_models import LLMPromptContext, LLMOutput
-from market_agents.simple_agent import SimpleAgent
-from typing import List, Tuple, Optional, Dict,Union
 import logging
+from pathlib import Path
+from typing import List, Dict, Any, Type
+from market_agents.economics.econ_models import Ask, Bid
+from pydantic import BaseModel, Field
+from colorama import Fore, Style
+import threading
+import os
+import yaml
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+from market_agents.agents.market_agent import MarketAgent
+from market_agents.environments.environment import MultiAgentEnvironment
+from market_agents.environments.mechanisms.auction import AuctionAction, DoubleAuction, AuctionActionSpace, AuctionObservationSpace, GlobalAuctionAction
+from market_agents.inference.message_models import LLMConfig
+from market_agents.agents.protocols.acl_message import ACLMessage
+from market_agents.logger_utils import *
+from market_agents.agents.personas.persona import generate_persona, save_persona_to_file, Persona
+
+# Remove the root logger setup to prevent duplicate logging
 logger = logging.getLogger(__name__)
+logger.handlers = []  # Clear any existing handlers
+logger.addHandler(logging.NullHandler())  # Add a null handler to prevent logging to the root logger
 
-class MarketOrchestrator():
-    def __init__(self, agents: Union[List[SimpleAgent], List[EconomicAgent]], markets: List[MultiAgentEnvironment], ai_utils: ParallelAIUtilities):
-        self.agents = agents
-        self.markets = markets
-        self.ai_utils = ai_utils
-        self.markets_dict = self.create_markets_dict(markets)
-        self.agents_dict = self.creat_agents_dict(agents)
-        self.failed_actions : List[LLMOutput] = []
-        typed_agents = [agent for agent in agents if isinstance(agent, EconomicAgent)]
-        typed_mechanisms = [market.mechanism for market in markets if isinstance(market.mechanism, DoubleAuction)]
-        self.equilibrium = Equilibrium(agents=typed_agents, goods=[mechanism.good_name for mechanism in typed_mechanisms])
+class AgentConfig(BaseModel):
+    num_units: int
+    base_value: float
+    use_llm: bool
+    initial_cash: float
+    initial_goods: int
+    good_name: str
+    noise_factor: float = Field(default=0.1)
+    max_relative_spread: float = Field(default=0.2)
 
-    def create_markets_dict(self,markets: List[MultiAgentEnvironment]) -> Dict[str, MultiAgentEnvironment]:
-        markets_dict = {}
-        for market in markets:
-            if not isinstance(market.mechanism, DoubleAuction):
-                raise ValueError(f"Market {market.mechanism} is not a DoubleAuction")
-            markets_dict[market.mechanism.good_name] = market
-        return markets_dict
+class AuctionConfig(BaseModel):
+    name: str
+    address: str
+    max_rounds: int
+    good_name: str
+
+class OrchestratorConfig(BaseModel):
+    num_agents: int
+    max_rounds: int
+    agent_config: AgentConfig
+    llm_config: LLMConfig
+    environment_configs: Dict[str, AuctionConfig]
+    protocol: Type[ACLMessage]
+    database_config: Dict[str, Any]
+
+class Orchestrator:
+    def __init__(self, config: OrchestratorConfig):
+        self.config = config
+        self.agents: List[MarketAgent] = []
+        self.environments: Dict[str, MultiAgentEnvironment] = {}
+        self.dashboard = None
+        self.database = None
+        self.simulation_order = ['auction']
+        self.simulation_data: List[Dict[str, Any]] = []
+        self.latest_data = None
+
+    def load_or_generate_personas(self) -> List[Persona]:
+        personas_dir = Path("./market_agents/agents/personas/generated_personas")
+        existing_personas = []
+
+        if os.path.exists(personas_dir):
+            for filename in os.listdir(personas_dir):
+                if filename.endswith(".yaml"):
+                    with open(os.path.join(personas_dir, filename), 'r') as file:
+                        persona_data = yaml.safe_load(file)
+                        existing_personas.append(Persona(**persona_data))
+
+        while len(existing_personas) < self.config.num_agents:
+            new_persona = generate_persona()
+            existing_personas.append(new_persona)
+            save_persona_to_file(new_persona, personas_dir)
+
+        return existing_personas[:self.config.num_agents]
+
+    def generate_agents(self):
+        log_section(logger, "INITIALIZING MARKET AGENTS")
+        personas = self.load_or_generate_personas()
+        for i, persona in enumerate(personas):
+            agent = MarketAgent.create(
+                agent_id=i,
+                is_buyer=persona.role.lower() == "buyer",
+                **self.config.agent_config.dict(),
+                llm_config=self.config.llm_config,
+                protocol=self.config.protocol,
+                environments=self.environments,
+                persona=persona
+            )
+            self.agents.append(agent)
+            log_agent_init(logger, i, persona.role.lower() == "buyer")
+        
+
+    def setup_environments(self):
+        log_section(logger, "CONFIGURING MARKET ENVIRONMENTS")
+        for env_name, env_config in self.config.environment_configs.items():
+            if env_name == 'auction':
+                double_auction = DoubleAuction(
+                    max_rounds=env_config.max_rounds,
+                    good_name=env_config.good_name
+                )
+                env = MultiAgentEnvironment(
+                    name=env_config.name,
+                    address=env_config.address,
+                    max_steps=env_config.max_rounds,
+                    action_space=AuctionActionSpace(),
+                    observation_space=AuctionObservationSpace(),
+                    mechanism=double_auction
+                )
+                self.environments[env_name] = env
+                log_environment_setup(logger, env_name)
+            else:
+                logger.warning(f"Unknown environment type: {env_name}")
+
+        logger.info(f"Set up {len(self.environments)} environments")
+
+        for agent in self.agents:
+            agent.environments = self.environments
+
+    #def setup_dashboard(self):
+    #    log_section(logger, "INITIALIZING DASHBOARD")
+    #    self.dashboard = create_dashboard(self.data_source)
+    #    logger.info("Dashboard setup complete")
+
+    def setup_database(self):
+        log_section(logger, "CONFIGURING SIMULATION DATABASE")
+        logger.info("Database setup skipped")
+
+    async def run_simulation(self):
+        log_section(logger, "SIMULATION COMMENCING")
+        
+        try:
+            for round_num in range(1, self.config.max_rounds + 1):
+                log_round(logger, round_num)
+                
+                for env_name in self.simulation_order:
+                    try:
+                        env_state = await self.run_environment(env_name)
+                        self.update_simulation_state(env_name, env_state)
+                    except Exception as e:
+                        logger.error(f"Error in environment {env_name}: {str(e)}")
+                
+                for agent in self.agents:
+                    try:
+                        reflection = await agent.reflect(env_name)
+                        if reflection:
+                            log_reflection(logger, int(agent.id), f"{Fore.MAGENTA}{reflection}{Style.RESET_ALL}")
+                    except Exception as e:
+                        logger.error(f"Error in agent {agent.id} reflection: {str(e)}")
+                
+                self.save_round_data(round_num)
+                self.update_dashboard()
+        except Exception as e:
+            logger.error(f"Simulation failed: {str(e)}")
+        finally:
+            log_completion(logger, "SIMULATION COMPLETED")
+            self.print_summary()
+
+    async def run_environment(self, env_name: str):
+        env = self.environments[env_name]
+        
+        log_running(logger, env_name)
+        agent_actions = {}
+        for agent in self.agents:
+            log_section(logger, f"Current Agent:\nAgent {agent.id} with persona:\n{agent.persona}")
+            perception = await agent.perceive(env_name)
+            log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
+
+            action = await agent.generate_action(env_name, perception)
+            log_raw_action(logger, int(agent.id), f"{Fore.LIGHTBLUE_EX}{action}{Style.RESET_ALL}")      
     
-    def creat_agents_dict(self,agents: Union[List[SimpleAgent], List[EconomicAgent]]) -> Dict[str, Union[SimpleAgent, EconomicAgent]]:
-        agents_dict = {}
-        for agent in agents:
-            agents_dict[agent.id] = agent
-        return agents_dict
-    
-    def get_zero_intelligence_agents(self):
-        return [agent for agent in self.agents if not isinstance(agent, SimpleAgent)]
-    
-    def get_llm_agents(self):
-        return [agent for agent in self.agents if isinstance(agent, LLMPromptContext)]
-    
-    def get_agent(self, agent_id: str) -> Union[SimpleAgent, EconomicAgent]:
-        return self.agents_dict[agent_id]
-    
-    def create_local_actions_zero_intelligence(self, good_name: str) -> Dict[str, AuctionAction]:
-        actions = {}
-        agents = [agent for agent in self.get_zero_intelligence_agents() if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
-        for agent in agents:
-            bid = agent.generate_bid(good_name)
-            ask = agent.generate_ask(good_name)
-            if bid:
-                actions[agent.id] = AuctionAction(agent_id=agent.id, action=bid)
-            elif ask:
-                actions[agent.id] = AuctionAction(agent_id=agent.id, action=ask)
-        return actions
-    
-    async def run_parallel_ai_completion(self, prompts: List[SimpleAgent],update_history:bool=True) -> List[LLMOutput]:
-        typed_prompts : List[LLMPromptContext] = [p for p in prompts if isinstance(p, LLMPromptContext)]
-        return await self.ai_utils.run_parallel_ai_completion(typed_prompts,update_history)
-    
-    def validate_output(self, output: LLMOutput, good_name: str) -> Union[Bid, Ask, None]:
-        agend_id = output.source_id
-        agent = self.get_agent(agend_id)
-        if agent is None:
-            raise ValueError(f"Agent {agend_id} not found")
-        market_action = None
-        if output.json_object is not None:
-            if output.json_object.name == "Bid":
-                bid = Bid.model_validate(output.json_object.object)
-                current_value = agent.get_current_value(good_name)
-                print(f"bid price: {bid.price}, current_value: {current_value}")
-                if current_value is not None and bid.price < current_value:
-                    print(f"adding bid to pending orders")
-                    market_action = bid
+            try:
+                # Extract the actual action from the content
+                action_content = action['content']['action']
+                if 'price' in action_content and 'quantity' in action_content:
+                    #fix quantity to 1 for now
+                    action_content['quantity'] = 1
+                    # Determine if it's a Bid or Ask based on the agent's role
+                    if agent.role == "buyer":
+                        auction_action = Bid(**action_content)
+                    elif agent.role == "seller":
+                        auction_action = Ask(**action_content)
+                    else:
+                        raise ValueError(f"Invalid agent role: {agent.role}")
                 else:
-                    print(f"not adding bid to pending orders")
-            elif output.json_object.name == "Ask":
-                ask = Ask.model_validate(output.json_object.object)
-                current_cost = agent.get_current_cost(good_name)
-                print(f"ask price: {ask.price}, current_cost: {current_cost}")
-                if current_cost is not None and ask.price > current_cost:
-                    print(f"adding ask to pending orders")
-                    market_action = ask
-                else:
-                    print(f"not adding ask to pending orders")
-        if market_action is not None:
-            agent.pending_orders.setdefault(good_name, []).append(market_action)
+                    raise ValueError(f"Invalid action content: {action_content}")
+                
+                agent_actions[agent.id] = AuctionAction(agent_id=agent.id, action=auction_action)
+            except (KeyError, ValueError) as e:
+                logger.error(f"Error creating AuctionAction for agent {agent.id}: {str(e)}")
+                continue
+
+            action_type = "Bid" if isinstance(auction_action, Bid) else "Ask"
+            color = Fore.BLUE if action_type == "Bid" else Fore.GREEN
+            log_action(logger, int(agent.id), f"{color}{action_type}: {auction_action}{Style.RESET_ALL}")
+        
+        global_action = GlobalAuctionAction(actions=agent_actions)
+        env_state = env.step(global_action)
+        logger.info(f"Completed {env_name} step")
+        return env_state
+
+    def update_simulation_state(self, env_name: str, env_state: Dict[str, Any]):
+        for agent in self.agents:
+            agent_observation = env_state.global_observation.observations.get(agent.id)
+            if agent_observation:
+                if not isinstance(agent_observation, dict):
+                    agent_observation = agent_observation.dict()
+                
+                # Update the agent's endowment directly
+                new_cash = agent_observation.get('endowment', {}).get('cash')
+                new_goods = agent_observation.get('endowment', {}).get('goods', {})
+                
+                if new_cash is not None:
+                    agent.endowment.current_basket.cash = new_cash
+                
+                for good, quantity in new_goods.items():
+                    agent.endowment.current_basket.update_good_quantity(good, quantity)
+
+        if not self.simulation_data or 'state' not in self.simulation_data[-1]:
+            self.simulation_data.append({'state': {}})
+
+        self.simulation_data[-1]['state'][env_name] = env_state.info
+        self.simulation_data[-1]['state']['trade_info'] = env_state.global_observation.all_trades
+
+    def save_round_data(self, round_num):
+        round_data = {
+            'round': round_num,
+            'agent_states': [{
+                'id': agent.id,
+                'is_buyer': agent.role == "buyer",
+                'cash': agent.endowment.current_basket.cash,  # Change this line
+                'goods': agent.endowment.current_basket.goods_dict,  # Change this line
+                'last_action': agent.last_action,
+                'memory': agent.memory[-1] if agent.memory else None
+            } for agent in self.agents],
+            'environment_states': {name: env.get_global_state() for name, env in self.environments.items()},
+        }
+        
+        if self.simulation_data and 'state' in self.simulation_data[-1]:
+            round_data['state'] = self.simulation_data[-1]['state']
+        
+        self.simulation_data.append(round_data)
+
+    #def data_source(self):
+    #    env = self.environments['auction']
+    #    global_state = env.get_global_state()
+    #    
+    #    return {
+    #        'current_step': global_state.get('current_step', 0),
+    #        'max_steps': self.config.max_rounds,
+    #        'total_utility': global_state.get('total_utility', 0),
+    #        'goods': global_state.get('goods', []),
+    #        'equilibria': global_state.get('equilibria', {}),
+    #        'order_books': global_state.get('order_books', {}),
+    #        'trade_history': global_state.get('trade_history', []),
+    #        'successful_trades': global_state.get('successful_trades', []),
+    #        'current_supply_curves': global_state.get('current_supply_curves', {}),
+    #        'current_demand_curves': global_state.get('current_demand_curves', {})
+    #    }
+#
+    #def update_dashboard(self):
+    #    if self.dashboard:
+    #        logger.info("Updating dashboard data...")
+    #        self.latest_data = self.data_source()
+#
+    #def run_dashboard(self):
+    #    if self.dashboard:
+    #        log_section(logger, "LAUNCHING DASHBOARD UI")
+    #        self.dashboard.run_server(debug=True, use_reloader=False)
+
+    def print_summary(self):
+        log_section(logger, "SIMULATION SUMMARY")
+        
+        # Calculate total empirical surplus
+        total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "buyer")
+        total_seller_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "seller")
+        total_empirical_surplus = total_buyer_surplus + total_seller_surplus
+
+        print(f"Total Empirical Buyer Surplus: {total_buyer_surplus:.2f}")
+        print(f"Total Empirical Seller Surplus: {total_seller_surplus:.2f}")
+        print(f"Total Empirical Surplus: {total_empirical_surplus:.2f}")
+
+        # Calculate theoretical equilibrium (if available)
+        env = self.environments['auction']
+        global_state = env.get_global_state()
+        equilibria = global_state.get('equilibria', {})
+        
+        if equilibria:
+            theoretical_total_surplus = sum(data['total_surplus'] for data in equilibria.values())
+            print(f"\nTheoretical Total Surplus: {theoretical_total_surplus:.2f}")
+
+            # Compute and print the empirical efficiency
+            efficiency = (total_empirical_surplus / theoretical_total_surplus) * 100 if theoretical_total_surplus > 0 else 0
+            print(f"\nEmpirical Efficiency: {efficiency:.2f}%")
         else:
-            self.failed_actions.append(output)
-        return market_action
-    
-    def create_local_actions_llm(self, good_name: str, llm_outputs: List[LLMOutput]) -> Dict[str, AuctionAction]:
-        actions = {}
-        
-        for output in llm_outputs:
-            market_action = self.validate_output(output, good_name)
-            if market_action is not None:
-                actions[output.source_id] = AuctionAction(agent_id=output.source_id, action=market_action)
-           
-        return actions
-    
-    def execute_trade(self, trade: Trade) -> float:
-        buyer = next(agent for agent in self.agents if agent.id == trade.buyer_id)
-        seller = next(agent for agent in self.agents if agent.id == trade.seller_id)
-        print(f"buyer_id: {trade.buyer_id}, seller_id: {trade.seller_id}")
-        if buyer is None or seller is None:
-            raise ValueError(f"Trade {trade} has invalid agent IDs")
-        
-        buyer_utility_before = buyer.calculate_utility(buyer.endowment.current_basket)
-        seller_utility_before = seller.calculate_utility(seller.endowment.current_basket)
-        buyer.process_trade(trade)
-        seller.process_trade(trade)
-        buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
-        seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
-        trade_surplus = buyer_utility_after - buyer_utility_before + seller_utility_after - seller_utility_before
-        return trade_surplus
-        
-    
-    def process_trades(self, global_observation: AuctionGlobalObservation) -> List[float]:
-        surplus = []
-        new_trades = global_observation.all_trades
-        new_trades.sort(key=lambda x: x.trade_id)
-        for trade in new_trades:
-            trade_surplus = self.execute_trade(trade)
-            if trade_surplus is not None:
-                surplus.append(trade_surplus)
-        return surplus
-    
-    def update_llm_new_message(self, global_observation: AuctionGlobalObservation):
-        for agent in self.get_llm_agents():
-            if agent.id in global_observation.observations:
-                agent.update_local(global_observation.observations[agent.id])
+            print("\nTheoretical equilibrium data not available.")
 
+        # Print trade statistics
+        successful_trades = global_state.get('successful_trades', [])
+        print(f"\nTotal number of successful trades: {len(successful_trades)}")
+        
+        if successful_trades:
+            average_price = sum(trade['price'] for trade in successful_trades) / len(successful_trades)
+            print(f"Average trade price: {average_price:.2f}")
+
+        # Print final agent states
+        print("\nFinal Agent States:")
+        for agent in self.agents:
+            print(f"Agent {agent.id} ({agent.role}):")
+            print(f"  Cash: {agent.endowment.current_basket.cash:.2f}")
+            print(f"  Goods: {agent.endowment.current_basket.goods_dict}")
+            print(f"  Individual Surplus: {agent.calculate_individual_surplus():.2f}")
+
+    async def start(self):
+        log_section(logger, "MARKET SIMULATION INITIALIZING")
+        self.generate_agents()
+        self.setup_environments()
+        #self.setup_dashboard()
+        self.setup_database()
+
+        if self.dashboard:
+            dashboard_thread = threading.Thread(target=self.run_dashboard)
+            dashboard_thread.start()
+
+        await self.run_simulation()
+
+        if self.dashboard:
+            dashboard_thread.join()
+
+if __name__ == "__main__":
+    config = OrchestratorConfig(
+        num_agents=8,
+        max_rounds=4,
+        agent_config=AgentConfig(
+            num_units=5,
+            base_value=100,
+            use_llm=True,
+            initial_cash=1000,
+            initial_goods=0,
+            good_name="apple",
+            noise_factor=0.1,
+            max_relative_spread=0.2
+        ),
+        llm_config=LLMConfig(
+            client='openai',
+            model='gpt-4o-mini',
+            temperature=0.5,
+            max_tokens=4096,
+            use_cache=True
+        ),
+        environment_configs={
+            'auction': AuctionConfig(
+                name='Apple Market',
+                address='apple_market',
+                max_rounds=100,
+                good_name='apple'
+            ),
+        },
+        protocol=ACLMessage,
+        database_config={
+            'db_type': 'postgres',
+            'db_name': 'market_simulation'
+        }
+    )
     
-    async def run_auction_step(self, good_name: str) -> Tuple[EnvironmentStep, List[float]]:
-        environment = self.markets_dict[good_name]
-        llm_agents = self.get_llm_agents()
-        
-        # Generate actions for LLM agents
-        llm_outputs = await self.run_parallel_ai_completion(llm_agents)  # Await here
-        llm_actions = self.create_local_actions_llm(good_name, llm_outputs)  # Pass llm_outputs
-        print(f"llm_actions: {llm_actions}")
-        
-        # Generate actions for zero-intelligence agents
-        zi_actions = self.create_local_actions_zero_intelligence(good_name)
-        
-        # Combine all actions
-        all_actions = {**llm_actions, **zi_actions}
-        
-        # Create global action and step the environment
-        global_action = GlobalAuctionAction(actions=all_actions)
-        step_result = environment.step(global_action)
-        assert isinstance(step_result.global_observation, AuctionGlobalObservation)
-        
-        # Process trades and update agents
-        surplus = self.process_trades(step_result.global_observation)
-        self.update_llm_new_message(step_result.global_observation)
-        return step_result, surplus
-    
-    async def simulate_market(self, max_rounds: int, good_name: str):
-        relevant_agents = [agent for agent in self.agents if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
-        
-        all_trades : List[Trade] = []
-        per_trade_surplus : List[float] = []
-        per_trade_quantities : List[int] = []
-
-        for round in range(max_rounds):
-            logger.info(f"Round {round + 1}")
-            
-            # Run one step of the orchestrator
-            step_result, surplus = await self.run_auction_step(good_name)
-            per_trade_surplus.extend(surplus)
-            # Process trades
-            global_observation  = step_result.global_observation
-            assert isinstance(global_observation, AuctionGlobalObservation)
-            new_trades = global_observation.all_trades
-            all_trades.extend(new_trades)
-            quantities = [trade.quantity for trade in new_trades]
-            per_trade_quantities.extend(quantities)
-            # Update cumulative quantities and surplus
-            
-           
-            
-            if new_trades:
-                logger.info(f"Trades executed in this round: {len(new_trades)}")
-                for trade in new_trades:
-                    logger.info(f"Trade executed at price: {trade.price}")
-            
-            if step_result.done:
-                logger.info("Market simulation completed.")
-                break
-        
-        # Reset pending orders for all agents
-        for agent in relevant_agents:
-            agent.reset_all_pending_orders()
-        cumulative_surplus = [sum(per_trade_surplus[:i+1]) for i in range(len(per_trade_surplus))]
-        cumulative_quantities = [sum(per_trade_quantities[:i+1]) for i in range(len(per_trade_quantities))]
-        assert len(cumulative_quantities) == len(cumulative_surplus)
-        # Generate market report
-        self.generate_market_report(all_trades, relevant_agents, good_name, max_rounds, cumulative_quantities, cumulative_surplus)
-
-    def generate_market_report(self, trades: List[Trade], agents: List[Union[SimpleAgent, EconomicAgent]], 
-                               good_name: str, max_rounds: int, cumulative_quantities: List[int], cumulative_surplus: List[float]):
-        analyze_and_plot_market_results(
-            trades=trades,
-            agents=agents,
-            equilibrium=self.equilibrium,
-            goods=[good_name],
-            max_rounds=max_rounds,
-            cumulative_quantities=cumulative_quantities,
-            cumulative_surplus=cumulative_surplus
-        )
-
-
+    import asyncio
+    orchestrator = Orchestrator(config)
+    asyncio.run(orchestrator.start())

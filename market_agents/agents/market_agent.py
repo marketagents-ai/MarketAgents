@@ -88,7 +88,8 @@ class MarketAgent(LLMAgent, EconomicAgent):
         if perception is None:
             perception = self.perceive(environment_name)
         environment_info = environment.get_global_state()
-        action_space = environment.action_space  # This is now directly AuctionAction
+        action_space = environment.action_space
+        
         recent_memories = self.memory[-5:] if self.memory else []
         
         variables = AgentPromptVariables(
@@ -102,7 +103,7 @@ class MarketAgent(LLMAgent, EconomicAgent):
         
         prompt = self.prompt_manager.get_action_prompt(variables.dict())
         
-        action_schema = action_space.allowed_actions[0].schema()  # Use the schema of AuctionAction directly
+        action_schema = action_space.allowed_actions[0].schema()
         
         response = await self.execute(prompt, output_format=action_schema)
         

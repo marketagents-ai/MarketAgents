@@ -5,7 +5,7 @@ import unittest
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.environments.environment import MultiAgentEnvironment
 from market_agents.environments.mechanisms.auction import DoubleAuction
-from market_agents.orchestrator import MarketOrchestrator
+from market_agents.market_orchestrator import MarketOrchestrator
 from market_agents.inference.message_models import LLMConfig
 from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.economics.econ_models import Endowment, Basket, Good
