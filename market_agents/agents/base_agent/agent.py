@@ -7,10 +7,11 @@ from typing import Any, Dict, List, Optional, Type, Union
 from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
-from base_agent.aiutilities import AIUtilities, LLMConfig, LLMPromptContext, StructuredTool, LLMOutput
-from base_agent.prompter import PromptManager
-from base_agent.utils import extract_json_from_response
-from base_agent.schemas import *
+from market_agents.inference.parallel_inference import ParallelAIUtilities
+from market_agents.inference.message_models import StructuredTool, LLMConfig, LLMPromptContext, LLMOutput
+from market_agents.agents.base_agent.prompter import PromptManager
+from market_agents.agents.base_agent.utils import extract_json_from_response
+from market_agents.agents.base_agent.schemas import *
 
 agent_logger = logging.getLogger(__name__)
 
@@ -61,9 +62,9 @@ class Agent(BaseModel):
 
     def __init__(self, **data: Any):
         super().__init__(**data)
-        self.ai_utilities = AIUtilities()
+        self.ai_utilities = ParallelAIUtilities()
 
-    def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None) -> Union[str, Dict[str, Any]]:
+    async def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None) -> Union[str, Dict[str, Any]]:
         """Execute a task and return the result."""
         execution_task = task if task is not None else self.task
         if execution_task is None:
@@ -81,7 +82,7 @@ class Agent(BaseModel):
         prompt_context = self._prepare_prompt_context(execution_task, execution_output_format)
         agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
 
-        result = self._run_ai_inference(prompt_context)
+        result = await self._run_ai_inference(prompt_context)
         self._log_interaction(prompt_context, result)
         return result
 
@@ -97,7 +98,7 @@ class Agent(BaseModel):
                     return schema_class.model_json_schema()
                 else:
                     raise ValueError(f"Invalid schema: {output_format}")
-            except (ImportError, AttributeError, ValueError) as e:
+            except (AttributeError, ValueError) as e:
                 agent_logger.warning(f"Could not load schema: {output_format}. Error: {str(e)}")
                 return None
         elif isinstance(output_format, dict):
@@ -127,6 +128,7 @@ class Agent(BaseModel):
             structured_output = StructuredTool(json_schema=output_format)
 
         return LLMPromptContext(
+            id=str(uuid.uuid4()),  # Generate a unique ID for each prompt context
             system_string=system_message,
             new_message=user_message,
             llm_config=self.llm_config,
@@ -135,16 +137,17 @@ class Agent(BaseModel):
     
     @retry(
         wait=wait_random_exponential(multiplier=1, max=30),
-        stop=stop_after_attempt(max_retries)
-    )
-    @retry(
-        wait=wait_random_exponential(multiplier=1, max=30),
         stop=stop_after_attempt(2),  # Limit to 2 attempts
         reraise=True  # Reraise the last exception
     )
-    def _run_ai_inference(self, prompt_context: LLMPromptContext) -> Any:
+    async def _run_ai_inference(self, prompt_context: LLMPromptContext) -> Any:
         try:
-            llm_output = self.ai_utilities.run_ai_completion(prompt_context)
+            llm_output = await self.ai_utilities.run_parallel_ai_completion([prompt_context])
+            
+            if not llm_output:
+                raise ValueError("No output received from AI inference")
+            
+            llm_output = llm_output[0]  # Get the first (and only) output
             
             if prompt_context.llm_config.response_format == "text":
                 return llm_output.str_content or str(llm_output.raw_result)

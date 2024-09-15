@@ -15,7 +15,7 @@ class AgentPromptVariables(BaseModel):
 
 class MarketAgentPromptManager(BaseModel):
     prompts: Dict[str, str] = Field(default_factory=dict)
-    prompt_file: str = Field(default="llm_agents/configs/prompts/market_agent_prompt.yaml")
+    prompt_file: str = Field(default="market_agents/agents/configs/prompts/market_agent_prompt.yaml")
 
     def __init__(self, **data: Any):
         super().__init__(**data)

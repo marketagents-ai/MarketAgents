@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Optional, Dict, Any, List, Generic, TypeVar
 from pydantic import BaseModel, Field
 from datetime import datetime
-from protocols.protocol import Protocol
+from market_agents.agents.protocols.protocol import Protocol
 
 T = TypeVar('T')
 
