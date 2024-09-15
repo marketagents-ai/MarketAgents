@@ -6,6 +6,10 @@ from colorama import Fore, Style
 import threading
 import os
 import yaml
+from pathlib import Path
+import psycopg2
+from psycopg2.extras import Json, UUID_adapter
+import uuid
 
 from market_agent.market_agents import MarketAgent
 from environments.environment import Environment
@@ -54,24 +58,24 @@ class Orchestrator:
         self.simulation_order = ['auction']
         self.simulation_data: List[Dict[str, Any]] = []
         self.latest_data = None
+        self.conn = None
 
     def load_or_generate_personas(self) -> List[Persona]:
-        personas_dir = "./personas/generated_personas"
+        personas_dir = Path("./personas/generated_personas")
         existing_personas = []
 
         # Check if the directory exists and load existing personas
-        if os.path.exists(personas_dir):
-            for filename in os.listdir(personas_dir):
-                if filename.endswith(".yaml"):
-                    with open(os.path.join(personas_dir, filename), 'r') as file:
-                        persona_data = yaml.safe_load(file)
-                        existing_personas.append(Persona(**persona_data))
+        if personas_dir.exists():
+            for filename in personas_dir.glob("*.yaml"):
+                with filename.open('r') as file:
+                    persona_data = yaml.safe_load(file)
+                    existing_personas.append(Persona(**persona_data))
 
         # Generate additional personas if needed
         while len(existing_personas) < self.config.num_agents:
             new_persona = generate_persona()
             existing_personas.append(new_persona)
-            save_persona_to_file(new_persona, os.path.join(personas_dir))
+            save_persona_to_file(new_persona, str(personas_dir))
 
         return existing_personas[:self.config.num_agents]
 
@@ -121,11 +125,20 @@ class Orchestrator:
         logger.info("Dashboard setup complete")
 
     def setup_database(self):
-        log_section(logger, "CONFIGURING SIMULATION DATABASE")
-        logger.info("Database setup skipped")
+        try:
+            self.conn = psycopg2.connect(
+                dbname=os.environ.get('DB_NAME', 'market_simulation'),
+                user=os.environ.get('DB_USER', 'db_user'),
+                password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
+                host=os.environ.get('DB_HOST', 'localhost'),
+                port=os.environ.get('DB_PORT', '5433')
+            )
+            logger.info("Database connection established successfully.")
+        except (Exception, psycopg2.Error) as error:
+            logger.error(f"Error while connecting to PostgreSQL: {error}")
 
     def run_simulation(self):
-        log_section(logger, "SIMULATION COMMENCING")
+        logger.info("Starting simulation")
         
         for round_num in range(1, self.config.max_rounds + 1):
             log_round(logger, round_num)
@@ -137,14 +150,14 @@ class Orchestrator:
             for agent in self.agents:
                 reflection = agent.reflect(env_name)
                 if reflection:
-                    log_reflection(logger, int(agent.id), f"{Fore.MAGENTA}{reflection}{Style.RESET_ALL}")
+                    log_reflection(logger, int(agent.agent_id), f"{Fore.MAGENTA}{reflection}{Style.RESET_ALL}")
                 else:
-                    logger.warning(f"Agent {agent.id} returned empty reflection")
+                    logger.warning(f"Agent {agent.agent_id} returned empty reflection")
             
             self.save_round_data(round_num)
             self.update_dashboard()
         
-        log_completion(logger, "SIMULATION COMPLETED")
+        logger.info("Simulation completed")
 
     def run_environment(self, env_name: str):
         env = self.environments[env_name]
@@ -152,9 +165,9 @@ class Orchestrator:
         log_running(logger, env_name)
         agent_actions = {}
         for agent in self.agents:
-            log_section(logger, f"Current Agent:\nAgent {agent.id} with persona:\n{agent.persona}")
+            log_section(logger, f"Current Agent:\nAgent {agent.agent_id} with persona:\n{agent.persona}")
             perception = agent.perceive(env_name)
-            log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
+            log_perception(logger, int(agent.agent_id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
 
             action = agent.generate_action(env_name, perception)
             agent_actions[agent.id] = action
@@ -165,7 +178,7 @@ class Orchestrator:
                 color = Fore.GREEN
             else:
                 color = Fore.YELLOW
-            log_action(logger, int(agent.id), f"{color}{action_type}: {action['content']}{Style.RESET_ALL}")
+            log_action(logger, int(agent.agent_id), f"{color}{action_type}: {action['content']}{Style.RESET_ALL}")
         
         env_state = env.update(agent_actions)
         logger.info(f"Completed {env_name} step")
@@ -191,10 +204,11 @@ class Orchestrator:
         self.simulation_data[-1]['state']['trade_info'] = env_state.get('trade_info', {})
 
     def save_round_data(self, round_num):
+        logger.info(f"Attempting to save data for round {round_num}")
         round_data = {
             'round': round_num,
             'agent_states': [{
-                'id': agent.id,
+                'id': agent.agent_id,
                 'is_buyer': agent.is_buyer,
                 'cash': agent.endowment.cash,
                 'goods': agent.endowment.goods,
@@ -204,11 +218,60 @@ class Orchestrator:
             'environment_states': {name: env.get_global_state() for name, env in self.environments.items()},
         }
         
-        # Add the state data if it exists
         if self.simulation_data and 'state' in self.simulation_data[-1]:
             round_data['state'] = self.simulation_data[-1]['state']
         
         self.simulation_data.append(round_data)
+
+        if self.conn:
+            cursor = self.conn.cursor()
+            try:
+                logger.info(f"Attempting to save round {round_num} data to the database.")
+                
+                # Insert into auctions table
+                cursor.execute("""
+                INSERT INTO auctions (max_rounds, current_round, total_surplus_extracted, average_prices, order_book, trade_history)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """, (self.config.max_rounds, round_num, 0, Json({}), Json({}), Json({})))
+                auction_id = cursor.fetchone()[0]
+                logger.info(f"Inserted auction data with id {auction_id}")
+
+                # Insert or update agent data
+                for agent in self.agents:
+                    # Generate a UUID for the agent if it doesn't have one
+                    if not hasattr(agent, 'uuid'):
+                        agent.uuid = uuid.uuid4()
+
+                    cursor.execute("""
+                    INSERT INTO agents (id, role, is_llm, max_iter, llm_config)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                    role = EXCLUDED.role,
+                    is_llm = EXCLUDED.is_llm,
+                    max_iter = EXCLUDED.max_iter,
+                    llm_config = EXCLUDED.llm_config
+                    """, (UUID_adapter(agent.uuid), agent.role, agent.use_llm, self.config.max_rounds, Json(agent.llm_config.dict())))
+                    logger.info(f"Inserted/updated agent data for agent {agent.agent_id}")
+
+                    # Insert agent allocations
+                    cursor.execute("""
+                    INSERT INTO allocations (agent_id, goods, cash, locked_goods, locked_cash, initial_goods, initial_cash)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (UUID_adapter(agent.uuid), agent.endowment.goods, agent.endowment.cash, 0, 0, self.config.agent_config.initial_goods, self.config.agent_config.initial_cash))
+                    logger.info(f"Inserted allocation data for agent {agent.agent_id}")
+
+                    # Save agent memory
+                    agent.save_memory_to_db(self.conn, round_num)
+
+                self.conn.commit()
+                logger.info(f"Round {round_num} data saved to the database.")
+            except (Exception, psycopg2.Error) as error:
+                logger.error(f"Error while saving round data to PostgreSQL: {error}")
+                self.conn.rollback()
+            finally:
+                cursor.close()
+        logger.info(f"Data for round {round_num} saved successfully")
 
     def data_source(self):
         env = self.environments['auction']
@@ -224,12 +287,16 @@ class Orchestrator:
             log_section(logger, "LAUNCHING DASHBOARD UI")
             self.dashboard.run_server(debug=True, use_reloader=False)
 
+    def close_db_connection(self):
+        if self.conn:
+            self.conn.close()
+            logger.info("Database connection closed.")
+
     def start(self):
+        self.setup_database()
         log_section(logger, "MARKET SIMULATION INITIALIZING")
         self.generate_agents()
         self.setup_environments()
-        self.setup_dashboard()
-        self.setup_database()
 
         # Start the dashboard in a separate thread
         if self.dashboard:
@@ -242,6 +309,9 @@ class Orchestrator:
         # Wait for the dashboard thread to finish if it's running
         if self.dashboard:
             dashboard_thread.join()
+
+        # Close the database connection
+        self.close_db_connection()
 
 if __name__ == "__main__":
     config = OrchestratorConfig(

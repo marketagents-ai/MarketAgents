@@ -84,10 +84,16 @@ def generate_persona() -> Persona:
         objectives=objectives
     )
 
-def save_persona_to_file(persona: Persona, output_dir: Path):
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with open(output_dir / f"{persona.name.replace(' ', '_')}.yaml", "w") as f:
-        yaml.dump(persona.dict(), f)
+def save_persona_to_file(persona: Persona, output_dir: str):
+    # Convert output_dir to a Path object
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    filename = f"{persona.name.replace(' ', '_').lower()}.yaml"
+    file_path = output_path / filename
+
+    with file_path.open('w') as file:
+        yaml.dump(persona.dict(), file)
 
 def generate_and_save_personas(num_personas: int, output_dir: Path):
     for _ in range(num_personas):

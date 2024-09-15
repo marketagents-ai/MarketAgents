@@ -9,6 +9,9 @@ from environments.environment import Environment
 from protocols.protocol import Protocol
 from market_agent.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
 from personas.persona import Persona
+import json
+from psycopg2.extras import Json
+import logging
 
 class MarketAgent(LLMAgent, EconomicAgent):
     memory: List[Dict[str, Any]] = Field(default_factory=list)
@@ -143,3 +146,46 @@ class MarketAgent(LLMAgent, EconomicAgent):
         })
 
         return response["reflection"]
+
+    def save_memory_to_db(self, conn, step_id: int):
+        cursor = conn.cursor()
+        
+        try:
+            logger.info(f"Attempting to save memory for agent {self.id} at step {step_id}")
+            
+            # Insert into agent_memories
+            cursor.execute("""
+            INSERT INTO agent_memories (agent_id, step_id)
+            VALUES (%s, %s) RETURNING id
+            """, (self.id, step_id))
+            memory_id = cursor.fetchone()[0]
+            logger.info(f"Inserted agent_memory with id {memory_id}")
+            
+            # Insert perception
+            perception = self.memory[-1].get("perception", {})
+            cursor.execute("""
+            INSERT INTO perceptions (memory_id, environment_name, environment_info, recent_memories)
+            VALUES (%s, %s, %s, %s)
+            """, (memory_id, perception.get("environment_name"), Json(perception.get("environment_info")), Json(perception.get("recent_memories"))))
+            
+            # Insert action
+            action = self.memory[-1].get("action", {})
+            cursor.execute("""
+            INSERT INTO actions (memory_id, environment_name, perception, environment_info, recent_memories, action_space)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """, (memory_id, action.get("environment_name"), Json(action.get("perception")), Json(action.get("environment_info")), Json(action.get("recent_memories")), Json(action.get("action_space"))))
+            
+            # Insert reflection
+            reflection = self.memory[-1].get("reflection", {})
+            cursor.execute("""
+            INSERT INTO reflections (memory_id, environment_name, observation, environment_info, last_action, reward, previous_strategy)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (memory_id, reflection.get("environment_name"), Json(reflection.get("observation")), Json(reflection.get("environment_info")), Json(reflection.get("last_action")), reflection.get("reward"), reflection.get("previous_strategy")))
+            
+            conn.commit()
+            logger.info(f"Successfully saved memory for agent {self.id} at step {step_id}")
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error saving memory to database for agent {self.id}: {e}")
+        finally:
+            cursor.close()

@@ -47,7 +47,7 @@ def create_tables():
     # Create tables
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS agents (
-        id UUID PRIMARY KEY,
+        id INTEGER PRIMARY KEY,
         role VARCHAR(10) NOT NULL CHECK (role IN ('buyer', 'seller')),
         is_llm BOOLEAN NOT NULL,
         max_iter INTEGER NOT NULL,
@@ -148,11 +148,60 @@ def create_tables():
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS agent_memories (
+        id SERIAL PRIMARY KEY,
+        agent_id INTEGER REFERENCES agents(id),
+        step_id INTEGER NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS perceptions (
+        id SERIAL PRIMARY KEY,
+        memory_id INTEGER REFERENCES agent_memories(id),
+        environment_name TEXT NOT NULL,
+        environment_info JSONB,
+        recent_memories JSONB
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS actions (
+        id SERIAL PRIMARY KEY,
+        memory_id INTEGER REFERENCES agent_memories(id),
+        environment_name TEXT NOT NULL,
+        perception JSONB,
+        environment_info JSONB,
+        recent_memories JSONB,
+        action_space JSONB
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS reflections (
+        id SERIAL PRIMARY KEY,
+        memory_id INTEGER REFERENCES agent_memories(id),
+        environment_name TEXT NOT NULL,
+        observation JSONB,
+        environment_info JSONB,
+        last_action JSONB,
+        reward FLOAT,
+        previous_strategy TEXT
+    )
+    """)
+
     # Create indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_auction_id ON trades(id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_agent_id ON orders(agent_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_allocations_agent_id ON allocations(agent_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_interactions_agent_id ON interactions(agent_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_memories_agent_id ON agent_memories(agent_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_memories_step_id ON agent_memories(step_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_perceptions_memory_id ON perceptions(memory_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_actions_memory_id ON actions(memory_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reflections_memory_id ON reflections(memory_id)")
 
     conn.commit()
     print("Tables and indexes created successfully.")

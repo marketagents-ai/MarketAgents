@@ -1,63 +1,63 @@
-name: Tamara Berger
+name: Ida Prado
 objectives:
 - Purchase goods at favorable prices
 - Your goal is to maximize utility
 persona: 'Personal Background:
 
-  Tamara Berger is a Female who participates in the market. They are 45 years old
-  and work as a Teacher. Their investment experience is Novice and they have a Aggressive
+  Ida Prado is a Female who participates in the market. They are 42 years old and
+  work as a Engineer. Their investment experience is Novice and they have a Conservative
   risk appetite.
 
 
   Demographic Characteristics:
 
-  Age: 45
+  Age: 42
 
   Gender: Female
 
-  Education Level: PhD
+  Education Level: High School
 
-  Occupation: Teacher
+  Occupation: Engineer
 
-  Income Bracket: Medium
+  Income Bracket: High
 
-  Geographic Location: Suburban
+  Geographic Location: Urban
 
 
   Economic Attributes:
 
-  Spending Habits: Frugal
+  Spending Habits: Lavish
 
-  Saving Preferences: Low
+  Saving Preferences: High
 
-  Risk Tolerance: 0.32
+  Risk Tolerance: 0.09
 
   Investment Experience: Novice
 
 
   Personality Traits:
 
-  Decision Making Style: Impulsive
+  Decision Making Style: Rational
 
-  Openness: 0.62
+  Openness: 0.88
 
-  Conscientiousness: 0.99
+  Conscientiousness: 0.78
 
-  Extraversion: 0.1
+  Extraversion: 0.75
 
-  Agreeableness: 0.76
+  Agreeableness: 0.03
 
-  Neuroticism: 0.05
+  Neuroticism: 0.91
 
 
   Hobbies and Interests:
 
-  Reading, Music, Reading
+  Cooking, Music, Travel
 
 
   Dynamic Attributes:
 
-  Current Mood: Excited
+  Current Mood: Sad
 
   Recent Life Events: [''Got a promotion'', ''Moved to a new city'']
 
@@ -68,7 +68,7 @@ persona: 'Personal Background:
 
   Long Term Goals: [''Save for retirement'', ''Buy a house'']
 
-  Risk Appetite: Aggressive
+  Risk Appetite: Conservative
 
   Investment Preferences: [''Stocks'', ''Bonds'', ''Real Estate'']
 

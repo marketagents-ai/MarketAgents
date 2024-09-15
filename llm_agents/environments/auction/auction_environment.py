@@ -80,7 +80,8 @@ class AuctionEnvironment(Environment):
 
     def get_observation(self, agent_id: str):
         """Get observation for an agent."""
-        observation = self.auction.get_current_trade_execution(int(agent_id))
+        int_agent_id = int(agent_id) if isinstance(agent_id, int) else hash(agent_id) % (2**32)
+        observation = self.auction.get_current_trade_execution(int_agent_id)
         if self.protocol:
             return self.protocol.create_observation(
                 sender="market",
