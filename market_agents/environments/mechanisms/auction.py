@@ -7,7 +7,7 @@ from market_agents.environments.environment import (
     Mechanism, LocalAction, GlobalAction, LocalObservation, GlobalObservation,
     EnvironmentStep, ActionSpace, ObservationSpace
 )
-from market_agents.economics.econ_models import Bid, Ask, Trade
+from market_agents.economics.econ_models import Bid, Ask, MarketAction, Trade
 import random
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,10 @@ class AuctionAction(LocalAction):
         random_price = random.uniform(0, 100)
         action = Bid(price=random_price, quantity=1) if is_buyer else Ask(price=random_price, quantity=1)
         return cls(agent_id=agent_id, action=action)
-
+    
+    @classmethod
+    def action_schema(cls) -> Type[BaseModel]:
+        return MarketAction.model_json_schema()
 
 class GlobalAuctionAction(GlobalAction):
     actions: Dict[str, AuctionAction]
@@ -42,7 +45,6 @@ class AuctionObservation(BaseModel):
 class AuctionLocalObservation(LocalObservation):
     observation: AuctionObservation
 
-
 class AuctionGlobalObservation(GlobalObservation):
     observations: Dict[str, AuctionLocalObservation]
     all_trades: List[Trade] = Field(default_factory=list, description="All trades executed in this round")
@@ -51,7 +53,6 @@ class AuctionGlobalObservation(GlobalObservation):
 
 class AuctionActionSpace(ActionSpace):
     allowed_actions: List[Type[LocalAction]] = [AuctionAction]
-
 
 class AuctionObservationSpace(ObservationSpace):
     allowed_observations: List[Type[LocalObservation]] = [AuctionLocalObservation]

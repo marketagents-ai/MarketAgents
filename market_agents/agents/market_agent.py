@@ -103,7 +103,7 @@ class MarketAgent(LLMAgent, EconomicAgent):
         
         prompt = self.prompt_manager.get_action_prompt(variables.dict())
         
-        action_schema = action_space.allowed_actions[0].schema()
+        action_schema = action_space.get_action_schema()
         
         response = await self.execute(prompt, output_format=action_schema)
         

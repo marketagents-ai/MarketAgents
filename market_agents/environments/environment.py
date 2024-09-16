@@ -5,6 +5,7 @@ import random
 import string
 from statistics import mean
 from abc import ABC, abstractmethod
+import json
 
 class LocalAction(BaseModel, ABC):
     """Represents an action for a single agent."""
@@ -151,10 +152,16 @@ class ActionSpace(BaseModel):
             raise ValueError("No allowed actions defined")
         action_type = random.choice(self.allowed_actions)
         return action_type.sample(agent_id)
+    
+    def get_action_schema(self) -> Type[BaseModel]:
+        """Get the schema for the allowed actions."""
+        if not self.allowed_actions:
+            raise ValueError("No allowed actions defined")
+        # Assuming all allowed actions have the same schema
+        return self.allowed_actions[0].action_schema()
 
 class ObservationSpace(BaseModel):
     allowed_observations: List[Type[LocalObservation]] = Field(default_factory=list)
-
 
 class Mechanism(BaseModel, ABC):
     sequential: bool = Field(default=False, description="Whether the mechanism is sequential")
@@ -328,4 +335,3 @@ class MultiAgentEnvironment(BaseModel):
         print("\nGlobal state:")
         print(self.get_global_state())
         print("\n" + "="*50)
-
