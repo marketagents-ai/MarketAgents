@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Type
-from market_agents.economics.econ_models import Ask, Bid
+from typing import List, Dict, Any, Type, Tuple
+from market_agents.economics.econ_models import Ask, Bid, Trade
 from pydantic import BaseModel, Field
 from colorama import Fore, Style
 import threading
@@ -9,8 +9,8 @@ import os
 import yaml
 
 from market_agents.agents.market_agent import MarketAgent
-from market_agents.environments.environment import MultiAgentEnvironment
-from market_agents.environments.mechanisms.auction import AuctionAction, DoubleAuction, AuctionActionSpace, AuctionObservationSpace, GlobalAuctionAction
+from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
+from market_agents.environments.mechanisms.auction import AuctionAction, AuctionGlobalObservation, DoubleAuction, AuctionActionSpace, AuctionObservationSpace, GlobalAuctionAction
 from market_agents.inference.message_models import LLMConfig
 from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.logger_utils import *
@@ -46,6 +46,26 @@ class OrchestratorConfig(BaseModel):
     protocol: Type[ACLMessage]
     database_config: Dict[str, Any]
 
+class AuctionTracker:
+    def __init__(self):
+        self.all_trades: List[Trade] = []
+        self.per_round_surplus: List[float] = []
+        self.per_round_quantities: List[int] = []
+
+    def add_trade(self, trade: Trade):
+        self.all_trades.append(trade)
+
+    def add_round_data(self, surplus: float, quantity: int):
+        self.per_round_surplus.append(surplus)
+        self.per_round_quantities.append(quantity)
+
+    def get_summary(self):
+        return {
+            "total_trades": len(self.all_trades),
+            "total_surplus": sum(self.per_round_surplus),
+            "total_quantity": sum(self.per_round_quantities)
+        }
+
 class Orchestrator:
     def __init__(self, config: OrchestratorConfig):
         self.config = config
@@ -56,6 +76,7 @@ class Orchestrator:
         self.simulation_order = ['auction']
         self.simulation_data: List[Dict[str, Any]] = []
         self.latest_data = None
+        self.trackers: Dict[str, AuctionTracker] = {}
 
     def load_or_generate_personas(self) -> List[Persona]:
         personas_dir = Path("./market_agents/agents/personas/generated_personas")
@@ -90,7 +111,6 @@ class Orchestrator:
             )
             self.agents.append(agent)
             log_agent_init(logger, i, persona.role.lower() == "buyer")
-        
 
     def setup_environments(self):
         log_section(logger, "CONFIGURING MARKET ENVIRONMENTS")
@@ -109,7 +129,9 @@ class Orchestrator:
                     mechanism=double_auction
                 )
                 self.environments[env_name] = env
+                self.trackers[env_name] = AuctionTracker()
                 log_environment_setup(logger, env_name)
+                
             else:
                 logger.warning(f"Unknown environment type: {env_name}")
 
@@ -117,11 +139,6 @@ class Orchestrator:
 
         for agent in self.agents:
             agent.environments = self.environments
-
-    #def setup_dashboard(self):
-    #    log_section(logger, "INITIALIZING DASHBOARD")
-    #    self.dashboard = create_dashboard(self.data_source)
-    #    logger.info("Dashboard setup complete")
 
     def setup_database(self):
         log_section(logger, "CONFIGURING SIMULATION DATABASE")
@@ -157,8 +174,9 @@ class Orchestrator:
             log_completion(logger, "SIMULATION COMPLETED")
             self.print_summary()
 
-    async def run_environment(self, env_name: str):
+    async def run_environment(self, env_name: str) -> EnvironmentStep:
         env = self.environments[env_name]
+        tracker = self.trackers[env_name]
         
         log_running(logger, env_name)
         agent_actions = {}
@@ -171,12 +189,10 @@ class Orchestrator:
             log_raw_action(logger, int(agent.id), f"{Fore.LIGHTBLUE_EX}{action}{Style.RESET_ALL}")      
     
             try:
-                # Extract the actual action from the content
-                action_content = action['content']['action']
+                action_content = action['content']
                 if 'price' in action_content and 'quantity' in action_content:
-                    #fix quantity to 1 for now
                     action_content['quantity'] = 1
-                    # Determine if it's a Bid or Ask based on the agent's role
+
                     if agent.role == "buyer":
                         auction_action = Bid(**action_content)
                     elif agent.role == "seller":
@@ -198,16 +214,49 @@ class Orchestrator:
         global_action = GlobalAuctionAction(actions=agent_actions)
         env_state = env.step(global_action)
         logger.info(f"Completed {env_name} step")
-        return env_state
 
-    def update_simulation_state(self, env_name: str, env_state: Dict[str, Any]):
+        if isinstance(env_state.global_observation, AuctionGlobalObservation):
+            logger.info(f"processing trades with: {tracker}")
+            self.process_trades(env_state.global_observation, tracker)
+        
+        return env_state
+    
+    def process_trades(self, global_observation: AuctionGlobalObservation, tracker: AuctionTracker):
+        round_surplus = 0
+        round_quantity = 0
+        logger.info(f"Processing {len(global_observation.all_trades)} trades")
+        for trade in global_observation.all_trades:
+            buyer = self.agents[int(trade.buyer_id)]
+            seller = self.agents[int(trade.seller_id)]
+            logger.info(f"Processing trade between buyer {buyer.id} and seller {seller.id}")
+            
+            buyer_utility_before = buyer.calculate_utility(buyer.endowment.current_basket)
+            seller_utility_before = seller.calculate_utility(seller.endowment.current_basket)
+            
+            buyer.process_trade(trade)
+            seller.process_trade(trade)
+            
+            buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
+            seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
+            
+            trade_surplus = (buyer_utility_after - buyer_utility_before) + (seller_utility_after - seller_utility_before)
+            
+            tracker.add_trade(trade)
+            round_surplus += trade_surplus
+            round_quantity += trade.quantity
+            logger.info(f"Executed trade: {trade}")
+            logger.info(f"Trade surplus: {trade_surplus}")
+
+        tracker.add_round_data(round_surplus, round_quantity)
+        logger.info(f"Round summary - Surplus: {round_surplus}, Quantity: {round_quantity}")
+    
+    def update_simulation_state(self, env_name: str, env_state: EnvironmentStep):
         for agent in self.agents:
             agent_observation = env_state.global_observation.observations.get(agent.id)
             if agent_observation:
                 if not isinstance(agent_observation, dict):
                     agent_observation = agent_observation.dict()
                 
-                # Update the agent's endowment directly
                 new_cash = agent_observation.get('endowment', {}).get('cash')
                 new_goods = agent_observation.get('endowment', {}).get('goods', {})
                 
@@ -229,8 +278,8 @@ class Orchestrator:
             'agent_states': [{
                 'id': agent.id,
                 'is_buyer': agent.role == "buyer",
-                'cash': agent.endowment.current_basket.cash,  # Change this line
-                'goods': agent.endowment.current_basket.goods_dict,  # Change this line
+                'cash': agent.endowment.current_basket.cash,
+                'goods': agent.endowment.current_basket.goods_dict,
                 'last_action': agent.last_action,
                 'memory': agent.memory[-1] if agent.memory else None
             } for agent in self.agents],
@@ -241,6 +290,49 @@ class Orchestrator:
             round_data['state'] = self.simulation_data[-1]['state']
         
         self.simulation_data.append(round_data)
+
+    def print_summary(self):
+        log_section(logger, "SIMULATION SUMMARY")
+        
+        total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "buyer")
+        total_seller_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "seller")
+        total_empirical_surplus = total_buyer_surplus + total_seller_surplus
+
+        print(f"Total Empirical Buyer Surplus: {total_buyer_surplus:.2f}")
+        print(f"Total Empirical Seller Surplus: {total_seller_surplus:.2f}")
+        print(f"Total Empirical Surplus: {total_empirical_surplus:.2f}")
+
+        env = self.environments['auction']
+        global_state = env.get_global_state()
+        equilibria = global_state.get('equilibria', {})
+        
+        if equilibria:
+            theoretical_total_surplus = sum(data['total_surplus'] for data in equilibria.values())
+            print(f"\nTheoretical Total Surplus: {theoretical_total_surplus:.2f}")
+
+            efficiency = (total_empirical_surplus / theoretical_total_surplus) * 100 if theoretical_total_surplus > 0 else 0
+            print(f"\nEmpirical Efficiency: {efficiency:.2f}%")
+        else:
+            print("\nTheoretical equilibrium data not available.")
+
+        for env_name, tracker in self.trackers.items():
+            summary = tracker.get_summary()
+            print(f"\nEnvironment: {env_name}")
+            print(f"Total number of trades: {summary['total_trades']}")
+            print(f"Total surplus: {summary['total_surplus']:.2f}")
+            print(f"Total quantity traded: {summary['total_quantity']}")
+
+        print("\nFinal Agent States:")
+        for agent in self.agents:
+            print(f"Agent {agent.id} ({agent.role}):")
+            print(f"  Cash: {agent.endowment.current_basket.cash:.2f}")
+            print(f"  Goods: {agent.endowment.current_basket.goods_dict}")
+            surplus = agent.calculate_individual_surplus()
+            print(f"  Individual Surplus: {surplus:.2f}")
+
+    def write_to_db(self):
+        # Implement database write operation here
+        pass
 
     #def data_source(self):
     #    env = self.environments['auction']
@@ -269,61 +361,18 @@ class Orchestrator:
     #        log_section(logger, "LAUNCHING DASHBOARD UI")
     #        self.dashboard.run_server(debug=True, use_reloader=False)
 
-    def print_summary(self):
-        log_section(logger, "SIMULATION SUMMARY")
-        
-        # Calculate total empirical surplus
-        total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "buyer")
-        total_seller_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "seller")
-        total_empirical_surplus = total_buyer_surplus + total_seller_surplus
-
-        print(f"Total Empirical Buyer Surplus: {total_buyer_surplus:.2f}")
-        print(f"Total Empirical Seller Surplus: {total_seller_surplus:.2f}")
-        print(f"Total Empirical Surplus: {total_empirical_surplus:.2f}")
-
-        # Calculate theoretical equilibrium (if available)
-        env = self.environments['auction']
-        global_state = env.get_global_state()
-        equilibria = global_state.get('equilibria', {})
-        
-        if equilibria:
-            theoretical_total_surplus = sum(data['total_surplus'] for data in equilibria.values())
-            print(f"\nTheoretical Total Surplus: {theoretical_total_surplus:.2f}")
-
-            # Compute and print the empirical efficiency
-            efficiency = (total_empirical_surplus / theoretical_total_surplus) * 100 if theoretical_total_surplus > 0 else 0
-            print(f"\nEmpirical Efficiency: {efficiency:.2f}%")
-        else:
-            print("\nTheoretical equilibrium data not available.")
-
-        # Print trade statistics
-        successful_trades = global_state.get('successful_trades', [])
-        print(f"\nTotal number of successful trades: {len(successful_trades)}")
-        
-        if successful_trades:
-            average_price = sum(trade['price'] for trade in successful_trades) / len(successful_trades)
-            print(f"Average trade price: {average_price:.2f}")
-
-        # Print final agent states
-        print("\nFinal Agent States:")
-        for agent in self.agents:
-            print(f"Agent {agent.id} ({agent.role}):")
-            print(f"  Cash: {agent.endowment.current_basket.cash:.2f}")
-            print(f"  Goods: {agent.endowment.current_basket.goods_dict}")
-            print(f"  Individual Surplus: {agent.calculate_individual_surplus():.2f}")
-
     async def start(self):
         log_section(logger, "MARKET SIMULATION INITIALIZING")
         self.generate_agents()
         self.setup_environments()
-        #self.setup_dashboard()
-        self.setup_database()
+        #self.setup_database()
 
         if self.dashboard:
             dashboard_thread = threading.Thread(target=self.run_dashboard)
             dashboard_thread.start()
 
         await self.run_simulation()
+        self.write_to_db()
 
         if self.dashboard:
             dashboard_thread.join()
@@ -367,3 +416,4 @@ if __name__ == "__main__":
     import asyncio
     orchestrator = Orchestrator(config)
     asyncio.run(orchestrator.start())
+
