@@ -1,12 +1,12 @@
-# LLM Agents
+# Market Agents
 
 ## Overview
 
-This project provides utilities for parallel AI inference and prompt caching using large language models (LLMs).
+This project provides agent framework for creating market agents with economic incentive. The agents have utilities for parallel AI inference and prompt caching using large language models (LLMs).
 
 ## Installation
 
-To install the `llm_agents` package in editable mode, follow these steps:
+To install the `market_agents` package in editable mode, follow these steps:
 
 1. Clone the repository:
 
