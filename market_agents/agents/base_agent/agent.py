@@ -121,6 +121,8 @@ class Agent(BaseModel):
 
         prompt_messages = prompt_manager.generate_prompt_messages()
         system_message = prompt_messages["messages"][0]["content"]
+        if self.system:
+            system_message += f"\n{self.system}"
         user_message = prompt_messages["messages"][1]["content"]
        
         structured_output = None
@@ -176,7 +178,8 @@ class Agent(BaseModel):
         interaction = {
             "id": self.id,
             "name": self.role,
-            "prompt_context": prompt.model_dump(),
+            "system": prompt.system_message,
+            "task": prompt.new_message,
             "response": response,
             "timestamp": datetime.now().isoformat()
         }

@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Type, Tuple
@@ -77,6 +78,7 @@ class Orchestrator:
         self.simulation_data: List[Dict[str, Any]] = []
         self.latest_data = None
         self.trackers: Dict[str, AuctionTracker] = {}
+        self.log_folder = Path("./outputs/interactions")
 
     def load_or_generate_personas(self) -> List[Persona]:
         personas_dir = Path("./market_agents/agents/personas/generated_personas")
@@ -153,7 +155,7 @@ class Orchestrator:
                 
                 for env_name in self.simulation_order:
                     try:
-                        env_state = await self.run_environment(env_name)
+                        env_state = await self.run_environment(env_name, round_num)
                         self.update_simulation_state(env_name, env_state)
                     except Exception as e:
                         logger.error(f"Error in environment {env_name}: {str(e)}")
@@ -167,14 +169,17 @@ class Orchestrator:
                         logger.error(f"Error in agent {agent.id} reflection: {str(e)}")
                 
                 self.save_round_data(round_num)
-                self.update_dashboard()
+                #self.update_dashboard()
+
+                # save interactions after each round
+                self.save_agent_interactions(round_num)
         except Exception as e:
             logger.error(f"Simulation failed: {str(e)}")
         finally:
             log_completion(logger, "SIMULATION COMPLETED")
             self.print_summary()
 
-    async def run_environment(self, env_name: str) -> EnvironmentStep:
+    async def run_environment(self, env_name: str, round_num: int) -> EnvironmentStep:
         env = self.environments[env_name]
         tracker = self.trackers[env_name]
         
@@ -185,6 +190,23 @@ class Orchestrator:
             perception = await agent.perceive(env_name)
             log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
 
+            good_name = env.mechanism.good_name  # Use the good_name from the environment
+            print(f"THE GOOD NAME IS {good_name}")
+
+            if round_num == 1:
+                if agent.role == "buyer":
+                    agent.system = f"This is the first round of the market so there are not bids or asks yet. You can make a profit by buying at {agent.preference_schedule.get_value(1)*0.99} or lower"
+                elif agent.role == "seller":
+                    agent.system = f"This is the first round of the market so there are not bids or asks yet. You can make a profit by selling at {agent.preference_schedule.get_value(1)*1.01} or higher"
+            else:
+                if agent.role == "buyer":
+                    current_value = agent.preference_schedule.get_value(agent.endowment.current_basket.goods_dict.get(good_name, 0) + 1)
+                    suggested_price = current_value * 0.99
+                    agent.system = f"Your current basket: {agent.endowment.current_basket}. Your current value for the good is {current_value}. You can make a profit by buying at {suggested_price} or lower."
+                elif agent.role == "seller":
+                    current_cost = agent.preference_schedule.get_value(agent.endowment.current_basket.goods_dict.get(good_name, 0))
+                    suggested_price = current_cost * 1.01
+                    agent.system = f"Your current basket: {agent.endowment.current_basket}. Your current cost for the good is {current_cost}. You can make a profit by selling at {suggested_price} or higher."
             action = await agent.generate_action(env_name, perception)
             log_raw_action(logger, int(agent.id), f"{Fore.LIGHTBLUE_EX}{action}{Style.RESET_ALL}")      
     
@@ -256,6 +278,8 @@ class Orchestrator:
             if agent_observation:
                 if not isinstance(agent_observation, dict):
                     agent_observation = agent_observation.dict()
+
+                agent.last_observation = agent_observation
                 
                 new_cash = agent_observation.get('endowment', {}).get('cash')
                 new_goods = agent_observation.get('endowment', {}).get('goods', {})
@@ -290,6 +314,27 @@ class Orchestrator:
             round_data['state'] = self.simulation_data[-1]['state']
         
         self.simulation_data.append(round_data)
+
+    def save_agent_interactions(self, round_num):
+        """Save interactions for all agents for the current round."""
+        self.log_folder.mkdir(parents=True, exist_ok=True)
+        
+        for agent in self.agents:
+            file_path = self.log_folder / f"agent_{agent.id}_interactions.jsonl"
+            with open(file_path, 'a') as f:
+                # Get all interactions that don't have a round number yet
+                new_interactions = [interaction for interaction in agent.interactions if 'round' not in interaction]
+                for interaction in new_interactions:
+                    interaction_with_round = {
+                        "round": round_num,
+                        **interaction
+                    }
+                    json.dump(interaction_with_round, f)
+                    f.write('\n')
+                # Clear the processed interactions
+                agent.interactions = [interaction for interaction in agent.interactions if 'round' in interaction]
+        
+        logger.info(f"Saved agent interactions for round {round_num} to {self.log_folder}")
 
     def print_summary(self):
         log_section(logger, "SIMULATION SUMMARY")
@@ -379,10 +424,10 @@ class Orchestrator:
 
 if __name__ == "__main__":
     config = OrchestratorConfig(
-        num_agents=8,
-        max_rounds=4,
+        num_agents=4,
+        max_rounds=2,
         agent_config=AgentConfig(
-            num_units=5,
+            num_units=10,
             base_value=100,
             use_llm=True,
             initial_cash=1000,

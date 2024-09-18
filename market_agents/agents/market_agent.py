@@ -5,7 +5,7 @@ from pydantic import Field
 from market_agents.agents.base_agent.agent import Agent as LLMAgent
 from market_agents.inference.message_models import LLMConfig
 from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
-from market_agents.environments.environment import MultiAgentEnvironment
+from market_agents.environments.environment import MultiAgentEnvironment, LocalObservation
 from market_agents.agents.protocols.protocol import Protocol
 from market_agents.agents.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
 from market_agents.agents.personas.persona import Persona
@@ -13,6 +13,7 @@ from market_agents.agents.personas.persona import Persona
 class MarketAgent(LLMAgent, EconomicAgent):
     memory: List[Dict[str, Any]] = Field(default_factory=list)
     last_action: Optional[Dict[str, Any]] = None
+    last_observation: Optional[LocalObservation] = Field(default_factory=dict)
     environments: Dict[str, MultiAgentEnvironment] = Field(default_factory=dict)
     protocol: Type[Protocol] = Field(..., description="Communication protocol class")
     address: str = Field(default="", description="Agent's address")
@@ -76,9 +77,9 @@ class MarketAgent(LLMAgent, EconomicAgent):
             recent_memories=recent_memories if recent_memories else []
         )
         
-        prompt = self.prompt_manager.get_perception_prompt(variables.dict())
+        prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
         
-        return await self.execute(prompt, output_format=PerceptionSchema.schema())
+        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema())
 
     async def generate_action(self, environment_name: str, perception: Optional[str] = None) -> Dict[str, Any]:
         if environment_name not in self.environments:
@@ -86,23 +87,24 @@ class MarketAgent(LLMAgent, EconomicAgent):
 
         environment = self.environments[environment_name]
         if perception is None:
-            perception = self.perceive(environment_name)
+            perception = await self.perceive(environment_name)
         environment_info = environment.get_global_state()
         action_space = environment.action_space
-        
-        recent_memories = self.memory[-5:] if self.memory else []
+        serialized_action_space = {
+            "allowed_actions": [action_type.__name__ for action_type in action_space.allowed_actions]
+        }
         
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
-            recent_memories=recent_memories if recent_memories else [],
-            observation=perception,
-            action_space=action_space.model_dump(),
-            last_action=self.last_action
+            perception=perception,
+            action_space=serialized_action_space,
+            last_action=self.last_action,
+            observation=self.last_observation
         )
         
-        prompt = self.prompt_manager.get_action_prompt(variables.dict())
-        
+        prompt = self.prompt_manager.get_action_prompt(variables.model_dump())
+     
         action_schema = action_space.get_action_schema()
         
         response = await self.execute(prompt, output_format=action_schema)
@@ -141,9 +143,9 @@ class MarketAgent(LLMAgent, EconomicAgent):
             previous_strategy=previous_strategy
         )
         
-        prompt = self.prompt_manager.get_reflection_prompt(variables.dict())
+        prompt = self.prompt_manager.get_reflection_prompt(variables.model_dump())
         
-        response = await self.execute(prompt, output_format=ReflectionSchema.schema())
+        response = await self.execute(prompt, output_format=ReflectionSchema.model_json_schema())
         
         self.memory.append({
             "type": "reflection",

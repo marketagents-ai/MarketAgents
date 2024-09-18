@@ -7,6 +7,7 @@ class AgentPromptVariables(BaseModel):
     environment_name: str
     environment_info: Any
     recent_memories: List[Dict[str, Any]] = Field(default_factory=list)
+    perception: Optional[Any] = None
     observation: Optional[Any] = None
     action_space: Dict[str, Any] = None
     last_action: Optional[Any] = None
