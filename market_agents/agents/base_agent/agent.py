@@ -178,7 +178,8 @@ class Agent(BaseModel):
         interaction = {
             "id": self.id,
             "name": self.role,
-            "prompt_context": prompt.model_dump(),
+            "system": prompt.system_message,
+            "task": prompt.new_message,
             "response": response,
             "timestamp": datetime.now().isoformat()
         }
