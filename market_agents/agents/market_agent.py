@@ -90,21 +90,21 @@ class MarketAgent(LLMAgent, EconomicAgent):
             perception = await self.perceive(environment_name)
         environment_info = environment.get_global_state()
         action_space = environment.action_space
-        
-        recent_memories = self.memory[-5:] if self.memory else []
+        serialized_action_space = {
+            "allowed_actions": [action_type.__name__ for action_type in action_space.allowed_actions]
+        }
         
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
-            recent_memories=recent_memories if recent_memories else [],
             perception=perception,
-            action_space=action_space.model_dump(),
+            action_space=serialized_action_space,
             last_action=self.last_action,
             observation=self.last_observation
         )
         
         prompt = self.prompt_manager.get_action_prompt(variables.model_dump())
-        
+     
         action_schema = action_space.get_action_schema()
         
         response = await self.execute(prompt, output_format=action_schema)
