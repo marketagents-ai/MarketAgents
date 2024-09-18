@@ -10,7 +10,8 @@ perception: |
 action: |
   Generate an action for the {environment_name} environment based on the following:
 
-  Perception: {observation}
+  Perception: {perception}
+  Last Observation: {observation}
   Environment State: {environment_info}
   Recent Memories: {recent_memories}
   Available Actions: {action_space}
