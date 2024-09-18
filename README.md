@@ -30,7 +30,6 @@ To install the `market_agents` package in editable mode, follow these steps:
 ## Running Examples
 
 You can run the `orchestrator` as follows:
-
     ```sh
     python3 market_agents/orchestrator.py
     ```
