@@ -34,8 +34,4 @@ You can run the `orchestrator` as follows:
 ```sh
 python3 market_agents/orchestrator.py
 ```
-    
-## Running Examples
-
-You can run the examples from the `examples` folder. For instance, to run the `cache_example.py`, use the following command:
 
