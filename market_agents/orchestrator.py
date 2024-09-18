@@ -267,6 +267,8 @@ class Orchestrator:
             if agent_observation:
                 if not isinstance(agent_observation, dict):
                     agent_observation = agent_observation.dict()
+
+                agent.last_observation = agent_observation
                 
                 new_cash = agent_observation.get('endowment', {}).get('cash')
                 new_goods = agent_observation.get('endowment', {}).get('goods', {})
@@ -309,15 +311,17 @@ class Orchestrator:
         for agent in self.agents:
             file_path = self.log_folder / f"agent_{agent.id}_interactions.jsonl"
             with open(file_path, 'a') as f:
-                # Get only the latest interaction (assuming it's the one for this round)
-                latest_interaction = agent.interactions[-1] if agent.interactions else None
-                if latest_interaction:
+                # Get all interactions that don't have a round number yet
+                new_interactions = [interaction for interaction in agent.interactions if 'round' not in interaction]
+                for interaction in new_interactions:
                     interaction_with_round = {
                         "round": round_num,
-                        **latest_interaction
+                        **interaction
                     }
                     json.dump(interaction_with_round, f)
                     f.write('\n')
+                # Clear the processed interactions
+                agent.interactions = [interaction for interaction in agent.interactions if 'round' in interaction]
         
         logger.info(f"Saved agent interactions for round {round_num} to {self.log_folder}")
 
