@@ -2,11 +2,12 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
 from retrieval_toys.bm25wcosine.bm25_cosine import BM25CosineEnsemble, SearchableCollection
-from llm_agents.market_agent.market_schemas import PerceptionSchema, ReflectionSchema
+from llm_agents.market_agent.market_schemas import PerceptionSchema, ReflectionSchema, MarketActionSchema, DoubleAuctionBid
 
 class MemoryType(Enum):
     PERCEPTION = "perception"
     REFLECTION = "reflection"
+    MARKET_ACTION = "market_action"  
 
 class RetrievalMode(Enum):
     BM25_COSINE = "bm25_cosine"
@@ -24,6 +25,9 @@ class MemoryModule:
             entry['content'] = PerceptionSchema(**entry['content']).dict()
         elif entry['type'] == MemoryType.REFLECTION:
             entry['content'] = ReflectionSchema(**entry['content']).dict()
+        elif entry['type'] == MemoryType.MARKET_ACTION:  
+            entry['content'] = MarketActionSchema(**entry['content']).dict()
+
         self.memory.append(entry)
         self.dummy_dataset.append(entry)
         self._update_indexes()
@@ -42,6 +46,13 @@ class MemoryModule:
             elif memory['type'] == MemoryType.REFLECTION:
                 summary += f"- Reflection: {content['reflection']}...\n"
                 summary += f"  Strategy Update: {content['strategy_update']}...\n"
+            elif memory['type'] == MemoryType.MARKET_ACTION:  
+                summary += f"- Market Action: {content['action']}...\n"
+                summary += f"  Thought: {content['thought']}...\n"
+                if content['bid']:
+                    summary += f"  Bid Reasoning: {content['bid'].reasoning}...\n"
+                    summary += f"  Confidence: {content['bid'].confidence}...\n"
+
         return summary
 
     def clear_memory(self) -> None:
@@ -60,6 +71,8 @@ class MemoryModule:
             return f"{x['content']['monologue']} {x['content']['strategy']}"
         elif x['type'] == MemoryType.REFLECTION:
             return f"{x['content']['reflection']} {x['content']['strategy_update']}"
+        elif x['type'] == MemoryType.MARKET_ACTION:  
+            return f"{x['content']['thought']} {x['content']['action']}"
 
     def retrieve_relevant_memories(self, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
         results = self.searchable_collection.search(query, top_k)
@@ -100,6 +113,13 @@ class Agent:
             strategy_update="Updated strategy based on reward"
         )
 
+    def market_action(self, action_type: str, thought: str, bid: Optional[DoubleAuctionBid] = None):
+        return MarketActionSchema(
+            thought=thought,
+            action=action_type,
+            bid=bid
+        )
+
 def generate_perception(agent: Agent, environment: Environment, memory_module: MemoryModule):
     perception = agent.perceive(environment)
     memory_module.add_memory({
@@ -119,6 +139,15 @@ def generate_reflection(agent: Agent, environment: Environment, memory_module: M
         'environment': environment.name
     })
     return reflection
+
+def generate_market_action(agent: Agent, environment: Environment, memory_module: MemoryModule, action_type: str, thought: str, bid: Optional[DoubleAuctionBid] = None):
+    market_action = agent.market_action(action_type, thought, bid)
+    memory_module.add_memory({
+        'type': MemoryType.MARKET_ACTION,
+        'content': market_action,
+        'environment': environment.name
+    })
+    return market_action
 
 def generate_prompts(memory_module: MemoryModule, environment: Environment):
     recent_memories = memory_module.get_recent_memories(5)
@@ -164,6 +193,10 @@ if __name__ == "__main__":
         reflection = generate_reflection(agent, env, memory)
         print(f"Generated reflection: {reflection}")
 
+        # Simulate a market action
+        market_action = generate_market_action(agent, env, memory, "bid", "Considering market conditions", None)
+        print(f"Generated market action: {market_action}")
+
     query = "market strategy"
     relevant_memories = memory.retrieve_relevant_memories(query)
     print(f"\nRelevant memories for query '{query}':")
@@ -174,6 +207,9 @@ if __name__ == "__main__":
         elif mem['type'] == MemoryType.REFLECTION:
             print(f"- Reflection: {mem['content']['reflection']}")
             print(f"  Strategy Update: {mem['content']['strategy_update']}")
+        elif mem['type'] == MemoryType.MARKET_ACTION:
+            print(f"- Market Action: {mem['content']['action']}")
+            print(f"  Thought: {mem['content']['thought']}")
 
     perception_prompt, reflection_prompt = generate_prompts(memory, env)
     print("\nPerception Prompt:")
