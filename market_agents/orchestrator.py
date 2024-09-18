@@ -190,12 +190,23 @@ class Orchestrator:
             perception = await agent.perceive(env_name)
             log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
 
+            good_name = env.mechanism.good_name  # Use the good_name from the environment
+            print(f"THE GOOD NAME IS {good_name}")
+
             if round_num == 1:
                 if agent.role == "buyer":
                     agent.system = f"This is the first round of the market so there are not bids or asks yet. You can make a profit by buying at {agent.preference_schedule.get_value(1)*0.99} or lower"
                 elif agent.role == "seller":
                     agent.system = f"This is the first round of the market so there are not bids or asks yet. You can make a profit by selling at {agent.preference_schedule.get_value(1)*1.01} or higher"
-
+            else:
+                if agent.role == "buyer":
+                    current_value = agent.preference_schedule.get_value(agent.endowment.current_basket.goods_dict.get(good_name, 0) + 1)
+                    suggested_price = current_value * 0.99
+                    agent.system = f"Your current basket: {agent.endowment.current_basket}. Your current value for the good is {current_value}. You can make a profit by buying at {suggested_price} or lower."
+                elif agent.role == "seller":
+                    current_cost = agent.preference_schedule.get_value(agent.endowment.current_basket.goods_dict.get(good_name, 0))
+                    suggested_price = current_cost * 1.01
+                    agent.system = f"Your current basket: {agent.endowment.current_basket}. Your current cost for the good is {current_cost}. You can make a profit by selling at {suggested_price} or higher."
             action = await agent.generate_action(env_name, perception)
             log_raw_action(logger, int(agent.id), f"{Fore.LIGHTBLUE_EX}{action}{Style.RESET_ALL}")      
     
@@ -413,10 +424,10 @@ class Orchestrator:
 
 if __name__ == "__main__":
     config = OrchestratorConfig(
-        num_agents=2,
+        num_agents=4,
         max_rounds=2,
         agent_config=AgentConfig(
-            num_units=5,
+            num_units=10,
             base_value=100,
             use_llm=True,
             initial_cash=1000,
