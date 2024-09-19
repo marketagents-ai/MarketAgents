@@ -18,3 +18,8 @@ llm_agents/logs*
 venv
 venv/*
 venv/**
+/market_agents.egg-info
+/reports
+/outputs
+/vscode
+/.vscode
