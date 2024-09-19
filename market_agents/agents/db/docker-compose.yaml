@@ -2,7 +2,7 @@ version: '3'
 
 services:
   db:
-    image: ankane/pgvector:latest
+    image: ankane/pgvector:v0.5.1
     environment:
       POSTGRES_DB: market_simulation
       POSTGRES_USER: db_user
@@ -11,6 +11,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - app-network
 
   app:
     build: .
@@ -22,6 +24,12 @@ services:
       DB_PORT: 5432
     depends_on:
       - db
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

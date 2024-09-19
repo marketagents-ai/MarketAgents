@@ -2,16 +2,16 @@
 FROM python:3.9
 
 # Set the working directory in the container
-WORKDIR /llm_agents/Database
+WORKDIR /agents/db
 
 # Install PostgreSQL client
 RUN apt-get update && apt-get install -y postgresql-client
 
 # Copy the Database directory contents into the container at /app/Database
-COPY . /llm_agents/Database
+COPY . /agents/db
 
 # Install any needed packages specified in requirements.txt
-COPY requirements.txt /llm_agents/Database/
+COPY requirements.txt /agents/db/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Make port 5432 available to the world outside this container

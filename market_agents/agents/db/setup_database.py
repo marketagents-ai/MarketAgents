@@ -1,4 +1,5 @@
 import psycopg2
+import psycopg2.extras  # Add this line
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import os
 import numpy as np
@@ -232,7 +233,39 @@ def create_tables():
 
     cursor.close()
     conn.close()
+def insert_test_data():
+    conn = psycopg2.connect(
+        dbname=os.environ.get('DB_NAME', 'market_simulation'),
+        user=os.environ.get('DB_USER', 'db_user'),
+        password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
+        host=os.environ.get('DB_HOST', 'localhost'),
+        port=os.environ.get('DB_PORT', '5433')
+    )
+    cursor = conn.cursor()
+
+    # Insert a test agent
+    cursor.execute("""
+    INSERT INTO agents (id, role, is_llm, max_iter, llm_config)
+    VALUES (gen_random_uuid(), 'buyer', true, 10, '{"model": "gpt-3.5-turbo"}')
+    RETURNING id
+    """)
+    agent_id = cursor.fetchone()[0]
+
+    # Insert test memory embeddings
+    for _ in range(5):
+        embedding = np.random.rand(1536).tolist()
+        memory_data = {"text": f"Test memory {_}", "timestamp": "2023-04-01T12:00:00Z"}
+        cursor.execute("""
+        INSERT INTO memory_embeddings (agent_id, embedding, memory_data)
+        VALUES (%s, %s, %s)
+        """, (agent_id, embedding, psycopg2.extras.Json(memory_data)))
+
+    conn.commit()
+    print("Test data inserted successfully.")
+
+    cursor.close()
+    conn.close()
 
 if __name__ == "__main__":
-    # create_database()
     create_tables()
+    insert_test_data()

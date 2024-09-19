@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository contains the database design and setup for a market simulation system. The database is designed to support a complex market environment with agents, auctions, trades, and various market activities.
+This directory contains the database setup and testing scripts for the Market Agents project. It uses PostgreSQL with the pgvector extension for vector similarity search capabilities.
 
 ## Table of Contents
 
@@ -14,6 +14,9 @@ This repository contains the database design and setup for a market simulation s
 6. [Query Examples](#query-examples)
 7. [Performance Considerations](#performance-considerations)
 8. [Backup and Recovery](#backup-and-recovery)
+9. [Docker Setup and Database Initialization](#docker-setup-and-database-initialization)
+10. [Setting up pgvector](#setting-up-pgvector)
+11. [Testing pgvector](#testing-pgvector)
 
 ## Database Schema
 
@@ -28,6 +31,7 @@ The database consists of the following tables:
 7. environments
 8. environment_agents
 9. interactions
+10. memory_embeddings
 
 ## Table Descriptions
 
@@ -58,6 +62,9 @@ Links environments to the agents participating in them.
 ### interactions
 Logs interactions between agents and the language model, if applicable.
 
+### memory_embeddings
+Stores vector embeddings of agent memories for similarity search.
+
 ## Relationships
 
 - An **agent** has one **preference_schedule** and one **allocation**.
@@ -65,19 +72,40 @@ Logs interactions between agents and the language model, if applicable.
 - An **environment** has many **agents** through **environment_agents**.
 - An **auction** has many **trades**.
 - An **agent** can have many **interactions**.
+- An **agent** can have many **memory_embeddings**.
 
 ## Setup Instructions
 
+### Prerequisites
+
+- PostgreSQL 14 or higher
+- pgvector extension
+- Python 3.8 or higher
+- psycopg2
+- numpy
+
+### Steps
+
 1. Install PostgreSQL on your system if not already installed.
-2. Create a new database for the market simulation project:
+2. Install pgvector:
+
+   #### macOS:
+   ```sh
+   ./setup_pgvector.sh
+   ```
+
+   #### Windows:
+   Follow the instructions in the main README for Windows pgvector setup.
+
+3. Create a new database for the market simulation project:
    ```
    createdb market_simulation
    ```
-3. Run the SQL script to create the tables and set up the schema:
+4. Set up the database:
    ```
-   psql -d market_simulation -f setup.sql
+   python setup_database.py
    ```
-4. Configure your application to connect to this database.
+5. Configure your application to connect to this database.
 
 ## Development Guidelines
 
@@ -139,11 +167,6 @@ To set up and run the PostgreSQL database using Docker:
    docker-compose up --build
    ```
 
-   This command will:
-   - Build the Docker images if they don't exist
-   - Start the PostgreSQL database container
-   - Start the application container, which will run the setup script
-
 4. Wait for the setup to complete. You should see output indicating that the database and tables have been created successfully.
 
 5. The database is now ready for use with the following connection details:
@@ -167,7 +190,6 @@ To set up and run the PostgreSQL database using Docker:
 
    Then, rebuild and start the containers again using step 3.
 
-
 ## Setting up pgvector
 
 This project uses pgvector for vector similarity search. To set it up:
@@ -181,8 +203,49 @@ This project uses pgvector for vector similarity search. To set it up:
 
 If you encounter any issues, please refer to the [pgvector documentation](https://github.com/pgvector/pgvector).
 
+## Testing pgvector
 
+To test if pgvector is working correctly:
 
-These steps will set up your PostgreSQL database in a Docker container and initialize it with the necessary tables and data.
+1. Ensure your database is set up and running.
 
-For any questions or issues, please open an issue in the repository or contact the database administrator.
+2. Set the following environment variables (or update the values in `test_pgvector.py`):
+   - `DB_NAME` (default: 'market_simulation')
+   - `DB_USER` (default: 'db_user')
+   - `DB_PASSWORD` (default: 'db_pwd@123')
+   - `DB_HOST` (default: 'localhost')
+   - `DB_PORT` (default: '5433')
+
+3. Run the test script:
+
+   ```sh
+   python test_pgvector.py
+   ```
+
+   This script will:
+   - Connect to the database
+   - Create the vector extension if it doesn't exist
+   - Perform a vector similarity search on the `memory_embeddings` table
+   - Print the top 3 similar vectors
+
+4. If successful, you should see output similar to:
+
+   ```
+   Top 3 similar vectors:
+   ID: 1, Memory: {'text': 'Test memory 0', 'timestamp': '2023-04-01T12:00:00Z'}, Distance: 0.123456
+   ID: 2, Memory: {'text': 'Test memory 1', 'timestamp': '2023-04-01T12:00:00Z'}, Distance: 0.234567
+   ID: 3, Memory: {'text': 'Test memory 2', 'timestamp': '2023-04-01T12:00:00Z'}, Distance: 0.345678
+   ```
+
+## Troubleshooting
+
+- If you encounter errors related to the vector extension, ensure it's properly installed and created in your database:
+  ```sql
+  CREATE EXTENSION vector;
+  ```
+
+- For connection issues, verify your environment variables match your PostgreSQL setup.
+
+- If the `test_pgvector.py` script fails, ensure you have test data in the `memory_embeddings` table. You can run `setup_database.py` again to insert test data.
+
+For any other issues, please refer to the main project README or open an issue on the project repository.
