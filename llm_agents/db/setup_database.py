@@ -1,22 +1,23 @@
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import os
+import numpy as np
 
 # Database connection parameters
 DB_NAME = "market_simulation"
-DB_USER = "your_username"
-DB_PASSWORD = "your_password"
+DB_USER = "db_user"
+DB_PASSWORD = "db_pwd@123"
 DB_HOST = "localhost"
-DB_PORT = "5432"
+DB_PORT = "5433"
 
 def create_database():
     # Connect to PostgreSQL server
     conn = psycopg2.connect(
-        dbname=os.environ.get('DB_NAME', 'market_simulation'),
+        dbname='postgres',  # Connect to default 'postgres' database initially
         user=os.environ.get('DB_USER', 'db_user'),
         password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
-        host=os.environ.get('DB_HOST', 'db'),  # Use 'db' instead of 'localhost'
-        port=os.environ.get('DB_PORT', '5432')
+        host=os.environ.get('DB_HOST', 'localhost'),  # Use 'localhost' as default
+        port=os.environ.get('DB_PORT', '5433')
     )
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cursor = conn.cursor()
@@ -39,15 +40,18 @@ def create_tables():
         dbname=os.environ.get('DB_NAME', 'market_simulation'),
         user=os.environ.get('DB_USER', 'db_user'),
         password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
-        host=os.environ.get('DB_HOST', 'db'),
-        port=os.environ.get('DB_PORT', '5432')
+        host=os.environ.get('DB_HOST', 'localhost'),  # Use 'localhost' as default
+        port=os.environ.get('DB_PORT', '5433')
     )
     cursor = conn.cursor()
 
-    # Create tables
+    # Drop existing tables
+    cursor.execute("DROP TABLE IF EXISTS agent_memories, preference_schedules, allocations, orders, trades, interactions, agents CASCADE")
+
+    # Update the agents table to use UUID
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS agents (
-        id INTEGER PRIMARY KEY,
+        id UUID PRIMARY KEY,
         role VARCHAR(10) NOT NULL CHECK (role IN ('buyer', 'seller')),
         is_llm BOOLEAN NOT NULL,
         max_iter INTEGER NOT NULL,
@@ -56,6 +60,18 @@ def create_tables():
     )
     """)
 
+    # Update agent_memories table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS agent_memories (
+        id SERIAL PRIMARY KEY,
+        agent_id UUID REFERENCES agents(id),
+        step_id INTEGER NOT NULL,
+        memory_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Update other tables that reference agents
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS preference_schedules (
         id SERIAL PRIMARY KEY,
@@ -109,6 +125,17 @@ def create_tables():
     """)
 
     cursor.execute("""
+    CREATE TABLE IF NOT EXISTS interactions (
+        id SERIAL PRIMARY KEY,
+        agent_id UUID REFERENCES agents(id),
+        round INTEGER NOT NULL,
+        task TEXT NOT NULL,
+        response TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS auctions (
         id SERIAL PRIMARY KEY,
         max_rounds INTEGER NOT NULL,
@@ -133,26 +160,6 @@ def create_tables():
         id SERIAL PRIMARY KEY,
         environment_id INTEGER REFERENCES environments(id),
         agent_id UUID REFERENCES agents(id),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS interactions (
-        id SERIAL PRIMARY KEY,
-        agent_id UUID REFERENCES agents(id),
-        round INTEGER NOT NULL,
-        task TEXT NOT NULL,
-        response TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS agent_memories (
-        id SERIAL PRIMARY KEY,
-        agent_id INTEGER REFERENCES agents(id),
-        step_id INTEGER NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -192,6 +199,23 @@ def create_tables():
     )
     """)
 
+    # Create pgvector extension
+    cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
+
+    # Create a new table for vector embeddings
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS memory_embeddings (
+        id SERIAL PRIMARY KEY,
+        agent_id UUID REFERENCES agents(id),
+        embedding vector(1536),
+        memory_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Create an index on the embedding column
+    cursor.execute("CREATE INDEX ON memory_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)")
+
     # Create indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_auction_id ON trades(id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_agent_id ON orders(agent_id)")
@@ -204,11 +228,11 @@ def create_tables():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reflections_memory_id ON reflections(memory_id)")
 
     conn.commit()
-    print("Tables and indexes created successfully.")
+    print("Tables, indexes, and pgvector extension created successfully.")
 
     cursor.close()
     conn.close()
 
 if __name__ == "__main__":
-    create_database()
+    # create_database()
     create_tables()

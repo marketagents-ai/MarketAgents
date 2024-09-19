@@ -10,6 +10,8 @@ from pathlib import Path
 import psycopg2
 from psycopg2.extras import Json, UUID_adapter
 import uuid
+from pgvector.psycopg2 import register_vector
+import numpy as np
 
 from market_agent.market_agents import MarketAgent
 from environments.environment import Environment
@@ -133,9 +135,45 @@ class Orchestrator:
                 host=os.environ.get('DB_HOST', 'localhost'),
                 port=os.environ.get('DB_PORT', '5433')
             )
-            logger.info("Database connection established successfully.")
+            register_vector(self.conn)
+            logger.info("Database connection established successfully with pgvector support.")
         except (Exception, psycopg2.Error) as error:
             logger.error(f"Error while connecting to PostgreSQL: {error}")
+
+    def save_memory_embedding(self, agent_id, embedding, memory_data):
+        if self.conn:
+            cursor = self.conn.cursor()
+            try:
+                cursor.execute("""
+                INSERT INTO memory_embeddings (agent_id, embedding, memory_data)
+                VALUES (%s, %s, %s)
+                """, (UUID_adapter(agent_id), embedding, Json(memory_data)))
+                self.conn.commit()
+                logger.info(f"Memory embedding saved for agent {agent_id}")
+            except (Exception, psycopg2.Error) as error:
+                logger.error(f"Error while saving memory embedding: {error}")
+                self.conn.rollback()
+            finally:
+                cursor.close()
+
+    def retrieve_similar_memories(self, agent_id, query_embedding, limit=5):
+        if self.conn:
+            cursor = self.conn.cursor()
+            try:
+                cursor.execute("""
+                SELECT memory_data, embedding <-> %s AS distance
+                FROM memory_embeddings
+                WHERE agent_id = %s
+                ORDER BY distance
+                LIMIT %s
+                """, (query_embedding, UUID_adapter(agent_id), limit))
+                results = cursor.fetchall()
+                return [{'memory_data': result[0], 'distance': result[1]} for result in results]
+            except (Exception, psycopg2.Error) as error:
+                logger.error(f"Error while retrieving similar memories: {error}")
+            finally:
+                cursor.close()
+        return []
 
     def run_simulation(self):
         logger.info("Starting simulation")
@@ -150,9 +188,15 @@ class Orchestrator:
             for agent in self.agents:
                 reflection = agent.reflect(env_name)
                 if reflection:
-                    log_reflection(logger, int(agent.agent_id), f"{Fore.MAGENTA}{reflection}{Style.RESET_ALL}")
+                    log_reflection(logger, int(agent.id), f"{Fore.MAGENTA}{reflection}{Style.RESET_ALL}")
+                    
+                    # Generate an embedding for the reflection (you'll need to implement this)
+                    embedding = self.generate_embedding(reflection)
+                    
+                    # Save the memory embedding
+                    self.save_memory_embedding(agent.id, embedding, {'reflection': reflection, 'round': round_num})
                 else:
-                    logger.warning(f"Agent {agent.agent_id} returned empty reflection")
+                    logger.warning(f"Agent {agent.id} returned empty reflection")
             
             self.save_round_data(round_num)
             self.update_dashboard()
@@ -165,9 +209,9 @@ class Orchestrator:
         log_running(logger, env_name)
         agent_actions = {}
         for agent in self.agents:
-            log_section(logger, f"Current Agent:\nAgent {agent.agent_id} with persona:\n{agent.persona}")
+            log_section(logger, f"Current Agent:\nAgent {agent.id} with persona:\n{agent.persona}")
             perception = agent.perceive(env_name)
-            log_perception(logger, int(agent.agent_id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
+            log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception}{Style.RESET_ALL}")
 
             action = agent.generate_action(env_name, perception)
             agent_actions[agent.id] = action
@@ -178,7 +222,7 @@ class Orchestrator:
                 color = Fore.GREEN
             else:
                 color = Fore.YELLOW
-            log_action(logger, int(agent.agent_id), f"{color}{action_type}: {action['content']}{Style.RESET_ALL}")
+            log_action(logger, int(agent.id), f"{color}{action_type}: {action['content']}{Style.RESET_ALL}")
         
         env_state = env.update(agent_actions)
         logger.info(f"Completed {env_name} step")
@@ -204,45 +248,28 @@ class Orchestrator:
         self.simulation_data[-1]['state']['trade_info'] = env_state.get('trade_info', {})
 
     def save_round_data(self, round_num):
-        logger.info(f"Attempting to save data for round {round_num}")
-        round_data = {
-            'round': round_num,
-            'agent_states': [{
-                'id': agent.agent_id,
-                'is_buyer': agent.is_buyer,
-                'cash': agent.endowment.cash,
-                'goods': agent.endowment.goods,
-                'last_action': agent.last_action,
-                'memory': agent.memory[-1] if agent.memory else None
-            } for agent in self.agents],
-            'environment_states': {name: env.get_global_state() for name, env in self.environments.items()},
-        }
-        
-        if self.simulation_data and 'state' in self.simulation_data[-1]:
-            round_data['state'] = self.simulation_data[-1]['state']
-        
-        self.simulation_data.append(round_data)
-
         if self.conn:
             cursor = self.conn.cursor()
             try:
                 logger.info(f"Attempting to save round {round_num} data to the database.")
                 
+                env = self.environments['auction']
+                auction = env.auction
+
                 # Insert into auctions table
                 cursor.execute("""
                 INSERT INTO auctions (max_rounds, current_round, total_surplus_extracted, average_prices, order_book, trade_history)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
-                """, (self.config.max_rounds, round_num, 0, Json({}), Json({}), Json({})))
+                """, (auction.max_rounds, auction.current_round, auction.total_surplus_extracted, 
+                      Json(auction.average_prices), Json(auction.order_book.dict()), Json([trade.dict() for trade in auction.trade_history])))
                 auction_id = cursor.fetchone()[0]
                 logger.info(f"Inserted auction data with id {auction_id}")
 
                 # Insert or update agent data
                 for agent in self.agents:
-                    # Generate a UUID for the agent if it doesn't have one
-                    if not hasattr(agent, 'uuid'):
-                        agent.uuid = uuid.uuid4()
-
+                    agent_uuid = getattr(agent, 'uuid', uuid.uuid4())
+                    
                     cursor.execute("""
                     INSERT INTO agents (id, role, is_llm, max_iter, llm_config)
                     VALUES (%s, %s, %s, %s, %s)
@@ -251,27 +278,86 @@ class Orchestrator:
                     is_llm = EXCLUDED.is_llm,
                     max_iter = EXCLUDED.max_iter,
                     llm_config = EXCLUDED.llm_config
-                    """, (UUID_adapter(agent.uuid), agent.role, agent.use_llm, self.config.max_rounds, Json(agent.llm_config.dict())))
-                    logger.info(f"Inserted/updated agent data for agent {agent.agent_id}")
+                    """, (UUID_adapter(agent_uuid), agent.role, agent.use_llm, self.config.max_rounds, Json(agent.llm_config.dict())))
+                    logger.info(f"Inserted/updated agent data for agent {agent.id}")
 
-                    # Insert agent allocations
+                    # Insert preference schedules
+                    cursor.execute("""
+                    INSERT INTO preference_schedules (agent_id, is_buyer, values, initial_endowment)
+                    VALUES (%s, %s, %s, %s)
+                    """, (UUID_adapter(agent_uuid), agent.is_buyer, Json(agent.preference_schedule.dict()), agent.endowment.cash))
+                    logger.info(f"Inserted preference schedule for agent {agent.id}")
+
+                    # Insert allocations
                     cursor.execute("""
                     INSERT INTO allocations (agent_id, goods, cash, locked_goods, locked_cash, initial_goods, initial_cash)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (UUID_adapter(agent.uuid), agent.endowment.goods, agent.endowment.cash, 0, 0, self.config.agent_config.initial_goods, self.config.agent_config.initial_cash))
-                    logger.info(f"Inserted allocation data for agent {agent.agent_id}")
+                    """, (UUID_adapter(agent_uuid), agent.endowment.goods, agent.endowment.cash, 0, 0, self.config.agent_config.initial_goods, self.config.agent_config.initial_cash))
+                    logger.info(f"Inserted allocation data for agent {agent.id}")
 
-                    # Save agent memory
-                    agent.save_memory_to_db(self.conn, round_num)
+                # Insert orders
+                for bid in auction.order_book.bids:
+                    cursor.execute("""
+                    INSERT INTO orders (agent_id, is_buy, quantity, price, base_value, base_cost)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (UUID_adapter(bid.agent_id), True, bid.quantity, bid.price, bid.base_value, None))
+                for ask in auction.order_book.asks:
+                    cursor.execute("""
+                    INSERT INTO orders (agent_id, is_buy, quantity, price, base_value, base_cost)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (UUID_adapter(ask.agent_id), False, ask.quantity, ask.price, None, ask.base_cost))
+                logger.info("Inserted order data")
+
+                # Insert trades
+                for trade in auction.trade_history:
+                    cursor.execute("""
+                    INSERT INTO trades (buyer_id, seller_id, quantity, price, buyer_value, seller_cost, round)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (UUID_adapter(trade.bid.agent_id), UUID_adapter(trade.ask.agent_id), trade.quantity, trade.price, trade.buyer_value, trade.seller_cost, trade.round))
+                logger.info("Inserted trade data")
+
+                # Insert interactions
+                for agent in self.agents:
+                    if agent.last_action:
+                        cursor.execute("""
+                        INSERT INTO interactions (agent_id, round, task, response)
+                        VALUES (%s, %s, %s, %s)
+                        """, (UUID_adapter(agent_uuid), round_num, 'action', Json(agent.last_action)))
+                logger.info("Inserted interaction data")
 
                 self.conn.commit()
                 logger.info(f"Round {round_num} data saved to the database.")
+                
+                # Print loaded data
+                self.print_loaded_data()
             except (Exception, psycopg2.Error) as error:
                 logger.error(f"Error while saving round data to PostgreSQL: {error}")
                 self.conn.rollback()
             finally:
                 cursor.close()
         logger.info(f"Data for round {round_num} saved successfully")
+
+    def print_loaded_data(self):
+        if self.conn:
+            cursor = self.conn.cursor()
+            try:
+                tables = ['auctions', 'agents', 'preference_schedules', 'allocations', 'orders', 'trades', 'interactions']
+                for table in tables:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                    count = cursor.fetchone()[0]
+                    print(f"Table {table}: {count} rows")
+                    
+                    if count > 0:
+                        cursor.execute(f"SELECT * FROM {table} LIMIT 5")
+                        rows = cursor.fetchall()
+                        print(f"Sample data from {table}:")
+                        for row in rows:
+                            print(row)
+                    print()
+            except (Exception, psycopg2.Error) as error:
+                logger.error(f"Error while fetching data from PostgreSQL: {error}")
+            finally:
+                cursor.close()
 
     def data_source(self):
         env = self.environments['auction']
@@ -291,6 +377,11 @@ class Orchestrator:
         if self.conn:
             self.conn.close()
             logger.info("Database connection closed.")
+
+    def generate_embedding(self, text):
+        # This is a placeholder function. You should replace this with your actual embedding generation logic.
+        # For example, you might use a pre-trained model from Hugging Face or OpenAI's embedding API.
+        return np.random.rand(1536).tolist()  # pgvector typically uses 1536-dimensional vectors
 
     def start(self):
         self.setup_database()

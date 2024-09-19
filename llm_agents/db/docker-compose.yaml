@@ -2,7 +2,7 @@ version: '3'
 
 services:
   db:
-    image: postgres:13
+    image: ankane/pgvector:latest
     environment:
       POSTGRES_DB: market_simulation
       POSTGRES_USER: db_user

@@ -167,6 +167,22 @@ To set up and run the PostgreSQL database using Docker:
 
    Then, rebuild and start the containers again using step 3.
 
+
+## Setting up pgvector
+
+This project uses pgvector for vector similarity search. To set it up:
+
+1. Ensure you have Homebrew and PostgreSQL 14 installed.
+2. Run the setup script: `./setup_pgvector.sh`
+3. After the script completes, connect to your database and run:
+   ```sql
+   CREATE EXTENSION vector;
+   ```
+
+If you encounter any issues, please refer to the [pgvector documentation](https://github.com/pgvector/pgvector).
+
+
+
 These steps will set up your PostgreSQL database in a Docker container and initialize it with the necessary tables and data.
 
 For any questions or issues, please open an issue in the repository or contact the database administrator.

@@ -19,3 +19,21 @@ EXPOSE 5432
 
 # Run setup_database.py when the container launches
 CMD ["sh", "run_setup.sh"]
+
+
+FROM postgres:14
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    postgresql-server-dev-14
+
+RUN git clone --branch v0.7.4 https://github.com/pgvector/pgvector.git
+RUN echo "CREATE EXTENSION IF NOT EXISTS vector;" > /docker-entrypoint-initdb.d/create_extension.sql
+
+RUN cd pgvector && \
+    make && \
+    make install
+
+# Set environment variable to create extension on database creation
+ENV CREATE_EXTENSION_SQL="CREATE EXTENSION IF NOT EXISTS vector;"
