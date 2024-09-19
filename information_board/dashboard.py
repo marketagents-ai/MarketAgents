@@ -35,9 +35,11 @@ posts_json = '''
 ]
 '''
 
+# Load data from JSON
 users_df = pd.read_json(users_json)
 posts_df = pd.read_json(posts_json)
 
+# Simulate Comments Data (you can adjust this to accept JSON as well)
 comments_df = pd.DataFrame({
     'comment_id': range(1, 21),
     'post_id': np.random.randint(1, 11, size=20),
@@ -47,9 +49,11 @@ comments_df = pd.DataFrame({
     'downvotes': np.random.randint(0, 5, size=20)
 })
 
+# Calculate Karma for posts and comments
 posts_df['karma'] = posts_df['upvotes'] - posts_df['downvotes']
 comments_df['karma'] = comments_df['upvotes'] - comments_df['downvotes']
 
+# Function to calculate user karma
 def calculate_user_karma(posts_df, comments_df, users_df):
     post_karma = posts_df.groupby('user_id')['karma'].sum().reset_index()
     comment_karma = comments_df.groupby('user_id')['karma'].sum().reset_index()
@@ -59,11 +63,17 @@ def calculate_user_karma(posts_df, comments_df, users_df):
     user_karma = pd.merge(user_karma, users_df, on='user_id', how='left')
     return user_karma
 
+# Calculate user karma
 user_karma_df = calculate_user_karma(posts_df, comments_df, users_df)
 
 # Merge Posts with User Karma
 posts_with_karma_df = pd.merge(posts_df, user_karma_df[['user_id', 'total_karma']], on='user_id', how='left')
 posts_with_karma_df = posts_with_karma_df.fillna({'total_karma': 0})
+
+# Add number of comments per post
+comments_count = comments_df.groupby('post_id').size().reset_index(name='num_comments')
+posts_with_karma_df = pd.merge(posts_with_karma_df, comments_count, on='post_id', how='left')
+posts_with_karma_df = posts_with_karma_df.fillna({'num_comments': 0})
 
 # Sorting Functions
 def sort_posts_by_user_karma(posts_df):
@@ -79,9 +89,11 @@ def sort_posts_by_combined_karma(posts_df, weight_user=0.5, weight_post=0.5):
 # Initialize Dash app with Bootstrap theme
 external_stylesheets = [dbc.themes.CERULEAN]  # You can choose other themes from dbc.themes
 app = Dash(__name__, external_stylesheets=external_stylesheets)
+app.title = "Community Dashboard"
 
-# Customizing the layout
+# Customizing the layout with enhanced sections
 app.layout = dbc.Container([
+    # Navbar
     dbc.NavbarSimple(
         brand="Community Dashboard",
         brand_href="#",
@@ -89,6 +101,8 @@ app.layout = dbc.Container([
         dark=True,
         className='mb-4'
     ),
+    
+    # Sorting Dropdown and Incentive Alert
     dbc.Row([
         dbc.Col([
             html.Label('Sort Posts By:', className='h5'),
@@ -112,26 +126,55 @@ app.layout = dbc.Container([
             )
         ], width=8),
     ]),
+    
+    # Timeline Graph
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id='timeline-graph')
+        ], width=12),
+    ]),
+    
+    # Posts Graph
     dbc.Row([
         dbc.Col([
             dcc.Graph(id='posts-graph')
         ], width=12),
     ]),
+    
+    # Users Karma Graph
     dbc.Row([
         dbc.Col([
             html.H2('Users Karma', className='mt-4'),
             dcc.Graph(id='users-graph')
         ], width=12),
-    ])
+    ]),
+    
+    # Comments Section
+    dbc.Row([
+        dbc.Col([
+            html.H2('Posts and Comments', className='mt-4'),
+            dbc.Accordion(
+                id='comments-accordion',
+                active_item=None,  # All items collapsed initially
+                always_open=True,
+            )
+        ], width=12),
+    ]),
+    
 ], fluid=True)
 
-# Callbacks
+# Callback to update the main graphs and timeline
 @app.callback(
-    Output('posts-graph', 'figure'),
-    Output('users-graph', 'figure'),
-    Input('sort-option', 'value')
+    [
+        Output('posts-graph', 'figure'),
+        Output('users-graph', 'figure'),
+        Output('timeline-graph', 'figure'),
+        Output('comments-accordion', 'children')
+    ],
+    [Input('sort-option', 'value')]
 )
-def update_graph(sort_option):
+def update_dashboard(sort_option):
+    # Sort posts based on the selected option
     if sort_option == 'user_karma':
         sorted_posts = sort_posts_by_user_karma(posts_with_karma_df)
     elif sort_option == 'post_karma':
@@ -160,8 +203,8 @@ def update_graph(sort_option):
         xaxis=dict(showgrid=False),
         yaxis=dict(showgrid=True, gridcolor='LightGray')
     )
-
-    # Users Graph
+    
+    # Users Karma Graph
     user_karma_df_sorted = user_karma_df.sort_values(by='total_karma', ascending=False)
     fig_users = px.bar(
         user_karma_df_sorted,
@@ -179,8 +222,78 @@ def update_graph(sort_option):
         yaxis=dict(showgrid=True, gridcolor='LightGray'),
         coloraxis_showscale=False
     )
-
-    return fig_posts, fig_users
+    
+    # Timeline Graph - Posts sorted by number of comments
+    timeline_sorted = posts_with_karma_df.sort_values(by='num_comments', ascending=False)
+    fig_timeline = px.bar(
+        timeline_sorted,
+        x='post_id',
+        y='num_comments',
+        color='post_type',
+        hover_data=['content', 'upvotes', 'downvotes'],
+        title='Posts Sorted by Number of Comments',
+        labels={'num_comments': 'Number of Comments', 'post_id': 'Post ID'},
+        color_discrete_map={
+            'informative': 'green',
+            'cooperative': 'blue',
+            'deceptive': 'red'
+        }
+    )
+    fig_timeline.update_layout(
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        xaxis=dict(title='Post ID', showgrid=False),
+        yaxis=dict(title='Number of Comments', showgrid=True, gridcolor='LightGray')
+    )
+    
+    # Prepare Accordion Items for Comments
+    accordion_items = []
+    for _, post in posts_with_karma_df.iterrows():
+        post_comments = comments_df[comments_df['post_id'] == post['post_id']]
+        comments_list = []
+        for _, comment in post_comments.iterrows():
+            comments_list.append(
+                dbc.ListGroupItem([
+                    html.H6(f"Comment {comment['comment_id']} by {users_df.loc[users_df['user_id'] == comment['user_id'], 'username'].values[0]}", className='mb-1'),
+                    html.P(comment['content'], className='mb-1'),
+                    html.Span(f"Upvotes: {comment['upvotes']} | Downvotes: {comment['downvotes']}", className='text-muted', style={'fontSize': '0.9em'})
+                ])
+            )
+        
+        # Convert post and comments to JSON for display (optional)
+        post_dict = {
+            'post_id': post['post_id'],
+            'user_id': post['user_id'],
+            'username': users_df.loc[users_df['user_id'] == post['user_id'], 'username'].values[0],
+            'content': post['content'],
+            'post_type': post['post_type'],
+            'upvotes': post['upvotes'],
+            'downvotes': post['downvotes'],
+            'karma': post['karma'],
+            'num_comments': int(post['num_comments']),
+            'comments': post_comments.to_dict(orient='records')
+        }
+        post_json = json.dumps(post_dict, indent=4)
+        
+        accordion_items.append(
+            dbc.AccordionItem(
+                [
+                    html.P(post['content'], style={'fontStyle': 'italic'}),
+                    html.H6("Comments:", className='mt-3'),
+                    dbc.ListGroup(comments_list, flush=True),
+                    html.H6("Post JSON:", className='mt-3'),
+                    dbc.Card(
+                        dbc.CardBody(
+                            dcc.Markdown(f"```json\n{post_json}\n```")
+                        ),
+                        className='mb-4'
+                    )
+                ],
+                title=f"Post {post['post_id']} by {users_df.loc[users_df['user_id'] == post['user_id'], 'username'].values[0]}"
+            )
+        )
+    
+    return fig_posts, fig_users, fig_timeline, accordion_items
 
 # Run the app
 if __name__ == '__main__':
