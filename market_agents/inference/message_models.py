@@ -104,6 +104,7 @@ class LLMPromptContext(BaseModel):
     structured_output : Optional[StructuredTool] = None
     use_schema_instruction: bool = Field(default=False, description="Whether to use the schema instruction")
     llm_config: LLMConfig
+    use_history: bool = Field(default=True, description="Whether to use the history")
     
 
 
@@ -151,7 +152,7 @@ class LLMPromptContext(BaseModel):
     @property
     def messages(self)-> List[Dict[str, Any]]:
         messages = [self.system_message] if self.system_message is not None else []
-        if self.history:
+        if  self.use_history and self.history:
             messages+=self.history
         messages.append({"role":"user","content":self.new_message})
         if self.use_prefill:
@@ -176,48 +177,7 @@ class LLMPromptContext(BaseModel):
         return self.model_copy(update={"llm_config":llm_config})
        
     
-    def update_history_safely(self,history:List[Dict[str, Any]]) -> 'LLMPromptContext':
-        return self.model_copy(update={"history":history})
-        
-    
-    def append_to_history_safely(self,new_message:Dict[str, Any]) -> 'LLMPromptContext':
-        if  self.history:
-            return self.model_copy(update={"history":self.history.append(new_message)})
-        else:
-            assert not self.history
-            return self.update_history_safely(history=[new_message])
-        
-    
-    def add_chat_turn_history_safely(self, llm_output:'LLMOutput') -> 'LLMPromptContext':
-        """
-        Safely adds a user-assistant chat turn to the history based on the LLMOutput.
-        
-        Args:
-            llm_output (LLMOutput): The output from the LLM completion.
-        
-        Returns:
-            LLMPromptContext: A new instance with the updated history.
-        """
-        if llm_output.completion_kwargs is None or "messages" not in llm_output.completion_kwargs:
-            raise ValueError("LLMOutput does not contain message history")
 
-        messages = llm_output.completion_kwargs["messages"]
-        user_message = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), None)
-        
-        if user_message is None:
-            raise ValueError("No user message found in the completion history")
-
-        assistant_response = llm_output.str_content or json.dumps(llm_output.json_object.object) if llm_output.json_object else "{}"
-
-        new_turn = [
-            {"role": "user", "content": user_message},
-            {"role": "assistant", "content": assistant_response}
-        ]
-        
-        if self.history is None:
-            return self.model_copy(update={"history": new_turn})
-        else:
-            return self.model_copy(update={"history": self.history + new_turn})
         
     def add_chat_turn_history(self, llm_output:'LLMOutput'):
         """ add a chat turn to the history without safely model copy just normal append """
