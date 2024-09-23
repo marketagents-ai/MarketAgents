@@ -51,13 +51,32 @@ class MemoryAgentState(SimpleAgentState):
         simple_agent_state = super().__str__()
         memory_state = str(self.memory_analysis)
         return f"{simple_agent_state}\n\nMemory Analysis:\n{memory_state}"
-
+    
+    @classmethod
+    def from_agent_and_observation(cls, agent: 'MemoryAgent', observation: AuctionLocalObservation):
+        """ Create a new MemoryAgentState from a MemoryAgent and an observation """
+        simple_agent_state = super().from_agent_and_observation(agent, observation)
+        memory_processor_history = agent.memory_processor.history
+        if memory_processor_history is not None and len(memory_processor_history) > 0:
+            memory_analysis = MemoryAnalysis.model_validate(memory_processor_history[-1]["content"])
+        else:
+            memory_analysis = MemoryAnalysis(analysis="", action_suggestion="")
+        return cls(memory_analysis=memory_analysis, **simple_agent_state.model_dump())
+    
 class MemoryAgent(SimpleAgent):
     """ SimpleAgent that uses a MemoryProcessor to compress its history into a single structured output, instead of implicetely analyzing the history through the message historie
      it uses a sub call to generate a memory analysis thread 
      memory maps MemoryAnalysis to Union[Bid,Ask] """
     memory_processor: MemoryProcessor = Field(description="The MemoryProcessor is used to compress the history of the agent into a single structured output")
     use_history: bool = Field(default=False, description="If false the agent will havea thread of MemoryProcessor/actions before the next action is taken")
+
+    @computed_field
+    @property
+    def stage(self)-> str:
+        if not self.memory_processor.memory_processed:
+            return "Memory Analysis"
+        else:
+            return "Action"
     
     def update_state(self, local_observation: Optional[AuctionLocalObservation]=None):
         if not self.memory_processor.memory_processed and local_observation is not None:
@@ -65,5 +84,8 @@ class MemoryAgent(SimpleAgent):
             self.memory_processor.update_state(last_input=self.input_history[-1],
                                            last_output=self.actions_history[-1])
         else:
-            self.new_message = str(self.memory_processor) 
+            if local_observation is None:
+                local_observation = self.input_history[-1].observation
+            memory_state = MemoryAgentState.from_agent_and_observation(self, local_observation)
+            self.new_message = str(memory_state) 
             self.memory_processor.memory_processed = False
