@@ -1,0 +1,76 @@
+name: Jose Gallegos
+objectives:
+- Sell goods at favorable prices
+- Your goal is to maximize profits
+persona: 'Personal Background:
+
+  Jose Gallegos is a Male who participates in the market. They are 59 years old and
+  work as a Artist. Their investment experience is Novice and they have a Aggressive
+  risk appetite.
+
+
+  Demographic Characteristics:
+
+  Age: 59
+
+  Gender: Male
+
+  Education Level: PhD
+
+  Occupation: Artist
+
+  Income Bracket: Low
+
+  Geographic Location: Suburban
+
+
+  Economic Attributes:
+
+  Spending Habits: Moderate
+
+  Saving Preferences: High
+
+  Risk Tolerance: 0.36
+
+  Investment Experience: Novice
+
+
+  Personality Traits:
+
+  Decision Making Style: Rational
+
+  Openness: 0.89
+
+  Conscientiousness: 0.86
+
+  Extraversion: 0.68
+
+  Agreeableness: 0.26
+
+  Neuroticism: 0.39
+
+
+  Hobbies and Interests:
+
+  Reading, Travel, Music
+
+
+  Dynamic Attributes:
+
+  Current Mood: Excited
+
+  Recent Life Events: [''Got a promotion'', ''Moved to a new city'']
+
+
+  Financial Objectives:
+
+  Short Term Goals: [''Build emergency fund'', ''Pay off credit card debt'']
+
+  Long Term Goals: [''Save for retirement'', ''Buy a house'']
+
+  Risk Appetite: Aggressive
+
+  Investment Preferences: [''Stocks'', ''Bonds'', ''Real Estate'']
+
+  '
+role: Seller
