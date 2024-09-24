@@ -170,6 +170,11 @@ class LLMPromptContext(BaseModel):
     @property
     def anthropic_messages(self) -> Tuple[List[PromptCachingBetaTextBlockParam],List[MessageParam]]:
         return msg_dict_to_anthropic(self.messages, use_cache=self.llm_config.use_cache)
+    
+    @computed_field
+    @property
+    def vllm_messages(self) -> List[Dict[str, Any]]:
+        return self.messages
         
     def update_llm_config(self,llm_config:LLMConfig) -> 'LLMPromptContext':
         
@@ -371,8 +376,9 @@ class LLMOutput(BaseModel):
         usage = None
         provider : Optional[Literal["openai", "anthropic"]] = None
 
+        print(self.raw_result)
         if "model" in self.raw_result:
-            provider = "openai" if "gpt" in self.raw_result["model"] else "anthropic"
+            provider = "openai" if "gpt" in self.raw_result["model"] or "Phi" in self.raw_result["model"] else "anthropic"
         else:
             raise ValueError("No model found in the result")
 
