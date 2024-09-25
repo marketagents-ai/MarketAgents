@@ -377,10 +377,17 @@ class LLMOutput(BaseModel):
         provider : Optional[Literal["openai", "anthropic"]] = None
 
         print(self.raw_result)
-        if "model" in self.raw_result:
-            provider = "openai" if "gpt" in self.raw_result["model"] or "Phi" in self.raw_result["model"] else "anthropic"
+        # Determine provider based on keys present in raw_result
+        if "choices" in self.raw_result:
+            provider = "openai"
+        elif "content" in self.raw_result:
+            provider = "anthropic"
         else:
-            raise ValueError("No model found in the result")
+            raise ValueError("Cannot determine provider from the raw result")
+        #if "model" in self.raw_result:
+        #    provider = "openai" if "gpt" in self.raw_result["model"] or "Phi" in self.raw_result["model"] else "anthropic"
+        #else:
+        #    raise ValueError("No model found in the result")
 
         if provider == "openai":
             first_choice = self.raw_result["choices"][0]
