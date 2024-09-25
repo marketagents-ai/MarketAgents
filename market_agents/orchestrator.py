@@ -8,6 +8,7 @@ from colorama import Fore, Style
 import threading
 import os
 import yaml
+import random
 
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
@@ -22,6 +23,17 @@ logger = logging.getLogger(__name__)
 logger.handlers = []  # Clear any existing handlers
 logger.addHandler(logging.NullHandler())  # Add a null handler to prevent logging to the root logger
 
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class LLMConfig(BaseModel):
+    name: str
+    client: str
+    model: str
+    temperature: float
+    max_tokens: int
+    use_cache: bool
+
 class AgentConfig(BaseModel):
     num_units: int
     base_value: float
@@ -29,8 +41,8 @@ class AgentConfig(BaseModel):
     initial_cash: float
     initial_goods: int
     good_name: str
-    noise_factor: float = Field(default=0.1)
-    max_relative_spread: float = Field(default=0.2)
+    noise_factor: float
+    max_relative_spread: float
 
 class AuctionConfig(BaseModel):
     name: str
@@ -38,14 +50,24 @@ class AuctionConfig(BaseModel):
     max_rounds: int
     good_name: str
 
-class OrchestratorConfig(BaseModel):
+class OrchestratorConfig(BaseSettings):
     num_agents: int
     max_rounds: int
     agent_config: AgentConfig
-    llm_config: LLMConfig
-    environment_configs: Dict[str, AuctionConfig]
-    protocol: Type[ACLMessage]
-    database_config: Dict[str, Any]
+    llm_configs: list[LLMConfig]
+    environment_configs: dict[str, AuctionConfig]
+    protocol: str
+    database_config: dict[str, str]
+
+    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+
+import yaml
+from pathlib import Path
+
+def load_config(config_path: Path = Path("./market_agents/orchestrator_config.yaml")) -> OrchestratorConfig:
+    with open(config_path, 'r') as file:
+        yaml_data = yaml.safe_load(file)
+    return OrchestratorConfig(**yaml_data)
 
 class AuctionTracker:
     def __init__(self):
@@ -99,20 +121,25 @@ class Orchestrator:
         return existing_personas[:self.config.num_agents]
 
     def generate_agents(self):
+
         log_section(logger, "INITIALIZING MARKET AGENTS")
         personas = self.load_or_generate_personas()
+
         for i, persona in enumerate(personas):
+            llm_config = random.choice(self.config.llm_configs).model_dump()
+
             agent = MarketAgent.create(
                 agent_id=i,
                 is_buyer=persona.role.lower() == "buyer",
                 **self.config.agent_config.dict(),
-                llm_config=self.config.llm_config,
-                protocol=self.config.protocol,
+                llm_config=llm_config,
+                protocol=ACLMessage,
                 environments=self.environments,
                 persona=persona
             )
             self.agents.append(agent)
             log_agent_init(logger, i, persona.role.lower() == "buyer")
+
 
     def setup_environments(self):
         log_section(logger, "CONFIGURING MARKET ENVIRONMENTS")
@@ -423,42 +450,43 @@ class Orchestrator:
             dashboard_thread.join()
 
 if __name__ == "__main__":
-    config = OrchestratorConfig(
-        num_agents=4,
-        max_rounds=2,
-        agent_config=AgentConfig(
-            num_units=10,
-            base_value=100,
-            use_llm=True,
-            initial_cash=1000,
-            initial_goods=0,
-            good_name="apple",
-            noise_factor=0.1,
-            max_relative_spread=0.2
-        ),
-        llm_config=LLMConfig(
-            client='openai',
-            model='gpt-4o-mini',
-            temperature=0.5,
-            max_tokens=4096,
-            use_cache=True
-        ),
-        environment_configs={
-            'auction': AuctionConfig(
-                name='Apple Market',
-                address='apple_market',
-                max_rounds=100,
-                good_name='apple'
-            ),
-        },
-        protocol=ACLMessage,
-        database_config={
-            'db_type': 'postgres',
-            'db_name': 'market_simulation'
-        }
-    )
+    #config = OrchestratorConfig(
+    #    num_agents=4,
+    #    max_rounds=2,
+    #    agent_config=AgentConfig(
+    #        num_units=10,
+    #        base_value=100,
+    #        use_llm=True,
+    #        initial_cash=1000,
+    #        initial_goods=0,
+    #        good_name="apple",
+    #        noise_factor=0.1,
+    #        max_relative_spread=0.2
+    #    ),
+    #    llm_config=LLMConfig(
+    #        client='vllm',
+    #        model='microsoft/Phi-3.5-mini-instruct',
+    #        temperature=0.5,
+    #        max_tokens=4096,
+    #        use_cache=True
+    #    ),
+    #    environment_configs={
+    #        'auction': AuctionConfig(
+    #            name='Apple Market',
+    #            address='apple_market',
+    #            max_rounds=100,
+    #            good_name='apple'
+    #        ),
+    #    },
+    #    protocol=ACLMessage,
+    #    database_config={
+    #        'db_type': 'postgres',
+    #        'db_name': 'market_simulation'
+    #    }
+    #)
     
     import asyncio
+    config = load_config()
     orchestrator = Orchestrator(config)
     asyncio.run(orchestrator.start())
 
