@@ -5,6 +5,7 @@ dash==2.17.1
 anthropic==0.34.1
 openai==1.42.0
 python-dotenv==1.0.1
+pydantic-settings==2.5.2
 colorama==0.4.6
 names==0.3.0
 tiktoken==0.7.0
