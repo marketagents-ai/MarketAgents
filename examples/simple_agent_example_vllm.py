@@ -22,8 +22,8 @@ async def main():
     apple = Good(name="apple", quantity=0)
 
     # Create LLM configs
-    buyer_llm_config = LLMConfig(client="vllm", model="microsoft/Phi-3.5-mini-instruct", response_format="tool")
-    seller_llm_config = LLMConfig(client="vllm", model="microsoft/Phi-3.5-mini-instruct", response_format="tool")
+    buyer_llm_config = LLMConfig(client="vllm", model="Hermes-3", response_format="tool")
+    seller_llm_config = LLMConfig(client="vllm", model="llama-3.1-70b", response_format="tool")
 
     #buyer_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool")
     #seller_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool")
