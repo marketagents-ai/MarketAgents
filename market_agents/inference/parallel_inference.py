@@ -25,6 +25,7 @@ class ParallelAIUtilities:
         self.openai_key = os.getenv("OPENAI_KEY")
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         self.vllm_key = os.getenv("VLLM_API_KEY")
+        self.vllm_endpoint = os.getenv("VLLM_ENDPOINT", "http://localhost:8000/v1/chat/completions")
         self.oai_request_limits = oai_request_limits if oai_request_limits else RequestLimits(max_requests_per_minute=500,max_tokens_per_minute=200000,provider="openai")
         self.anthropic_request_limits = anthropic_request_limits if anthropic_request_limits else RequestLimits(max_requests_per_minute=50,max_tokens_per_minute=40000,provider="anthropic")
         self.vllm_request_limits = RequestLimits(max_requests_per_minute=500,max_tokens_per_minute=200000,provider="vllm")
@@ -230,7 +231,8 @@ class ParallelAIUtilities:
             return OAIApiFromFileConfig(
                 requests_filepath=requests_file,
                 save_filepath=results_file,
-                request_url="http://localhost:8000/v1/chat/completions",
+                request_url=self.vllm_endpoint,
+                #request_url="http://localhost:8000/v1/chat/completions",
                 api_key=self.vllm_key,
                 max_requests_per_minute=self.vllm_request_limits.max_requests_per_minute,
                 max_tokens_per_minute=self.vllm_request_limits.max_tokens_per_minute,
