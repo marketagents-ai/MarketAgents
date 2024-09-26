@@ -232,7 +232,7 @@ class ParallelAIUtilities:
                 requests_filepath=requests_file,
                 save_filepath=results_file,
                 request_url=self.vllm_endpoint,
-                #request_url="http://localhost:8000/v1/chat/completions",
+                #request_url="http://localhost:8000/v1/chat/completions", #now reading from .env else default
                 api_key=self.vllm_key,
                 max_requests_per_minute=self.vllm_request_limits.max_requests_per_minute,
                 max_tokens_per_minute=self.vllm_request_limits.max_tokens_per_minute,
