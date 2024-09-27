@@ -136,6 +136,8 @@ class LLMPromptContext(BaseModel):
         if self.llm_config.client == 'anthropic' and  self.llm_config.response_format in ["json_beg", "structured_output","json_object"]:
 
             return True
+        elif self.llm_config.client == 'vllm' and self.llm_config.response_format  == "json_beg":
+            return True
         else:
             return False
         

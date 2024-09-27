@@ -146,12 +146,9 @@ class ParallelAIUtilities:
     def _validate_anthropic_request(self, request: Dict[str, Any]) -> bool:
         try:
             anthropic_request = AnthropicRequest(**request)
-            print(f"request: {anthropic_request} has been validated")
             return True
         except Exception as e:
-            print(f"Error validating Anthropic request: {e} with request: {request}")
             raise ValidationError(f"Error validating Anthropic request: {e} with request: {request}")
-            return False
     
     def _validate_openai_request(self, request: Dict[str, Any]) -> bool:
         try:
@@ -224,7 +221,7 @@ class ParallelAIUtilities:
             if tool:
                 request["tools"] = [tool]
                 request["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
-        elif prompt.llm_config.response_format == "structured_output" and prompt.structured_output:
+        elif prompt.llm_config.response_format in ["structured_output", "json_object"] and prompt.structured_output:
             request["guided_json"] = prompt.structured_output.json_schema
         
         if self._validate_vllm_request(request):
@@ -315,7 +312,6 @@ class ParallelAIUtilities:
 
     def _convert_result_to_llm_output(self, result: List[Dict[str, Any]],client: Literal["openai", "anthropic", "vllm", "litellm"]) -> LLMOutput:
         metadata, request_data, response_data = result
-        print(metadata)
         
         return LLMOutput(
             raw_result=response_data,

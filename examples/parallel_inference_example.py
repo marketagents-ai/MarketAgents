@@ -10,7 +10,8 @@ async def main():
     load_dotenv()
     oai_request_limits = RequestLimits(max_requests_per_minute=500, max_tokens_per_minute=200000)
     anthropic_request_limits = RequestLimits(max_requests_per_minute=40, max_tokens_per_minute=40000)
-    parallel_ai = ParallelAIUtilities(oai_request_limits=oai_request_limits, anthropic_request_limits=anthropic_request_limits)
+    vllm_request_limits = RequestLimits(max_requests_per_minute=100, max_tokens_per_minute=100000)
+    parallel_ai = ParallelAIUtilities(oai_request_limits=oai_request_limits, anthropic_request_limits=anthropic_request_limits, vllm_request_limits=vllm_request_limits)
 
     json_schema = {
         "type": "object",
@@ -50,7 +51,7 @@ async def main():
     vllm_model = os.getenv("VLLM_MODEL")
     vllm_prompts = []
     if vllm_model is not None:
-        vllm_prompts = create_prompts("vllm", vllm_model, ["text","json_beg","structured_output","tool"],1)
+        vllm_prompts = create_prompts("vllm", vllm_model, ["text","json_beg","json_object","structured_output","tool"],1)
 
     # Anthropic prompts
     anthropic_prompts = create_prompts("anthropic", "claude-3-5-sonnet-20240620", ["text","json_beg","tool"],1)
