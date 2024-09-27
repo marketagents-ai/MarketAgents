@@ -122,7 +122,7 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
         else:
             return list(self.value_schedules.keys())[0]
     
-    def update_state(self, local_observation: AuctionLocalObservation):
+    def update_state(self, local_observation: AuctionLocalObservation,update_message:bool=True):
         """ Update the internal state of the agent with the local observation """
         if local_observation.observation.trades:
             for trade in local_observation.observation.trades:
@@ -132,7 +132,8 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
                     print(f"Trade {trade} already in endowment")
         simple_agent_state = SimpleAgentState.from_agent_and_observation(self, local_observation)
         self.input_history.append(AuctionInput(observation=local_observation, state=simple_agent_state))
-        self.new_message = str(simple_agent_state)
+        if update_message:
+            self.new_message = str(simple_agent_state)
 
     def add_chat_turn_history(self, llm_output:LLMOutput):
         """ add a chat turn to the history without safely model copy just normal append """
