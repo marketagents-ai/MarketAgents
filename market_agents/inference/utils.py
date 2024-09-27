@@ -130,7 +130,6 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
             else:
                 
                 use_cache_final = use_cache if  i in use_cache_ids else False
-                print(f"use_cache_final: {use_cache_final} for message {i} out of {num_messages-1}")
                 converted_messages.append(convert_message(message,use_cache= use_cache_final))
 
         

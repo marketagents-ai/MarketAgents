@@ -28,7 +28,7 @@ async def main():
     )
 
     # Create prompts for text, structured output, and tool use
-    def create_prompts(model: str, topics: List[str], response_formats: List[Literal["text", "structured_output","json_object", "tool"]]):
+    def create_prompts(model: str, topics: List[str], response_formats: List[Literal["text", "structured_output", "tool","json_object"]]):
         prompts = []
         for i, topic in enumerate(topics):
             for response_format in response_formats:
@@ -38,24 +38,28 @@ async def main():
                 if response_format == "text":
                     system_string = "You are a helpful assistant that provides information on various topics."
                     new_message = f"Tell me about {topic}."
+                elif response_format == "json_object":
+                    system_string = f"You are an AI that analyzes text and provides summaries with sentiment. using the following json schema: {json_schema}"
+                    new_message = f"Analyze the following topic: {topic}"
 
                 prompts.append(
                     LLMPromptContext(
                         id=f"{response_format}_{i}",
                         system_string=system_string,
                         new_message=new_message,
-                        llm_config=LLMConfig(client="vllm", model=model, response_format=response_format),
+                        llm_config=LLMConfig(client="litellm", model=model, response_format=response_format, max_tokens = 200),
                         structured_output=structured_tool if response_format in ["structured_output", "tool"] else None
+
                     )
                 )
         return prompts
 
     # Set up prompts
-    model = os.getenv("VLLM_MODEL")
+    model = os.getenv("LITELLM_MODEL")
     if model is None:
-        raise ValueError("VLLM_MODEL is not set")
+        raise ValueError("LITELLM_MODEL is not set")
     topics = ["artificial intelligence", "climate change", "space exploration"]
-    response_formats : List[Literal["text", "structured_output","json_object", "tool"]] = ["text", "structured_output", "tool"]
+    response_formats : List[Literal["text", "structured_output", "tool","json_object"]] = ["json_object"] #["text", "structured_output", "tool","json_object"]
     all_prompts = create_prompts(model, topics, response_formats)
 
     # Run parallel completions

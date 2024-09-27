@@ -19,12 +19,13 @@ import anthropic
 class RequestLimits(BaseModel):
     max_requests_per_minute: int = Field(default=50,description="The maximum number of requests per minute for the API")
     max_tokens_per_minute: int = Field(default=100000,description="The maximum number of tokens per minute for the API")
-    provider: Literal["openai", "anthropic", "vllm"] = Field(default="openai",description="The provider of the API")
+    provider: Literal["openai", "anthropic", "vllm", "litellm"] = Field(default="openai",description="The provider of the API")
 
 class ParallelAIUtilities:
     def __init__(self, oai_request_limits: Optional[RequestLimits] = None, 
                  anthropic_request_limits: Optional[RequestLimits] = None, 
                  vllm_request_limits: Optional[RequestLimits] = None,
+                 litellm_request_limits: Optional[RequestLimits] = None,
                  local_cache: bool = True,
                  cache_folder: Optional[str] = None):
         load_dotenv()
@@ -32,9 +33,12 @@ class ParallelAIUtilities:
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         self.vllm_key = os.getenv("VLLM_API_KEY")
         self.vllm_endpoint = os.getenv("VLLM_ENDPOINT", "http://localhost:8000/v1/chat/completions")
+        self.litellm_endpoint = os.getenv("LITELLM_ENDPOINT", "http://localhost:8000/v1/chat/completions")
+        self.litellm_key = os.getenv("LITELLM_API_KEY")
         self.oai_request_limits = oai_request_limits if oai_request_limits else RequestLimits(max_requests_per_minute=500,max_tokens_per_minute=200000,provider="openai")
         self.anthropic_request_limits = anthropic_request_limits if anthropic_request_limits else RequestLimits(max_requests_per_minute=50,max_tokens_per_minute=40000,provider="anthropic")
         self.vllm_request_limits = vllm_request_limits if vllm_request_limits else RequestLimits(max_requests_per_minute=500,max_tokens_per_minute=200000,provider="vllm")
+        self.litellm_request_limits = litellm_request_limits if litellm_request_limits else RequestLimits(max_requests_per_minute=500,max_tokens_per_minute=200000,provider="litellm")
         self.local_cache = local_cache
         self.cache_folder = self._setup_cache_folder(cache_folder)
 
@@ -62,6 +66,7 @@ class ParallelAIUtilities:
         openai_prompts = [p for p in prompts if p.llm_config.client == "openai"]
         anthropic_prompts = [p for p in prompts if p.llm_config.client == "anthropic"]
         vllm_prompts = [p for p in prompts if p.llm_config.client == "vllm"] 
+        litellm_prompts = [p for p in prompts if p.llm_config.client == "litellm"]
         tasks = []
         if openai_prompts:
             tasks.append(self._run_openai_completion(openai_prompts))
@@ -69,6 +74,8 @@ class ParallelAIUtilities:
             tasks.append(self._run_anthropic_completion(anthropic_prompts))
         if vllm_prompts:
             tasks.append(self._run_vllm_completion(vllm_prompts))
+        if litellm_prompts:
+            tasks.append(self._run_litellm_completion(litellm_prompts))
 
         results = await asyncio.gather(*tasks)
         flattened_results = [item for sublist in results for item in sublist]
@@ -122,6 +129,21 @@ class ParallelAIUtilities:
                 if not self.local_cache:
                     self._delete_files(requests_file, results_file)
         return []
+    
+    async def _run_litellm_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
+        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        requests_file = os.path.join(self.cache_folder, f'litellm_requests_{timestamp}.jsonl')
+        results_file = os.path.join(self.cache_folder, f'litellm_results_{timestamp}.jsonl')
+        self._prepare_requests_file(prompts, "litellm", requests_file)
+        config = self._create_litellm_completion_config(prompts[0], requests_file, results_file)
+        if config:
+            try:
+                await process_api_requests_from_file(config)
+                return self._parse_results_file(results_file,client="litellm")
+            finally:
+                if not self.local_cache:
+                    self._delete_files(requests_file, results_file)
+        return []
 
     
 
@@ -165,8 +187,7 @@ class ParallelAIUtilities:
             # Instead of raising ValidationError, we'll return False
             raise ValidationError(f"Error validating VLLM request: {e} with request: {request}")
         
-    def _validate_litellm_request(self, request: Dict[str, Any]) -> bool:
-        return False
+
     
     def _get_openai_request(self, prompt: LLMPromptContext) -> Optional[Dict[str, Any]]:
         messages = prompt.oai_messages
@@ -221,8 +242,10 @@ class ParallelAIUtilities:
             if tool:
                 request["tools"] = [tool]
                 request["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
-        elif prompt.llm_config.response_format in ["structured_output", "json_object"] and prompt.structured_output:
-            request["guided_json"] = prompt.structured_output.json_schema
+        if prompt.llm_config.response_format == "json_object":
+            raise ValueError("VLLM does not support json_object response format otherwise infinite whitespaces are returned")
+        if prompt.oai_response_format and prompt.oai_response_format:
+            request["response_format"] = prompt.oai_response_format
         
         if self._validate_vllm_request(request):
             return request
@@ -230,11 +253,9 @@ class ParallelAIUtilities:
             return None
         
     def _get_litellm_request(self, prompt: LLMPromptContext) -> Optional[Dict[str, Any]]:
-        request = {}
-        if self._validate_litellm_request(request):
-            return request
-        else:
-            return None
+        if prompt.llm_config.response_format == "json_object":
+            raise ValueError("VLLM does not support json_object response format otherwise infinite whitespaces are returned")
+        return self._get_openai_request(prompt)
         
     def _convert_prompt_to_request(self, prompt: LLMPromptContext, client: str) -> Optional[Dict[str, Any]]:
         if client == "openai":
@@ -280,12 +301,12 @@ class ParallelAIUtilities:
         return None
     
     def _create_vllm_completion_config(self, prompt: LLMPromptContext, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
-        if prompt.llm_config.client == "vllm" and self.vllm_key:
+        if prompt.llm_config.client == "vllm":
             return OAIApiFromFileConfig(
                 requests_filepath=requests_file,
                 save_filepath=results_file,
                 request_url=self.vllm_endpoint,
-                api_key=self.vllm_key,
+                api_key=self.vllm_key if self.vllm_key else "",
                 max_requests_per_minute=self.vllm_request_limits.max_requests_per_minute,
                 max_tokens_per_minute=self.vllm_request_limits.max_tokens_per_minute,
                 token_encoding_name="cl100k_base",
@@ -293,6 +314,22 @@ class ParallelAIUtilities:
                 logging_level=20,
             )
         return None
+    
+    def _create_litellm_completion_config(self, prompt: LLMPromptContext, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
+        if prompt.llm_config.client == "litellm":
+            return OAIApiFromFileConfig(
+                requests_filepath=requests_file,
+                save_filepath=results_file,
+                request_url=self.litellm_endpoint,
+                api_key=self.litellm_key if self.litellm_key else "",
+                max_requests_per_minute=self.litellm_request_limits.max_requests_per_minute,
+                max_tokens_per_minute=self.litellm_request_limits.max_tokens_per_minute,
+                token_encoding_name="cl100k_base",
+                max_attempts=5,
+                logging_level=20,
+            )
+        return None
+    
 
     def _parse_results_file(self, filepath: str,client: Literal["openai", "anthropic", "vllm", "litellm"]) -> List[LLMOutput]:
         results = []

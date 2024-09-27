@@ -96,12 +96,22 @@ class StructuredTool(BaseModel):
         return None
     
 class LLMConfig(BaseModel):
-    client: Literal["openai", "azure_openai", "anthropic", "vllm"]
+    client: Literal["openai", "azure_openai", "anthropic", "vllm", "litellm"]
     model: Optional[str] = None
     max_tokens: int = Field(default=400)
     temperature: float = 0
     response_format: Literal["json_beg", "text","json_object","structured_output","tool"] = "text"
     use_cache: bool = True
+
+    @model_validator(mode="after")
+    def validate_response_format(self) -> Self:
+        if self.response_format == "json_object" and self.client in ["vllm", "litellm","anthropic"]:
+            raise ValueError(f"{self.client} does not support json_object response format")
+        elif self.response_format == "structured_output" and self.client == "anthropic":
+            raise ValueError(f"Anthropic does not support structured_output response format use json_beg or tool instead")
+        return self
+
+
   
 
 class LLMPromptContext(BaseModel):
@@ -133,10 +143,8 @@ class LLMPromptContext(BaseModel):
     @computed_field
     @property
     def use_prefill(self) -> bool:
-        if self.llm_config.client == 'anthropic' and  self.llm_config.response_format in ["json_beg", "structured_output","json_object"]:
+        if self.llm_config.client in ['anthropic','vllm','litellm'] and  self.llm_config.response_format in ["json_beg"]:
 
-            return True
-        elif self.llm_config.client == 'vllm' and self.llm_config.response_format  == "json_beg":
             return True
         else:
             return False
@@ -206,7 +214,7 @@ class LLMPromptContext(BaseModel):
     def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
             return None
-        if self.llm_config.client == "openai" or self.llm_config.client == "vllm":
+        if self.llm_config.client in ["openai","vllm","litellm"]:
             return self.structured_output.get_openai_tool()
         elif self.llm_config.client == "anthropic":
             return self.structured_output.get_anthropic_tool()
@@ -362,6 +370,8 @@ class LLMOutput(BaseModel):
                 return self._parse_anthropic_message(AnthropicMessage.model_validate(self.raw_result))
         elif provider == "vllm":
              return self._parse_oai_completion(ChatCompletion.model_validate(self.raw_result))
+        elif provider == "litellm":
+            return self._parse_oai_completion(ChatCompletion.model_validate(self.raw_result))
         else:
             raise ValueError(f"Unsupported result provider: {provider}")
 
