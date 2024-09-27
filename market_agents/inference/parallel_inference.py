@@ -195,7 +195,6 @@ class ParallelAIUtilities:
                 request["guided_json"] = prompt.structured_output.json_schema
             return request
         return None
-
     def _create_oai_completion_config(self, prompt: LLMPromptContext, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
         if prompt.llm_config.client == "openai" and self.openai_key:
             return OAIApiFromFileConfig(

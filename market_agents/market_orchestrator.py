@@ -90,7 +90,7 @@ class MarketOrchestrator():
                 current_cost = agent.get_current_cost(good_name)
                 print(f"ask price: {ask.price}, current_cost: {current_cost}")
                 if current_cost is not None and ask.price > current_cost:
-                    print(f"adding ask to pending orders")
+                    print(f"adding ask {ask}  from agent {agent.id} with current_cost {current_cost} to pending orders")
                     market_action = ask
                 else:
                     print(f"not adding ask to pending orders")
@@ -137,10 +137,10 @@ class MarketOrchestrator():
                 surplus.append(trade_surplus)
         return surplus
     
-    def update_llm_new_message(self, global_observation: AuctionGlobalObservation):
+    def update_llm_state(self, global_observation: AuctionGlobalObservation):
         for agent in self.get_llm_agents():
             if agent.id in global_observation.observations:
-                agent.update_local(global_observation.observations[agent.id])
+                agent.update_state(global_observation.observations[agent.id])
 
     
     async def run_auction_step(self, good_name: str) -> Tuple[EnvironmentStep, List[float]]:
@@ -148,7 +148,7 @@ class MarketOrchestrator():
         llm_agents = self.get_llm_agents()
         
         # Generate actions for LLM agents
-        llm_outputs = await self.run_parallel_ai_completion(llm_agents)  # Await here
+        llm_outputs = await self.run_parallel_ai_completion(llm_agents, update_history=True)  # Await here
         llm_actions = self.create_local_actions_llm(good_name, llm_outputs)  # Pass llm_outputs
         print(f"llm_actions: {llm_actions}")
         
@@ -165,7 +165,7 @@ class MarketOrchestrator():
         
         # Process trades and update agents
         surplus = self.process_trades(step_result.global_observation)
-        self.update_llm_new_message(step_result.global_observation)
+        self.update_llm_state(step_result.global_observation)
         return step_result, surplus
     
     async def simulate_market(self, max_rounds: int, good_name: str):
