@@ -1,35 +1,47 @@
-
-from pydantic import BaseModel, Field
-from typing import Literal, Optional, Union, Dict, Any, List, Iterable
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
-from openai.types.shared_params import ResponseFormatText, ResponseFormatJSONObject
-
-#import together
-from anthropic.types import MessageParam
-from anthropic.types.beta.prompt_caching.prompt_caching_beta_cache_control_ephemeral_param import PromptCachingBetaCacheControlEphemeralParam
-from anthropic.types.beta.prompt_caching.prompt_caching_beta_text_block_param import PromptCachingBetaTextBlockParam
-from anthropic.types import (
-    TextBlock,
-    
-)
-
-from openai.types.chat import ChatCompletion
-from openai.types.chat.completion_create_params import ResponseFormat
-from openai.types.shared_params import FunctionDefinition
-from openai.types.shared_params.response_format_json_schema import ResponseFormatJSONSchema, JSONSchema
-from anthropic.types import ToolParam
-
-from pydantic import BaseModel, Field, computed_field
-from typing import Union, Optional, List, Tuple, Literal, Dict, Any
-from anthropic.types import Message as AnthropicMessage
-from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage, PromptCachingBetaToolParam
-from anthropic.types import TextBlock, ToolUseBlock
+from pydantic import BaseModel, Field, computed_field, ValidationError, model_validator
+from typing import Literal, Optional, Union, Dict, Any, List, Iterable, Tuple
 import json
-from .utils import msg_dict_to_oai, msg_dict_to_anthropic, parse_json_string
-
-from dataclasses import dataclass, field
-from typing import List, Optional
 import time
+from typing_extensions import Self
+
+
+from openai.types.chat import (
+    ChatCompletionMessageParam,
+    ChatCompletionToolParam,
+    ChatCompletionToolChoiceOptionParam,
+    ChatCompletion
+)
+from openai.types.shared_params import (
+    ResponseFormatText,
+    ResponseFormatJSONObject,
+    FunctionDefinition
+)
+from openai.types.chat.completion_create_params import (
+    ResponseFormat,
+    CompletionCreateParams,
+    FunctionCall
+)
+from openai.types.shared_params.response_format_json_schema import ResponseFormatJSONSchema, JSONSchema
+
+from anthropic.types import (
+    MessageParam,
+    TextBlock,
+    ToolUseBlock,
+    ToolParam,
+    Message as AnthropicMessage
+)
+from anthropic.types.beta.prompt_caching import (
+    PromptCachingBetaMessage,
+    PromptCachingBetaToolParam,
+    PromptCachingBetaMessageParam,
+    PromptCachingBetaTextBlockParam,
+    message_create_params
+)
+from anthropic.types.beta.prompt_caching.prompt_caching_beta_cache_control_ephemeral_param import PromptCachingBetaCacheControlEphemeralParam
+from anthropic.types.model_param import ModelParam
+
+from market_agents.inference.utils import msg_dict_to_oai, msg_dict_to_anthropic, parse_json_string
+
 
 
 
@@ -90,9 +102,7 @@ class LLMConfig(BaseModel):
     temperature: float = 0
     response_format: Literal["json_beg", "text","json_object","structured_output","tool"] = "text"
     use_cache: bool = True
-
-   
-
+  
 
 class LLMPromptContext(BaseModel):
     id: str
@@ -106,8 +116,6 @@ class LLMPromptContext(BaseModel):
     llm_config: LLMConfig
     use_history: bool = Field(default=True, description="Whether to use the history")
     
-
-
     @computed_field
     @property
     def oai_response_format(self) -> Optional[ResponseFormat]:
@@ -174,8 +182,8 @@ class LLMPromptContext(BaseModel):
     
     @computed_field
     @property
-    def vllm_messages(self) -> List[Dict[str, Any]]:
-        return self.messages
+    def vllm_messages(self) -> List[ChatCompletionMessageParam]:
+        return msg_dict_to_oai(self.messages)
         
     def update_llm_config(self,llm_config:LLMConfig) -> 'LLMPromptContext':
         
@@ -196,7 +204,7 @@ class LLMPromptContext(BaseModel):
     def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
             return None
-        if self.llm_config.client == "openai":
+        if self.llm_config.client == "openai" or self.llm_config.client == "vllm":
             return self.structured_output.get_openai_tool()
         elif self.llm_config.client == "anthropic":
             return self.structured_output.get_anthropic_tool()
@@ -221,6 +229,7 @@ class LLMOutput(BaseModel):
     start_time: float
     end_time: float
     source_id: str
+    client: Optional[Literal["openai", "anthropic","vllm","litellm"]] = Field(default=None)
 
     @property
     def time_taken(self) -> float:
@@ -249,27 +258,38 @@ class LLMOutput(BaseModel):
 
     @computed_field
     @property
-    def result_type(self) -> Literal["str", "dict", "oaicompletion", "anthropicmessage", "anthropicbetamessage"]:
-        if isinstance(self.raw_result, str):
-            return "str"
-        elif isinstance(self.raw_result, dict):
-            return "dict"
-        elif isinstance(self.raw_result, ChatCompletion):
-            return "oaicompletion"
-        elif isinstance(self.raw_result, AnthropicMessage):
-            return "anthropicmessage"
-        else:
-            assert isinstance(self.raw_result, PromptCachingBetaMessage), "Invalid raw result type"
-            return "anthropicbetamessage"
+    def result_provider(self) -> Optional[Literal["openai", "anthropic","vllm","litellm"]]:
+        return self.search_result_provider() if self.client is None else self.client
+    
+    @model_validator(mode="after")
+    def validate_provider_and_client(self) -> Self:
+        if self.client is not None and self.result_provider != self.client:
+            raise ValueError(f"The inferred result provider '{self.result_provider}' does not match the specified client '{self.client}'")
+        return self
+    
+    
+    def search_result_provider(self) -> Optional[Literal["openai", "anthropic"]]:
+        try:
+            oai_completion = ChatCompletion.model_validate(self.raw_result)
+            return "openai"
+        except ValidationError:
+            try:
+                anthropic_completion = AnthropicMessage.model_validate(self.raw_result)
+                return "anthropic"
+            except ValidationError:
+                try:
+                    antrhopic_beta_completion = PromptCachingBetaMessage.model_validate(self.raw_result)
+                    return "anthropic"
+                except ValidationError:
+                    return None
 
     def _parse_json_string(self, content: str) -> Optional[Dict[str, Any]]:
         return parse_json_string(content)
     
     
 
-    def _parse_oai_completion(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
-        assert isinstance(self.raw_result, ChatCompletion), "The result is not an OpenAI ChatCompletion"
-        message = self.raw_result.choices[0].message
+    def _parse_oai_completion(self,chat_completion:ChatCompletion) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
+        message = chat_completion.choices[0].message
         content = message.content
 
         json_object = None
@@ -290,23 +310,22 @@ class LLMOutput(BaseModel):
                 content = None  # Set content to None when we have a parsed JSON object
 
 
-        if self.raw_result.usage:
+        if chat_completion.usage:
             usage = Usage(
-                prompt_tokens=self.raw_result.usage.prompt_tokens,
-                completion_tokens=self.raw_result.usage.completion_tokens,
-                total_tokens=self.raw_result.usage.total_tokens
+                prompt_tokens=chat_completion.usage.prompt_tokens,
+                completion_tokens=chat_completion.usage.completion_tokens,
+                total_tokens=chat_completion.usage.total_tokens
             )
 
         return content, json_object, usage
 
-    def _parse_anthropic_message(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
-        assert isinstance(self.raw_result, (AnthropicMessage, PromptCachingBetaMessage)), "The message is not an Anthropic message"
+    def _parse_anthropic_message(self, message: Union[AnthropicMessage, PromptCachingBetaMessage]) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
         content = None
         json_object = None
         usage = None
 
-        if self.raw_result.content:
-            first_content = self.raw_result.content[0]
+        if message.content:
+            first_content = message.content[0]
             if isinstance(first_content, TextBlock):
                 content = first_content.text
                 parsed_json = self._parse_json_string(content)
@@ -318,113 +337,31 @@ class LLMOutput(BaseModel):
                 input_dict : Dict[str,Any] = first_content.input # type: ignore  # had to ignore due to .input being of object class
                 json_object = GeneratedJsonObject(name=name, object=input_dict)
 
-        if hasattr(self.raw_result, 'usage'):
+        if hasattr(message, 'usage'):
             usage = Usage(
-                prompt_tokens=self.raw_result.usage.input_tokens,
-                completion_tokens=self.raw_result.usage.output_tokens,
-                total_tokens=self.raw_result.usage.input_tokens + self.raw_result.usage.output_tokens,
-                cache_creation_input_tokens=getattr(self.raw_result.usage, 'cache_creation_input_tokens', None),
-                cache_read_input_tokens=getattr(self.raw_result.usage, 'cache_read_input_tokens', None)
+                prompt_tokens=message.usage.input_tokens,
+                completion_tokens=message.usage.output_tokens,
+                total_tokens=message.usage.input_tokens + message.usage.output_tokens,
+                cache_creation_input_tokens=getattr(message.usage, 'cache_creation_input_tokens', None),
+                cache_read_input_tokens=getattr(message.usage, 'cache_read_input_tokens', None)
             )
 
         return content, json_object, usage
-
-    def _parse__dict(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
-        assert isinstance(self.raw_result, dict), "The result is not a dictionary"
-        content = None
-        json_object = None
-        usage = None
-        provider : Optional[Literal["openai", "anthropic"]] = None
-
-        print(self.raw_result)
-        # Determine provider based on keys present in raw_result
-        if "choices" in self.raw_result:
-            provider = "openai"
-        elif "content" in self.raw_result:
-            provider = "anthropic"
-        else:
-            raise ValueError("Cannot determine provider from the raw result")
-        #if "model" in self.raw_result:
-        #    provider = "openai" if "gpt" in self.raw_result["model"] or "Phi" in self.raw_result["model"] else "anthropic"
-        #else:
-        #    raise ValueError("No model found in the result")
-
-        if provider == "openai":
-            first_choice = self.raw_result["choices"][0]
-            if "message" in first_choice:
-                if first_choice["message"].get("tool_calls"):
-                    tool_call = first_choice["message"]["tool_calls"][0]
-                    name = tool_call["function"]["name"]
-                    try:
-                        object_dict = json.loads(tool_call["function"]["arguments"])
-                        json_object = GeneratedJsonObject(name=name, object=object_dict)
-                    except json.JSONDecodeError:
-                        json_object = GeneratedJsonObject(name=name, object={"raw": tool_call["function"]["arguments"]})
-                content = first_choice["message"].get("content")
-                if content is not None:
-                    parsed_json = self._parse_json_string(content)
-                    if parsed_json:
-                        json_object = GeneratedJsonObject(name="parsed_content", object=parsed_json)
-                        content = None  # Set content to None when we have a parsed JSON object
-
-                if "function_call" in first_choice["message"]:
-                    func_call = first_choice["message"]["function_call"]
-                    name = func_call["name"]
-                    try:
-                        object_dict = json.loads(func_call["arguments"])
-                        json_object = GeneratedJsonObject(name=name, object=object_dict)
-                       
-                    except json.JSONDecodeError:
-                        json_object = GeneratedJsonObject(name=name, object={"raw": func_call["arguments"]})
- 
-        elif provider == "anthropic":
-            content_list = self.raw_result["content"]
-            if isinstance(content_list, list) and len(content_list) > 0:
-                first_content = content_list[0]
-                if isinstance(first_content, dict):
-                    if first_content.get("type") == "text":
-                        content = first_content.get("text")
-                        if content:
-                            parsed_json = self._parse_json_string(content)
-                            if parsed_json:
-                                    json_object = GeneratedJsonObject(name="parsed_content", object=parsed_json)
-                                    content = None  # Set content to None when we have a parsed JSON object
-                    elif first_content.get("type") == "tool_use":
-                        name = first_content.get("name", "unknown_tool")
-                        json_object = GeneratedJsonObject(name=name, object=first_content.get("input", {}))
-        if "usage" in self.raw_result and provider is not None:
-           
-            usage_data = self.raw_result["usage"]
-            if provider == "openai":
-                usage = Usage(
-                    prompt_tokens=usage_data["prompt_tokens"],
-                    completion_tokens=usage_data["completion_tokens"],
-                    total_tokens=usage_data["total_tokens"]
-                )
-            elif provider == "anthropic":
-                usage = Usage(
-                    prompt_tokens=usage_data["input_tokens"],
-                    completion_tokens=usage_data["output_tokens"],
-                    total_tokens=usage_data["input_tokens"] + usage_data["output_tokens"],
-                    cache_creation_input_tokens=usage_data.get("cache_creation_input_tokens", None),
-                    cache_read_input_tokens=usage_data.get("cache_read_input_tokens", None)
-                )
-
-        return content, json_object, usage
-
     
 
     def _parse_result(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
-        if isinstance(self.raw_result, str):
-            return self.raw_result, None, None
-        elif self.result_type == "dict":
-            return self._parse__dict()
-        elif self.result_type == "oaicompletion":
-            return self._parse_oai_completion()
-        elif self.result_type in ["anthropicmessage", "anthropicbetamessage"]:
-            return self._parse_anthropic_message()
+        provider = self.result_provider
+        if provider == "openai":
+            return self._parse_oai_completion(ChatCompletion.model_validate(self.raw_result))
+        elif provider == "anthropic":
+            try: #beta first
+                return self._parse_anthropic_message(PromptCachingBetaMessage.model_validate(self.raw_result))
+            except ValidationError:
+                return self._parse_anthropic_message(AnthropicMessage.model_validate(self.raw_result))
+        elif provider == "vllm":
+             return self._parse_oai_completion(ChatCompletion.model_validate(self.raw_result))
         else:
-            raise ValueError("Invalid raw result type")
+            raise ValueError(f"Unsupported result provider: {provider}")
 
     class Config:
         arbitrary_types_allowed = True

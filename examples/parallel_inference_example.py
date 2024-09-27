@@ -4,6 +4,7 @@ from market_agents.inference.parallel_inference import ParallelAIUtilities, Requ
 from market_agents.inference.message_models import LLMPromptContext, LLMConfig, StructuredTool
 from typing import Literal, List
 import time
+import os
 
 async def main():
     load_dotenv()
@@ -46,14 +47,16 @@ async def main():
 
     # OpenAI prompts
     openai_prompts = create_prompts("openai", "gpt-4o-mini",["text","json_beg","json_object","structured_output","tool"],1)
-
-
+    vllm_model = os.getenv("VLLM_MODEL")
+    vllm_prompts = []
+    if vllm_model is not None:
+        vllm_prompts = create_prompts("vllm", vllm_model, ["text","json_beg","structured_output","tool"],1)
 
     # Anthropic prompts
-    anthropic_prompts = create_prompts("anthropic", "claude-3-haiku-20240307", ["json_beg", "text","tool"],1)
+    anthropic_prompts = create_prompts("anthropic", "claude-3-5-sonnet-20240620", ["text","json_beg","tool"],1)
     # Run parallel completions
     print("Running parallel completions...")
-    all_prompts = openai_prompts + anthropic_prompts
+    all_prompts = anthropic_prompts + openai_prompts + vllm_prompts
     # all_prompts=anthropic_prompts
     start_time = time.time()
     completion_results = await parallel_ai.run_parallel_ai_completion(all_prompts)
@@ -81,6 +84,8 @@ async def main():
     print(f"Total time taken: {total_time:.2f} seconds")
     print(f"Request limits oai: {oai_request_limits.max_requests_per_minute} requests/min, {oai_request_limits.max_tokens_per_minute} tokens/min")
     print(f"Request limits anthropic: {anthropic_request_limits.max_requests_per_minute} requests/min, {anthropic_request_limits.max_tokens_per_minute} tokens/min")
+    print(f"Number of OpenAI requests: {len(openai_prompts)}")
+    print(f"Number of Anthropic requests: {len(anthropic_prompts)}")
     print(f"Number of text responses: {num_text}")
     print(f"Number of JSON responses: {num_json}")
     print(f"Total number of responses: {total_calls}")
