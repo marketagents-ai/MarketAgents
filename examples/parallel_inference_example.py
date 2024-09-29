@@ -39,7 +39,7 @@ async def main():
                         id=f"{client}_{model}_{response_format}_{i}",
                         system_string="You are a helpful assistant that tells programmer jokes.",
                         new_message=f"Tell me a programmer joke about the number {i}.",
-                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=400),
+                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=50),
                         structured_output=structured_tool,
                         
                     )

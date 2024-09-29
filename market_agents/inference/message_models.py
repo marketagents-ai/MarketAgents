@@ -255,6 +255,10 @@ class LLMOutput(BaseModel):
     def json_object(self) -> Optional[GeneratedJsonObject]:
         return self._parse_result()[1]
     
+    @computed_field
+    @property
+    def error(self) -> Optional[str]:
+        return self._parse_result()[3]
 
     @computed_field
     @property
@@ -298,7 +302,7 @@ class LLMOutput(BaseModel):
     
     
 
-    def _parse_oai_completion(self,chat_completion:ChatCompletion) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
+    def _parse_oai_completion(self,chat_completion:ChatCompletion) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage], None]:
         message = chat_completion.choices[0].message
         content = message.content
 
@@ -314,12 +318,17 @@ class LLMOutput(BaseModel):
             except json.JSONDecodeError:
                 json_object = GeneratedJsonObject(name=name, object={"raw": tool_call.function.arguments})
         elif content is not None:
+            if self.completion_kwargs:
+                name = self.completion_kwargs.get("response_format",{}).get("json_schema",{}).get("name",None)
+            else:
+                name = None
             parsed_json = self._parse_json_string(content)
             if parsed_json:
-                json_object = GeneratedJsonObject(name="parsed_content", object=parsed_json)
+                
+                json_object = GeneratedJsonObject(name="parsed_content" if name is None else name,
+                                                   object=parsed_json)
                 content = None  # Set content to None when we have a parsed JSON object
-
-
+                print(f"parsed_json: {parsed_json} with name")
         if chat_completion.usage:
             usage = Usage(
                 prompt_tokens=chat_completion.usage.prompt_tokens,
@@ -327,9 +336,9 @@ class LLMOutput(BaseModel):
                 total_tokens=chat_completion.usage.total_tokens
             )
 
-        return content, json_object, usage
+        return content, json_object, usage, None
 
-    def _parse_anthropic_message(self, message: Union[AnthropicMessage, PromptCachingBetaMessage]) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
+    def _parse_anthropic_message(self, message: Union[AnthropicMessage, PromptCachingBetaMessage]) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage],None]:
         content = None
         json_object = None
         usage = None
@@ -356,11 +365,13 @@ class LLMOutput(BaseModel):
                 cache_read_input_tokens=getattr(message.usage, 'cache_read_input_tokens', None)
             )
 
-        return content, json_object, usage
+        return content, json_object, usage, None
     
 
-    def _parse_result(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage]]:
+    def _parse_result(self) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage],Optional[str]]:
         provider = self.result_provider
+        if getattr(self.raw_result, "error", None):
+            return None, None, None,  getattr(self.raw_result, "error", None)
         if provider == "openai":
             return self._parse_oai_completion(ChatCompletion.model_validate(self.raw_result))
         elif provider == "anthropic":
