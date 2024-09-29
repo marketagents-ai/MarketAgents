@@ -105,7 +105,8 @@ class EconomicAgent(BaseModel):
         total_quantity = self.get_quantity_for_bid(good_name)
         if total_quantity is None:
             return None
-        return self.value_schedules[good_name].get_value(total_quantity+1)
+        value = self.value_schedules[good_name].get_value(total_quantity+1)
+        return value if value > 0 else None
     
     
     def get_current_cost(self, good_name: str) -> Optional[float]:
@@ -117,8 +118,9 @@ class EconomicAgent(BaseModel):
         current_quantity = self.endowment.current_basket.get_good_quantity(good_name)
         pending_quantity = self.get_pending_ask_quantity(good_name)
         total_quantity = int(starting_quantity - current_quantity + pending_quantity)+1
+        cost = self.cost_schedules[good_name].get_value(total_quantity)
 
-        return self.cost_schedules[good_name].get_value(total_quantity)
+        return cost if cost > 0 else None
     def get_previous_cost(self, good_name: str) -> Optional[float]:
         """ returns the previous cost of the good for sellers only
         it takes in consideration both the current inventory and the pending orders"""

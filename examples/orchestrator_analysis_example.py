@@ -7,6 +7,7 @@ from market_agents.economics.econ_models import Good, Endowment, Basket
 from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionActionSpace, AuctionObservationSpace
 from market_agents.environments.environment import MultiAgentEnvironment
 from market_agents.market_orchestrator import MarketOrchestrator
+import os
 
 async def main():
     load_dotenv()
@@ -25,10 +26,21 @@ async def main():
     # Create LLM configs
     # buyer_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
     # seller_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
-    buyer_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
-    seller_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
-    num_buyers = 20
-    num_sellers = 20
+    vllm_model = os.getenv("VLLM_MODEL")
+    litellm_model = os.getenv("LITELLM_MODEL")
+    # buyer_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
+    # seller_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
+    #vllm config
+    if vllm_model is not None:
+        buyer_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
+        seller_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
+    # #litellm config
+    if litellm_model is not None:
+        buyer_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
+        seller_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
+
+    num_buyers = 1
+    num_sellers = 1
     # Create simple agents
     buyers = [
         create_simple_agent(

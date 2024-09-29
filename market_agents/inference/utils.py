@@ -4,7 +4,7 @@ from openai.types.chat import ChatCompletionMessageParam
 from anthropic.types import MessageParam
 from anthropic.types.beta.prompt_caching.prompt_caching_beta_cache_control_ephemeral_param import PromptCachingBetaCacheControlEphemeralParam
 from anthropic.types.beta.prompt_caching.prompt_caching_beta_text_block_param import PromptCachingBetaTextBlockParam
-
+from anthropic.types.beta.prompt_caching.prompt_caching_beta_message_param import PromptCachingBetaMessageParam
 from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
@@ -91,7 +91,7 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
                     return [PromptCachingBetaTextBlockParam(type="text", text=text)]
             return []
 
-        def convert_message(msg: Dict[str, Any],use_cache:bool=False) -> Union[MessageParam, None]:
+        def convert_message(msg: Dict[str, Any],use_cache:bool=False) -> Union[PromptCachingBetaMessageParam, None]:
             role = msg["role"]
             content = msg["content"]
             if role == "system":
@@ -116,7 +116,7 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
             else:
                 raise ValueError("Invalid content type")
             
-            return MessageParam(role=role, content=content)
+            return PromptCachingBetaMessageParam(role=role, content=content)
         converted_messages = []
         system_message = []
         num_messages = len(messages)
@@ -130,7 +130,6 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
             else:
                 
                 use_cache_final = use_cache if  i in use_cache_ids else False
-                print(f"use_cache_final: {use_cache_final} for message {i} out of {num_messages-1}")
                 converted_messages.append(convert_message(message,use_cache= use_cache_final))
 
         

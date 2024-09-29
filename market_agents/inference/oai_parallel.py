@@ -397,7 +397,8 @@ def api_endpoint_from_url(request_url: str) -> str:
     Extracts the API endpoint from a given request URL.
 
     This function applies a regular expression search to find the API endpoint pattern within the provided URL.
-    It supports extracting endpoints from standard OpenAI API URLs as well as custom Azure OpenAI deployment URLs.
+    It supports extracting endpoints from standard OpenAI API URLs, custom Azure OpenAI deployment URLs,
+    and vLLM endpoints.
 
     Parameters:
     - request_url (str): The full URL of the API request.
@@ -411,14 +412,19 @@ def api_endpoint_from_url(request_url: str) -> str:
       Output: "completions"
     - Input: "https://custom.azurewebsites.net/openai/deployments/my-model/completions"
       Output: "completions"
+    - Input: "http://localhost:8000/v1/completions"
+      Output: "completions"
     """
     match = re.search("^https://[^/]+/v\\d+/(.+)$", request_url)
     if match is None:
         # for Azure OpenAI deployment urls
         match = re.search(r"^https://[^/]+/openai/deployments/[^/]+/(.+?)(\?|$)", request_url)
         if match is None:
-            raise ValueError(f"Invalid URL: {request_url}")
-    return match[1] 
+            # for vLLM endpoints
+            match = re.search(r"^http://localhost:8000/v\d+/(.+)$", request_url)
+            if match is None:
+                raise ValueError(f"Invalid URL: {request_url}")
+    return match[1]
 
 
 def append_to_jsonl(data, filename: str) -> None:

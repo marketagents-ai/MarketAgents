@@ -4,12 +4,14 @@ from market_agents.inference.parallel_inference import ParallelAIUtilities, Requ
 from market_agents.inference.message_models import LLMPromptContext, LLMConfig, StructuredTool
 from typing import Literal, List
 import time
+import os
 
 async def main():
     load_dotenv()
     oai_request_limits = RequestLimits(max_requests_per_minute=500, max_tokens_per_minute=200000)
     anthropic_request_limits = RequestLimits(max_requests_per_minute=40, max_tokens_per_minute=40000)
-    parallel_ai = ParallelAIUtilities(oai_request_limits=oai_request_limits, anthropic_request_limits=anthropic_request_limits)
+    vllm_request_limits = RequestLimits(max_requests_per_minute=100, max_tokens_per_minute=100000)
+    parallel_ai = ParallelAIUtilities(oai_request_limits=oai_request_limits, anthropic_request_limits=anthropic_request_limits, vllm_request_limits=vllm_request_limits)
 
     json_schema = {
         "type": "object",
@@ -37,7 +39,7 @@ async def main():
                         id=f"{client}_{model}_{response_format}_{i}",
                         system_string="You are a helpful assistant that tells programmer jokes.",
                         new_message=f"Tell me a programmer joke about the number {i}.",
-                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=400),
+                        llm_config=LLMConfig(client=client, model=model, response_format=response_format,max_tokens=50),
                         structured_output=structured_tool,
                         
                     )
@@ -46,14 +48,19 @@ async def main():
 
     # OpenAI prompts
     openai_prompts = create_prompts("openai", "gpt-4o-mini",["text","json_beg","json_object","structured_output","tool"],1)
-
-
-
+    vllm_model = os.getenv("VLLM_MODEL")
+    vllm_prompts = []
+    if vllm_model is not None:
+        vllm_prompts = create_prompts("vllm", vllm_model, ["text","json_beg","structured_output","tool"],1)
+    litellm_model = os.getenv("LITELLM_MODEL")
+    litellm_prompts = []
+    if litellm_model is not None:
+        litellm_prompts = create_prompts("litellm", litellm_model, ["text","json_beg","structured_output","tool"],1)
     # Anthropic prompts
-    anthropic_prompts = create_prompts("anthropic", "claude-3-haiku-20240307", ["json_beg", "text","tool"],1)
+    anthropic_prompts = create_prompts("anthropic", "claude-3-5-sonnet-20240620", ["text","json_beg","tool"],1)
     # Run parallel completions
     print("Running parallel completions...")
-    all_prompts = openai_prompts + anthropic_prompts
+    all_prompts = anthropic_prompts + openai_prompts + vllm_prompts + litellm_prompts
     # all_prompts=anthropic_prompts
     start_time = time.time()
     completion_results = await parallel_ai.run_parallel_ai_completion(all_prompts)
@@ -81,6 +88,10 @@ async def main():
     print(f"Total time taken: {total_time:.2f} seconds")
     print(f"Request limits oai: {oai_request_limits.max_requests_per_minute} requests/min, {oai_request_limits.max_tokens_per_minute} tokens/min")
     print(f"Request limits anthropic: {anthropic_request_limits.max_requests_per_minute} requests/min, {anthropic_request_limits.max_tokens_per_minute} tokens/min")
+    print(f"Number of OpenAI requests: {len(openai_prompts)}")
+    print(f"Number of Anthropic requests: {len(anthropic_prompts)}")
+    print(f"Number of VLLM requests: {len(vllm_prompts)}")
+    print(f"Number of Litellm requests: {len(litellm_prompts)}")
     print(f"Number of text responses: {num_text}")
     print(f"Number of JSON responses: {num_json}")
     print(f"Total number of responses: {total_calls}")

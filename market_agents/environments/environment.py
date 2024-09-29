@@ -153,12 +153,6 @@ class ActionSpace(BaseModel):
         action_type = random.choice(self.allowed_actions)
         return action_type.sample(agent_id)
     
-    def get_action_schema(self) -> Type[BaseModel]:
-        """Get the schema for the allowed actions."""
-        if not self.allowed_actions:
-            raise ValueError("No allowed actions defined")
-        # Assuming all allowed actions have the same schema
-        return self.allowed_actions[0].action_schema()
 
 class ObservationSpace(BaseModel):
     allowed_observations: List[Type[LocalObservation]] = Field(default_factory=list)
