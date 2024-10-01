@@ -33,8 +33,8 @@ class Agent(BaseModel):
         interactions (List[Dict[str, Any]]): History of agent interactions.
 
     Methods:
-        execute(task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str]] = None) -> Union[str, Dict[str, Any]]:
-            Execute a task and return the result.
+        execute(task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str]] = None, return_prompt: bool = False) -> Union[str, Dict[str, Any], LLMPromptContext]:
+            Execute a task and return the result or the prompt context.
         _load_output_schema(output_format: Optional[Union[Dict[str, Any], str]]) -> Optional[Dict[str, Any]]:
             Load the output schema based on the output_format.
         _prepare_prompt_context(task: Optional[str], output_format: Optional[Dict[str, Any]]) -> LLMPromptContext:
@@ -64,8 +64,8 @@ class Agent(BaseModel):
         super().__init__(**data)
         self.ai_utilities = ParallelAIUtilities()
 
-    async def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None) -> Union[str, Dict[str, Any]]:
-        """Execute a task and return the result."""
+    async def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None, return_prompt: bool = False) -> Union[str, Dict[str, Any], LLMPromptContext]:
+        """Execute a task and return the result or the prompt context."""
         execution_task = task if task is not None else self.task
         if execution_task is None:
             raise ValueError("No task provided. Agent needs a task to execute.")
@@ -76,11 +76,14 @@ class Agent(BaseModel):
         if execution_output_format == "plain_text":
             self.llm_config.response_format = "text"
         else:
-            self.llm_config.response_format = "json_object"
+            self.llm_config.response_format = "structured_output"
             execution_output_format = self._load_output_schema(execution_output_format)
 
         prompt_context = self._prepare_prompt_context(execution_task, execution_output_format)
         agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
+
+        if return_prompt:
+            return prompt_context
 
         result = await self._run_ai_inference(prompt_context)
         self._log_interaction(prompt_context, result)
