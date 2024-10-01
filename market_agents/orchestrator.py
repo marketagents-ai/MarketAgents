@@ -8,10 +8,12 @@ from colorama import Fore, Style
 import threading
 import os
 import yaml
+import psycopg2
+import uuid
 
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
-from market_agents.environments.mechanisms.auction import AuctionAction, AuctionGlobalObservation, DoubleAuction, AuctionActionSpace, AuctionObservationSpace, GlobalAuctionAction
+from market_agents.environments.mechanisms.auction import AuctionObservation, AuctionAction, AuctionGlobalObservation, DoubleAuction, AuctionActionSpace, AuctionObservationSpace, GlobalAuctionAction
 from market_agents.inference.message_models import LLMConfig
 from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.logger_utils import *
@@ -46,6 +48,12 @@ class OrchestratorConfig(BaseModel):
     environment_configs: Dict[str, AuctionConfig]
     protocol: Type[ACLMessage]
     database_config: Dict[str, Any]
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, AuctionObservation):
+            return obj.dict()  
+        return super().default(obj)
 
 class AuctionTracker:
     def __init__(self):
@@ -374,10 +382,167 @@ class Orchestrator:
             print(f"  Goods: {agent.endowment.current_basket.goods_dict}")
             surplus = agent.calculate_individual_surplus()
             print(f"  Individual Surplus: {surplus:.2f}")
-
+    
     def write_to_db(self):
-        # Implement database write operation here
-        pass
+        log_section(logger, "WRITING SIMULATION DATA TO DATABASE")
+        connection = None
+        cursor = None
+        try:
+            connection = psycopg2.connect(
+                dbname=self.config.database_config['db_name'],
+                user=os.environ.get('DB_USER', 'db_user'),
+                password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
+                host=os.environ.get('DB_HOST', 'localhost'),
+                port=os.environ.get('DB_PORT', '5433')
+            )
+            cursor = connection.cursor()
+
+            # Create a mapping of original agent IDs to new UUIDs
+            agent_id_mapping = {}
+
+            # Insert agents
+            for agent in self.agents:
+                new_agent_id = str(uuid.uuid4())  # Generate a new UUID for each agent
+                agent_id_mapping[str(agent.id)] = new_agent_id
+                cursor.execute("""
+                INSERT INTO agents (id, role, is_llm, max_iter, llm_config)
+                VALUES (%s, %s, %s, %s, %s)
+                """, (new_agent_id, agent.role, agent.use_llm, self.config.max_rounds, json.dumps(self.config.llm_config.dict(), cls=CustomJSONEncoder)))
+
+                # Insert agent memories, perceptions, and reflections
+                for step, memory in enumerate(agent.memory):
+                    cursor.execute("""
+                    INSERT INTO agent_memories (agent_id, step_id, memory_data)
+                    VALUES (%s, %s, %s)
+                    RETURNING id
+                    """, (new_agent_id, step, json.dumps(memory, cls=CustomJSONEncoder)))
+                    memory_id = cursor.fetchone()[0]
+
+                    # Insert perceptions
+                    if 'perception' in memory:
+                        cursor.execute("""
+                        INSERT INTO perceptions (memory_id, environment_name, environment_info, recent_memories)
+                        VALUES (%s, %s, %s, %s)
+                        """, (memory_id, memory.get('environment_name', ''), 
+                            json.dumps(memory.get('environment_info', {}), cls=CustomJSONEncoder),
+                            json.dumps(memory.get('recent_memories', []), cls=CustomJSONEncoder)))
+
+                    # Insert reflections
+                    if 'reflection' in memory:
+                        cursor.execute("""
+                        INSERT INTO reflections (memory_id, environment_name, observation, environment_info, last_action, reward, previous_strategy)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (memory_id, memory.get('environment_name', ''),
+                            json.dumps(memory.get('observation', {}), cls=CustomJSONEncoder),
+                            json.dumps(memory.get('environment_info', {}), cls=CustomJSONEncoder),
+                            json.dumps(memory.get('last_action', {}), cls=CustomJSONEncoder),
+                            float(memory.get('reward', 0)),
+                            str(memory.get('previous_strategy', ''))))
+
+                # Insert preference schedules
+                cursor.execute("""
+                INSERT INTO preference_schedules (agent_id, is_buyer, values, initial_endowment)
+                VALUES (%s, %s, %s, %s)
+                """, (new_agent_id, agent.role == 'buyer', json.dumps(agent.preference_schedule.values, cls=CustomJSONEncoder), float(agent.endowment.initial_basket.cash)))
+
+                # Insert allocations
+                cursor.execute("""
+                INSERT INTO allocations (agent_id, goods, cash, locked_goods, locked_cash, initial_goods, initial_cash)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (new_agent_id, int(agent.endowment.current_basket.goods_dict[self.config.agent_config.good_name]), 
+                    float(agent.endowment.current_basket.cash), 0, 0.0, 
+                    int(agent.endowment.initial_basket.goods_dict[self.config.agent_config.good_name]), 
+                    float(agent.endowment.initial_basket.cash)))
+
+            # Insert auctions and related data
+            for env_name, env in self.environments.items():
+                if isinstance(env.mechanism, DoubleAuction):
+                    cursor.execute("""
+                    INSERT INTO auctions (max_rounds, current_round, total_surplus_extracted, average_prices, trade_history)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """, (int(env.mechanism.max_rounds), 
+                        int(env.mechanism.current_round),
+                        float(getattr(env.mechanism, 'total_surplus_extracted', 0)),
+                        json.dumps(getattr(env.mechanism, 'average_prices', {}), cls=CustomJSONEncoder),
+                        json.dumps([trade.model_dump() for trade in env.mechanism.trades], cls=CustomJSONEncoder)))
+
+                    # Insert orders
+                    for bid in env.mechanism.waiting_bids:
+                        try:
+                            agent_id = agent_id_mapping.get(str(bid.agent_id), str(bid.agent_id))
+                            cursor.execute("""
+                            INSERT INTO orders (agent_id, is_buy, quantity, price, base_value, base_cost)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (agent_id, True, int(bid.action.quantity), float(bid.action.price), 
+                                float(getattr(bid.action, 'base_value', 0)) if hasattr(bid.action, 'base_value') else None, None))
+                        except Exception as e:
+                            logger.error(f"Error inserting bid: {e}")
+                            logger.error(f"Bid data: {bid}")
+
+                    for ask in env.mechanism.waiting_asks:
+                        try:
+                            agent_id = agent_id_mapping.get(str(ask.agent_id), str(ask.agent_id))
+                            cursor.execute("""
+                            INSERT INTO orders (agent_id, is_buy, quantity, price, base_value, base_cost)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (agent_id, False, int(ask.action.quantity), float(ask.action.price), 
+                                None, float(getattr(ask.action, 'base_cost', 0)) if hasattr(ask.action, 'base_cost') else None))
+                        except Exception as e:
+                            logger.error(f"Error inserting ask: {e}")
+                            logger.error(f"Ask data: {ask}")
+
+            # Insert trades
+            total_trades = sum(len(tracker.all_trades) for tracker in self.trackers.values())
+            if total_trades == 0:
+                logger.info("No trades were executed during the simulation.")
+            else:
+                logger.info(f"Attempting to insert {total_trades} trades.")
+
+            for env_name, tracker in self.trackers.items():
+                logger.info(f"Processing trades for environment: {env_name}")
+                logger.info(f"Number of trades in this environment: {len(tracker.all_trades)}")
+                for trade in tracker.all_trades:
+                    try:
+                        buyer_id = agent_id_mapping.get(str(trade.buyer_id), str(trade.buyer_id))
+                        seller_id = agent_id_mapping.get(str(trade.seller_id), str(trade.seller_id))
+                        cursor.execute("""
+                        INSERT INTO trades (buyer_id, seller_id, quantity, price, buyer_value, seller_cost, round)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (buyer_id, seller_id, 
+                            int(trade.quantity), float(trade.price), 
+                            float(trade.buyer_value) if trade.buyer_value is not None else None, 
+                            float(trade.seller_cost) if trade.seller_cost is not None else None, 
+                            int(trade.round)))
+                        logger.info(f"Successfully inserted trade: {trade}")
+                    except Exception as e:
+                        logger.error(f"Error inserting trade: {e}")
+                        logger.error(f"Trade data: {trade}")
+
+            # Insert interactions
+            for agent in self.agents:
+                for interaction in agent.interactions:
+                    try:
+                        agent_id = agent_id_mapping.get(str(agent.id), str(agent.id))
+                        cursor.execute("""
+                        INSERT INTO interactions (agent_id, round, task, response)
+                        VALUES (%s, %s, %s, %s)
+                        """, (agent_id, int(interaction['round']), str(interaction['task']), str(interaction['response'])))
+                    except Exception as e:
+                        logger.error(f"Error inserting interaction: {e}")
+                        logger.error(f"Interaction data: {interaction}")
+
+            connection.commit()
+            logger.info("Successfully wrote simulation data to database.")
+        except Exception as e:
+            logger.error(f"Error writing to database: {e}")
+            if connection:
+                connection.rollback()
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
 
     #def data_source(self):
     #    env = self.environments['auction']
@@ -424,8 +589,8 @@ class Orchestrator:
 
 if __name__ == "__main__":
     config = OrchestratorConfig(
-        num_agents=4,
-        max_rounds=2,
+        num_agents=1,
+        max_rounds=1,
         agent_config=AgentConfig(
             num_units=10,
             base_value=100,
