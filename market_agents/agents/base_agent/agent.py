@@ -130,7 +130,7 @@ class Agent(BaseModel):
        
         structured_output = None
         if output_format and isinstance(output_format, dict):
-            structured_output = StructuredTool(json_schema=output_format)
+            structured_output = StructuredTool(json_schema=output_format, strict_schema=False)
 
         return LLMPromptContext(
             id=str(uuid.uuid4()),  # Generate a unique ID for each prompt context
