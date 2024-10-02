@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, Type, Union, Tuple,Protocol
+from typing import Dict, Any, List, Optional, Type, Union, Tuple
 from pydantic import BaseModel, Field, computed_field
 from datetime import datetime
 import random
@@ -6,16 +6,6 @@ import string
 from statistics import mean
 from abc import ABC, abstractmethod
 import json
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-class GroupChatLike(Protocol):
-    messages: List[Any]
-    current_topic: str
-    speaker_order: List[str]
-
 
 class LocalAction(BaseModel, ABC):
     """Represents an action for a single agent."""
@@ -50,9 +40,6 @@ class LocalObservation(BaseModel, ABC):
 class GlobalObservation(BaseModel):
     """Represents observations for all agents."""
     observations: Dict[str, LocalObservation]
-    all_messages: Optional[List[Any]] = None
-    current_topic: Optional[str] = None
-    speaker_order: Optional[List[str]] = None
     
 
     def locals(self) -> Dict[str, LocalObservation]:
@@ -66,9 +53,9 @@ class GlobalObservation(BaseModel):
         return None
 
     @classmethod
-    def from_local_observations(cls, local_observations: Dict[str, LocalObservation], **kwargs) -> "GlobalObservation":
+    def from_local_observations(cls, local_observations: Dict[str, LocalObservation]) -> "GlobalObservation":
         """Create a global observation from local observations."""
-        return cls(observations=local_observations ,**kwargs)
+        return cls(observations=local_observations)
 
     def to_local(self, agent_id: str) -> LocalObservation:
         """Convert global observation to local observation for a specific agent."""
@@ -238,64 +225,30 @@ class MultiAgentEnvironment(BaseModel):
     history: EnvironmentHistory = Field(default_factory=EnvironmentHistory, description="History of environment steps")
     mechanism: Mechanism = Field(default_factory=Notebook, description="Mechanism of the environment that determines the rules of the game P(s, a, s')")
 
-    # def step(self, actions: GlobalAction) -> EnvironmentStep:
-    #     """
-    #     Run one timestep of the environment's dynamics using the batched agent actions.
+    def step(self, actions: GlobalAction) -> EnvironmentStep:
+        """
+        Run one timestep of the environment's dynamics using the batched agent actions.
         
-    #     Args:
-    #         actions (GlobalAction): A batched action containing actions for each agent.
+        Args:
+            actions (GlobalAction): A batched action containing actions for each agent.
 
-    #     Returns:
-    #         EnvironmentStep: The result of taking a step in the environment.
-    #     """
-    #     if self.mechanism.sequential:
-    #         # if it is sequential, we need to run the mechanism for each agent
-    #         local_steps: Dict[str, LocalEnvironmentStep] = {}  # Correct type annotation
-    #         for agent_id, local_action in actions.locals().items():
-    #             local_step = self.mechanism.step(local_action)
-    #             assert isinstance(local_step, LocalEnvironmentStep)
-    #             local_steps[agent_id] = local_step
-    #         global_step = EnvironmentStep.from_local_steps(local_steps)
-    #     else:
-    #         global_step = self.mechanism.step(actions)
-    #         assert isinstance(global_step, EnvironmentStep)
-    #     self.current_step += 1
-    #     self.update_history(actions, global_step)
-    #     return global_step
-    def step(self, action: Union[GlobalAction, Dict[str, Any]]) -> EnvironmentStep:
-        local_step = self.mechanism.step(action)
-        assert isinstance(local_step, dict) and all(isinstance(step, LocalEnvironmentStep) for step in local_step.values())
-        
-        global_observation = self._aggregate_observations(local_step)
-        done = all(step.done for step in local_step.values())
-        info = {agent_id: step.info for agent_id, step in local_step.items()}
-        
-        return EnvironmentStep(
-            global_observation=global_observation,
-            done=done,
-            info=info
-        )
-
-    def _aggregate_observations(self, local_steps: Dict[str, LocalEnvironmentStep]) -> GlobalObservation:
-        observations = {agent_id: step.observation for agent_id, step in local_steps.items()}
-        
-        # Check if the mechanism has the necessary attributes
-        if hasattr(self.mechanism, 'messages') and hasattr(self.mechanism, 'current_topic') and hasattr(self.mechanism, 'speaker_order'):
-            all_messages = self.mechanism.messages
-            current_topic = self.mechanism.current_topic
-            speaker_order = self.mechanism.speaker_order
+        Returns:
+            EnvironmentStep: The result of taking a step in the environment.
+        """
+        if self.mechanism.sequential:
+            # if it is sequential, we need to run the mechanism for each agent
+            local_steps: Dict[str, LocalEnvironmentStep] = {}  # Correct type annotation
+            for agent_id, local_action in actions.locals().items():
+                local_step = self.mechanism.step(local_action)
+                assert isinstance(local_step, LocalEnvironmentStep)
+                local_steps[agent_id] = local_step
+            global_step = EnvironmentStep.from_local_steps(local_steps)
         else:
-            all_messages = None
-            current_topic = None
-            speaker_order = None
-        
-        return GlobalObservation.from_local_observations(
-            observations,
-            all_messages=all_messages,
-            current_topic=current_topic,
-            speaker_order=speaker_order
-        )
-
+            global_step = self.mechanism.step(actions)
+            assert isinstance(global_step, EnvironmentStep)
+        self.current_step += 1
+        self.update_history(actions, global_step)
+        return global_step
 
     def reset(self) -> GlobalObservation:
         """

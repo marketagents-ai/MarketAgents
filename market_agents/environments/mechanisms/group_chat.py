@@ -23,7 +23,8 @@ class GroupChatAction(LocalAction):
             agent_id=agent_id, 
             action=GroupChatMessage(
                 content="Sample message", 
-                message_type="group_message"
+                message_type="group_message",
+                agent_id=agent_id
             )
         )
 
@@ -65,68 +66,111 @@ class GroupChat(Mechanism):
     actions: GroupChatGlobalAction = Field(default=None)
 
     sequential: bool = Field(default=False, description="Whether the mechanism is sequential")
-    def step(self, actions: Union[GroupChatGlobalAction, Dict[str, Any]]) -> LocalEnvironmentStep:
-        logger.debug(f"Received actions of type: {type(actions).__name__}")
-        logger.debug(f"Actions content: {actions}")
-        
-        # Handle if actions is a dict (possibly due to serialization)
-        if isinstance(actions, dict):
-            try:
-                actions = GroupChatGlobalAction(actions=actions)
-                logger.debug("Parsed actions into GroupChatGlobalAction.")
-            except Exception as e:
-                logger.error(f"Failed to parse actions into GroupChatGlobalAction: {e}")
-                raise
 
-        # Ensure actions is GroupChatGlobalAction
-        if not isinstance(actions, GroupChatGlobalAction):
-            logger.error(f"Expected GroupChatGlobalAction, got {type(actions).__name__}")
-            raise TypeError(f"Expected GroupChatGlobalAction, got {type(actions).__name__}")
+    def step(self, action: Union[GroupChatAction, GroupChatGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
+        logger.debug(f"Received action of type: {type(action).__name__}")
+        logger.debug(f"Action content: {action}")
 
-        self.current_round += 1
-        logger.debug(f"Processing round {self.current_round} with actions: {actions}")
+        if self.sequential:
+            # Sequential mode: expect a LocalAction
+            if isinstance(action, dict):
+                try:
+                    action = GroupChatAction.parse_obj(action)
+                    logger.debug("Parsed action into GroupChatAction.")
+                except Exception as e:
+                    logger.error(f"Failed to parse action into GroupChatAction: {e}")
+                    raise
+            if not isinstance(action, GroupChatAction):
+                logger.error(f"Expected GroupChatAction, got {type(action).__name__}")
+                raise TypeError(f"Expected GroupChatAction, got {type(action).__name__}")
 
-        new_messages = self._process_actions(actions)
-        self.messages.extend(new_messages)
+            # Check if it's the current agent's turn
+            if action.agent_id != self.speaker_order[self.current_speaker_index]:
+                raise ValueError(f"It's not agent {action.agent_id}'s turn to speak.")
 
-        observations = self._create_observations(new_messages)
-        done = self.current_round >= self.max_rounds
+            self.current_round += 1
+            logger.debug(f"Processing round {self.current_round} with action: {action}")
 
-        # Select next speaker
-        if self.sequential and self.speaker_order:
-            next_speaker = self._select_next_speaker()
-            logger.debug(f"Next speaker selected: {next_speaker}")
-        else:
-            next_speaker = random.choice(self.speaker_order) if self.speaker_order else None
+            # Process the action
+            self.messages.append(action.action)
 
-        # Optionally, update topic if a propose_topic message is found
-        for message in new_messages:
-            if message.message_type == "propose_topic":
-                self._update_topic(message.content)
+            # Update topic if necessary
+            if action.action.message_type == "propose_topic":
+                self._update_topic(action.action.content)
 
-        global_observation = GroupChatGlobalObservation(
-            observations=observations,
-            all_messages=self.messages,
-            current_topic=self.current_topic,
-            speaker_order=self.speaker_order
-        )
+            # Create observation for the agent
+            observation = self._create_observation([action.action], action.agent_id)
+            done = self.current_round >= self.max_rounds
 
-        local_steps = {}
-        for agent_id in self.speaker_order:
-            local_steps[agent_id] = LocalEnvironmentStep(
-                observation=observations[agent_id],
-                reward=0,  # You may want to implement a reward function
+            # Update the current speaker
+            self._select_next_speaker()
+            logger.debug(f"Next speaker selected: {self.speaker_order[self.current_speaker_index]}")
+
+            local_step = LocalEnvironmentStep(
+                observation=observation,
+                reward=0,  # Implement reward function if needed
                 done=done,
                 info={
                     "current_round": self.current_round,
                     "current_topic": self.current_topic,
-                    "all_messages": self.messages,
+                    "all_messages": [message.dict() for message in self.messages],
                     "speaker_order": self.speaker_order
                 }
             )
 
-        return local_steps
-    
+            return local_step
+
+        else:
+            # Non-sequential mode: expect a GlobalAction
+            if isinstance(action, dict):
+                try:
+                    action = GroupChatGlobalAction.parse_obj(action)
+                    logger.debug("Parsed actions into GroupChatGlobalAction.")
+                except Exception as e:
+                    logger.error(f"Failed to parse actions into GroupChatGlobalAction: {e}")
+                    raise
+
+            # Ensure action is GroupChatGlobalAction
+            if not isinstance(action, GroupChatGlobalAction):
+                logger.error(f"Expected GroupChatGlobalAction, got {type(action).__name__}")
+                raise TypeError(f"Expected GroupChatGlobalAction, got {type(action).__name__}")
+
+            self.current_round += 1
+            logger.debug(f"Processing round {self.current_round} with actions: {action}")
+
+            new_messages = self._process_actions(action)
+            self.messages.extend(new_messages)
+
+            observations = self._create_observations(new_messages)
+            done = self.current_round >= self.max_rounds
+
+            # Optionally, update topic if a propose_topic message is found
+            for message in new_messages:
+                if message.message_type == "propose_topic":
+                    self._update_topic(message.content)
+
+            # Create global_observation
+            global_observation = GroupChatGlobalObservation(
+                observations=observations,
+                all_messages=self.messages,
+                current_topic=self.current_topic,
+                speaker_order=self.speaker_order
+            )
+
+            # Return an EnvironmentStep with your custom global_observation
+            env_step = EnvironmentStep(
+                global_observation=global_observation,
+                done=done,
+                info={
+                    "current_round": self.current_round,
+                    "current_topic": self.current_topic,
+                    "all_messages": [message.dict() for message in self.messages],
+                    "speaker_order": self.speaker_order
+                }
+            )
+
+            return env_step
+
     def _process_actions(self, global_action: GroupChatGlobalAction) -> List[GroupChatMessage]:
         new_messages = []
         for agent_id, action_dict in global_action.actions.items():
@@ -142,6 +186,17 @@ class GroupChat(Mechanism):
         self.topics.append(new_topic)
         self.current_topic = new_topic
         logger.info(f"Updated topic to: {new_topic}")
+
+    def _create_observation(self, new_messages: List[GroupChatMessage], agent_id: str) -> GroupChatLocalObservation:
+        observation = GroupChatObservation(
+            messages=new_messages,
+            current_topic=self.current_topic,
+            current_speaker=self.speaker_order[self.current_speaker_index]
+        )
+        return GroupChatLocalObservation(
+            agent_id=agent_id,
+            observation=observation
+        )
 
     def _create_observations(self, new_messages: List[GroupChatMessage]) -> Dict[str, GroupChatLocalObservation]:
         observations = {}
@@ -160,7 +215,7 @@ class GroupChat(Mechanism):
     def get_global_state(self) -> Dict[str, Any]:
         return {
             "current_round": self.current_round,
-            "messages": [message.model_dump() for message in self.messages],
+            "messages": [message.dict() for message in self.messages],
             "current_topic": self.current_topic,
             "speaker_order": self.speaker_order,
             "current_speaker_index": self.current_speaker_index
