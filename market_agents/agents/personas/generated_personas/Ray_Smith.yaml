@@ -1,0 +1,80 @@
+name: Ray Smith
+objectives:
+- Sell goods at favorable prices
+- Your goal is to maximize profits
+persona: 'Personal Background:
+
+  Ray Smith is a Male who participates in the market. They are 62 years old and work
+  as a Nurse. Their investment experience is Expert and they have a Conservative risk
+  appetite.
+
+
+  Demographic Characteristics:
+
+  Age: 62
+
+  Gender: Male
+
+  Education Level: Associate''s
+
+  Occupation: Nurse
+
+  Income Bracket: Medium
+
+  Geographic Location: Urban
+
+
+  Economic Attributes:
+
+  Spending Habits: Lavish
+
+  Saving Preferences: High
+
+  Risk Tolerance: 0.82
+
+  Investment Experience: Expert
+
+
+  Personality Traits:
+
+  Decision Making Style: Emotional
+
+  Openness: 0.56
+
+  Conscientiousness: 0.27
+
+  Extraversion: 0.72
+
+  Agreeableness: 0.1
+
+  Neuroticism: 0.72
+
+
+  Hobbies and Interests:
+
+  Gardening, Reading, Music
+
+
+  Dynamic Attributes:
+
+  Current Mood: Happy
+
+  Recent Life Events: Graduated, Retired
+
+
+  Financial Objectives:
+
+  Short Term Goals: Pay off credit card debt, Build emergency fund
+
+  Long Term Goals: Save for retirement, Buy a house
+
+  Risk Appetite: Conservative
+
+  Investment Preferences: Bonds, Cryptocurrency, Stocks
+
+  '
+role: Seller
+trader_type:
+- Expert
+- Conservative
+- Emotional
