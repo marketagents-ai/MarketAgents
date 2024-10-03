@@ -4,6 +4,10 @@
 
 This project provides agent framework for creating market agents with economic incentive. The agents have utilities for parallel AI inference and prompt caching using large language models (LLMs).
 
+<p align="center">
+  <img src="assets/marketagents.jpeg" alt="Image Alt Text" width="80%" height="80%">
+</p>
+
 ## Installation
 
 To install the `market_agents` package in editable mode, follow these steps:
