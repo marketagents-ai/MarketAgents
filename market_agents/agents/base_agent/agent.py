@@ -133,7 +133,7 @@ class Agent(BaseModel):
             structured_output = StructuredTool(json_schema=output_format, strict_schema=False)
 
         return LLMPromptContext(
-            id=str(uuid.uuid4()),  # Generate a unique ID for each prompt context
+            id=self.id,
             system_string=system_message,
             new_message=user_message,
             llm_config=self.llm_config,
