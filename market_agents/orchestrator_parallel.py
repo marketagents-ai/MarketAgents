@@ -1,9 +1,12 @@
+# orchestrator_parallel.py
+
 from datetime import datetime
 import json
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Type, Tuple
 from market_agents.economics.econ_models import Ask, Bid, Trade
+from market_agents.economics.econ_agent import create_economic_agent
 from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
 from pydantic import BaseModel, Field
 from colorama import Fore, Style
@@ -49,20 +52,14 @@ logger.propagate = False
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-class LLMConfig(BaseModel):
-    name: str
-    client: str
-    model: str
-    temperature: float
-    max_tokens: int
-    use_cache: bool
-
 class AgentConfig(BaseModel):
     num_units: int
     base_value: float
     use_llm: bool
-    initial_cash: float
-    initial_goods: int
+    buyer_initial_cash: float
+    buyer_initial_goods: int
+    seller_initial_cash: float
+    seller_initial_goods: int
     good_name: str
     noise_factor: float
     max_relative_spread: float
@@ -77,10 +74,10 @@ class OrchestratorConfig(BaseSettings):
     num_agents: int
     max_rounds: int
     agent_config: AgentConfig
-    llm_configs: list[LLMConfig]
-    environment_configs: dict[str, AuctionConfig]
+    llm_configs: List[LLMConfig]
+    environment_configs: Dict[str, AuctionConfig]
     protocol: str
-    database_config: dict[str, str]
+    database_config: Dict[str, str]
 
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
@@ -124,8 +121,8 @@ class Orchestrator:
         self.latest_data = None
         self.trackers: Dict[str, AuctionTracker] = {}
         self.log_folder = Path("./outputs/interactions")
-        oai_request_limits = RequestLimits(max_requests_per_minute=500, max_tokens_per_minute=200000)
-        anthropic_request_limits = RequestLimits(max_requests_per_minute=40, max_tokens_per_minute=10000)
+        oai_request_limits = RequestLimits(max_requests_per_minute=20000, max_tokens_per_minute=2000000)
+        anthropic_request_limits = RequestLimits(max_requests_per_minute=20000, max_tokens_per_minute=2000000)
         self.ai_utils = ParallelAIUtilities(
             oai_request_limits=oai_request_limits,
             anthropic_request_limits=anthropic_request_limits
@@ -150,25 +147,66 @@ class Orchestrator:
         return existing_personas[:self.config.num_agents]
 
     def generate_agents(self):
-
         log_section(logger, "INITIALIZING MARKET AGENTS")
         personas = self.load_or_generate_personas()
+        num_agents = len(personas)
+        num_buyers = num_agents // 2
+        num_sellers = num_agents - num_buyers
 
         for i, persona in enumerate(personas):
             llm_config = random.choice(self.config.llm_configs).model_dump()
+            # Assign roles explicitly based on index
+            if i < num_buyers:
+                is_buyer = True
+                persona.role = "buyer"
+            else:
+                is_buyer = False
+                persona.role = "seller"
+
+            agent_config = self.config.agent_config.dict()
+            if is_buyer:
+                initial_cash = agent_config.get('buyer_initial_cash', 1000)
+                initial_goods_quantity = agent_config.get('buyer_initial_goods', 0)
+            else:
+                initial_cash = agent_config.get('seller_initial_cash', 0)
+                initial_goods_quantity = agent_config.get('seller_initial_goods', 10)
+
+            good_name = agent_config.get('good_name', 'apple')
+            initial_goods = {good_name: initial_goods_quantity}
+
+            # Create economic agent
+            economic_agent = create_economic_agent(
+                agent_id=str(i),
+                goods=[good_name],
+                buy_goods=[good_name] if is_buyer else [],
+                sell_goods=[good_name] if not is_buyer else [],
+                base_values={good_name: agent_config.get('base_value', 100)},
+                initial_cash=initial_cash,
+                initial_goods=initial_goods,
+                num_units=agent_config.get('num_units', 10),
+                noise_factor=agent_config.get('noise_factor', 0.1),
+                max_relative_spread=agent_config.get('max_relative_spread', 0.2),
+            )
 
             agent = MarketAgent.create(
-                agent_id=i,
-                is_buyer=persona.role.lower() == "buyer",
-                **self.config.agent_config.dict(),
+                agent_id=str(i),  # Ensure agent_id is a string
+                is_buyer=is_buyer,
+                num_units=agent_config.get('num_units', 10),
+                base_value=agent_config.get('base_value', 100),
+                use_llm=agent_config.get('use_llm', True),
+                initial_cash=initial_cash,
+                initial_goods=initial_goods_quantity,
+                good_name=good_name,
+                noise_factor=agent_config.get('noise_factor', 0.1),
+                max_relative_spread=agent_config.get('max_relative_spread', 0.2),
                 llm_config=llm_config,
-                protocol=ACLMessage,
                 environments=self.environments,
+                protocol=ACLMessage,
                 persona=persona
             )
+            agent.economic_agent = economic_agent  # Assign the economic agent to the agent
             self.agents.append(agent)
-            log_agent_init(logger, i, persona.role.lower() == "buyer")
-
+            log_agent_init(logger, i, is_buyer, persona)
 
     def setup_environments(self):
         log_section(logger, "CONFIGURING MARKET ENVIRONMENTS")
@@ -189,7 +227,6 @@ class Orchestrator:
                 self.environments[env_name] = env
                 self.trackers[env_name] = AuctionTracker()
                 log_environment_setup(logger, env_name)
-                
             else:
                 logger.warning(f"Unknown environment type: {env_name}")
 
@@ -235,44 +272,72 @@ class Orchestrator:
         
         log_running(logger, env_name)
 
-        # Run parallel perceive
-        perception_prompts = await self.run_parallel_perceive(env_name)
-        perceptions = await self.run_parallel_ai_completion(perception_prompts)
-        for agent, perception in zip(self.agents, perceptions):
-            log_section(logger, f"Current Agent:\nAgent {agent.id} with persona:\n{agent.persona}")
-            log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception.json_object.object}{Style.RESET_ALL}")
+        # Reset pending orders at the beginning of the round
+        for agent in self.agents:
+            agent.economic_agent.reset_all_pending_orders()
 
         # Set system messages for agents
         self.set_agent_system_messages(round_num, env.mechanism.good_name)
 
+        # Run parallel perceive
+        perception_prompts = await self.run_parallel_perceive(env_name)
+        perceptions = await self.run_parallel_ai_completion(perception_prompts)
+        perceptions_map = {perception.source_id: perception for perception in perceptions}
+
+        for agent in self.agents:
+            perception = perceptions_map.get(agent.id)
+            if perception:
+                log_section(logger, f"Current Agent:\nAgent {agent.id} with persona:\n{agent.persona}")
+                log_perception(logger, int(agent.id), f"{Fore.CYAN}{perception.json_object.object if perception.json_object else perception.str_content}{Style.RESET_ALL}")
+            else:
+                logger.warning(f"No perception found for agent {agent.id}")
+
+        # Extract perception content to pass to generate_action
+        perception_contents = []
+        for agent in self.agents:
+            perception = perceptions_map.get(agent.id)
+            if perception:
+                perception_content = perception.json_object.object if perception.json_object else perception.str_content
+                perception_contents.append(perception_content)
+            else:
+                perception_contents.append("")
+
         # Run parallel generate_action
-        action_prompts = await self.run_parallel_generate_action(env_name, [p.json_object.object for p in perceptions])
+        action_prompts = await self.run_parallel_generate_action(env_name, perception_contents)
         actions = await self.run_parallel_ai_completion(action_prompts)
+        actions_map = {action.source_id: action for action in actions}
 
         agent_actions = {}
-        for agent, action in zip(self.agents, actions):
-            try:
-                action_content = action.json_object.object
-                if 'price' in action_content and 'quantity' in action_content:
-                    action_content['quantity'] = 1
+        for agent in self.agents:
+            action = actions_map.get(agent.id)
+            if action:
+                try:
+                    action_content = action.json_object.object if action.json_object else json.loads(action.str_content)
+                    if 'price' in action_content and 'quantity' in action_content:
+                        action_content['quantity'] = 1
 
-                    if agent.role == "buyer":
-                        auction_action = Bid(**action_content)
-                    elif agent.role == "seller":
-                        auction_action = Ask(**action_content)
+                        if agent.role == "buyer":
+                            auction_action = Bid(**action_content)
+                        elif agent.role == "seller":
+                            auction_action = Ask(**action_content)
+                        else:
+                            raise ValueError(f"Invalid agent role: {agent.role}")
+                        
+                        agent_actions[agent.id] = AuctionAction(agent_id=agent.id, action=auction_action)
+
+                        # Update agent's pending orders
+                        good_name = env.mechanism.good_name
+                        agent.economic_agent.pending_orders.setdefault(good_name, []).append(auction_action)
+
+                        action_type = "Bid" if isinstance(auction_action, Bid) else "Ask"
+                        color = Fore.BLUE if action_type == "Bid" else Fore.GREEN
+                        log_action(logger, int(agent.id), f"{color}{action_type}: {auction_action}{Style.RESET_ALL}")
                     else:
-                        raise ValueError(f"Invalid agent role: {agent.role}")
-                else:
-                    raise ValueError(f"Invalid action content: {action_content}")
-                
-                agent_actions[agent.id] = AuctionAction(agent_id=agent.id, action=auction_action)
-
-                action_type = "Bid" if isinstance(auction_action, Bid) else "Ask"
-                color = Fore.BLUE if action_type == "Bid" else Fore.GREEN
-                log_action(logger, int(agent.id), f"{color}{action_type}: {auction_action}{Style.RESET_ALL}")
-            except (json.JSONDecodeError, KeyError, ValueError) as e:
-                logger.error(f"Error creating AuctionAction for agent {agent.id}: {str(e)}")
-                continue
+                        raise ValueError(f"Invalid action content: {action_content}")
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                    logger.error(f"Error creating AuctionAction for agent {agent.id}: {str(e)}")
+            else:
+                logger.warning(f"No action found for agent {agent.id}")
 
         global_action = GlobalAuctionAction(actions=agent_actions)
         env_state = env.step(global_action)
@@ -287,18 +352,53 @@ class Orchestrator:
         for agent in self.agents:
             if round_num == 1:
                 if agent.role == "buyer":
-                    agent.system = f"This is the first round of the market so there are no bids or asks yet. You can make a profit by buying at {agent.preference_schedule.get_value(1)*0.99} or lower"
-                elif agent.role == "seller":
-                    agent.system = f"This is the first round of the market so there are no bids or asks yet. You can make a profit by selling at {agent.preference_schedule.get_value(1)*1.01} or higher"
-            else:
-                if agent.role == "buyer":
-                    current_value = agent.preference_schedule.get_value(agent.endowment.current_basket.goods_dict.get(good_name, 0) + 1)
+                    # Use the value of purchasing one unit
+                    value_schedule = agent.economic_agent.value_schedules[good_name]
+                    current_value = value_schedule.get_value(1)
                     suggested_price = current_value * 0.99
-                    agent.system = f"Your current basket: {agent.endowment.current_basket}. Your current value for the good is {current_value}. You can make a profit by buying at {suggested_price} or lower."
+                    agent.system = (
+                        f"This is the first round of the market so there are no bids or asks yet. "
+                        f"You can make a profit by buying at {suggested_price:.2f} or lower."
+                    )
                 elif agent.role == "seller":
-                    current_cost = agent.preference_schedule.get_value(agent.endowment.current_basket.goods_dict.get(good_name, 0))
-                    suggested_price = current_cost * 1.01
-                    agent.system = f"Your current basket: {agent.endowment.current_basket}. Your current cost for the good is {current_cost}. You can make a profit by selling at {suggested_price} or higher."
+                    if agent.economic_agent.endowment.current_basket.goods_dict.get(good_name, 0) <= 0:
+                        agent.system = f"You have no {good_name} to sell."
+                    else:
+                        cost_schedule = agent.economic_agent.cost_schedules[good_name]
+                        current_cost = cost_schedule.get_value(1)
+                        suggested_price = current_cost * 1.01
+                        agent.system = (
+                            f"This is the first round of the market so there are no bids or asks yet. "
+                            f"You can make a profit by selling at {suggested_price:.2f} or higher."
+                        )
+            else:
+                # Use marginal value and cost calculations for subsequent rounds
+                current_quantity = agent.economic_agent.endowment.current_basket.goods_dict.get(good_name, 0)
+                if agent.role == "buyer":
+                    value_schedule = agent.economic_agent.value_schedules[good_name]
+                    value_q_plus_1 = value_schedule.get_value(current_quantity + 1)
+                    value_q = value_schedule.get_value(current_quantity)
+                    marginal_value = value_q_plus_1 - value_q
+                    suggested_price = marginal_value * 0.99
+                    agent.system = (
+                        f"Your current basket: {agent.economic_agent.endowment.current_basket}. "
+                        f"Your marginal value for the next unit of {good_name} is {marginal_value:.2f}. "
+                        f"You can make a profit by buying at {suggested_price:.2f} or lower."
+                    )
+                elif agent.role == "seller":
+                    if current_quantity <= 0:
+                        agent.system = f"You have no {good_name} to sell."
+                    else:
+                        cost_schedule = agent.economic_agent.cost_schedules[good_name]
+                        cost_q = cost_schedule.get_value(current_quantity)
+                        cost_q_minus_1 = cost_schedule.get_value(current_quantity - 1)
+                        marginal_cost = cost_q - cost_q_minus_1
+                        suggested_price = marginal_cost * 1.01
+                        agent.system = (
+                            f"Your current basket: {agent.economic_agent.endowment.current_basket}. "
+                            f"Your marginal cost for selling the next unit of {good_name} is {marginal_cost:.2f}. "
+                            f"You can make a profit by selling at {suggested_price:.2f} or higher."
+                        )
 
     async def run_simulation(self):
         log_section(logger, "SIMULATION COMMENCING")
@@ -317,7 +417,8 @@ class Orchestrator:
                 # Run parallel reflect
                 reflect_prompts = await self.run_parallel_reflect(env_name)
                 reflections = await self.run_parallel_ai_completion(reflect_prompts)
-                for agent, reflection in zip([a for a in self.agents if a.last_observation], reflections):
+                agents_with_observations = [a for a in self.agents if a.last_observation]
+                for agent, reflection in zip(agents_with_observations, reflections):
                     if reflection.json_object:
                         log_reflection(logger, int(agent.id), f"{Fore.MAGENTA}{reflection.json_object.object}{Style.RESET_ALL}")
                         agent.memory.append({
@@ -346,14 +447,14 @@ class Orchestrator:
             seller = self.agents[int(trade.seller_id)]
             logger.info(f"Processing trade between buyer {buyer.id} and seller {seller.id}")
             
-            buyer_utility_before = buyer.calculate_utility(buyer.endowment.current_basket)
-            seller_utility_before = seller.calculate_utility(seller.endowment.current_basket)
+            buyer_utility_before = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
+            seller_utility_before = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
             
-            buyer.process_trade(trade)
-            seller.process_trade(trade)
+            buyer.economic_agent.process_trade(trade)
+            seller.economic_agent.process_trade(trade)
             
-            buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
-            seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
+            buyer_utility_after = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
+            seller_utility_after = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
             
             trade_surplus = (buyer_utility_after - buyer_utility_before) + (seller_utility_after - seller_utility_before)
             
@@ -379,10 +480,10 @@ class Orchestrator:
                 new_goods = agent_observation.get('endowment', {}).get('goods', {})
                 
                 if new_cash is not None:
-                    agent.endowment.current_basket.cash = new_cash
+                    agent.economic_agent.endowment.current_basket.cash = new_cash
                 
                 for good, quantity in new_goods.items():
-                    agent.endowment.current_basket.update_good_quantity(good, quantity)
+                    agent.economic_agent.endowment.current_basket.update_good_quantity(good, quantity)
 
         if not self.simulation_data or 'state' not in self.simulation_data[-1]:
             self.simulation_data.append({'state': {}})
@@ -396,8 +497,8 @@ class Orchestrator:
             'agent_states': [{
                 'id': agent.id,
                 'is_buyer': agent.role == "buyer",
-                'cash': agent.endowment.current_basket.cash,
-                'goods': agent.endowment.current_basket.goods_dict,
+                'cash': agent.economic_agent.endowment.current_basket.cash,
+                'goods': agent.economic_agent.endowment.current_basket.goods_dict,
                 'last_action': agent.last_action,
                 'memory': agent.memory[-1] if agent.memory else None
             } for agent in self.agents],
@@ -433,8 +534,8 @@ class Orchestrator:
     def print_summary(self):
         log_section(logger, "SIMULATION SUMMARY")
         
-        total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "buyer")
-        total_seller_surplus = sum(agent.calculate_individual_surplus() for agent in self.agents if agent.role == "seller")
+        total_buyer_surplus = sum(agent.economic_agent.calculate_individual_surplus() for agent in self.agents if agent.role == "buyer")
+        total_seller_surplus = sum(agent.economic_agent.calculate_individual_surplus() for agent in self.agents if agent.role == "seller")
         total_empirical_surplus = total_buyer_surplus + total_seller_surplus
 
         print(f"Total Empirical Buyer Surplus: {total_buyer_surplus:.2f}")
@@ -464,9 +565,9 @@ class Orchestrator:
         print("\nFinal Agent States:")
         for agent in self.agents:
             print(f"Agent {agent.id} ({agent.role}):")
-            print(f"  Cash: {agent.endowment.current_basket.cash:.2f}")
-            print(f"  Goods: {agent.endowment.current_basket.goods_dict}")
-            surplus = agent.calculate_individual_surplus()
+            print(f"  Cash: {agent.economic_agent.endowment.current_basket.cash:.2f}")
+            print(f"  Goods: {agent.economic_agent.endowment.current_basket.goods_dict}")
+            surplus = agent.economic_agent.calculate_individual_surplus()
             print(f"  Individual Surplus: {surplus:.2f}")
 
     def write_to_db(self):
@@ -477,7 +578,7 @@ class Orchestrator:
         log_section(logger, "MARKET SIMULATION INITIALIZING")
         self.generate_agents()
         self.setup_environments()
-        #self.setup_database()
+        # self.setup_database()
 
         if self.dashboard:
             dashboard_thread = threading.Thread(target=self.run_dashboard)
@@ -494,4 +595,3 @@ if __name__ == "__main__":
     config = load_config()
     orchestrator = Orchestrator(config)
     asyncio.run(orchestrator.start())
-
