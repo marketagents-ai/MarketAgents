@@ -1,6 +1,4 @@
 import logging
-from typing import Callable
-import random
 
 def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
@@ -24,10 +22,11 @@ def log_round(logger: logging.Logger, round_num: int):
     logger.info(f"🔔 ROUND {round_num:02d} BEGINS 🔔")
     logger.info("🎲 Let the market dynamics unfold! 🎲")
 
-def log_agent_init(logger: logging.Logger, agent_id: int, is_buyer: bool):
-    agent_type = "🛒 Strategic Buyer" if is_buyer else "💼 Savvy Seller"
-    personality = random.choice(["Analytical", "Risk-taking", "Conservative", "Adaptive", "Innovative"])
-    logger.info(f"🤖 Agent {agent_id:02d} | {agent_type} | {personality} Strategist | Initialized")
+def log_agent_init(logger: logging.Logger, agent_id: int, is_buyer: bool, persona):
+    agent_type = "🛒 Buyer" if is_buyer else "💼 Seller"
+    trader_type = " | ".join(persona.trader_type)
+    
+    logger.info(f"🤖 Agent {agent_id:02d} | {agent_type} | {trader_type} | Initialized")
 
 def log_environment_setup(logger: logging.Logger, env_name: str):
     logger.info(f"🏛️ Entering the {env_name.upper()} ECOSYSTEM 🏛️")
@@ -46,12 +45,21 @@ def log_running(logger: logging.Logger, env_name: str):
 def log_perception(logger: logging.Logger, agent_id: int, perception: str):
     logger.info(f"👁️ Agent {agent_id:02d} perceives: {perception}")
 
-def log_raw_action(Logger: logging.Logger, agent_id: int, action: dict):
-    Logger.info(f"🔧 Agent {agent_id:02d} executes: {action}")
+def log_raw_action(logger: logging.Logger, agent_id: int, action: dict):
+    logger.info(f"🔧 Agent {agent_id:02d} executes: {action}")
 
 def log_action(logger: logging.Logger, agent_id: int, action: str):
-    emojis = ["💡", "🔧", "🚀", "🔬", "🔑", "🎯", "🧠", "⚡"]
-    logger.info(f"{random.choice(emojis)} Agent {agent_id:02d} executes: {action}")
+    if "Bid" in action:
+        emoji = "💰"
+    elif "Ask" in action:
+        emoji = "💵"
+    elif "reflects" in action.lower():
+        emoji = "💭"
+    elif "perceives" in action.lower():
+        emoji = "👁️"
+    else:
+        emoji = "🔧"
+    logger.info(f"{emoji} Agent {agent_id:02d} executes: {action}")
 
 def log_market_update(logger: logging.Logger, update: str):
     logger.info(f"📢 MARKET INSIGHT: {update}")
