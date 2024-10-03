@@ -1,45 +1,53 @@
-num_agents: 8
+num_agents: 100 
 max_rounds: 2
 agent_config:
   num_units: 10
   base_value: 100
   use_llm: true
-  initial_cash: 1000
-  initial_goods: 0
+  buyer_initial_cash: 1000  
+  buyer_initial_goods: 0    
+  seller_initial_cash: 0    
+  seller_initial_goods: 10  
   good_name: "apple"
   noise_factor: 0.1
   max_relative_spread: 0.2
 llm_configs:
-  - name: "gpt-4o-mini"
+  - name: "gpt-4o-mini-low-temp"
     client: "openai"
     model: "gpt-4o-mini"
-    temperature: 1
+    temperature: 0.2
+    max_tokens: 2048
+    use_cache: true
+  - name: "gpt-4o-mini-med-temp"
+    client: "openai"
+    model: "gpt-4o-mini"
+    temperature: 0.6
+    max_tokens: 4096
+    use_cache: true
+  - name: "gpt-4o-mini-high-temp"
+    client: "openai"
+    model: "gpt-4o-mini"
+    temperature: 1.0
     max_tokens: 8192
     use_cache: true
-#  - name: "qwen2.5"
-#    client: "vllm"
-#    model: "Qwen2.5-7B-Instruct"
-#    temperature: 0.4
-#    max_tokens: 512
-#    use_cache: true
-#  - name: "qwen2.5"
-#    client: "vllm"
-#    model: "Qwen2.5-7B-Instruct"
-#    temperature: 0.6
-#    max_tokens: 1048
-#    use_cache: true
-#  - name: "qwen2.5"
-#    client: "vllm"
-#    model: "Qwen2.5-7B-Instruct"
-#    temperature: 0.8
-#    max_tokens: 2048
-#    use_cache: true
-#  - name: "qwen2.5"
-#    client: "vllm"
-#    model: "Qwen2.5-7B-Instruct"
-#    temperature: 1
-#    max_tokens: 4096
-#    use_cache: true
+  - name: "gpt-4o-low-temp"
+    client: "openai"
+    model: "gpt-4o"
+    temperature: 0.2
+    max_tokens: 4096
+    use_cache: true
+  - name: "gpt-4o-med-temp"
+    client: "openai"
+    model: "gpt-4o"
+    temperature: 0.6
+    max_tokens: 8192
+    use_cache: true
+  - name: "gpt-4o-high-temp"
+    client: "openai"
+    model: "gpt-4o"
+    temperature: 1.0
+    max_tokens: 16384
+    use_cache: true
 environment_configs:
   auction:
     name: "Apple Market"
