@@ -314,9 +314,9 @@ class Orchestrator:
                             f"Your marginal cost for selling the next unit of {good_name} is {marginal_cost:.2f}. "
                             f"You can make a profit by selling at {suggested_price:.2f} or higher."
                         )
-
             action = await agent.generate_action(env_name, perception)
-            log_raw_action(logger, int(agent.id), f"{Fore.LIGHTBLUE_EX}{action}{Style.RESET_ALL}")
+            log_raw_action(logger, int(agent.id), {"action": json.dumps(action, indent=2)})
+            logger.info(f"{Fore.LIGHTBLUE_EX}Agent {agent.id} action: {json.dumps(action, indent=2)}{Style.RESET_ALL}")
 
             try:
                 action_content = action['content']
@@ -488,6 +488,10 @@ class Orchestrator:
 
     def write_to_db(self):
         # Implement database write operation here
+        pass
+    
+    def run_dashboard(self):
+        # Implement dashboard logic here
         pass
 
     async def start(self):

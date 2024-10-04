@@ -1,4 +1,4 @@
-num_agents: 100 
+num_agents: 2 
 max_rounds: 2
 agent_config:
   num_units: 10

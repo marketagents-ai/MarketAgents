@@ -147,7 +147,7 @@ class Orchestrator:
             llm_config = random.choice(self.config.llm_configs).model_dump()
 
             agent = MarketAgent.create(
-                agent_id=str(i),  # Ensure agent_id is a string
+                agent_id=i,
                 is_buyer=persona.role.lower() == "buyer",
                 num_units=self.config.agent_config.num_units,
                 base_value=self.config.agent_config.base_value,
@@ -170,7 +170,13 @@ class Orchestrator:
 
     def setup_environments(self):
         log_section(logger, "CONFIGURING GROUP CHAT ENVIRONMENT")
+        if 'group_chat' not in self.config.environment_configs:
+            raise KeyError("'group_chat' configuration is missing in environment_configs")
+        
         group_chat_config = self.config.environment_configs['group_chat']
+        if not isinstance(group_chat_config, GroupChatConfig):
+            raise TypeError("Expected GroupChatConfig for 'group_chat' configuration")
+        
         group_chat = GroupChat(
             max_rounds=group_chat_config.max_rounds,
             current_topic=group_chat_config.initial_topic,
@@ -220,7 +226,11 @@ class Orchestrator:
             else:
                 logger.info(f"Skipping reflection for agent {agent.id} due to no observation")
         return reflect_prompts, agents_with_observations
+    
     async def generate_initial_topic(self) -> str:
+        if self.topic_proposer is None:
+            raise ValueError("topic_proposer is not initialized")
+        
         topic_action = await self.topic_proposer.generate_action(
             "group_chat",
             "Consider recent economic events, market trends, or financial news. For this round discuss how Fed rate cut of 50 bps is going to impact the market"
@@ -314,7 +324,7 @@ class Orchestrator:
         agent_actions = {}
         for agent_id, action_output in actions_map.items():
             try:
-                action_content = action_output.json_object.object if action_output.json_object else json.loads(action_output.str_content)
+                action_content = action_output.json_object.object if action_output.json_object else json.loads(action_output.str_content or '')
                 group_chat_message = GroupChatMessage(
                     content=action_content['action']['content'],
                     message_type=action_content.get('message_type', 'group_message'),

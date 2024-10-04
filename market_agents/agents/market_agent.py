@@ -20,11 +20,23 @@ class MarketAgent(LLMAgent, EconomicAgent):
     prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
 
     @classmethod
-    def create(cls, agent_id: int, is_buyer: bool, num_units: int, base_value: float, use_llm: bool,
-        initial_cash: float, initial_goods: int, good_name: str, noise_factor: float = 0.1,
-        max_relative_spread: float = 0.2, llm_config: Optional[LLMConfig] = None,
-        environments: Dict[str, MultiAgentEnvironment] = None, protocol: Type[Protocol] = None,
-        persona: Persona = None) -> 'MarketAgent':
+    def create(
+        cls,
+        agent_id: int,
+        is_buyer: bool,
+        num_units: int,
+        base_value: float,
+        use_llm: bool,
+        initial_cash: float,
+        initial_goods: int,
+        good_name: str,
+        noise_factor: float = 0.1,
+        max_relative_spread: float = 0.2,
+        llm_config: Optional[LLMConfig] = None,
+        environments: Dict[str, MultiAgentEnvironment] = {},
+        protocol: Optional[Type[Protocol]] = None,
+        persona: Optional[Persona] = None
+    ) -> 'MarketAgent':
     
         econ_agent = create_economic_agent(
             agent_id=str(agent_id),
@@ -151,14 +163,21 @@ class MarketAgent(LLMAgent, EconomicAgent):
         response = await self.execute(prompt, output_format=ReflectionSchema.model_json_schema(), return_prompt=return_prompt)
         
         if not return_prompt:
+            if isinstance(response, dict):
+                reflection = response.get("reflection", "")
+                strategy_update = response.get("strategy_update")
+            else:
+                reflection = response
+                strategy_update = None
+
             self.memory.append({
                 "type": "reflection",
-                "content": response["reflection"],
-                "strategy_update": response["strategy_update"],
+                "content": reflection,
+                "strategy_update": strategy_update,
                 "observation": observation,
                 "reward": reward,
                 "timestamp": datetime.now().isoformat()
             })
-            return response["reflection"]
+            return reflection
         else:
             return response

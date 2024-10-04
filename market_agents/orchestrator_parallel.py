@@ -312,7 +312,7 @@ class Orchestrator:
             action = actions_map.get(agent.id)
             if action:
                 try:
-                    action_content = action.json_object.object if action.json_object else json.loads(action.str_content)
+                    action_content = action.json_object.object if action.json_object else json.loads(action.str_content or '{}')
                     if 'price' in action_content and 'quantity' in action_content:
                         action_content['quantity'] = 1
 
@@ -426,7 +426,7 @@ class Orchestrator:
                             "content": reflection.json_object.object["reflection"],
                             "strategy_update": reflection.json_object.object["strategy_update"],
                             "observation": agent.last_observation,
-                            "reward": agent.last_observation.get('reward', 0),
+                            "reward": agent.last_observation.get('reward', 0) if agent.last_observation else 0,
                             "timestamp": datetime.now().isoformat()
                         })
                 
@@ -572,6 +572,10 @@ class Orchestrator:
 
     def write_to_db(self):
         # Implement database write operation here
+        pass
+
+    def run_dashboard(self):
+        # Implement dashboard logic here
         pass
 
     async def start(self):

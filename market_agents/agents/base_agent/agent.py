@@ -79,9 +79,11 @@ class Agent(BaseModel):
             self.llm_config.response_format = "structured_output"
             execution_output_format = self._load_output_schema(execution_output_format)
 
-        prompt_context = self._prepare_prompt_context(execution_task, execution_output_format)
+        prompt_context = self._prepare_prompt_context(
+            execution_task,
+            execution_output_format if isinstance(execution_output_format, dict) else None
+        )
         agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
-
         if return_prompt:
             return prompt_context
 
@@ -116,7 +118,7 @@ class Agent(BaseModel):
         prompt_manager = PromptManager(
             role=self.role,
             persona=self.persona,
-            task=task,
+            task=task if task is not None else [],
             resources=None,
             output_schema=output_format,
             char_limit=1000
@@ -142,8 +144,8 @@ class Agent(BaseModel):
     
     @retry(
         wait=wait_random_exponential(multiplier=1, max=30),
-        stop=stop_after_attempt(2),  # Limit to 2 attempts
-        reraise=True  # Reraise the last exception
+        stop=stop_after_attempt(2),
+        reraise=True
     )
     async def _run_ai_inference(self, prompt_context: LLMPromptContext) -> Any:
         try:
@@ -152,7 +154,7 @@ class Agent(BaseModel):
             if not llm_output:
                 raise ValueError("No output received from AI inference")
             
-            llm_output = llm_output[0]  # Get the first (and only) output
+            llm_output = llm_output[0]
             
             if prompt_context.llm_config.response_format == "text":
                 return llm_output.str_content or str(llm_output.raw_result)
