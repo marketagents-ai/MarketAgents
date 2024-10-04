@@ -9,7 +9,7 @@ class AgentPromptVariables(BaseModel):
     recent_memories: List[Dict[str, Any]] = Field(default_factory=list)
     perception: Optional[Any] = None
     observation: Optional[Any] = None
-    action_space: Dict[str, Any] = None
+    action_space: Dict[str, Any] = {}
     last_action: Optional[Any] = None
     reward: Optional[float] = None
     previous_strategy: Optional[str] = None

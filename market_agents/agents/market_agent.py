@@ -3,7 +3,7 @@ from datetime import datetime
 from market_agents.agents.market_schemas import PerceptionSchema, ReflectionSchema
 from pydantic import Field
 from market_agents.agents.base_agent.agent import Agent as LLMAgent
-from market_agents.inference.message_models import LLMConfig
+from market_agents.inference.message_models import LLMConfig, LLMPromptContext
 from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
 from market_agents.environments.environment import MultiAgentEnvironment, LocalObservation
 from market_agents.agents.protocols.protocol import Protocol
@@ -20,11 +20,23 @@ class MarketAgent(LLMAgent, EconomicAgent):
     prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
 
     @classmethod
-    def create(cls, agent_id: int, is_buyer: bool, num_units: int, base_value: float, use_llm: bool,
-        initial_cash: float, initial_goods: int, good_name: str, noise_factor: float = 0.1,
-        max_relative_spread: float = 0.2, llm_config: Optional[LLMConfig] = None,
-        environments: Dict[str, MultiAgentEnvironment] = None, protocol: Type[Protocol] = None,
-        persona: Persona = None) -> 'MarketAgent':
+    def create(
+        cls,
+        agent_id: int,
+        is_buyer: bool,
+        num_units: int,
+        base_value: float,
+        use_llm: bool,
+        initial_cash: float,
+        initial_goods: int,
+        good_name: str,
+        noise_factor: float = 0.1,
+        max_relative_spread: float = 0.2,
+        llm_config: Optional[LLMConfig] = None,
+        environments: Dict[str, MultiAgentEnvironment] = {},
+        protocol: Optional[Type[Protocol]] = None,
+        persona: Optional[Persona] = None
+    ) -> 'MarketAgent':
     
         econ_agent = create_economic_agent(
             agent_id=str(agent_id),
@@ -64,7 +76,7 @@ class MarketAgent(LLMAgent, EconomicAgent):
             llm_config=llm_agent.llm_config,
         )
 
-    async def perceive(self, environment_name: str) -> str:
+    async def perceive(self, environment_name: str, return_prompt: bool = False) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
@@ -79,14 +91,14 @@ class MarketAgent(LLMAgent, EconomicAgent):
         
         prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
         
-        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema())
+        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), return_prompt=return_prompt)
 
-    async def generate_action(self, environment_name: str, perception: Optional[str] = None) -> Dict[str, Any]:
+    async def generate_action(self, environment_name: str, perception: Optional[str] = None, return_prompt: bool = False) -> Union[Dict[str, Any], LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
         environment = self.environments[environment_name]
-        if perception is None:
+        if perception is None and not return_prompt:
             perception = await self.perceive(environment_name)
         environment_info = environment.get_global_state()
         action_space = environment.action_space
@@ -107,16 +119,19 @@ class MarketAgent(LLMAgent, EconomicAgent):
      
         action_schema = action_space.get_action_schema()
         
-        response = await self.execute(prompt, output_format=action_schema)
+        response = await self.execute(prompt, output_format=action_schema, return_prompt=return_prompt)
         
-        action = {
-            "sender": self.id,
-            "content": response,
-        }
-        self.last_action = response
-        return action
+        if not return_prompt:
+            action = {
+                "sender": self.id,
+                "content": response,
+            }
+            self.last_action = response
+            return action
+        else:
+            return response
 
-    async def reflect(self, environment_name: str) -> None:
+    async def reflect(self, environment_name: str, return_prompt: bool = False) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
         
@@ -145,15 +160,24 @@ class MarketAgent(LLMAgent, EconomicAgent):
         
         prompt = self.prompt_manager.get_reflection_prompt(variables.model_dump())
         
-        response = await self.execute(prompt, output_format=ReflectionSchema.model_json_schema())
+        response = await self.execute(prompt, output_format=ReflectionSchema.model_json_schema(), return_prompt=return_prompt)
         
-        self.memory.append({
-            "type": "reflection",
-            "content": response["reflection"],
-            "strategy_update": response["strategy_update"],
-            "observation": observation,
-            "reward": reward,
-            "timestamp": datetime.now().isoformat()
-        })
+        if not return_prompt:
+            if isinstance(response, dict):
+                reflection = response.get("reflection", "")
+                strategy_update = response.get("strategy_update")
+            else:
+                reflection = response
+                strategy_update = None
 
-        return response["reflection"]
+            self.memory.append({
+                "type": "reflection",
+                "content": reflection,
+                "strategy_update": strategy_update,
+                "observation": observation,
+                "reward": reward,
+                "timestamp": datetime.now().isoformat()
+            })
+            return reflection
+        else:
+            return response

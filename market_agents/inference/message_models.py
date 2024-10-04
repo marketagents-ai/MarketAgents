@@ -328,7 +328,7 @@ class LLMOutput(BaseModel):
                 json_object = GeneratedJsonObject(name="parsed_content" if name is None else name,
                                                    object=parsed_json)
                 content = None  # Set content to None when we have a parsed JSON object
-                print(f"parsed_json: {parsed_json} with name")
+                #print(f"parsed_json: {parsed_json} with name")
         if chat_completion.usage:
             usage = Usage(
                 prompt_tokens=chat_completion.usage.prompt_tokens,
@@ -388,4 +388,3 @@ class LLMOutput(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-

@@ -1,0 +1,10 @@
+model_configs:
+#  Hermes-3:
+#    api_url: "https://hermes-70b.legendarywou.com/v1/chat/completions"
+#    model: "/models/Hermes-3-Llama-3.1-70B"
+#  llama-3.1-70b:
+#    api_url: "https://llama3-70b.legendarywou.com/v1/chat/completions"
+#    model: "/models/Llama-3.1-70B-Instruct-FP8"
+  qwen25-72b:
+    api_url: "https://qwen25-70b.legendarywou.com/v1/chat/completions"
+    model: "models/Qwen2.5-72B-Instruct"
