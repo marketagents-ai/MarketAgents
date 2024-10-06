@@ -28,16 +28,16 @@ async def main():
     # seller_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
     vllm_model = os.getenv("VLLM_MODEL")
     litellm_model = os.getenv("LITELLM_MODEL")
-    # buyer_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
-    # seller_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
+    buyer_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
+    seller_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
     #vllm config
-    if vllm_model is not None:
-        buyer_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
-        seller_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
-    # #litellm config
-    if litellm_model is not None:
-        buyer_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
-        seller_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
+    # if vllm_model is not None:
+    #     buyer_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
+    #     seller_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
+    # # #litellm config
+    # if litellm_model is not None:
+    #     buyer_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
+    #     seller_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
 
     num_buyers = 1
     num_sellers = 1
@@ -89,6 +89,8 @@ async def main():
 
     # Run the market simulation
     await orchestrator.simulate_market(max_rounds=10, good_name="apple")
+    #plot the market results
+    print(orchestrator.get_market_summary("apple"))
 
 if __name__ == "__main__":
     asyncio.run(main())
