@@ -49,7 +49,7 @@ def create_tables():
     # Drop existing tables
     cursor.execute("DROP TABLE IF EXISTS agent_memories, preference_schedules, allocations, orders, trades, interactions, agents CASCADE")
 
-    # Update the agents table to use UUID
+    # Create tables with correct UUID types
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS agents (
         id UUID PRIMARY KEY,
@@ -61,7 +61,6 @@ def create_tables():
     )
     """)
 
-    # Update agent_memories table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS agent_memories (
         id SERIAL PRIMARY KEY,
@@ -118,8 +117,9 @@ def create_tables():
         seller_id UUID REFERENCES agents(id),
         quantity INTEGER NOT NULL,
         price DECIMAL(15, 2) NOT NULL,
-        buyer_value DECIMAL(15, 2) NOT NULL,
-        seller_cost DECIMAL(15, 2) NOT NULL,
+        buyer_surplus DECIMAL(15, 2) NOT NULL,
+        seller_surplus DECIMAL(15, 2) NOT NULL,
+        total_surplus DECIMAL(15, 2) NOT NULL,
         round INTEGER NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
@@ -168,7 +168,7 @@ def create_tables():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS perceptions (
         id SERIAL PRIMARY KEY,
-        memory_id INTEGER REFERENCES agent_memories(id),
+        memory_id UUID REFERENCES agents(id),
         environment_name TEXT NOT NULL,
         environment_info JSONB,
         recent_memories JSONB
@@ -190,7 +190,7 @@ def create_tables():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS reflections (
         id SERIAL PRIMARY KEY,
-        memory_id INTEGER REFERENCES agent_memories(id),
+        memory_id UUID REFERENCES agents(id),  
         environment_name TEXT NOT NULL,
         observation JSONB,
         environment_info JSONB,

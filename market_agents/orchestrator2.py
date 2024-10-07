@@ -11,6 +11,11 @@ import os
 import yaml
 import random
 import asyncio
+import psycopg2
+import psycopg2.extras
+import uuid
+from typing import Dict, Any
+import datetime
 
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.economics.econ_agent import create_economic_agent
@@ -102,6 +107,7 @@ class Orchestrator:
         self.latest_data = None
         self.trackers: Dict[str, AuctionTracker] = {}
         self.log_folder = Path("./outputs/interactions")
+        self.db_connection = self.setup_database_connection()
 
     def load_or_generate_personas(self) -> List[Persona]:
         personas_dir = Path("./market_agents/agents/personas/generated_personas")
@@ -210,14 +216,73 @@ class Orchestrator:
         for agent in self.agents:
             agent.environments = self.environments
 
-    def setup_database(self):
-        log_section(logger, "CONFIGURING SIMULATION DATABASE")
-        logger.info("Database setup skipped")
+    def setup_database_connection(self):
+        try:
+            connection = psycopg2.connect(
+                dbname=self.config.database_config.get('DB_NAME', 'market_simulation'),
+                user=self.config.database_config.get('DB_USER', 'db_user'),
+                password=self.config.database_config.get('DB_PASSWORD', 'db_pwd@123'),
+                host=self.config.database_config.get('DB_HOST', 'localhost'),
+                port=self.config.database_config.get('DB_PORT', '5433')
+            )
+            logger.info("Database connection established successfully")
+            return connection
+        except Exception as e:
+            logger.error(f"Failed to establish database connection: {str(e)}")
+            return None
+    def insert_test_data(self):
+        if self.db_connection is None:
+            logger.error("Database connection is not established")
+            return
+
+        test_data = {
+            'id': str(uuid.uuid4()),
+            'created_at': datetime.now().isoformat(),
+            'data': json.dumps({'test_key': 'test_value'})
+        }
+
+        query = """
+        INSERT INTO environments (id, created_at, data)
+        VALUES (%(id)s, %(created_at)s, %(data)s)
+        """
+        
+        try:
+            with self.db_connection.cursor() as cursor:
+                cursor.execute(query, test_data)
+            self.db_connection.commit()
+            logger.info("Successfully inserted test data into environments table")
+        except Exception as e:
+            self.db_connection.rollback()
+            logger.error(f"Error inserting test data into environments table: {str(e)}")
+    
+    def write_db(self, table_name: str, data: Dict[str, Any]):
+        if self.db_connection is None:
+            logger.error("Database connection is not established")
+            return
+
+        columns = ', '.join(data.keys())
+        placeholders = ', '.join(['%s'] * len(data))
+        query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        
+        try:
+            with self.db_connection.cursor() as cursor:
+                cursor.execute(query, list(data.values()))
+            self.db_connection.commit()
+            logger.info(f"Successfully inserted data into {table_name}")
+        except Exception as e:
+            self.db_connection.rollback()
+            raise Exception(f"Error inserting data into {table_name}: {str(e)}")
 
     async def run_simulation(self):
         log_section(logger, "SIMULATION COMMENCING")
+        if self.db_connection is None:
+            self.db_connection = self.setup_database_connection()
+            if self.db_connection is None:
+                logger.error("Failed to establish database connection. Aborting simulation.")
+                return
 
         try:
+            self.insert_test_data()
             for round_num in range(1, self.config.max_rounds + 1):
                 log_round(logger, round_num)
 
@@ -225,8 +290,103 @@ class Orchestrator:
                     try:
                         env_state = await self.run_environment(env_name, round_num)
                         self.update_simulation_state(env_name, env_state)
+                        # Write environment data
+                        self.write_db('environments', {
+                            'id': uuid.uuid4(),
+                            'created_at': psycopg2.extras.Json(datetime.now())
+                        })
+
+                        # Write auction data if applicable
+                        if isinstance(env_state.global_observation, AuctionGlobalObservation):
+                            auction = env_state.global_observation.auction
+                            self.write_db('auctions', {
+                                'max_rounds': auction.max_rounds,
+                                'current_round': auction.current_round,
+                                'total_surplus_extracted': auction.total_surplus_extracted,
+                                'average_prices': psycopg2.extras.Json(auction.average_prices),
+                                'order_book': psycopg2.extras.Json(auction.order_book),
+                                'trade_history': psycopg2.extras.Json(auction.trade_history)
+                            })
+
+                            for trade in env_state.global_observation.all_trades:
+                                self.write_db('trades', {
+                                    'buyer_id': trade.buyer_id,
+                                    'seller_id': trade.seller_id,
+                                    'quantity': trade.quantity,
+                                    'price': trade.price,
+                                    'buyer_value': trade.buyer_value,
+                                    'seller_cost': trade.seller_cost,
+                                    'round': round_num
+                                })
+
+                        # Write agent-specific data
+                        for agent in env_state.environment.agents:
+                            allocation = env_state.allocations[agent.id]
+                            self.write_db('allocations', {
+                                'agent_id': agent.id,
+                                'goods': allocation.goods,
+                                'cash': allocation.cash,
+                                'locked_goods': allocation.locked_goods,
+                                'locked_cash': allocation.locked_cash,
+                                'initial_goods': allocation.initial_goods,
+                                'initial_cash': allocation.initial_cash
+                            })
+
+                            for order in env_state.orders[agent.id]:
+                                self.write_db('orders', {
+                                    'agent_id': agent.id,
+                                    'is_buy': order.is_buy,
+                                    'quantity': order.quantity,
+                                    'price': order.price,
+                                    'base_value': order.base_value,
+                                    'base_cost': order.base_cost
+                                })
+
+                            # Write agent memory, perception, action, and reflection
+                            memory_id = uuid.uuid4()
+                            self.write_db('agent_memories', {
+                                'id': memory_id,
+                                'agent_id': agent.id,
+                                'step_id': round_num,
+                                'memory_data': psycopg2.extras.Json(agent.memory.get_recent_memories())
+                            })
+
+                            perception = env_state.perceptions[agent.id]
+                            self.write_db('perceptions', {
+                                'memory_id': memory_id,
+                                'environment_name': perception.environment_name,
+                                'environment_info': psycopg2.extras.Json(perception.environment_info),
+                                'recent_memories': psycopg2.extras.Json(perception.recent_memories)
+                            })
+
+                            action = env_state.actions[agent.id]
+                            self.write_db('actions', {
+                                'memory_id': memory_id,
+                                'environment_name': action.environment_name,
+                                'perception': psycopg2.extras.Json(action.perception),
+                                'environment_info': psycopg2.extras.Json(action.environment_info),
+                                'recent_memories': psycopg2.extras.Json(action.recent_memories),
+                                'action_space': psycopg2.extras.Json(action.action_space)
+                            })
+
+                            reflection = env_state.reflections[agent.id]
+                            self.write_db('reflections', {
+                                'memory_id': memory_id,
+                                'environment_name': reflection.environment_name,
+                                'observation': psycopg2.extras.Json(reflection.observation),
+                                'environment_info': psycopg2.extras.Json(reflection.environment_info),
+                                'last_action': psycopg2.extras.Json(reflection.last_action),
+                                'reward': reflection.reward,
+                                'previous_strategy': reflection.previous_strategy
+                            })
+                            self.write_db('environments', {
+                    'id': uuid.uuid4(),
+                    'created_at': psycopg2.extras.Json(datetime.now().isoformat())
+                })
+
                     except Exception as e:
                         logger.error(f"Error in environment {env_name}: {str(e)}")
+
 
                 for agent in self.agents:
                     try:
@@ -244,6 +404,9 @@ class Orchestrator:
         except Exception as e:
             logger.error(f"Simulation failed: {str(e)}")
         finally:
+            if self.db_connection:
+                self.db_connection.close()
+                logger.info("Database connection closed")
             log_completion(logger, "SIMULATION COMPLETED")
             self.print_summary()
 
