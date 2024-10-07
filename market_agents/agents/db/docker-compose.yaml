@@ -1,0 +1,35 @@
+version: '3'
+
+services:
+  db:
+    image: ankane/pgvector:v0.5.1
+    environment:
+      POSTGRES_DB: market_simulation
+      POSTGRES_USER: db_user
+      POSTGRES_PASSWORD: db_pwd@123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - app-network
+
+  app:
+    build: .
+    environment:
+      DB_NAME: market_simulation
+      DB_USER: db_user
+      DB_PASSWORD: db_pwd@123
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
