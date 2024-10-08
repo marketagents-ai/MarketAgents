@@ -23,10 +23,11 @@ reflection: |
   Observation: {observation}
   Environment State: {environment_info}
   Last Action: {last_action}
-  Reward: {reward}
+  Reward from Environment: {reward}
 
   Actions:
-  1. Reflect on the observation and surplus based on your last action
-  2. Update strategy based on this reflection, the surplus, and your previous strategy
+  1. Reflect on your actions, observations and reward (if available)
+  2. Assign yourself a reward between 0.0 and 1.0 based on your performance and alignment with your objectives & strategy.
+  3. Update strategy based on this reflection and your previous strategy.
 
   Previous strategy: {previous_strategy}
