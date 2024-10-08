@@ -69,14 +69,18 @@ class MarketAgent(LLMAgent, EconomicAgent):
             use_llm=use_llm, 
             address=f"agent_{agent_id}_address",
             environments=environments or {},
-            protocol=protocol,  # This should be the ACLMessage class, not an instance
+            protocol=protocol,
             role=llm_agent.role,
             persona=llm_agent.persona,
             objectives=llm_agent.objectives,
             llm_config=llm_agent.llm_config,
         )
 
-    async def perceive(self, environment_name: str, return_prompt: bool = False) -> Union[str, LLMPromptContext]:
+    async def perceive(
+            self,
+            environment_name: str,
+            return_prompt: bool = False
+        ) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
@@ -93,7 +97,12 @@ class MarketAgent(LLMAgent, EconomicAgent):
         
         return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), return_prompt=return_prompt)
 
-    async def generate_action(self, environment_name: str, perception: Optional[str] = None, return_prompt: bool = False) -> Union[Dict[str, Any], LLMPromptContext]:
+    async def generate_action(
+            self,
+            environment_name: str,
+            perception: Optional[str] = None,
+            return_prompt: bool = False
+        ) -> Union[Dict[str, Any], LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
@@ -131,53 +140,77 @@ class MarketAgent(LLMAgent, EconomicAgent):
         else:
             return response
 
-    async def reflect(self, environment_name: str, return_prompt: bool = False) -> Union[str, LLMPromptContext]:
+    async def reflect(
+        self,
+        environment_name: str,
+        environment_reward_weight: float = 0.5,
+        self_reward_weight: float = 0.5,
+        return_prompt: bool = False
+    ) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
         
+        total_weight = environment_reward_weight + self_reward_weight
+        if total_weight == 0:
+            raise ValueError("Sum of weights must not be zero.")
+        environment_reward_weight /= total_weight
+        self_reward_weight /= total_weight
+
         environment = self.environments[environment_name]
         last_step = environment.history.steps[-1][1] if environment.history.steps else None
-        
+
         if last_step:
-            local_step = last_step.get_local_step(self.id)
-            observation = local_step.observation.observation
-            reward = local_step.info.get('reward', 0)
+            reward = last_step.info.get('agent_rewards', {}).get(self.id, 0.0)
+            local_observation = last_step.global_observation.observations.get(self.id)
+            if local_observation:
+                observation = local_observation.observation
+            else:
+                observation = {}
         else:
             observation = {}
-            reward = 0
+            reward = 0.0
 
         environment_info = environment.get_global_state()
         previous_strategy = self.memory[-1].get('strategy_update', 'No previous strategy') if self.memory else 'No previous strategy'
-        
+
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
-            observation=observation,
+            observation=observation if isinstance(observation, dict) else observation.model_dump(),
             last_action=self.last_action,
             reward=reward,
             previous_strategy=previous_strategy
         )
-        
+
         prompt = self.prompt_manager.get_reflection_prompt(variables.model_dump())
-        
-        response = await self.execute(prompt, output_format=ReflectionSchema.model_json_schema(), return_prompt=return_prompt)
-        
-        if not return_prompt:
-            if isinstance(response, dict):
-                reflection = response.get("reflection", "")
-                strategy_update = response.get("strategy_update")
-            else:
-                reflection = response
-                strategy_update = None
+
+        response = await self.execute(
+            prompt,
+            output_format=ReflectionSchema.model_json_schema(),
+            return_prompt=return_prompt
+        )
+
+        if not return_prompt and isinstance(response, dict):
+            self_reward = response.get("self_reward", 0.0)
+            environment_reward = reward if reward is not None else 0.0
+
+            total_reward = (
+                environment_reward * environment_reward_weight +
+                self_reward * self_reward_weight
+            )
 
             self.memory.append({
                 "type": "reflection",
-                "content": reflection,
-                "strategy_update": strategy_update,
-                "observation": observation,
-                "reward": reward,
+                "content": response["reflection"],
+                "strategy_update": response["strategy_update"],
+                "observation": observation if isinstance(observation, dict) else observation.model_dump(),
+                "environment_reward": environment_reward,
+                "self_reward": self_reward,
+                "total_reward": total_reward,
                 "timestamp": datetime.now().isoformat()
             })
-            return reflection
+            return response["reflection"]
         else:
             return response
+
+
