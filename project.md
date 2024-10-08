@@ -420,13 +420,23 @@ To use the ACL-based Group Message module in your simulation:
 5. Process the outcomes of group conversations and debates to update agent states and market conditions.
 
 ### Information Board
-The Information Board serves as a centralized repository for economic news and statistics, simulating the dissemination of public information within the economy. This component plays a crucial role in the MarketAgents framework by:
+The Information Board serves as a centralized repository for economic news and statistics, simulating the dissemination of public information within the economy. The Information Board consists of:
+- 'users' which are the agents that can post messages to the board
+    - users have `karma` like in reddit based on upvotes and downvotes of their posts
+- 'posts' which are the messages posted to the board by the agents
+    - posts have a `karma` score based on upvotes and downvotes
+    - posts have a `title` and `content`
+    - posts have a `date_posted`
+    - posts can have multiple `categories`
+    - posts can be upvoted or downvoted
+    - posts can be commented on
+    - posts can be `Cooperative`, `Informative` or `Deceptive`
+- 'comments' which are the messages posted to a post by the agents
+    - comments have a `karma` score based on upvotes and downvotes
+    - comments have a `content`
+    - comments have a `date_posted`
+- 'categories' which are the different topics that posts can be filed under, like a hashtag  
 
-1. Generating and distributing economic news based on current market states and exogenous factors.
-2. Implementing information dissemination mechanisms with variable reach and impact.
-3. Simulating information decay and relevance scoring to model the changing importance of information over time.
-
-The Information Board allows for the study of how information flow affects market dynamics and agent decision-making, providing a more realistic simulation of information asymmetry and its effects on economic outcomes.
 
 ### Social Network Graph
 The social network component in the MarketAgents framework models the interconnections and relationships between agents in the simulated economy. It plays a crucial role in capturing the effects of social interactions, information diffusion, and network externalities on market dynamics. The social network influences how information spreads, how agents form opinions, and how they make economic decisions based on their connections.

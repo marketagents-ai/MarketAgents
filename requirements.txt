@@ -11,3 +11,5 @@ names==0.3.0
 tiktoken==0.7.0
 aiohttp
 scipy
+fastapi
+uvicorn
