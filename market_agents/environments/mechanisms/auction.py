@@ -5,7 +5,7 @@ from typing import Any, List, Dict, Union, Type
 from pydantic import BaseModel, Field, field_validator
 from market_agents.environments.environment import (
     Mechanism, LocalAction, GlobalAction, LocalObservation, GlobalObservation,
-    EnvironmentStep, ActionSpace, ObservationSpace
+    EnvironmentStep, ActionSpace, ObservationSpace, MultiAgentEnvironment
 )
 from market_agents.economics.econ_models import Bid, Ask, MarketAction, Trade
 import random
@@ -29,7 +29,7 @@ class AuctionAction(LocalAction):
         return cls(agent_id=agent_id, action=action)
     
     @classmethod
-    def action_schema(cls) -> Type[BaseModel]:
+    def action_schema(cls) -> Dict[str, Any]:
         return MarketAction.model_json_schema()
 
 class GlobalAuctionAction(GlobalAction):
@@ -59,7 +59,7 @@ class AuctionObservationSpace(ObservationSpace):
 
 
 class DoubleAuction(Mechanism):
-    max_rounds: int = Field(..., description="Maximum number of auction rounds")
+    max_rounds: int = Field(default=10, description="Maximum number of auction rounds")
     current_round: int = Field(default=0, description="Current round number")
     trades: List[Trade] = Field(default_factory=list, description="List of executed trades")
     waiting_bids: List[AuctionAction] = Field(default_factory=list, description="List of waiting bids")
@@ -197,3 +197,11 @@ class DoubleAuction(Mechanism):
             "total_volume": len(trades),
             "price_range": (min(prices), max(prices))
         }
+
+class AuctionMarket(MultiAgentEnvironment):
+    name: str = Field(default="Auction Market", description="Name of the auction market")
+    
+    action_space : AuctionActionSpace = Field(default_factory=AuctionActionSpace, description="Action space of the auction market")
+    observation_space : AuctionObservationSpace = Field(default_factory=AuctionObservationSpace, description="Observation space of the auction market")
+    mechanism : DoubleAuction = Field(default_factory=DoubleAuction, description="Mechanism of the auction market")
+

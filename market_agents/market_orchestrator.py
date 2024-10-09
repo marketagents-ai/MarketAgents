@@ -1,8 +1,9 @@
-from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
+from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.economics.econ_models import Basket, Good, Trade, Bid, Ask
 from market_agents.economics.equilibrium import Equilibrium
+from market_agents.economics.scenario import Scenario
 from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
-from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation
+from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation, AuctionMarket
 from market_agents.economics.analysis import analyze_and_plot_market_results
 from market_agents.inference.parallel_inference import ParallelAIUtilities
 from market_agents.inference.message_models import LLMPromptContext, LLMOutput
@@ -17,16 +18,20 @@ class MarketStep(BaseModel):
     market_id: str
     step_number: int
     participating_agent_ids: Set[str]
+    equilibrium: Equilibrium
+    episode: int
 
 class MarketOrchestratorState(BaseModel):
     steps: List[MarketStep] = Field(default_factory=list)
 
-    def add_step(self, market_id: str, participating_agent_ids: Set[str]):
+    def add_step(self, market_id: str, participating_agent_ids: Set[str], equilibrium: Equilibrium, episode: int):
         step_number = self.get_market_step_count(market_id) + 1
         new_step = MarketStep(
             market_id=market_id,
             step_number=step_number,
-            participating_agent_ids=participating_agent_ids
+            participating_agent_ids=participating_agent_ids,
+            equilibrium=equilibrium,
+            episode=episode
         )
         self.steps.append(new_step)
 
@@ -61,34 +66,48 @@ class MarketOrchestratorState(BaseModel):
         return [step for step in self.steps if step.market_id == market_id]
 
 class MarketOrchestrator:
-    def __init__(self, agents: Union[List[SimpleAgent], List[EconomicAgent]], markets: List[MultiAgentEnvironment], ai_utils: ParallelAIUtilities):
-        self.agents = agents
-        self.markets = markets
+    def __init__(self, 
+                llm_agents: List[SimpleAgent],
+                goods: List[str],
+                ai_utils: ParallelAIUtilities = ParallelAIUtilities(),
+                max_rounds: int = 10,
+                scenario: Optional[Scenario] = None):
+        self.llm_agents = llm_agents
+        self.goods = goods
+        self.max_rounds = max_rounds
+        self.markets = self.create_markets(self.goods)
         self.ai_utils = ai_utils
-        self.markets_dict = self.create_markets_dict(markets)
-        self.agents_dict = self.create_agents_dict(agents)
+        self.scenario = scenario
+        self.agents_dict, self.llm_agents_dict, self.zi_agents_dict = self.create_agents_dicts()
+        self.agents = list(self.agents_dict.values())
         self.failed_actions: List[LLMOutput] = []
-        typed_agents = [agent for agent in agents if isinstance(agent, EconomicAgent)]
-        typed_mechanisms = [market.mechanism for market in markets if isinstance(market.mechanism, DoubleAuction)]
-        self.equilibrium = Equilibrium(agents=typed_agents, goods=[mechanism.good_name for mechanism in typed_mechanisms])
         self.state = MarketOrchestratorState()
 
-    def create_markets_dict(self, markets: List[MultiAgentEnvironment]) -> Dict[str, MultiAgentEnvironment]:
+    def get_current_equilibrium(self) -> Equilibrium:
+        typed_agents = [agent for agent in self.agents if isinstance(agent, EconomicAgent)]
+        return Equilibrium(agents=typed_agents, goods=self.goods)
+
+    def create_markets(self, goods: List[str]) -> Dict[str, AuctionMarket]:
         markets_dict = {}
-        for market in markets:
-            if not isinstance(market.mechanism, DoubleAuction):
-                raise ValueError(f"Market {market.mechanism} is not a DoubleAuction")
-            markets_dict[market.mechanism.good_name] = market
+        for good in goods:
+            markets_dict[good] = AuctionMarket(name=f"Auction {good} Market",mechanism = DoubleAuction(good_name=good, max_rounds=self.max_rounds))
         return markets_dict
     
-    def create_agents_dict(self, agents: Union[List[SimpleAgent], List[EconomicAgent]]) -> Dict[str, Union[SimpleAgent, EconomicAgent]]:
-        return {agent.id: agent for agent in agents}
+    def create_agents_dicts(self) -> Tuple[Dict[str, Union[SimpleAgent, EconomicAgent]],
+                                            Dict[str, SimpleAgent], 
+                                            Dict[str, EconomicAgent]]:
+        zi_dict = {}
+        if self.scenario:
+            zi_agents = self.scenario.agents
+            zi_dict = {agent.id: agent for agent in zi_agents}
+        llm_dict = {agent.id: agent for agent in self.llm_agents}
+        return {**zi_dict, **llm_dict}, llm_dict, zi_dict
     
-    def get_zero_intelligence_agents(self):
-        return [agent for agent in self.agents if not isinstance(agent, SimpleAgent)]
+    def get_zero_intelligence_agents(self) -> List[EconomicAgent]:
+        return list(self.zi_agents_dict.values())
     
-    def get_llm_agents(self):
-        return [agent for agent in self.agents if isinstance(agent, SimpleAgent)]
+    def get_llm_agents(self) -> List[SimpleAgent]:
+        return list(self.llm_agents_dict.values())
     
     def get_agent(self, agent_id: str) -> Union[SimpleAgent, EconomicAgent]:
         return self.agents_dict[agent_id]
@@ -140,6 +159,31 @@ class MarketOrchestrator:
             self.failed_actions.append(output)
         return market_action
     
+    def generate_market_report(self, trades: List[Trade], agents: List[Union[SimpleAgent, EconomicAgent]], 
+                               good_name: str, max_rounds: int, cumulative_quantities: List[int], cumulative_surplus: List[float]):
+        analyze_and_plot_market_results(
+            trades=trades,
+            agents=agents,
+            equilibrium=self.get_current_equilibrium(),
+            goods=[good_name],
+            max_rounds=max_rounds,
+            cumulative_quantities=cumulative_quantities,
+            cumulative_surplus=cumulative_surplus
+        )
+
+    def get_market_summary(self, market_id: str):
+        return {
+            "total_steps": self.state.get_market_step_count(market_id),
+            "participating_agents": self.state.get_participating_agents(market_id),
+            "history": self.state.get_market_history(market_id)
+        }
+
+    def get_overall_summary(self):
+        return {
+            "market_steps": self.state.market_step_counts,
+            "agent_participations": self.state.agent_participation_counts
+        }
+    
     def create_local_actions_llm(self, good_name: str, llm_outputs: List[LLMOutput]) -> Dict[str, AuctionAction]:
         actions = {}
         for output in llm_outputs:
@@ -180,7 +224,7 @@ class MarketOrchestrator:
                 agent.update_state(global_observation.observations[agent.id])
     
     async def run_auction_step(self, good_name: str) -> Tuple[EnvironmentStep, List[float]]:
-        environment = self.markets_dict[good_name]
+        environment = self.markets[good_name]
         llm_agents = self.get_llm_agents()
         
         # Generate actions for LLM agents
@@ -205,11 +249,11 @@ class MarketOrchestrator:
         
         # Update state
         participating_agent_ids = set(all_actions.keys())
-        self.state.add_step(good_name, participating_agent_ids)
+        self.state.add_step(good_name, participating_agent_ids, self.get_current_equilibrium(), self.scenario._current_episode if self.scenario else 0)
         
         return step_result, surplus
     
-    async def simulate_market(self, max_rounds: int, good_name: str):
+    async def run_auction_episode(self, max_rounds: int, good_name: str):
         relevant_agents = [agent for agent in self.agents if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
         
         all_trades: List[Trade] = []
@@ -239,7 +283,8 @@ class MarketOrchestrator:
             if step_result.done:
                 logger.info("Market simulation completed.")
                 break
-        
+        if self.scenario:
+            self.scenario.episode()
         # Reset pending orders for all agents
         for agent in relevant_agents:
             agent.reset_all_pending_orders()
@@ -251,27 +296,12 @@ class MarketOrchestrator:
         # Generate market report
         self.generate_market_report(all_trades, relevant_agents, good_name, max_rounds, cumulative_quantities, cumulative_surplus)
 
-    def generate_market_report(self, trades: List[Trade], agents: List[Union[SimpleAgent, EconomicAgent]], 
-                               good_name: str, max_rounds: int, cumulative_quantities: List[int], cumulative_surplus: List[float]):
-        analyze_and_plot_market_results(
-            trades=trades,
-            agents=agents,
-            equilibrium=self.equilibrium,
-            goods=[good_name],
-            max_rounds=max_rounds,
-            cumulative_quantities=cumulative_quantities,
-            cumulative_surplus=cumulative_surplus
-        )
+    async def run_scenario(self):
+        if self.scenario:
+            for episode in range(self.scenario.num_episodes):
+                for good in self.scenario.goods:
+                    await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good)
+        else:
+            for good in self.goods:
+                await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good)
 
-    def get_market_summary(self, market_id: str):
-        return {
-            "total_steps": self.state.get_market_step_count(market_id),
-            "participating_agents": self.state.get_participating_agents(market_id),
-            "history": self.state.get_market_history(market_id)
-        }
-
-    def get_overall_summary(self):
-        return {
-            "market_steps": self.state.market_step_counts,
-            "agent_participations": self.state.agent_participation_counts
-        }

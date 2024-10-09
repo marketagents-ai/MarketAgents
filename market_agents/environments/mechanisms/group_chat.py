@@ -29,7 +29,7 @@ class GroupChatAction(LocalAction):
         )
 
     @classmethod
-    def action_schema(cls) -> Type[BaseModel]:
+    def action_schema(cls) -> Dict[str, Any]:
         return cls.model_json_schema()
 
 class GroupChatGlobalAction(GlobalAction):

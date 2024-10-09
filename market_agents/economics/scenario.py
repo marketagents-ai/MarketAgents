@@ -12,15 +12,15 @@ class Scenario(BaseModel):
     name: str
     goods: List[str]
     factories: List[ZiFactory]
-    _current_step: int = 0
+    _current_episode: int = 0
 
     @property
-    def num_steps(self) -> int:
+    def num_episodes(self) -> int:
         return len(self.factories)
 
-    def step(self) -> int:
-        current = self._current_step
-        self._current_step = (self._current_step + 1) % self.num_steps
+    def episode(self) -> int:
+        current = self._current_episode
+        self._current_episode = (self._current_episode + 1) % self.num_episodes
         return current
 
     @computed_field
@@ -28,21 +28,21 @@ class Scenario(BaseModel):
     def equilibriums(self) -> List[Equilibrium]:
         logger.info("Computing equilibriums...")
         return [
-            Equilibrium(agents=self._get_agents(step), goods=self.goods)
-            for step in range(self.num_steps)
+            Equilibrium(agents=self._get_agents(episode), goods=self.goods)
+            for episode in range(self.num_episodes)
         ]
 
-    def _get_agents(self, step: int) -> List[EconomicAgent]:
-        return self.factories[step].agents
+    def _get_agents(self, episode: int) -> List[EconomicAgent]:
+        return self.factories[episode].agents
 
     @computed_field
     @property
     def agents(self) -> List[EconomicAgent]:
-        return self._get_agents(self._current_step)
+        return self._get_agents(self._current_episode)
 
     @computed_field
     def ce(self) -> Equilibrium:
-        return self.equilibriums[self._current_step]
+        return self.equilibriums[self._current_episode]
 
     @computed_field
     @cached_property
@@ -69,7 +69,7 @@ class Scenario(BaseModel):
         equilibrium_prices = []
         equilibrium_quantities = []
         
-        for step, equilibrium in enumerate(self.equilibriums):
+        for episode, equilibrium in enumerate(self.equilibriums):
             eq_data = equilibrium.calculate_equilibrium()[good]
             eq_price = eq_data['price']
             eq_quantity = eq_data['quantity']
@@ -82,9 +82,9 @@ class Scenario(BaseModel):
                 supply_quantities = list(range(1, len(supply_prices) + 1))
                 
                 ax.step(demand_quantities, demand_prices, where='post', 
-                        alpha=0.3, color='blue', label=f'Demand (Step {step})' if step == 0 else "")
+                        alpha=0.3, color='blue', label=f'Demand (episode {episode})' if episode == 0 else "")
                 ax.step(supply_quantities, supply_prices, where='post', 
-                        alpha=0.3, color='red', label=f'Supply (Step {step})' if step == 0 else "")
+                        alpha=0.3, color='red', label=f'Supply (episode {episode})' if episode == 0 else "")
             
             # Plot equilibrium point
             ax.plot(eq_quantity, eq_price, 'go', markersize=10)
@@ -130,17 +130,17 @@ if __name__ == "__main__":
         is_buyer=False
     )
 
-    # Create a list of factories, one for each step
+    # Create a list of factories, one for each episode
     factories = [
         ZiFactory(
-            id=f"factory_step_{i}",
+            id=f"factory_episode_{i}",
             goods=["apple"],
-            num_buyers=10+i,  # Increase buyers by 1 each step
-            num_sellers=10+ i*2,     # Keep sellers constant
+            num_buyers=int(10+(i*3)),  # Increase buyers by 1 each episode
+            num_sellers=10+ i,     # Keep sellers constant
             buyer_params=buyer_params,
             seller_params=seller_params
         )
-        for i in range(0,50,5)  
+        for i in range(0,500,5)  
     ]
 
     scenario = Scenario(
