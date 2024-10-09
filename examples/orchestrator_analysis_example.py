@@ -69,28 +69,14 @@ async def main():
     agents = buyers + sellers
 
     # Create DoubleAuction mechanism
-    double_auction = DoubleAuction(
-        max_rounds=10,
-        good_name="apple"
-    )
 
-    # Create MultiAgentEnvironment
-    environment = MultiAgentEnvironment(
-        name="Apple Market",
-        address="apple_market",
-        max_steps=10,
-        action_space=AuctionActionSpace(),
-        observation_space=AuctionObservationSpace(),
-        mechanism=double_auction
-    )
 
-    # Create MarketOrchestrator
-    orchestrator = MarketOrchestrator(agents=agents, markets=[environment], ai_utils=parallel_ai)
+    orchestrator = MarketOrchestrator(llm_agents=agents, goods=[apple.name], ai_utils=parallel_ai,max_rounds=1)
 
     # Run the market simulation
-    await orchestrator.simulate_market(max_rounds=10, good_name="apple")
+    await orchestrator.run_scenario()
     #plot the market results
-    print(orchestrator.get_market_summary("apple"))
+    print(orchestrator.state)
 
 if __name__ == "__main__":
     asyncio.run(main())

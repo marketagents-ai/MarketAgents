@@ -1,33 +1,49 @@
 from typing import List, Dict, Tuple
-from pydantic import BaseModel
+from pydantic import BaseModel,computed_field
 import matplotlib.pyplot as plt
 import logging
 import random
 from market_agents.economics.econ_agent import EconomicAgent, ZiFactory, ZiParams
 from market_agents.economics.econ_models import Trade
+from functools import cached_property
 # Set up logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
+
+class EquilibriumResults(BaseModel):
+    price: float
+    quantity: int
+    buyer_surplus: float
+    seller_surplus: float
+    total_surplus: float
+    good_name: str
 
 class Equilibrium(BaseModel):
     agents: List[EconomicAgent]
     goods: List[str]
 
-    def calculate_equilibrium(self) -> Dict[str, Dict[str, float]]:
+    def calculate_equilibrium(self) -> Dict[str, EquilibriumResults]:
         equilibria = {}
         for good in self.goods:
             logger.info(f"Calculating equilibrium for {good}")
             demand_prices, supply_prices = self._aggregate_curves(good)
             equilibrium_price, equilibrium_quantity = self._find_intersection(demand_prices, supply_prices)
-            equilibria[good] = {
-                "price": equilibrium_price,
-                "quantity": equilibrium_quantity,
-                "buyer_surplus": self._calculate_surplus(demand_prices, equilibrium_price, equilibrium_quantity, is_buyer=True),
-                "seller_surplus": self._calculate_surplus(supply_prices, equilibrium_price, equilibrium_quantity, is_buyer=False),
-            }
-            equilibria[good]["total_surplus"] = equilibria[good]["buyer_surplus"] + equilibria[good]["seller_surplus"]
-            logger.info(f"Equilibrium for {good}: {equilibria[good]}")
+            equilibria[good]=EquilibriumResults(
+                price=equilibrium_price,
+                quantity=equilibrium_quantity,
+                buyer_surplus=self._calculate_surplus(demand_prices, equilibrium_price, equilibrium_quantity, is_buyer=True),
+                seller_surplus=self._calculate_surplus(supply_prices, equilibrium_price, equilibrium_quantity, is_buyer=False),
+                total_surplus=self._calculate_surplus(demand_prices, equilibrium_price, equilibrium_quantity, is_buyer=True) + self._calculate_surplus(supply_prices, equilibrium_price, equilibrium_quantity, is_buyer=False),
+                good_name=good
+            )  
         return equilibria
+    
+    @computed_field
+    @cached_property
+    def equilibrium(self) -> Dict[str, EquilibriumResults]:
+        return self.calculate_equilibrium()
+    
+
 
     def _aggregate_curves(self, good: str) -> Tuple[List[float], List[float]]:
         demand_prices = []
@@ -103,9 +119,9 @@ class Equilibrium(BaseModel):
         ax.step(supply_quantities, supply_prices_plot, where='pre', label='Aggregate Supply', color='red')
 
         # Plot equilibrium point
-        equilibrium = self.calculate_equilibrium()[good]
-        equilibrium_quantity = equilibrium['quantity']
-        equilibrium_price = equilibrium['price']
+        equilibrium = self.equilibrium[good]
+        equilibrium_quantity = equilibrium.quantity
+        equilibrium_price = equilibrium.price
 
         ax.plot([equilibrium_quantity], [equilibrium_price], 'go', label='Equilibrium')
 
@@ -183,9 +199,10 @@ if __name__ == "__main__":
     print("Theoretical Equilibrium Results:")
     for good, data in result.items():
         print(f"\nGood: {good}")
-        for key, value in data.items():
+        dumped_data = data.model_dump() 
+        for key, value in dumped_data.items():
             print(f"  {key}: {value}")
-    theoretical_total_surplus = sum(data['total_surplus'] for data in result.values())
+    theoretical_total_surplus = sum(dumped_data['total_surplus'] for data in result.values())
     print(f"\nTheoretical Total Surplus: {theoretical_total_surplus:.2f}")
     
     # Plot the supply and demand curves

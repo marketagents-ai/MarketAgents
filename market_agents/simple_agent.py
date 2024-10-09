@@ -1,4 +1,4 @@
-from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
+from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.economics.econ_models import Basket, Good, Trade, Endowment, Bid, Ask, SellerPreferenceSchedule, BuyerPreferenceSchedule
 from market_agents.inference.parallel_inference import ParallelAIUtilities
 from market_agents.inference.message_models import LLMPromptContext, StructuredTool, LLMConfig, LLMOutput

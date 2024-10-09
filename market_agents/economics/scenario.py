@@ -2,7 +2,7 @@ from typing import List, Dict
 from pydantic import BaseModel, Field, computed_field
 from functools import cached_property
 from market_agents.economics.econ_agent import ZiFactory, ZiParams, EconomicAgent
-from market_agents.economics.equilibrium import Equilibrium
+from market_agents.economics.equilibrium import Equilibrium, EquilibriumResults
 import logging
 import matplotlib.pyplot as plt
 
@@ -18,7 +18,7 @@ class Scenario(BaseModel):
     def num_episodes(self) -> int:
         return len(self.factories)
 
-    def episode(self) -> int:
+    def next_episode(self) -> int:
         current = self._current_episode
         self._current_episode = (self._current_episode + 1) % self.num_episodes
         return current
@@ -48,7 +48,7 @@ class Scenario(BaseModel):
     @cached_property
     def prices(self) -> Dict[str, List[float]]:
         return {
-            good: [eq.calculate_equilibrium()[good]['price'] for eq in self.equilibriums]
+            good: [eq.calculate_equilibrium()[good].price for eq in self.equilibriums]
             for good in self.goods
         }
 
@@ -56,11 +56,11 @@ class Scenario(BaseModel):
     @cached_property
     def quantities(self) -> Dict[str, List[int]]:
         return {
-            good: [int(eq.calculate_equilibrium()[good]['quantity']) for eq in self.equilibriums]
+            good: [eq.calculate_equilibrium()[good].quantity for eq in self.equilibriums]
             for good in self.goods
         }
 
-    def run(self) -> List[Dict[str, Dict[str, float]]]:
+    def run(self) -> List[Dict[str, EquilibriumResults]]:
         return [eq.calculate_equilibrium() for eq in self.equilibriums]
     
     def plot_dynamic_equilibrium(self, good: str, include_supply_demand: bool = False):
@@ -71,8 +71,8 @@ class Scenario(BaseModel):
         
         for episode, equilibrium in enumerate(self.equilibriums):
             eq_data = equilibrium.calculate_equilibrium()[good]
-            eq_price = eq_data['price']
-            eq_quantity = eq_data['quantity']
+            eq_price = eq_data.price
+            eq_quantity = eq_data.quantity
             equilibrium_prices.append(eq_price)
             equilibrium_quantities.append(eq_quantity)
             

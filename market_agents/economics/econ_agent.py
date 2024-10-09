@@ -38,6 +38,17 @@ class EconomicAgent(BaseModel):
     cost_schedules: Dict[str, SellerPreferenceSchedule] = Field(default_factory=dict)
     max_relative_spread: float = Field(default=0.2)
     pending_orders: Dict[str, List[MarketAction]] = Field(default_factory=dict)
+    archived_endowments: List[Endowment] = Field(default_factory=list)
+
+    def archive_endowment(self, new_basket: Optional[Basket]=None):
+        #first we model_copy the current endowment and we add the copy to the list
+        #then we model_copy the current endowment with a new endowment without trades
+        self.archived_endowments.append(self.endowment.model_copy(deep=True))
+        if new_basket is None:
+            new_endowment = self.endowment.model_copy(deep=True,update={"trades":[]})
+        else:
+            new_endowment = self.endowment.model_copy(deep=True,update={"trades":[],"initial_basket":new_basket})
+        self.endowment = new_endowment
 
     @classmethod
     def from_zi_params(cls, params: ZiParams) -> 'EconomicAgent':
