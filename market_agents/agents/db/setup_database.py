@@ -213,6 +213,24 @@ def create_tables():
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS requests (
+        id SERIAL PRIMARY KEY,
+        prompt_context_id TEXT,
+        start_time TIMESTAMP WITH TIME ZONE,
+        end_time TIMESTAMP WITH TIME ZONE,
+        total_time FLOAT,
+        model TEXT,
+        max_tokens INTEGER,
+        temperature FLOAT,
+        messages JSONB,
+        system TEXT,
+        tools JSONB,
+        tool_choice JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_requests_prompt_context_id ON requests(prompt_context_id)")
 
     # Create an index on the embedding column
     cursor.execute("CREATE INDEX ON memory_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)")

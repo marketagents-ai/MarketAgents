@@ -41,6 +41,7 @@ class ParallelAIUtilities:
         self.litellm_request_limits = litellm_request_limits if litellm_request_limits else RequestLimits(max_requests_per_minute=500,max_tokens_per_minute=200000,provider="litellm")
         self.local_cache = local_cache
         self.cache_folder = self._setup_cache_folder(cache_folder)
+        self.all_requests = []
 
     def _setup_cache_folder(self, cache_folder: Optional[str]) -> str:
         if cache_folder:
@@ -79,11 +80,18 @@ class ParallelAIUtilities:
 
         results = await asyncio.gather(*tasks)
         flattened_results = [item for sublist in results for item in sublist]
+        
+        # Track  requests
+        self.all_requests.extend(flattened_results)
+        
         if update_history:
             prompts = self._update_prompt_history(prompts, flattened_results)
         
-        # Flatten the results list
         return flattened_results
+    def get_all_requests(self):
+        requests = self.all_requests
+        self.all_requests = []  
+        return requests
 
     async def _run_openai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")

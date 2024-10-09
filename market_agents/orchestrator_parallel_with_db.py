@@ -244,9 +244,34 @@ class Orchestrator:
     def setup_database(self):
         log_section(logger, "CONFIGURING SIMULATION DATABASE")
         logger.info("Database setup skipped")
+    def insert_ai_requests(self, ai_requests):
+        requests_data = []
+        for request in ai_requests:
+            requests_data.append({
+                'prompt_context_id': request.source_id,
+                'start_time': request.start_time,
+                'end_time': request.end_time,
+                'total_time': request.end_time - request.start_time,
+                'model': request.completion_kwargs.get('model', ''),
+                'max_tokens': request.completion_kwargs.get('max_tokens', 0),
+                'temperature': request.completion_kwargs.get('temperature', 0),
+                'messages': request.completion_kwargs.get('messages', []),
+                'system': request.completion_kwargs.get('system', ''),
+                'tools': request.completion_kwargs.get('tools', []),
+                'tool_choice': request.completion_kwargs.get('tool_choice', {})
+            })
+        
+        if requests_data:
+            self.data_inserter.insert_ai_requests(requests_data)
 
     async def run_parallel_ai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
-        return await self.ai_utils.run_parallel_ai_completion(prompts, update_history=False)
+        results =  await self.ai_utils.run_parallel_ai_completion(prompts, update_history=False)
+                # Insert Anthropic requests into the database
+        # Collect all AI requests
+        ai_requests = self.ai_utils.get_all_requests()
+        self.insert_ai_requests(ai_requests)
+        
+        return results
 
     async def run_parallel_perceive(self, env_name: str) -> List[LLMPromptContext]:
         perceive_prompts = []
@@ -543,22 +568,21 @@ class Orchestrator:
             logging.info("Reflections insertion complete")
 
 
-            # Perceptions data
+                # Perceptions data
             logging.info("Preparing perceptions data")
-            perceptions_data = [
-                {
-                    'memory_id': str(agent.id),
-                    'environment_name': 'auction',
-                    'environment_info': agent.last_perception.get('environment_info', {}),
-                    'recent_memories': agent.memory[-5:] if agent.memory else []
-                }
-                for agent in self.agents if agent.last_perception
-            ]
-            logging.info(f"Inserting {len(perceptions_data)} perceptions")
-            self.data_inserter.insert_perceptions(perceptions_data, agent_id_map)
+            perceptions_data = []
+            for agent in self.agents:
+                if agent.last_perception is not None:
+                    perceptions_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'auction',
+                        'environment_info': agent.last_perception.get('environment_info', {}),
+                        'recent_memories': agent.last_perception.get('recent_memories', [])
+                    })
+            
+            if perceptions_data:
+                self.data_inserter.insert_perceptions(perceptions_data, agent_id_map)
             logging.info("Perceptions insertion complete")
-            # Trades data
-            # Trades data
             # Trades data
             logging.info("Preparing trades data")
             trades_data = []

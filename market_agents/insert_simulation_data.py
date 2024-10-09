@@ -298,6 +298,34 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting perceptions: {str(e)}")
             raise
+    def insert_ai_requests(self, requests_data):
+        query = """
+        INSERT INTO requests 
+        (prompt_context_id, start_time, end_time, total_time, model, max_tokens, temperature, messages, system, tools, tool_choice)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                for request in requests_data:
+                    cur.execute(query, (
+                        request['prompt_context_id'],
+                        datetime.fromtimestamp(request['start_time']),
+                        datetime.fromtimestamp(request['end_time']),
+                        request['total_time'],
+                        request['model'],
+                        request['max_tokens'],
+                        request['temperature'],
+                        json.dumps(request['messages']),
+                        request['system'],
+                        json.dumps(request['tools']),
+                        json.dumps(request['tool_choice'])
+                    ))
+            self.conn.commit()
+            logging.info(f"Inserted {len(requests_data)} AI requests")
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(f"Error inserting AI requests: {str(e)}")
+            raise
 def addapt_uuid(uuid_value):
     return AsIs(f"'{uuid_value}'")
 
