@@ -2,166 +2,179 @@
 
 ## Overview
 
-This document outlines the design for a Memory Unit system, which forms the basis for both short-term and long-term memory in our AI agent architecture. The system is built using Pydantic models for strong typing and data validation, and incorporates computed fields for relevance, recency, and importance.
+This document outlines the design for an AI Memory Management System, which simulates human-like memory processes including storage, retrieval, decay, and forgetting. The system uses vector embeddings for semantic similarity, TF-IDF for relevance scoring, and implements a forgetting factor for memory decay.
 
-## Base MemoryUnit
+## Key Components
 
-The `MemoryUnit` serves as the base class for all memory types.
+1. **EmbeddingModel**: Handles text-to-vector conversion using OpenAI's API.
+2. **VectorDB**: Manages vector storage and retrieval, including cosine similarity search and BM25 scoring.
+3. **ChunkingStrategy**: Breaks text into manageable chunks.
+4. **EpisodicMemory**: Represents individual memories.
+5. **MemoryManager**: Orchestrates all memory operations.
+
+## EmbeddingModel
 
 ```python
-from pydantic import BaseModel, Field
-from datetime import datetime
-from typing import Dict, Any, List
+class EmbeddingModel:
+    def __init__(self, model="nomic-embed-text:latest"):
+        self.client = OpenAI(base_url='http://localhost:11434/v1/', api_key='ollama')
+        self.model = model
 
-class MemoryUnit(BaseModel):
+    def embed(self, text):
+        # Implementation details
+        pass
+```
+
+## VectorDB
+
+```python
+class VectorDB:
+    def __init__(self, vector_dim: int = 768):
+        # Initialization details
+
+    def add_item(self, vector: List[float], meta: Dict[str, Any]):
+        # Implementation details
+
+    def calculate_bm25_scores(self, query_terms: List[str], k1: float = 1.5, b: float = 0.75) -> Dict[int, float]:
+        # Implementation details
+
+    def update_forgetting_factors(self, decay_rate: float = 0.99):
+        # Implementation details
+
+    def search(self, query_vector: List[float], query_text: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        # Implementation details
+
+    def save(self, filename: str):
+        # Implementation details
+
+    def load(self, filename: str):
+        # Implementation details
+
+    def remove_item(self, content: str):
+        # Implementation details
+```
+
+## ChunkingStrategy
+
+```python
+class ChunkingStrategy:
+    @staticmethod
+    def chunk(text: str, max_tokens: int = 256, encoding_name: str = 'gpt2') -> List[str]:
+        # Implementation details
+```
+
+## EpisodicMemory
+
+```python
+class EpisodicMemory(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    agent_id: str = "default_agent"
     content: str
     timestamp: datetime = Field(default_factory=datetime.now)
     forgetting_factor: float = 1.0
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    
-    vector_db: Any
-    embedding_model: Any
-    retrieval_method: Any
-    chunking_strategy: Any
+    vector_db: Any = Field(default=None)
+    embedding_model: Any = Field(default=None)
+    chunking_strategy: Any = Field(default=None)
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata for the memory")
 
     class Config:
         arbitrary_types_allowed = True
 
-    @property
-    def relevance(self) -> float:
-        # Implementation details
-        pass
-
-    @property
-    def recency(self) -> float:
-        # Implementation details
-        pass
-
-    @property
-    def importance(self) -> float:
-        # Implementation details
-        pass
-
-    @property
-    def score(self) -> float:
-        alpha_recency = 0.3
-        alpha_importance = 0.3
-        alpha_relevance = 0.4
-        return (alpha_recency * self.recency) + (alpha_importance * self.importance) + (alpha_relevance * self.relevance)
-
-    def chunk(self, input_data: str) -> List[str]:
-        # Implementation details
-        pass
-
-    def index(self, chunks: List[str]) -> Any:
-        # Implementation details
-        pass
-
-    def forget(self, threshold: float) -> bool:
-        # Implementation details
-        pass
-
-    def retrieve(self, query: str) -> List[Dict[str, Any]]:
-        # Implementation details
-        pass
-
-    def decay(self, rate: float = 0.99):
-        # Implementation details
-        pass
-
-    def reinforce(self, factor: float = 1.1):
-        # Implementation details
-        pass
+    # Methods for chunking, indexing, forgetting, retrieving, decaying, and reinforcing memories
+    # Properties for relevance, recency, importance, and score calculation
 ```
 
-## ShortTermMemory
-
-The `ShortTermMemory` class extends `MemoryUnit` for recent interactions or ongoing tasks.
+## MemoryManager
 
 ```python
-class ShortTermMemory(MemoryUnit):
-    lifespan: int = Field(default=5, description="Number of interaction cycles this memory persists")
+class MemoryManager:
+    def __init__(self, index_file: str = "memory_index.pkl", db_file: str = "vector_db.pkl"):
+        # Initialization details
 
-    def update_lifespan(self):
-        # Decrease lifespan with each interaction
-        pass
+    def add_memory(self, agent_id: str, content: str, metadata: Dict[str, Any] = None, memory_id: str = None):
+        # Implementation details
+
+    def search(self, agent_id: str, query: str, top_k: int = 5) -> List[EpisodicMemory]:
+        # Implementation details
+
+    def forget_memories(self, agent_id: str, threshold: float):
+        # Implementation details
+
+    def decay_memories(self, agent_id: str, rate: float = 0.99):
+        # Implementation details
 ```
-
-## LongTermMemory
-
-The `LongTermMemory` class extends `MemoryUnit` for persistent, important information.
-
-```python
-class LongTermMemory(MemoryUnit):
-    consolidation_count: int = Field(default=0, description="Number of times this memory has been reinforced")
-
-    def consolidate(self):
-        # Increase consolidation count and adjust importance
-        pass
-```
-
-## Key Components
-
-1. **Vector Database (SimpleVectorDB)**: Stores and manages vector representations of memories.
-2. **Embedding Model**: Converts text to vector representations.
-3. **Chunking Strategy**: Breaks down long text inputs into manageable chunks.
-4. **Memory Manager**: Orchestrates the creation, retrieval, and management of memories.
 
 ## Memory Lifecycle
 
-1. **Creation**: Memories are created from agent perceptions, actions, observations, and reflections.
-2. **Indexing**: Memories are chunked, embedded, and stored in the vector database.
+1. **Creation**: Memories are created from agent interactions and stored as EpisodicMemory objects.
+2. **Indexing**: Memories are chunked, embedded, and stored in the VectorDB.
 3. **Retrieval**: Memories are retrieved based on relevance to current context, recency, and importance.
 4. **Decay**: Memories gradually lose importance over time unless reinforced.
-5. **Forgetting**: Memories below a certain threshold are removed or archived.
+5. **Forgetting**: Memories below a certain threshold are removed.
 6. **Reinforcement**: Important or frequently accessed memories are strengthened.
 
 ## Key Processes
 
-1. **Reflection -> Memory Retrieval**: The agent's internal monologue is used as a query for memory retrieval.
-2. **Memory Ingestion**: Retrieved memories are used in the action generation process.
-3. **Reflection**: Agent reflects on its perception, action, and observation, creating a compressed memory.
-4. **Memory Update**: The reflection is stored as a new memory or updates existing memories.
+1. **Memory Addition**: New memories are added to the system, chunked, and indexed.
+2. **Memory Retrieval**: Relevant memories are retrieved based on queries using vector similarity and BM25 scoring.
+3. **Memory Decay**: All memories are periodically decayed to simulate natural forgetting.
+4. **Memory Forgetting**: Less important memories are removed from the system.
+
 
 ```mermaid
 graph TD
-    subgraph "Agent Interaction Cycle"
-        A[Perception] --> D[Reflection]
-        D --> B[Action]
-        B --> C[Observation]
-        C --> D
+    subgraph "Agent Interaction"
+        A[User Input] --> B[MemoryManager]
     end
     subgraph "Memory Module"
-        D -->|Compression| E[Compressed Memory]
-        E --> F[Embedding Model]
-        F --> G[VectorDB]
-        G -->|Update| H[ConcreteMemories]
-        H -->|Decay| G
-        G <-->|Update| I[Action]
+        B --> C[EpisodicMemory]
+        C --> D[ChunkingStrategy]
+        D --> E[EmbeddingModel]
+        E --> F[VectorDB]
+        F -->|Store| G[Indexed Memories]
+        G -->|Decay| F
+    end
+    subgraph "Memory Operations"
+        B -->|Add Memory| H[add_memory]
+        B -->|Search| I[search]
+        B -->|Forget| J[forget_memories]
+        B -->|Decay| K[decay_memories]
     end
     subgraph "Retrieval Process"
-        J[Query Formation] --> K[Vector Similarity Search]
-        K --> L[Rank and Score]
-        L --> M[Retrieve Relevant Memories]
+        I --> L[Query Embedding]
+        L --> M[Vector Similarity Search]
+        M --> N[BM25 Scoring]
+        N --> O[Hybrid Scoring]
+        O --> P[Retrieve Relevant Memories]
     end
-    I -->|Influence| J
-    M -->|Inform| D
-    H -->|Provide Context| D
-    
-    classDef compression fill:#f9f,stroke:#333,stroke-width:2px;
-    class E compression;
+    H --> C
+    I --> E
+    J --> F
+    K --> F
+    F --> M
+    F --> N
+    P -->|Inform| B
+    G -->|Provide Context| B
+
+    classDef embedding fill:#f9f,stroke:#333,stroke-width:2px;
+    class E embedding;
 ```
+
 
 ## Implementation Notes
 
-- The `cosine_check_and_update` method in `SimpleVectorDB` ensures that similar memories are updated rather than duplicated.
-- The `decay_memories` method in `MemoryManager` applies decay to all memories periodically.
-- The `forget_memories` method removes memories below a certain importance threshold.
+- The system uses a combination of vector similarity and BM25 scoring for memory retrieval.
+- A forgetting factor is implemented to simulate natural memory decay over time.
+- The system supports saving and loading of memories and the vector database for persistence.
+- The `cosine_check_and_update` method in `VectorDB` ensures that similar memories are updated rather than duplicated.
 
 ## Work In Progress
 
-- Refactoring 
-- Implement greater frameworks db replacing my placeholder pickled-index 🥒
-- Handle the embedding model call with other api calls
-- Implement a more careful and type sensitive chunking strat, that was a `cursor` generation align with projects tokenizer
-- Write tests, punish it with a few generations then work on regex methods for edges after reading logs
+- Refactoring for improved code structure and efficiency.
+- Implementation of more robust database solutions to replace the current pickled-index system.
+- Handling of embedding model calls with other API calls for improved performance.
+- Implementation of a more careful and type-sensitive chunking strategy that aligns with the project's tokenizer.
+- Writing comprehensive tests and analyzing logs for edge case handling.
+- Development of regex methods for improved text processing.
+
+This AI Memory Management System is designed to maintain an efficient and dynamic set of memories, prioritizing important and relevant information while allowing less significant memories to fade over time, similar to human memory processes.
