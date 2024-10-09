@@ -83,38 +83,101 @@ Stores vector embeddings of agent memories for similarity search.
 - Python 3.8 or higher
 - psycopg2
 - numpy
+## Docker Setup and Database Initialization
 
-### Steps
+Follow these steps to set up and run the PostgreSQL database with pgvector using Docker:
 
-1. Install PostgreSQL on your system if not already installed.
-2. Install pgvector:
+1. **Prerequisites**
+   - Docker
+   - Docker Compose
+   - Python 3.9 or higher
 
-   #### macOS:
-   ```sh
-   ./setup_pgvector.sh
+2. **Setup Steps**
+
+   a. Navigate to the project root directory containing the `docker-compose.yaml` file.
+
+   b. Ensure the following files are present in the `market_agents/agents/db/` directory:
+      - `Dockerfile`
+      - `run_setup.sh`
+      - `setup_pgvector.sh`
+      - `setup_database.py`
+
+   c. Make sure the shell scripts are executable:
+      ```
+      chmod +x market_agents/agents/db/run_setup.sh
+      chmod +x market_agents/agents/db/setup_pgvector.sh
+      ```
+
+   d. Build and start the Docker containers:
+      ```
+      docker-compose up --build -d
+      ```
+      This command will:
+      - Build the custom PostgreSQL image with pgvector (version 0.5.1)
+      - Start the database container
+      - Start the application container
+      - Run the `run_setup.sh` script, which waits for the database to be ready and then runs `setup_database.py`
+
+   e. Wait for the containers to fully start and the setup to complete. You can check the logs to monitor the progress:
+      ```
+      docker-compose logs -f app
+      ```
+
+   f. Once the setup is complete, run the pgvector setup script:
+      ```
+      docker-compose exec app ./setup_pgvector.sh
+      ```
+      This script will ensure pgvector is properly installed and configured.
+
+3. **Verification**
+   To verify that the database is set up correctly:
    ```
-
-   #### Windows:
-   Follow the instructions in the main README for Windows pgvector setup.
-
-3. Create a new database for the market simulation project:
+   docker-compose exec db psql -U db_user -d market_simulation -c "\dt"
    ```
-   createdb market_simulation
-   ```
-4. Set up the database:
-   ```
-   python setup_database.py
-   ```
-5. Configure your application to connect to this database.
+   This should list all the tables in your database.
 
-## Development Guidelines
+4. **Usage**
+   The database is now ready for use with the following connection details:
+   - Host: localhost
+   - Port: 5433
+   - Database: market_simulation
+   - Username: db_user
+   - Password: db_pwd@123
 
-1. Always use prepared statements or ORM queries to prevent SQL injection.
-2. Create indexes for frequently queried columns.
-3. Use transactions for operations that modify multiple tables.
-4. Implement proper error handling and logging for database operations.
-5. Write unit tests for database interactions.
-6. Document any schema changes in the project's change log.
+5. **Management Commands**
+   - To stop the containers:
+     ```
+     docker-compose down
+     ```
+   - To reset the database completely:
+     ```
+     docker-compose down -v
+     docker-compose up --build -d
+     ```
+     The setup scripts will run automatically on container startup.
+
+6. **Troubleshooting**
+   - If you encounter connection issues, verify that the Docker containers are running:
+     ```
+     docker-compose ps
+     ```
+   - To view the logs of the Docker containers:
+     ```
+     docker-compose logs
+     ```
+   - If you need to access the database container directly:
+     ```
+     docker-compose exec db bash
+     ```
+
+This setup ensures that:
+- The PostgreSQL database (version 14) with pgvector (version 0.5.1) is running in a Docker container.
+- The database schema is initialized using the `setup_database.py` script.
+- pgvector is properly set up using the `setup_pgvector.sh` script.
+
+Note: The `run_setup.sh` script automatically runs on container startup, handling the database initialization. The `setup_pgvector.sh` script needs to be run manually after the containers are up to ensure pgvector is properly configured.
+
+Make sure to keep your `setup_database.py` and `setup_pgvector.sh` scripts up to date with your latest schema and configuration requirements.
 
 ## Query Examples
 
