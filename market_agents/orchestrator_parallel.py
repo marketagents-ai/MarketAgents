@@ -14,10 +14,18 @@ import threading
 import os
 import yaml
 import random
+import asyncio
 
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
-from market_agents.environments.mechanisms.auction import AuctionAction, AuctionGlobalObservation, DoubleAuction, AuctionActionSpace, AuctionObservationSpace, GlobalAuctionAction
+from market_agents.environments.mechanisms.auction import (
+    AuctionAction,
+    AuctionGlobalObservation,
+    DoubleAuction,
+    AuctionActionSpace,
+    AuctionObservationSpace,
+    GlobalAuctionAction,
+)
 from market_agents.inference.message_models import LLMConfig, LLMOutput, LLMPromptContext
 from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.logger_utils import *
@@ -25,8 +33,8 @@ from market_agents.agents.personas.persona import generate_persona, save_persona
 
 # Set up logging for this module
 logger = logging.getLogger(__name__)
-logger.handlers = []  # Clear any existing handlers
-logger.addHandler(logging.NullHandler())  # Add a null handler to prevent logging to the root logger
+logger.handlers = []
+logger.addHandler(logging.NullHandler())
 
 # Create a formatter
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -126,7 +134,8 @@ class Orchestrator:
         self.ai_utils = ParallelAIUtilities(
             oai_request_limits=oai_request_limits,
             anthropic_request_limits=anthropic_request_limits
-        ) 
+        )
+        self.agent_surpluses = {}
 
     def load_or_generate_personas(self) -> List[Persona]:
         personas_dir = Path("./market_agents/agents/personas/generated_personas")
@@ -189,7 +198,7 @@ class Orchestrator:
             )
 
             agent = MarketAgent.create(
-                agent_id=str(i),  # Ensure agent_id is a string
+                agent_id=str(i),
                 is_buyer=is_buyer,
                 num_units=agent_config.get('num_units', 10),
                 base_value=agent_config.get('base_value', 100),
@@ -204,7 +213,7 @@ class Orchestrator:
                 protocol=ACLMessage,
                 persona=persona
             )
-            agent.economic_agent = economic_agent  # Assign the economic agent to the agent
+            agent.economic_agent = economic_agent
             self.agents.append(agent)
             log_agent_init(logger, i, is_buyer, persona)
 
@@ -259,7 +268,11 @@ class Orchestrator:
     async def run_parallel_reflect(self, env_name: str) -> List[LLMPromptContext]:
         reflect_prompts = []
         for agent in self.agents:
-            if agent.last_observation:  # Only reflect if there's an observation
+            if agent.last_observation:
+                # Ensure agent.last_step is set
+                environment = self.environments[env_name]
+                last_step = environment.history.steps[-1][1] if environment.history.steps else None
+                agent.last_step = last_step
                 reflect_prompt = await agent.reflect(env_name, return_prompt=True)
                 reflect_prompts.append(reflect_prompt)
             else:
@@ -269,7 +282,7 @@ class Orchestrator:
     async def run_environment(self, env_name: str, round_num: int) -> EnvironmentStep:
         env = self.environments[env_name]
         tracker = self.trackers[env_name]
-        
+
         log_running(logger, env_name)
 
         # Reset pending orders at the beginning of the round
@@ -322,7 +335,7 @@ class Orchestrator:
                             auction_action = Ask(**action_content)
                         else:
                             raise ValueError(f"Invalid agent role: {agent.role}")
-                        
+
                         agent_actions[agent.id] = AuctionAction(agent_id=agent.id, action=auction_action)
 
                         # Update agent's pending orders
@@ -345,7 +358,10 @@ class Orchestrator:
 
         if isinstance(env_state.global_observation, AuctionGlobalObservation):
             self.process_trades(env_state.global_observation, tracker)
-        
+
+            # Include agent_surpluses in env_state.info
+            env_state.info['agent_rewards'] = self.agent_surpluses
+
         return env_state
 
     def set_agent_system_messages(self, round_num: int, good_name: str):
@@ -398,7 +414,7 @@ class Orchestrator:
                             f"Your current basket: {agent.economic_agent.endowment.current_basket}. "
                             f"Your marginal cost for selling the next unit of {good_name} is {marginal_cost:.2f}. "
                             f"You can make a profit by selling at {suggested_price:.2f} or higher."
-                        )
+                    )
 
     async def run_simulation(self):
         log_section(logger, "SIMULATION COMMENCING")
@@ -421,14 +437,27 @@ class Orchestrator:
                 for agent, reflection in zip(agents_with_observations, reflections):
                     if reflection.json_object:
                         log_reflection(logger, int(agent.id), f"{Fore.MAGENTA}{reflection.json_object.object}{Style.RESET_ALL}")
+                        # Access the surplus from agent's last_step.info
+                        environment_reward = agent.last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if agent.last_step else 0.0
+                        self_reward = reflection.json_object.object.get("self_reward", 0.0)
+                        total_reward = environment_reward * 0.5 + self_reward * 0.5
+                        # Add logging for rewards
+                        logger.info(
+                            f"Agent {agent.id} rewards - Environment Reward: {environment_reward}, "
+                            f"Self Reward: {self_reward}, Total Reward: {total_reward}"
+                        )
                         agent.memory.append({
                             "type": "reflection",
                             "content": reflection.json_object.object["reflection"],
                             "strategy_update": reflection.json_object.object["strategy_update"],
                             "observation": agent.last_observation,
-                            "reward": agent.last_observation.get('reward', 0) if agent.last_observation else 0,
+                            "environment_reward": environment_reward,
+                            "self_reward": self_reward,
+                            "total_reward": total_reward,
                             "timestamp": datetime.now().isoformat()
                         })
+                    else:
+                        logger.warning(f"No reflection JSON object for agent {agent.id}")
                 
                 self.save_round_data(round_num)
                 self.save_agent_interactions(round_num)
@@ -437,10 +466,11 @@ class Orchestrator:
         finally:
             log_completion(logger, "SIMULATION COMPLETED")
             self.print_summary()
-    
+
     def process_trades(self, global_observation: AuctionGlobalObservation, tracker: AuctionTracker):
         round_surplus = 0
         round_quantity = 0
+        agent_surpluses = {}
         logger.info(f"Processing {len(global_observation.all_trades)} trades")
         for trade in global_observation.all_trades:
             buyer = self.agents[int(trade.buyer_id)]
@@ -456,7 +486,14 @@ class Orchestrator:
             buyer_utility_after = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
             seller_utility_after = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
             
-            trade_surplus = (buyer_utility_after - buyer_utility_before) + (seller_utility_after - seller_utility_before)
+            buyer_surplus = buyer_utility_after - buyer_utility_before
+            seller_surplus = seller_utility_after - seller_utility_before
+            
+            # Store surplus per agent
+            agent_surpluses[buyer.id] = agent_surpluses.get(buyer.id, 0.0) + buyer_surplus
+            agent_surpluses[seller.id] = agent_surpluses.get(seller.id, 0.0) + seller_surplus
+            
+            trade_surplus = buyer_surplus + seller_surplus
             
             tracker.add_trade(trade)
             round_surplus += trade_surplus
@@ -466,22 +503,29 @@ class Orchestrator:
 
         tracker.add_round_data(round_surplus, round_quantity)
         logger.info(f"Round summary - Surplus: {round_surplus}, Quantity: {round_quantity}")
-    
+
+        # Store agent_surpluses for use in update_simulation_state
+        self.agent_surpluses = agent_surpluses
+
     def update_simulation_state(self, env_name: str, env_state: EnvironmentStep):
         for agent in self.agents:
             agent_observation = env_state.global_observation.observations.get(agent.id)
             if agent_observation:
-                if not isinstance(agent_observation, dict):
-                    agent_observation = agent_observation.dict()
-
                 agent.last_observation = agent_observation
-                
-                new_cash = agent_observation.get('endowment', {}).get('cash')
-                new_goods = agent_observation.get('endowment', {}).get('goods', {})
-                
+                agent.last_step = env_state
+
+                # Convert agent_observation.observation to dict if necessary
+                if hasattr(agent_observation.observation, 'model_dump'):
+                    observation_dict = agent_observation.observation.model_dump()
+                else:
+                    observation_dict = agent_observation.observation
+
+                new_cash = observation_dict.get('endowment', {}).get('cash')
+                new_goods = observation_dict.get('endowment', {}).get('goods', {})
+
                 if new_cash is not None:
                     agent.economic_agent.endowment.current_basket.cash = new_cash
-                
+
                 for good, quantity in new_goods.items():
                     agent.economic_agent.endowment.current_basket.update_good_quantity(good, quantity)
 
@@ -504,16 +548,16 @@ class Orchestrator:
             } for agent in self.agents],
             'environment_states': {name: env.get_global_state() for name, env in self.environments.items()},
         }
-        
+
         if self.simulation_data and 'state' in self.simulation_data[-1]:
             round_data['state'] = self.simulation_data[-1]['state']
-        
+
         self.simulation_data.append(round_data)
 
     def save_agent_interactions(self, round_num):
         """Save interactions for all agents for the current round."""
         self.log_folder.mkdir(parents=True, exist_ok=True)
-        
+
         for agent in self.agents:
             file_path = self.log_folder / f"agent_{agent.id}_interactions.jsonl"
             with open(file_path, 'a') as f:
@@ -528,7 +572,7 @@ class Orchestrator:
                     f.write('\n')
                 # Clear the processed interactions
                 agent.interactions = [interaction for interaction in agent.interactions if 'round' in interaction]
-        
+
         logger.info(f"Saved agent interactions for round {round_num} to {self.log_folder}")
 
     def print_summary(self):
@@ -595,7 +639,6 @@ class Orchestrator:
             dashboard_thread.join()
 
 if __name__ == "__main__":
-    import asyncio
     config = load_config()
     orchestrator = Orchestrator(config)
     asyncio.run(orchestrator.start())

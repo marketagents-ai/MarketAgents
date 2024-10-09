@@ -1,0 +1,24 @@
+current_utility: 1000.0, initial_utility: 1000.0, surplus: 0.0
+current_utility: 1982.593479181927, initial_utility: 1982.593479181927, surplus: 0.0
+Total Empirical Buyer Surplus: 0.00
+Total Empirical Seller Surplus: 0.00
+Total Empirical Surplus: 0.00
+
+Theoretical equilibrium data not available.
+
+Environment: auction
+Total number of trades: 0
+Total surplus: 0.00
+Total quantity traded: 0
+
+Final Agent States:
+Agent 0 (buyer):
+  Cash: 1000.00
+  Goods: {'apple': 0}
+current_utility: 1000.0, initial_utility: 1000.0, surplus: 0.0
+  Individual Surplus: 0.00
+Agent 1 (seller):
+  Cash: 1000.00
+  Goods: {'apple': 10}
+current_utility: 1982.593479181927, initial_utility: 1982.593479181927, surplus: 0.0
+  Individual Surplus: 0.00

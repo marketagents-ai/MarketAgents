@@ -233,13 +233,30 @@ class Orchestrator:
                         reflection = await agent.reflect(env_name)
                         if reflection:
                             log_reflection(logger, int(agent.id), f"{Fore.MAGENTA}{reflection}{Style.RESET_ALL}")
+
+                            # Access the last memory entry to get rewards
+                            if agent.memory:
+                                last_memory = agent.memory[-1]
+                                environment_reward = last_memory.get('environment_reward', 0.0)
+                                self_reward = last_memory.get('self_reward', 0.0)
+                                total_reward = last_memory.get('total_reward', 0.0)
+
+                                # Log the rewards
+                                logger.info(
+                                    f"Agent {agent.id} rewards - Environment Reward: {environment_reward}, "
+                                    f"Self Reward: {self_reward}, Total Reward: {total_reward}"
+                                )
+                            else:
+                                logger.warning(f"Agent {agent.id} has no memory entries after reflection.")
+                        else:
+                            logger.warning(f"Agent {agent.id} did not produce a reflection.")
                     except Exception as e:
                         logger.error(f"Error in agent {agent.id} reflection: {str(e)}")
 
                 self.save_round_data(round_num)
                 # self.update_dashboard()
 
-                # save interactions after each round
+                # Save interactions after each round
                 self.save_agent_interactions(round_num)
         except Exception as e:
             logger.error(f"Simulation failed: {str(e)}")
@@ -351,12 +368,14 @@ class Orchestrator:
         if isinstance(env_state.global_observation, AuctionGlobalObservation):
             logger.info(f"Processing trades with: {tracker}")
             self.process_trades(env_state.global_observation, tracker)
+            env_state.info['agent_rewards'] = self.agent_surpluses
 
         return env_state
 
     def process_trades(self, global_observation: AuctionGlobalObservation, tracker: AuctionTracker):
         round_surplus = 0
         round_quantity = 0
+        agent_surpluses = {}  # Dictionary to store surplus per agent
         logger.info(f"Processing {len(global_observation.all_trades)} trades")
         for trade in global_observation.all_trades:
             buyer = self.agents[int(trade.buyer_id)]
@@ -372,7 +391,14 @@ class Orchestrator:
             buyer_utility_after = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
             seller_utility_after = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
             
-            trade_surplus = (buyer_utility_after - buyer_utility_before) + (seller_utility_after - seller_utility_before)
+            buyer_surplus = buyer_utility_after - buyer_utility_before
+            seller_surplus = seller_utility_after - seller_utility_before
+            
+            # Store surplus per agent
+            agent_surpluses[buyer.id] = agent_surpluses.get(buyer.id, 0.0) + buyer_surplus
+            agent_surpluses[seller.id] = agent_surpluses.get(seller.id, 0.0) + seller_surplus
+            
+            trade_surplus = buyer_surplus + seller_surplus
             
             tracker.add_trade(trade)
             round_surplus += trade_surplus
@@ -382,6 +408,10 @@ class Orchestrator:
 
         tracker.add_round_data(round_surplus, round_quantity)
         logger.info(f"Round summary - Surplus: {round_surplus}, Quantity: {round_quantity}")
+
+        # Store agent_surpluses for use in update_simulation_state
+        self.agent_surpluses = agent_surpluses
+
 
     def update_simulation_state(self, env_name: str, env_state: EnvironmentStep):
         for agent in self.agents:

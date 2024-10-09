@@ -22,8 +22,9 @@ class DoubleAuctionMessage(BaseModel):
     quantity: int
 
 class ReflectionSchema(BaseModel):
-    reflection: str = Field(..., description="Reflection on the observation and surplus based on the last action")
-    strategy_update: str = Field(..., description="Updated strategy based on the reflection, surplus, and previous strategy")
+    reflection: str = Field(..., description="Reflection on the observation and actions")
+    strategy_update: str = Field(..., description="Updated strategy based on the reflection and previous strategy")
+    self_reward: float = Field(..., description="Self-assigned reward between 0.0 and 1.0")
 
 class PerceptionSchema(BaseModel):
     monologue: str = Field(..., description="Agent's internal monologue about the perceived market situation")
