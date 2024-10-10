@@ -43,10 +43,10 @@ def log_running(logger: logging.Logger, env_name: str):
     logger.info("💥 Prepare for economic disruption! 💥")
 
 def log_perception(logger: logging.Logger, agent_id: int, perception: str):
-    logger.info(f"👁️ Agent {agent_id:02d} perceives: {perception}")
+    logger.info(f"👁️ Agent {agent_id} perceives: {perception}")
 
 def log_raw_action(logger: logging.Logger, agent_id: int, action: dict):
-    logger.info(f"🔧 Agent {agent_id:02d} executes: {action}")
+    logger.info(f"🔧 Agent {agent_id} executes: {action}")
 
 def log_action(logger: logging.Logger, agent_id: int, action: str):
     if "Bid" in action:
