@@ -1,53 +1,44 @@
 import psycopg2
-import psycopg2.extras  # Add this line
+import psycopg2.extras
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-import os
-import numpy as np
 
-# Database connection parameters
-DB_NAME = "market_simulation"
-DB_USER = "db_user"
-DB_PASSWORD = "db_pwd@123"
-DB_HOST = "localhost"
-DB_PORT = "5433"
-
-def create_database():
+def create_database(db_params):
     # Connect to PostgreSQL server
     conn = psycopg2.connect(
         dbname='postgres',  # Connect to default 'postgres' database initially
-        user=os.environ.get('DB_USER', 'db_user'),
-        password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
-        host=os.environ.get('DB_HOST', 'localhost'),  # Use 'localhost' as default
-        port=os.environ.get('DB_PORT', '5433')
+        user=db_params['user'],
+        password=db_params['password'],
+        host=db_params['host'],
+        port=db_params['port']
     )
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cursor = conn.cursor()
 
     # Create database if it doesn't exist
-    cursor.execute(f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = '{DB_NAME}'")
+    cursor.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (db_params['dbname'],))
     exists = cursor.fetchone()
     if not exists:
-        cursor.execute(f"CREATE DATABASE {DB_NAME}")
-        print(f"Database '{DB_NAME}' created successfully.")
+        cursor.execute(f"CREATE DATABASE {db_params['dbname']}")
+        print(f"Database '{db_params['dbname']}' created successfully.")
     else:
-        print(f"Database '{DB_NAME}' already exists.")
+        print(f"Database '{db_params['dbname']}' already exists.")
 
     cursor.close()
     conn.close()
 
-def create_tables():
-    # Connect to the market_simulation database
+def create_tables(db_params):
+    # Connect to the specified database
     conn = psycopg2.connect(
-        dbname=os.environ.get('DB_NAME', 'market_simulation'),
-        user=os.environ.get('DB_USER', 'db_user'),
-        password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
-        host=os.environ.get('DB_HOST', 'localhost'),  # Use 'localhost' as default
-        port=os.environ.get('DB_PORT', '5433')
+        dbname=db_params['dbname'],
+        user=db_params['user'],
+        password=db_params['password'],
+        host=db_params['host'],
+        port=db_params['port']
     )
     cursor = conn.cursor()
 
-    # Drop existing tables
-    cursor.execute("DROP TABLE IF EXISTS agent_memories, preference_schedules, allocations, orders, trades, interactions, agents CASCADE")
+    # Create pgvector extension
+    cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
     # Create tables with correct UUID types
     cursor.execute("""
@@ -71,14 +62,14 @@ def create_tables():
     )
     """)
 
-    # Update other tables that reference agents
+    # Create other tables
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS preference_schedules (
         id SERIAL PRIMARY KEY,
         agent_id UUID REFERENCES agents(id),
         is_buyer BOOLEAN NOT NULL,
         values JSONB NOT NULL,
-        initial_endowment DECIMAL(15, 2) NOT NULL,
+        initial_endowment JSONB,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -170,38 +161,45 @@ def create_tables():
         id SERIAL PRIMARY KEY,
         memory_id UUID REFERENCES agents(id),
         environment_name TEXT NOT NULL,
-        environment_info JSONB,
-        recent_memories JSONB
+        monologue TEXT,
+        strategy TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS actions (
         id SERIAL PRIMARY KEY,
-        memory_id INTEGER REFERENCES agent_memories(id),
+        memory_id UUID REFERENCES agents(id),
         environment_name TEXT NOT NULL,
-        perception JSONB,
-        environment_info JSONB,
-        recent_memories JSONB,
-        action_space JSONB
+        action JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS reflections (
         id SERIAL PRIMARY KEY,
-        memory_id UUID REFERENCES agents(id),  
+        memory_id UUID REFERENCES agents(id),
         environment_name TEXT NOT NULL,
-        observation JSONB,
-        environment_info JSONB,
-        last_action JSONB,
-        reward FLOAT,
-        previous_strategy TEXT
+        reflection TEXT,
+        self_reward FLOAT,
+        environment_reward FLOAT,
+        total_reward FLOAT,
+        strategy_update TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
-    # Create pgvector extension
-    cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS observations (
+        id SERIAL PRIMARY KEY,
+        memory_id UUID REFERENCES agents(id),
+        environment_name TEXT NOT NULL,
+        observation JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
     # Create a new table for vector embeddings
     cursor.execute("""
@@ -213,6 +211,7 @@ def create_tables():
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -230,12 +229,10 @@ def create_tables():
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_requests_prompt_context_id ON requests(prompt_context_id)")
-
-    # Create an index on the embedding column
-    cursor.execute("CREATE INDEX ON memory_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)")
 
     # Create indexes
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_requests_prompt_context_id ON requests(prompt_context_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_memory_embeddings_embedding ON memory_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_auction_id ON trades(id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_agent_id ON orders(agent_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_allocations_agent_id ON allocations(agent_id)")
@@ -245,19 +242,21 @@ def create_tables():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_perceptions_memory_id ON perceptions(memory_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_actions_memory_id ON actions(memory_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reflections_memory_id ON reflections(memory_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_observations_memory_id ON observations(memory_id)")
 
     conn.commit()
     print("Tables, indexes, and pgvector extension created successfully.")
 
     cursor.close()
     conn.close()
-def insert_test_data():
+
+def insert_test_data(db_params):
     conn = psycopg2.connect(
-        dbname=os.environ.get('DB_NAME', 'market_simulation'),
-        user=os.environ.get('DB_USER', 'db_user'),
-        password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
-        host=os.environ.get('DB_HOST', 'localhost'),
-        port=os.environ.get('DB_PORT', '5433')
+        dbname=db_params['dbname'],
+        user=db_params['user'],
+        password=db_params['password'],
+        host=db_params['host'],
+        port=db_params['port']
     )
     cursor = conn.cursor()
 
@@ -271,7 +270,7 @@ def insert_test_data():
 
     # Insert test memory embeddings
     for _ in range(5):
-        embedding = np.random.rand(1536).tolist()
+        embedding = [0.0] * 1536  # Create a list of 1536 zeros
         memory_data = {"text": f"Test memory {_}", "timestamp": "2023-04-01T12:00:00Z"}
         cursor.execute("""
         INSERT INTO memory_embeddings (agent_id, embedding, memory_data)
@@ -285,5 +284,15 @@ def insert_test_data():
     conn.close()
 
 if __name__ == "__main__":
-    create_tables()
-    insert_test_data()
+    # Example usage with default parameters
+    db_params = {
+        'dbname': 'market_simulation',
+        'user': 'db_user',
+        'password': 'db_pwd@123',
+        'host': 'localhost',
+        'port': '5433'
+    }
+    create_database(db_params)
+    create_tables(db_params)
+    # Optionally insert test data
+    # insert_test_data(db_params)

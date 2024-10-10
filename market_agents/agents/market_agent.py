@@ -12,6 +12,7 @@ from market_agents.agents.personas.persona import Persona
 
 class MarketAgent(LLMAgent, EconomicAgent):
     memory: List[Dict[str, Any]] = Field(default_factory=list)
+    last_perception: Optional[Dict[str, Any]] = None
     last_action: Optional[Dict[str, Any]] = None
     last_observation: Optional[LocalObservation] = Field(default_factory=dict)
     environments: Dict[str, MultiAgentEnvironment] = Field(default_factory=dict)

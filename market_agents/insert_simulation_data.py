@@ -8,12 +8,15 @@ import json
 import logging
 import uuid
 from datetime import datetime
+from market_agents.economics.econ_models import BuyerPreferenceSchedule, SellerPreferenceSchedule
 
 
 def json_serial(self, obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, datetime):
         return obj.isoformat()
+    elif isinstance(obj, (BuyerPreferenceSchedule, SellerPreferenceSchedule)):
+        return obj.dict()
     raise TypeError(f"Type {type(obj)} not serializable")
 
 class SimulationDataInserter:
@@ -57,8 +60,11 @@ class SimulationDataInserter:
                         agent['max_iter'],
                         json.dumps(agent['llm_config'])
                     ))
-                    inserted_id = cur.fetchone()[0]
-                    agent_id_map[str(agent['id'])] = inserted_id
+                    inserted_id = cur.fetchone()
+                    if inserted_id:
+                        agent_id_map[str(agent['id'])] = inserted_id[0]
+                    else:
+                        logging.warning(f"No id returned for agent: {agent['id']}")
                 self.conn.commit()
             except ValueError as e:
                 agent_id = uuid.uuid4()
@@ -71,8 +77,11 @@ class SimulationDataInserter:
                         agent['max_iter'],
                         json.dumps(agent['llm_config'])
                     ))
-                    inserted_id = cur.fetchone()[0]
-                    agent_id_map[str(agent['id'])] = inserted_id
+                    inserted_id = cur.fetchone()
+                    if inserted_id:
+                        agent_id_map[str(agent['id'])] = inserted_id[0]
+                    else:
+                        logging.warning(f"No id returned for agent: {agent['id']}")
                 self.conn.commit()
             except Exception as e:
                 logging.error(f"Error inserting agent: {str(e)}")
@@ -83,7 +92,11 @@ class SimulationDataInserter:
         """JSON serializer for objects not serializable by default json code"""
         if isinstance(obj, datetime):
             return obj.isoformat()
+        elif isinstance(obj, (BuyerPreferenceSchedule, SellerPreferenceSchedule)):
+            return obj.dict()
+
         raise TypeError(f"Type {type(obj)} not serializable")
+
     def insert_agent_memories(self, memories: List[Dict[str, Any]]):
         for memory in memories:
             try:
@@ -102,29 +115,66 @@ class SimulationDataInserter:
                 logging.error(f"Error inserting agent memory: {e}")
         logging.info(f"Inserted {len(memories)} agent memories into the database")
 
-    def insert_schedules(self, schedules_data):
+
+    def insert_schedules(self, schedules_data: List[Dict[str, Any]]):
+        """
+        Inserts schedule data into the preference_schedules table without handling conflicts.
+
+        Args:
+            schedules_data (List[Dict[str, Any]]): List of schedule dictionaries containing:
+                - agent_id (UUID)
+                - is_buyer (bool)
+                - values (BuyerPreferenceSchedule or SellerPreferenceSchedule)
+                - initial_endowment (Basket)
+        """
         query = """
-        INSERT INTO schedules (agent_id, is_buyer, values, initial_endowment)
+        INSERT INTO preference_schedules (agent_id, is_buyer, values, initial_endowment)
         VALUES (%s, %s, %s, %s)
-        ON CONFLICT (agent_id) DO UPDATE SET
-        is_buyer = EXCLUDED.is_buyer,
-        values = EXCLUDED.values,
-        initial_endowment = EXCLUDED.initial_endowment
         """
         try:
             with self.conn.cursor() as cur:
                 for schedule in schedules_data:
-                    cur.execute(query, (
-                        schedule['agent_id'],
-                        schedule['is_buyer'],
-                        json.dumps(schedule['values']),
-                        json.dumps(schedule['initial_endowment'])
-                    ))
+                    logging.debug(f"Inserting schedule: {schedule}")
+
+                    # Serialize 'values' using json_serial
+                    try:
+                        values_json = json.dumps(schedule['values'], default=self.json_serial)
+                    except TypeError as e:
+                        logging.error(f"Error serializing 'values' for agent_id {schedule['agent_id']}: {e}")
+                        raise
+
+                    # Handle 'initial_endowment'
+                    initial_endowment = schedule['initial_endowment']
+                    if hasattr(initial_endowment, 'dict'):
+                        # Convert Basket instance to dict
+                        initial_endowment_serializable = initial_endowment.dict()
+                    else:
+                        # Assume it's already a dict or another serializable type
+                        initial_endowment_serializable = initial_endowment
+
+                    try:
+                        initial_endowment_json = json.dumps(initial_endowment_serializable)
+                    except TypeError as e:
+                        logging.error(f"Error serializing 'initial_endowment' for agent_id {schedule['agent_id']}: {e}")
+                        raise
+
+                    # Execute the SQL Insert without ON CONFLICT
+                    try:
+                        cur.execute(query, (
+                            schedule['agent_id'],
+                            schedule['is_buyer'],
+                            values_json,
+                            initial_endowment_json
+                        ))
+                    except psycopg2.Error as db_err:
+                        logging.error(f"Database error inserting schedule for agent_id {schedule['agent_id']}: {db_err}")
+                        raise
             self.conn.commit()
             logging.info(f"Successfully inserted {len(schedules_data)} schedules")
         except Exception as e:
             self.conn.rollback()
             logging.error(f"Error inserting schedules: {str(e)}")
+            logging.exception("Exception details:")
             raise
 
     def insert_allocations(self, allocations: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
@@ -182,6 +232,7 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting orders: {str(e)}")
             raise
+
     def insert_trades(self, trades_data: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO trades (buyer_id, seller_id, quantity, price, buyer_surplus, seller_surplus, total_surplus, round)
@@ -213,6 +264,7 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting trades: {str(e)}")
             raise
+
     def insert_interactions(self, interactions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO interactions (agent_id, round, task, response)
@@ -247,9 +299,34 @@ class SimulationDataInserter:
                   psycopg2.extras.Json(auction['average_prices']), psycopg2.extras.Json(auction['order_book']),
                   psycopg2.extras.Json(auction['trade_history'])))
         self.conn.commit()
+
+    def insert_observations(self, observations: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
+        query = """
+        INSERT INTO observations (memory_id, environment_name, observation)
+        VALUES (%s, %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                for observation in observations:
+                    memory_id = agent_id_map.get(str(observation['memory_id']))
+                    if memory_id is None:
+                        logging.error(f"No matching UUID found for memory_id: {observation['memory_id']}")
+                        continue
+                    cur.execute(query, (
+                        memory_id,
+                        observation['environment_name'],
+                        psycopg2.extras.Json(observation['observation'])
+                    ))
+            self.conn.commit()
+            logging.info(f"Inserted {len(observations)} observations into the database")
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(f"Error inserting observations: {str(e)}")
+            raise
+
     def insert_reflections(self, reflections: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
-        INSERT INTO reflections (memory_id, environment_name, observation, environment_info, last_action, reward, previous_strategy)
+        INSERT INTO reflections (memory_id, environment_name, reflection, self_reward, environment_reward, total_reward, strategy_update)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         try:
@@ -262,11 +339,11 @@ class SimulationDataInserter:
                     cur.execute(query, (
                         memory_id,
                         reflection['environment_name'],
-                        json.dumps(reflection['observation'], default=self.json_serial) if reflection['observation'] else None,
-                        json.dumps(reflection['environment_info'], default=self.json_serial) if reflection['environment_info'] else None,
-                        json.dumps(reflection['last_action'], default=self.json_serial) if reflection['last_action'] else None,
-                        reflection['reward'],
-                        reflection['previous_strategy']
+                        reflection['reflection'],
+                        reflection['self_reward'],
+                        reflection['environment_reward'],
+                        reflection['total_reward'],
+                        reflection['strategy_update']
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(reflections)} reflections into the database")
@@ -274,9 +351,10 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting reflections: {str(e)}")
             raise
+
     def insert_perceptions(self, perceptions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
-        INSERT INTO perceptions (memory_id, environment_name, environment_info, recent_memories)
+        INSERT INTO perceptions (memory_id, environment_name, monologue, strategy)
         VALUES (%s, %s, %s, %s)
         """
         try:
@@ -289,8 +367,8 @@ class SimulationDataInserter:
                     cur.execute(query, (
                         memory_id,
                         perception['environment_name'],
-                        json.dumps(perception['environment_info'], default=self.json_serial),
-                        json.dumps(perception['recent_memories'], default=self.json_serial)
+                        perception['monologue'],
+                        perception['strategy']
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(perceptions)} perceptions into the database")
@@ -298,6 +376,38 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting perceptions: {str(e)}")
             raise
+
+    def insert_actions(self, actions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
+        query = """
+        INSERT INTO actions (
+            memory_id, 
+            environment_name, 
+            action
+        )
+        VALUES (%s, %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                for action in actions:
+                    memory_id = agent_id_map.get(str(action['memory_id']))
+                    if memory_id is None:
+                        logging.error(f"No matching UUID found for memory_id: {action['memory_id']}")
+                        continue
+                    environment_name = action['environment_name']
+                    action_data = action['action']
+                    
+                    cur.execute(query, (
+                        memory_id,
+                        environment_name,
+                        json.dumps(action_data, default=str)
+                    ))
+            self.conn.commit()
+            logging.info(f"Inserted {len(actions)} actions into the database")
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(f"Error inserting actions: {str(e)}")
+            raise
+
     def insert_ai_requests(self, requests_data):
         query = """
         INSERT INTO requests 
@@ -309,16 +419,16 @@ class SimulationDataInserter:
                 for request in requests_data:
                     cur.execute(query, (
                         request['prompt_context_id'],
-                        datetime.fromtimestamp(request['start_time']),
-                        datetime.fromtimestamp(request['end_time']),
+                        request['start_time'],
+                        request['end_time'],
                         request['total_time'],
                         request['model'],
                         request['max_tokens'],
                         request['temperature'],
-                        json.dumps(request['messages']),
+                        json.dumps(request['messages'], default=str),
                         request['system'],
-                        json.dumps(request['tools']),
-                        json.dumps(request['tool_choice'])
+                        json.dumps(request['tools'], default=str),
+                        json.dumps(request['tool_choice'], default=str)
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(requests_data)} AI requests")
@@ -326,6 +436,7 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting AI requests: {str(e)}")
             raise
+
 def addapt_uuid(uuid_value):
     return AsIs(f"'{uuid_value}'")
 
