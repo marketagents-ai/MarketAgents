@@ -204,7 +204,7 @@ class MarketOrchestrator:
     def execute_trade(self, trade: Trade) -> float:
         buyer = self.get_agent(trade.buyer_id)
         seller = self.get_agent(trade.seller_id)
-        print(f"buyer_id: {trade.buyer_id}, seller_id: {trade.seller_id}")
+        # print(f"buyer_id: {trade.buyer_id}, seller_id: {trade.seller_id}")
         if buyer is None or seller is None:
             raise ValueError(f"Trade {trade} has invalid agent IDs")
         

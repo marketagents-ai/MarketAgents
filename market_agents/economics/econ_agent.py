@@ -153,7 +153,6 @@ class EconomicAgent(BaseModel):
         total_quantity = int(current_quantity + pending_quantity)
         if total_quantity > self.value_schedules[good_name].num_units:
             return None
-        print(f"total_quantity: {total_quantity}")
         return total_quantity+1
 
     
@@ -308,7 +307,6 @@ class EconomicAgent(BaseModel):
     def calculate_individual_surplus(self) -> float:
         current_utility = self.calculate_utility(self.endowment.current_basket)
         surplus = current_utility - self.initial_utility
-        print(f"current_utility: {current_utility}, initial_utility: {self.initial_utility}, surplus: {surplus}")
         return surplus
 
 

@@ -92,10 +92,10 @@ class DoubleAuction(Mechanism):
         for agent_id, auction_action in actions.items():
             action = auction_action.action
             if isinstance(action, Bid):
-                print(f"Bid from agent {agent_id}: {action}")
+                # print(f"Bid from agent {agent_id}: {action}")
                 self.waiting_bids.append(auction_action)
             elif isinstance(action, Ask):
-                print(f"Ask from agent {agent_id}: {action}")
+                # print(f"Ask from agent {agent_id}: {action}")
                 self.waiting_asks.append(auction_action)
             else:
                 logger.error(f"Invalid action type from agent {agent_id}: {type(action)}")
