@@ -1,11 +1,41 @@
 from pydantic import BaseModel, Field, computed_field, model_validator
 from functools import cached_property
-from typing import List, Dict
+from typing import List, Dict, Self
 import random
 from copy import deepcopy
 from datetime import datetime
 import uuid
+import os
+from pathlib import Path
+import json
 
+class SavableBaseModel(BaseModel):
+    name:str
+    def save_to_json(self, folder_path: str) -> str:
+        # Create folder if it doesn't exist
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{self.name.replace(' ', '_')}_{timestamp}.json"
+        file_path = os.path.join(folder_path, filename)
+
+        # Convert to dict and save as JSON
+        data = self.model_dump(mode='json')
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        print(f"State saved to {file_path}")
+        return file_path
+
+    @classmethod
+    def load_from_json(cls, file_path: str) -> Self:
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        
+        # Convert JSON data back to MarketOrchestratorState
+        return cls.model_validate(data)
+    
 class MarketAction(BaseModel):
     price: float = Field(..., description="Price of the order")
     quantity: int = Field(default=1, ge=1,le=1, description="Quantity of the order")

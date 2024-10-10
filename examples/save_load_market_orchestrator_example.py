@@ -59,10 +59,22 @@ if __name__ == "__main__":
         max_relative_spread=0.2,
         is_buyer=False
     )
-    scenario,state = asyncio.run(zi_exploration(buyer_params, seller_params))
-    file_path_state = state.save_to_json(r"C:\Users\Tommaso\Documents\Dev\MarketAgents\outputs\econ_results")
+    scenario, state = asyncio.run(zi_exploration(buyer_params, seller_params))
+
+    # Get the project root directory
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+    # Define the relative path for saving results
+    output_dir = os.path.join(project_root, 'outputs', 'econ_results')
+    
+    # Ensure the output directory exists
+
+    # Save and load state
+    file_path_state = state.save_to_json(output_dir)
     loaded_state = MarketOrchestratorState.load_from_json(file_path_state)
-    file_path_scenario = scenario.save_to_json(r"C:\Users\Tommaso\Documents\Dev\MarketAgents\outputs\econ_results")
+
+    # Save and load scenario
+    file_path_scenario = scenario.save_to_json(output_dir)
     loaded_scenario = Scenario.load_from_json(file_path_scenario)
 
     if state == loaded_state:

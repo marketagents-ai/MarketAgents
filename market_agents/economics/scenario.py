@@ -1,6 +1,7 @@
 from typing import List, Dict
 from pydantic import BaseModel, Field, computed_field
 from functools import cached_property
+from market_agents.economics.econ_models import SavableBaseModel
 from market_agents.economics.econ_agent import ZiFactory, ZiParams, EconomicAgent
 from market_agents.economics.equilibrium import Equilibrium, EquilibriumResults
 import logging
@@ -8,8 +9,8 @@ import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
-class Scenario(BaseModel):
-    name: str
+class Scenario(SavableBaseModel):
+    name: str = Field(default="scenario")
     goods: List[str]
     factories: List[ZiFactory]
     _current_episode: int = 0
