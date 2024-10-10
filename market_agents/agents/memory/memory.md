@@ -1,125 +1,85 @@
-# memoryMODULE Design Specification
+# memoryMODULE: AI Memory Management System
 
 ## Overview
 
-This document outlines the design for an AI Memory Management System, which simulates human-like memory processes including storage, retrieval, decay, and forgetting. The system uses vector embeddings for semantic similarity, TF-IDF for relevance scoring, and implements a forgetting factor for memory decay.
+memoryMODULE is an AI memory management system designed to handle the storage, retrieval, and manipulation of information in vector form. It provides mechanisms for memory formation, storage, retrieval, decay, and reinforcement.
 
 ## Key Components
 
-1. **EmbeddingModel**: Handles text-to-vector conversion using OpenAI's API.
-2. **VectorDB**: Manages vector storage and retrieval, including cosine similarity search and BM25 scoring.
-3. **ChunkingStrategy**: Breaks text into manageable chunks.
-4. **EpisodicMemory**: Represents individual memories.
-5. **MemoryManager**: Orchestrates all memory operations.
+1. **EmbeddingModel**: Converts text to vector representations using the OpenAI API.
+2. **VectorDB**: Manages vector storage and retrieval, including similarity search and BM25 scoring.
+3. **ChunkingStrategy**: Segments text into smaller units for processing.
+4. **EpisodicMemory**: Represents individual memory units with associated metadata.
+5. **MemoryManager**: Coordinates all memory operations.
 
-## EmbeddingModel
+## Core Functionality
 
-```python
-class EmbeddingModel:
-    def __init__(self, model="nomic-embed-text:latest"):
-        self.client = OpenAI(base_url='http://localhost:11434/v1/', api_key='ollama')
-        self.model = model
+### Memory Formation and Storage
+- Text input is converted to vector representations.
+- Vectors are stored in VectorDB with associated metadata.
+- Memories are indexed for efficient retrieval.
 
-    def embed(self, text):
-        # Implementation details
-        pass
-```
+### Memory Retrieval
+- Utilizes a combination of vector similarity search and BM25 scoring.
+- Retrieval factors include recency, importance, and relevance to the query.
 
-## VectorDB
+### Memory Decay
+- Implements a forgetting factor that reduces memory strength over time.
+- Decay rate is configurable.
 
-```python
-class VectorDB:
-    def __init__(self, vector_dim: int = 768):
-        # Initialization details
+### Memory Reinforcement
+- Allows for strengthening of memories based on access frequency or importance.
 
-    def add_item(self, vector: List[float], meta: Dict[str, Any]):
-        # Implementation details
-
-    def calculate_bm25_scores(self, query_terms: List[str], k1: float = 1.5, b: float = 0.75) -> Dict[int, float]:
-        # Implementation details
-
-    def update_forgetting_factors(self, decay_rate: float = 0.99):
-        # Implementation details
-
-    def search(self, query_vector: List[float], query_text: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        # Implementation details
-
-    def save(self, filename: str):
-        # Implementation details
-
-    def load(self, filename: str):
-        # Implementation details
-
-    def remove_item(self, content: str):
-        # Implementation details
-```
-
-## ChunkingStrategy
-
-```python
-class ChunkingStrategy:
-    @staticmethod
-    def chunk(text: str, max_tokens: int = 256, encoding_name: str = 'gpt2') -> List[str]:
-        # Implementation details
-```
-
-## EpisodicMemory
-
-```python
-class EpisodicMemory(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    agent_id: str = "default_agent"
-    content: str
-    timestamp: datetime = Field(default_factory=datetime.now)
-    forgetting_factor: float = 1.0
-    vector_db: Any = Field(default=None)
-    embedding_model: Any = Field(default=None)
-    chunking_strategy: Any = Field(default=None)
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata for the memory")
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    # Methods for chunking, indexing, forgetting, retrieving, decaying, and reinforcing memories
-    # Properties for relevance, recency, importance, and score calculation
-```
-
-## MemoryManager
+## Implementation Details
 
 ```python
 class MemoryManager:
     def __init__(self, index_file: str = "memory_index.pkl", db_file: str = "vector_db.pkl"):
-        # Initialization details
+        # Initialization code
 
     def add_memory(self, agent_id: str, content: str, metadata: Dict[str, Any] = None, memory_id: str = None):
-        # Implementation details
+        # Memory addition logic
 
     def search(self, agent_id: str, query: str, top_k: int = 5) -> List[EpisodicMemory]:
-        # Implementation details
+        # Memory search implementation
 
     def forget_memories(self, agent_id: str, threshold: float):
-        # Implementation details
+        # Memory forgetting mechanism
 
     def decay_memories(self, agent_id: str, rate: float = 0.99):
-        # Implementation details
+        # Memory decay process
 ```
 
-## Memory Lifecycle
+## Usage
 
-1. **Creation**: Memories are created from agent interactions and stored as EpisodicMemory objects.
-2. **Indexing**: Memories are chunked, embedded, and stored in the VectorDB.
-3. **Retrieval**: Memories are retrieved based on relevance to current context, recency, and importance.
-4. **Decay**: Memories gradually lose importance over time unless reinforced.
-5. **Forgetting**: Memories below a certain threshold are removed.
-6. **Reinforcement**: Important or frequently accessed memories are strengthened.
+```python
+memory_manager = MemoryManager()
+memory_manager.add_memory("agent1", "Information to store", {"importance": 0.8})
+results = memory_manager.search("agent1", "Query for retrieval")
+```
 
-## Key Processes
+## Technical Specifications
 
-1. **Memory Addition**: New memories are added to the system, chunked, and indexed.
-2. **Memory Retrieval**: Relevant memories are retrieved based on queries using vector similarity and BM25 scoring.
-3. **Memory Decay**: All memories are periodically decayed to simulate natural forgetting.
-4. **Memory Forgetting**: Less important memories are removed from the system.
+- Vector Dimension: 768 (default, configurable)
+- Similarity Measure: Cosine similarity
+- Text Encoding: Uses GPT-2 tokenizer
+- Persistence: Pickle-based storage for memory index and vector database
 
+## Current Limitations
+
+- Scalability constraints due to in-memory vector operations - only process vectors in batches to memory, rely on existing db
+- Lack of distributed storage capabilities - refactor for sql hybrid operations
+- Limited to text-based inputs - refactor for multi-modal inputs
+
+## Ongoing Development
+
+- Implementing more efficient database solutions
+- Optimizing embedding model calls
+- Developing more sophisticated chunking strategies
+- Expanding test coverage and error handling
+- Improving text processing with advanced regex methods
+
+This system provides a framework for managing AI memory operations, focusing on vector-based storage and retrieval mechanisms. It is designed for integration into larger AI systems that require persistent and queryable memory capabilities.
 
 ```mermaid
 graph TD

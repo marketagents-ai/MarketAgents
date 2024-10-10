@@ -1,34 +1,28 @@
-# Interactive Memory and Market Dashboard
+# Agent Psychometrics Dashboard
 
-## WIP
+A web-based tool for analyzing agent interactions in multi-agent systems, focusing on a initial skeletal framework for searching agent memories from json files. With the goal of including our existing remote sql database and presenting a table of agents with columns for each field defined in the pydantic model schema.
 
-The Interactive Agent Memory Dashboard is a web application designed to analyze data from our agents performing in a simulated market. It combines memory management techniques with data visualization to provide insights into AI agent behaviors within a simulated economic environment.
+## Current Features
+- Natural language memory search
+- Agent-specific filtering
+- Semantic relationship visualization
 
-## Key Features
+## Architecture
+- Backend: FastAPI, Dash, MemoryManager
+- Frontend: HTML, JavaScript, Plotly.js
 
-1. **Memory Search and Visualization**
-   - Semantic search functionality for querying AI agent memories
-   - Visualization of memory embeddings
-   - Display of search results with similarity scores
+## Quick Start
+1. Run Python server script
+2. Open HTML file in browser
+3. Select agents, enter queries, explore results
 
-2. **Agent Data Analysis**
-   - Visualization of various agent metrics and trends
+## Main Dependencies
+FastAPI, Dash, NumPy, scikit-learn, Plotly.js, Marked.js
 
-3. **AI Memory Management**
-   - Implementation of a memory management system for AI applications
-   - Simulates memory processes including storage, retrieval, and decay
+## Work Yet To Be Done
+- ingest raw json files to populate a dynamictable with the fields defined in the pydantic model schema
+- add a search bar to the table to search for all fields in the table
+- toggle between local db and remote sql database
 
-4. **Interactive User Interface**
-   - Web-based dashboard for data exploration and analysis
 
-## Technology Stack
-
-- Backend: FastAPI (Python)
-- Frontend: HTML, CSS, JavaScript
-- Data Visualization: Plotly.js
-- Memory Module: Custom implementations for memory management and embeddings
-
-## Integration with Larger Project
-
-This dashboard serves as a component in the broader AI market simulation framework, providing tools for analyzing agent behaviors and market dynamics.
 
