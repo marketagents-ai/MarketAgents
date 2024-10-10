@@ -1,37 +1,38 @@
 # orchestrator_parallel_with_db.py
 
-from datetime import datetime
+import asyncio
 import json
 import logging
-from pathlib import Path
-from typing import List, Dict, Any, Type
-from market_agents.economics.econ_models import Ask, Bid, Trade
-from market_agents.economics.econ_agent import create_economic_agent
-from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
-from pydantic import BaseModel, Field
-from colorama import Fore, Style
+import os
+import random
 import threading
 import uuid
-import os
-import yaml
-import random
-import asyncio
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
 
-from market_agents.insert_simulation_data import SimulationDataInserter
+import yaml
+from colorama import Fore, Style
 from market_agents.agents.market_agent import MarketAgent
-from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
-from market_agents.environments.mechanisms.auction import (
-    AuctionAction,
-    AuctionGlobalObservation,
-    DoubleAuction,
-    AuctionActionSpace,
-    AuctionObservationSpace,
-    GlobalAuctionAction,
-)
-from market_agents.inference.message_models import LLMConfig, LLMOutput, LLMPromptContext
+from market_agents.agents.personas.persona import Persona, generate_persona, save_persona_to_file
 from market_agents.agents.protocols.acl_message import ACLMessage
+from market_agents.economics.econ_agent import create_economic_agent
+from market_agents.economics.econ_models import Ask, Bid, Trade
+from market_agents.environments.environment import EnvironmentStep, MultiAgentEnvironment
+from market_agents.environments.mechanisms.auction import (AuctionAction,
+                                                           AuctionActionSpace,
+                                                           AuctionGlobalObservation,
+                                                           AuctionObservationSpace,
+                                                           DoubleAuction,
+                                                           GlobalAuctionAction)
+from market_agents.inference.message_models import LLMConfig, LLMOutput, LLMPromptContext
+from market_agents.inference.parallel_inference import (ParallelAIUtilities,
+                                                        RequestLimits)
+from market_agents.insert_simulation_data import SimulationDataInserter
 from market_agents.logger_utils import *
-from market_agents.agents.personas.persona import generate_persona, save_persona_to_file, Persona
+from market_agents.agents.db.setup_database import create_database, create_tables
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Set up logging for this module
 logger = logging.getLogger(__name__)
@@ -59,8 +60,6 @@ logger.setLevel(logging.INFO)
 # Prevent propagation to avoid double logging
 logger.propagate = False
 
-from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AgentConfig(BaseModel):
     num_units: int
@@ -74,11 +73,33 @@ class AgentConfig(BaseModel):
     noise_factor: float
     max_relative_spread: float
 
+
 class AuctionConfig(BaseModel):
     name: str
     address: str
     max_rounds: int
     good_name: str
+
+
+class LLMConfig(BaseModel):
+    name: str
+    client: str
+    model: str
+    temperature: float
+    max_tokens: int
+    use_cache: bool
+
+
+class DatabaseConfig(BaseSettings):
+    db_type: str = "postgres"
+    db_name: str = "market_simulation"
+    db_user: str = Field(..., env='DB_USER')
+    db_password: str = Field(..., env='DB_PASSWORD')
+    db_host: str = Field('localhost', env='DB_HOST')
+    db_port: str = Field('5433', env='DB_PORT')
+
+    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+
 
 class OrchestratorConfig(BaseSettings):
     num_agents: int
@@ -87,17 +108,16 @@ class OrchestratorConfig(BaseSettings):
     llm_configs: List[LLMConfig]
     environment_configs: Dict[str, AuctionConfig]
     protocol: str
-    database_config: Dict[str, str]
+    database_config: DatabaseConfig = DatabaseConfig()
 
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
-import yaml
-from pathlib import Path
 
 def load_config(config_path: Path = Path("./market_agents/orchestrator_config.yaml")) -> OrchestratorConfig:
     with open(config_path, 'r') as file:
         yaml_data = yaml.safe_load(file)
     return OrchestratorConfig(**yaml_data)
+
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -109,6 +129,7 @@ def json_serial(obj):
         return obj.__dict__
     else:
         raise TypeError(f"Type {type(obj)} not serializable")
+
 
 def serialize_memory_data(memory_data):
     if isinstance(memory_data, dict):
@@ -125,6 +146,7 @@ def serialize_memory_data(memory_data):
         return memory_data
     else:
         return str(memory_data)
+
 
 class AuctionTracker:
     def __init__(self):
@@ -145,6 +167,7 @@ class AuctionTracker:
             "total_surplus": sum(self.per_round_surplus),
             "total_quantity": sum(self.per_round_quantities)
         }
+
 
 class Orchestrator:
     def __init__(self, config: OrchestratorConfig):
@@ -167,6 +190,15 @@ class Orchestrator:
         )
         self.agent_surpluses = {}
         self.agent_dict: Dict[str, MarketAgent] = {}  # Mapping from agent IDs to agents
+
+        # Initialize database parameters from config
+        self.db_params = {
+            'dbname': self.config.database_config.db_name,
+            'user': self.config.database_config.db_user,
+            'password': self.config.database_config.db_password,
+            'host': self.config.database_config.db_host,
+            'port': self.config.database_config.db_port
+        }
 
     def load_or_generate_personas(self) -> List[Persona]:
         personas_dir = Path("./market_agents/agents/personas/generated_personas")
@@ -195,7 +227,7 @@ class Orchestrator:
 
         for i, persona in enumerate(personas):
             agent_uuid = str(uuid.uuid4())
-            llm_config = random.choice(self.config.llm_configs).model_dump()
+            llm_config = random.choice(self.config.llm_configs).dict()
             # Assign roles explicitly based on index
             if i < num_buyers:
                 is_buyer = True
@@ -284,19 +316,58 @@ class Orchestrator:
 
     def setup_database(self):
         log_section(logger, "CONFIGURING SIMULATION DATABASE")
+        # Create the database if it doesn't exist
+        create_database(db_params=self.db_params)
+        # Check if required tables exist
+        if not self.check_tables_exist():
+            create_tables(db_params=self.db_params)
+            # Optionally, insert test data if needed
+            # insert_test_data(db_params=self.db_params)
+        else:
+            logger.info("Required tables already exist.")
         logger.info("Database setup completed")
+
+    def check_tables_exist(self):
+        import psycopg2
+        conn = psycopg2.connect(
+            dbname=self.db_params['dbname'],
+            user=self.db_params['user'],
+            password=self.db_params['password'],
+            host=self.db_params['host'],
+            port=self.db_params['port']
+        )
+        cursor = conn.cursor()
+        # Check if the 'agents' table exists
+        cursor.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name=%s)", ('agents',))
+        exists = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        return exists
 
     def insert_ai_requests(self, ai_requests):
         requests_data = []
         for request in ai_requests:
+            # Check if start_time and end_time are floats (Unix timestamps)
+            if isinstance(request.start_time, (float, int)):
+                start_time = datetime.fromtimestamp(request.start_time)
+            else:
+                start_time = request.start_time
+
+            if isinstance(request.end_time, (float, int)):
+                end_time = datetime.fromtimestamp(request.end_time)
+            else:
+                end_time = request.end_time
+
+            total_time = (end_time - start_time).total_seconds()
+
             requests_data.append({
                 'prompt_context_id': request.source_id,
-                'start_time': request.start_time,
-                'end_time': request.end_time,
-                'total_time': request.end_time - request.start_time,
+                'start_time': start_time,
+                'end_time': end_time,
+                'total_time': total_time,
                 'model': request.completion_kwargs.get('model', ''),
-                'max_tokens': request.completion_kwargs.get('max_tokens', 0),
-                'temperature': request.completion_kwargs.get('temperature', 0),
+                'max_tokens': int(request.completion_kwargs.get('max_tokens', 0)),
+                'temperature': float(request.completion_kwargs.get('temperature', 0)),
                 'messages': request.completion_kwargs.get('messages', []),
                 'system': request.completion_kwargs.get('system', ''),
                 'tools': request.completion_kwargs.get('tools', []),
@@ -308,7 +379,6 @@ class Orchestrator:
                 self.data_inserter.insert_ai_requests(requests_data)
             except Exception as e:
                 logging.error(f"Error inserting AI requests: {e}")
-                # You can choose to handle the exception or continue without stopping the simulation
 
     async def run_parallel_ai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         results = await self.ai_utils.run_parallel_ai_completion(prompts, update_history=False)
@@ -370,7 +440,8 @@ class Orchestrator:
                 log_section(logger, f"Current Agent:\nAgent {agent.index} with persona:\n{agent.persona}")
                 log_perception(logger, agent.index, f"{Fore.CYAN}{perception.json_object.object if perception.json_object else perception.str_content}{Style.RESET_ALL}")
                 # Store the perception content
-                agent.last_perception = perception.json_object.object if perception.json_object else perception.str_content
+                agent.last_perception = perception.json_object.object if perception.json_object else None
+
             else:
                 logger.warning(f"No perception found for agent {agent.index}")
                 agent.last_perception = None  # Ensure it's set even if None
@@ -392,6 +463,7 @@ class Orchestrator:
             if action:
                 try:
                     action_content = action.json_object.object if action.json_object else json.loads(action.str_content or '{}')
+                    agent.last_action = action_content
                     if 'price' in action_content and 'quantity' in action_content:
                         action_content['quantity'] = 1
 
@@ -491,6 +563,7 @@ class Orchestrator:
                             f"You can make a profit by selling at {suggested_price:.2f} or higher."
                     )
 
+
     def insert_round_data(self, round_num):
         logging.info(f"Starting data insertion for round {round_num}")
 
@@ -503,7 +576,7 @@ class Orchestrator:
                     'role': agent.role,
                     'is_llm': agent.use_llm,
                     'max_iter': self.config.max_rounds,
-                    'llm_config': agent.llm_config.dict() if isinstance(agent.llm_config, LLMConfig) else agent.llm_config
+                    'llm_config': agent.llm_config if isinstance(agent.llm_config, dict) else agent.llm_config.dict()
                 }
                 for agent in self.agents
             ]
@@ -543,6 +616,20 @@ class Orchestrator:
             self.data_inserter.insert_allocations(allocations_data, agent_id_map)
             logging.info("Allocations insertion complete")
 
+            logging.info("Preparing schedules data")
+            schedules_data = [
+                {
+                    'agent_id': str(agent.id),
+                    'is_buyer': agent.role == "buyer",
+                    'values': agent.economic_agent.value_schedules.get(self.config.agent_config.good_name, {}),
+                    'initial_endowment': agent.economic_agent.endowment.initial_basket
+                }
+                for agent in self.agents
+            ]
+            logging.info(f"Inserting {len(schedules_data)} schedules")
+            self.data_inserter.insert_schedules(schedules_data)
+            logging.info("Schedules insertion complete")
+
             # Orders data
             logging.info("Preparing orders data")
             orders_data = [
@@ -579,21 +666,29 @@ class Orchestrator:
 
             # Reflections data
             logging.info("Preparing reflections data")
+            observations_data = []
             reflections_data = []
             for agent in self.agents:
                 if agent.memory and agent.memory[-1]['type'] == 'reflection':
                     reflection = agent.memory[-1]
                     observation = reflection.get('observation')
                     observation_serialized = serialize_memory_data(observation)
+                    observations_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'auction',
+                        'observation': observation_serialized
+                    })
                     reflections_data.append({
                         'memory_id': str(agent.id),
                         'environment_name': 'auction',
-                        'observation': observation_serialized,
-                        'environment_info': serialize_memory_data(reflection.get('environment_info')),
-                        'last_action': serialize_memory_data(agent.last_action) if hasattr(agent, 'last_action') else None,
-                        'reward': reflection.get('total_reward', 0),
-                        'previous_strategy': reflection.get('strategy_update', '')
+                        'reflection': reflection.get('content', ''),
+                        'self_reward': reflection.get('self_reward', 0),
+                        'environment_reward': reflection.get('environment_reward', 0),
+                        'total_reward': reflection.get('total_reward', 0),
+                        'strategy_update': reflection.get('strategy_update', '')
                     })
+            logging.info(f"inserting {len(observations_data)} observations")
+            self.data_inserter.insert_observations(observations_data, agent_id_map)
             logging.info(f"Inserting {len(reflections_data)} reflections")
             self.data_inserter.insert_reflections(reflections_data, agent_id_map)
             logging.info("Reflections insertion complete")
@@ -603,17 +698,11 @@ class Orchestrator:
             perceptions_data = []
             for agent in self.agents:
                 if agent.last_perception is not None:
-                    if isinstance(agent.last_perception, dict):
-                        environment_info = serialize_memory_data(agent.last_perception.get('environment_info', {}))
-                        recent_memories = serialize_memory_data(agent.last_perception.get('recent_memories', []))
-                    else:
-                        environment_info = {}
-                        recent_memories = []
                     perceptions_data.append({
                         'memory_id': str(agent.id),
                         'environment_name': 'auction',
-                        'environment_info': environment_info,
-                        'recent_memories': recent_memories
+                        'monologue': str(agent.last_perception.get('monologue')),
+                        'strategy': str(agent.last_perception.get('strategy'))
                     })
 
             if perceptions_data:
@@ -622,6 +711,22 @@ class Orchestrator:
                 logging.info("Perceptions insertion complete")
             else:
                 logging.info("No perceptions to insert")
+
+                    # Now, prepare actions data
+            logging.info("Preparing actions data")
+            actions_data = []
+            for agent in self.agents:
+                # Assuming each agent has a last_action attribute that stores the LLM output
+                if hasattr(agent, 'last_action') and agent.last_action:
+                    actions_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'auction',
+                        'action': agent.last_action
+                    })
+            
+            logging.info(f"Inserting {len(actions_data)} actions")
+            self.data_inserter.insert_actions(actions_data, agent_id_map)
+            logging.info("Actions insertion complete")
 
             # Trades data
             logging.info("Preparing trades data")
@@ -785,12 +890,6 @@ class Orchestrator:
 
                 for good, quantity in new_goods.items():
                     agent.economic_agent.endowment.current_basket.update_good_quantity(good, quantity)
-
-                # Store the perception (ensure last_perception is set)
-                agent.last_perception = {
-                    'environment_info': env_state.info,
-                    'observation': observation_dict
-                }
             else:
                 agent.last_perception = None  # Ensure it's set even if None
 
