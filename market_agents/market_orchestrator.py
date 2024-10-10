@@ -22,24 +22,26 @@ class MarketStep(BaseModel):
     episode: int
     trades: List[Trade]
     market_summary: Dict[str, Any]
-
+    surplus: List[float]
 class MarketOrchestratorState(BaseModel):
     steps: List[MarketStep] = Field(default_factory=list)
 
     def add_step(self, market_id: str,
                  participating_agent_ids: Set[str],
-                 equilibrium: EquilibriumResults,
+                 equilibrium_results: EquilibriumResults,
                  episode: int,
                  trades: List[Trade],
+                 surplus: List[float],
                  market_summary: Dict[str, Any]):
         step_number = self.get_market_step_count(market_id) + 1
         new_step = MarketStep(
             market_id=market_id,
             step_number=step_number,
             participating_agent_ids=participating_agent_ids,
-            equilibrium=equilibrium,
+            equilibrium=equilibrium_results,
             episode=episode,
             trades=trades,
+            surplus=surplus,
             market_summary=market_summary
         )
         self.steps.append(new_step)
@@ -179,19 +181,6 @@ class MarketOrchestrator:
             cumulative_quantities=cumulative_quantities,
             cumulative_surplus=cumulative_surplus
         )
-
-    def get_market_summary(self, market_id: str):
-        return {
-            "total_steps": self.state.get_market_step_count(market_id),
-            "participating_agents": self.state.get_participating_agents(market_id),
-            "history": self.state.get_market_history(market_id)
-        }
-
-    def get_overall_summary(self):
-        return {
-            "market_steps": self.state.market_step_counts,
-            "agent_participations": self.state.agent_participation_counts
-        }
     
     def create_local_actions_llm(self, good_name: str, llm_outputs: List[LLMOutput]) -> Dict[str, AuctionAction]:
         actions = {}
@@ -258,9 +247,10 @@ class MarketOrchestrator:
         participating_agent_ids = set(all_actions.keys())
         self.state.add_step(good_name,
                             participating_agent_ids,
-                            equilibrium=self.get_current_equilibrium().equilibrium[good_name],
+                            equilibrium_results=self.get_current_equilibrium().equilibrium[good_name],
                             episode=self.scenario._current_episode if self.scenario else 0,
                             trades=step_result.global_observation.all_trades,
+                            surplus=surplus,
                             market_summary=step_result.global_observation.market_summary,
                             )
         
@@ -274,12 +264,12 @@ class MarketOrchestrator:
         per_trade_quantities: List[int] = []
 
         for round in range(max_rounds):
+            round_surplus : List[float]= []
             logger.info(f"Round {round + 1}")
             
             # Run one step of the orchestrator
             step_result, surplus = await self.run_auction_step(good_name)
             per_trade_surplus.extend(surplus)
-            
             # Process trades
             global_observation = step_result.global_observation
             assert isinstance(global_observation, AuctionGlobalObservation)

@@ -83,7 +83,8 @@ async def zi_exploration():
     # Run the market simulation
     await orchestrator.run_scenario()
     #plot the market results
-    print(orchestrator.state)
+    return orchestrator.state
 
 if __name__ == "__main__":
-    asyncio.run(zi_exploration())
+    state = asyncio.run(zi_exploration())
+    print(state)
