@@ -2,7 +2,7 @@ from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.economics.econ_models import Basket, Good, Trade, Endowment, Bid, Ask, SellerPreferenceSchedule, BuyerPreferenceSchedule
 from market_agents.inference.parallel_inference import ParallelAIUtilities
 from market_agents.inference.message_models import LLMPromptContext, StructuredTool, LLMConfig, LLMOutput
-from market_agents.environments.mechanisms.auction import AuctionLocalObservation, AuctionGlobalObservation
+from market_agents.environments.mechanisms.auction import AuctionLocalObservation, AuctionGlobalObservation, MarketSummary
 from typing import Optional, Union, Dict, Any, List
 from pydantic import Field, field_validator, model_validator, computed_field, BaseModel
 import json
@@ -33,7 +33,7 @@ class AskTool(StructuredTool):
     instruction_string: str = Field(default="Choose the price to ask for a quantity of 1 of a good in the market. The price must be positive float that must be strictly higher than your current evaluation of the good. You will see your current evalution in the most recent user messae together with the rest of the market state.")
 
 class SimpleAgentState(BaseModel):
-    market_summary: Dict[str, Any]
+    market_summary: MarketSummary
     trades: List[Trade]
     waiting_orders: List[Union[Bid, Ask]]
     current_basket: Basket

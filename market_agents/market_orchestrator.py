@@ -3,7 +3,7 @@ from market_agents.economics.econ_models import Basket, Good, Trade, Bid, Ask
 from market_agents.economics.equilibrium import Equilibrium, EquilibriumResults
 from market_agents.economics.scenario import Scenario
 from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
-from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation, AuctionMarket
+from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation, AuctionMarket, MarketSummary
 from market_agents.economics.analysis import analyze_and_plot_market_results
 from market_agents.inference.parallel_inference import ParallelAIUtilities
 from market_agents.inference.message_models import LLMPromptContext, LLMOutput
@@ -11,6 +11,10 @@ from market_agents.simple_agent import SimpleAgent
 from pydantic import BaseModel, Field, computed_field
 from typing import List, Tuple, Optional, Dict, Union, Set, Any
 import logging
+import json
+from datetime import datetime
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +25,12 @@ class MarketStep(BaseModel):
     equilibrium: EquilibriumResults
     episode: int
     trades: List[Trade]
-    market_summary: Dict[str, Any]
+    market_summary: MarketSummary
     surplus: List[float]
+
+
 class MarketOrchestratorState(BaseModel):
+    name:str = Field(default="orchestrator_state")
     steps: List[MarketStep] = Field(default_factory=list)
 
     def add_step(self, market_id: str,
@@ -32,7 +39,7 @@ class MarketOrchestratorState(BaseModel):
                  episode: int,
                  trades: List[Trade],
                  surplus: List[float],
-                 market_summary: Dict[str, Any]):
+                 market_summary: MarketSummary):
         step_number = self.get_market_step_count(market_id) + 1
         new_step = MarketStep(
             market_id=market_id,
@@ -76,6 +83,31 @@ class MarketOrchestratorState(BaseModel):
     def get_market_history(self, market_id: str) -> List[MarketStep]:
         return [step for step in self.steps if step.market_id == market_id]
 
+    def save_to_json(self, folder_path: str) -> str:
+        # Create folder if it doesn't exist
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{self.name.replace(' ', '_')}_{timestamp}.json"
+        file_path = os.path.join(folder_path, filename)
+
+        # Convert to dict and save as JSON
+        data = self.model_dump(mode='json')
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        print(f"State saved to {file_path}")
+        return file_path
+
+    @classmethod
+    def load_from_json(cls, file_path: str) -> 'MarketOrchestratorState':
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        
+        # Convert JSON data back to MarketOrchestratorState
+        return cls.model_validate(data)
+
 class MarketOrchestrator:
     def __init__(self, 
                 llm_agents: List[SimpleAgent],
@@ -92,7 +124,11 @@ class MarketOrchestrator:
         self.agents_dict, self.llm_agents_dict, self.zi_agents_dict = self.create_agents_dicts()
         self.agents = list(self.agents_dict.values())
         self.failed_actions: List[LLMOutput] = []
-        self.state = MarketOrchestratorState()
+        if self.scenario:
+            name = self.scenario.name
+        else:
+            name = "orchestrator_state"
+        self.state = MarketOrchestratorState(name=name)
 
     def get_current_equilibrium(self) -> Equilibrium:
         typed_agents = [agent for agent in self.agents if isinstance(agent, EconomicAgent)]

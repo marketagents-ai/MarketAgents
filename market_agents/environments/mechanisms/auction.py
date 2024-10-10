@@ -1,7 +1,7 @@
 # double_auction.py
 
 import logging
-from typing import Any, List, Dict, Union, Type
+from typing import Any, List, Dict, Union, Type, Optional, Tuple
 from pydantic import BaseModel, Field, field_validator
 from market_agents.environments.environment import (
     Mechanism, LocalAction, GlobalAction, LocalObservation, GlobalObservation,
@@ -11,6 +11,11 @@ from market_agents.economics.econ_models import Bid, Ask, MarketAction, Trade
 import random
 logger = logging.getLogger(__name__)
 
+class MarketSummary(BaseModel):
+    trades_count: int = Field(default=0, description="Number of trades executed")
+    average_price: float = Field(default=0.0, description="Average price of trades")
+    total_volume: int = Field(default=0, description="Total volume of trades")
+    price_range: Tuple[float, float] = Field(default=(0.0, 0.0), description="Range of prices")
 
 class AuctionAction(LocalAction):
     action: Union[Bid, Ask]
@@ -38,7 +43,7 @@ class GlobalAuctionAction(GlobalAction):
 
 class AuctionObservation(BaseModel):
     trades: List[Trade] = Field(default_factory=list, description="List of trades the agent participated in")
-    market_summary: Dict[str, Any] = Field(default_factory=dict, description="Summary of market activity")
+    market_summary: MarketSummary = Field(default_factory=MarketSummary, description="Summary of market activity")
     waiting_orders: List[Union[Bid, Ask]] = Field(default_factory=list, description="List of orders waiting to be executed")
 
 
@@ -48,7 +53,7 @@ class AuctionLocalObservation(LocalObservation):
 class AuctionGlobalObservation(GlobalObservation):
     observations: Dict[str, AuctionLocalObservation]
     all_trades: List[Trade] = Field(default_factory=list, description="All trades executed in this round")
-    market_summary: Dict[str, Any] = Field(default_factory=dict, description="Summary of market activity")
+    market_summary: MarketSummary = Field(default_factory=MarketSummary, description="Summary of market activity")
 
 
 class AuctionActionSpace(ActionSpace):
@@ -137,7 +142,7 @@ class DoubleAuction(Mechanism):
 
         return trades
 
-    def _create_observations(self, new_trades: List[Trade], market_summary: Dict[str, Any]) -> Dict[str, AuctionLocalObservation]:
+    def _create_observations(self, new_trades: List[Trade], market_summary: MarketSummary) -> Dict[str, AuctionLocalObservation]:
         observations = {}
 
         # Agents with trades in this round
@@ -181,22 +186,17 @@ class DoubleAuction(Mechanism):
         self.waiting_bids = []
         self.waiting_asks = []
 
-    def _create_market_summary(self, trades: List[Trade]) -> Dict[str, Any]:
+    def _create_market_summary(self, trades: List[Trade]) -> MarketSummary:
         if not trades:
-            return {
-                "trades_count": 0,
-                "average_price": None,
-                "total_volume": 0,
-                "price_range": None
-            }
+            return MarketSummary()
 
         prices = [trade.price for trade in trades]
-        return {
-            "trades_count": len(trades),
-            "average_price": sum(prices) / len(prices),
-            "total_volume": len(trades),
-            "price_range": (min(prices), max(prices))
-        }
+        return MarketSummary(
+            trades_count=len(trades),
+            average_price=sum(prices) / len(prices),
+            total_volume=len(trades),
+            price_range=(min(prices), max(prices))
+        )
 
 class AuctionMarket(MultiAgentEnvironment):
     name: str = Field(default="Auction Market", description="Name of the auction market")
