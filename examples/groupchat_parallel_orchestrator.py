@@ -21,6 +21,7 @@ from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.logger_utils import *
 from market_agents.agents.personas.persona import generate_persona, save_persona_to_file, Persona
 from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
+from naptha_sdk.client.naptha import agent as naptha_agent
 
 # Set up logging for this module
 logger = logging.getLogger(__name__)
@@ -105,6 +106,26 @@ class GroupChatTracker:
             "total_topics": len(self.topics)
         }
 
+@naptha_agent("market_agent")
+def create_agent(i, persona, llm_config, config, environments):
+    agent = MarketAgent.create(
+        agent_id=i,
+        is_buyer=persona.role.lower() == "buyer",
+        num_units=config.agent_config.num_units,
+        base_value=config.agent_config.base_value,
+        use_llm=config.agent_config.use_llm,
+        initial_cash=config.agent_config.buyer_initial_cash if persona.role.lower() == "buyer" else config.agent_config.seller_initial_cash,
+        initial_goods=config.agent_config.buyer_initial_goods if persona.role.lower() == "buyer" else config.agent_config.seller_initial_goods,
+        good_name=config.agent_config.good_name,
+        noise_factor=config.agent_config.noise_factor,
+        max_relative_spread=config.agent_config.max_relative_spread,
+        llm_config=llm_config,
+        protocol=ACLMessage,
+        environments=environments,
+        persona=persona
+    )
+    return agent
+
 class Orchestrator:
     def __init__(self, config: OrchestratorConfig):
         self.config = config
@@ -146,22 +167,7 @@ class Orchestrator:
         for i, persona in enumerate(personas):
             llm_config = random.choice(self.config.llm_configs).model_dump()
 
-            agent = MarketAgent.create(
-                agent_id=i,
-                is_buyer=persona.role.lower() == "buyer",
-                num_units=self.config.agent_config.num_units,
-                base_value=self.config.agent_config.base_value,
-                use_llm=self.config.agent_config.use_llm,
-                initial_cash=self.config.agent_config.buyer_initial_cash if persona.role.lower() == "buyer" else self.config.agent_config.seller_initial_cash,
-                initial_goods=self.config.agent_config.buyer_initial_goods if persona.role.lower() == "buyer" else self.config.agent_config.seller_initial_goods,
-                good_name=self.config.agent_config.good_name,
-                noise_factor=self.config.agent_config.noise_factor,
-                max_relative_spread=self.config.agent_config.max_relative_spread,
-                llm_config=llm_config,
-                protocol=ACLMessage,
-                environments=self.environments,
-                persona=persona
-            )
+            agent = create_agent(i, persona, llm_config, self.config, self.environments)
             self.agents.append(agent)
             log_agent_init(logger, i, agent.is_buyer, persona)
 
