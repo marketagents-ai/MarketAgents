@@ -226,6 +226,10 @@ def create_tables(db_params):
         system TEXT,
         tools JSONB,
         tool_choice JSONB,
+        raw_response JSONB,
+        completion_tokens INTEGER,
+        prompt_tokens INTEGER,
+        total_tokens INTEGER,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)

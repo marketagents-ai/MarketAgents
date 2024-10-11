@@ -88,6 +88,7 @@ class ParallelAIUtilities:
             prompts = self._update_prompt_history(prompts, flattened_results)
         
         return flattened_results
+    
     def get_all_requests(self):
         requests = self.all_requests
         self.all_requests = []  

@@ -4,77 +4,77 @@ objectives:
 - Your goal is to maximize utility
 persona: 'Personal Background:
 
-  James Burns is a Non-binary who participates in the market. They are 90 years old
-  and work as a Salesperson. Their investment experience is Novice and they have a
-  Aggressive risk appetite.
+  James Burns is a Male who participates in the market. They are 48 years old and
+  work as a Nurse. Their investment experience is Expert and they have a Conservative
+  risk appetite.
 
 
   Demographic Characteristics:
 
-  Age: 90
+  Age: 48
 
-  Gender: Non-binary
+  Gender: Male
 
   Education Level: Bachelor''s
 
-  Occupation: Salesperson
+  Occupation: Nurse
 
   Income Bracket: Medium
 
-  Geographic Location: Suburban
+  Geographic Location: Urban
 
 
   Economic Attributes:
 
-  Spending Habits: Frugal
+  Spending Habits: Lavish
 
-  Saving Preferences: Low
+  Saving Preferences: Medium
 
-  Risk Tolerance: 0.52
+  Risk Tolerance: 0.03
 
-  Investment Experience: Novice
+  Investment Experience: Expert
 
 
   Personality Traits:
 
   Decision Making Style: Impulsive
 
-  Openness: 0.5
+  Openness: 0.55
 
-  Conscientiousness: 0.95
+  Conscientiousness: 0.04
 
-  Extraversion: 0.96
+  Extraversion: 0.73
 
-  Agreeableness: 0.72
+  Agreeableness: 0.49
 
-  Neuroticism: 0.35
+  Neuroticism: 0.55
 
 
   Hobbies and Interests:
 
-  Art, Music, Travel
+  Travel, Music, Cooking
 
 
   Dynamic Attributes:
 
-  Current Mood: Neutral
+  Current Mood: Happy
 
-  Recent Life Events: Retired, Got a promotion
+  Recent Life Events: Started a new hobby, Graduated
 
 
   Financial Objectives:
 
-  Short Term Goals: Build emergency fund, Save for vacation
+  Short Term Goals: Build emergency fund, Pay off credit card debt
 
-  Long Term Goals: Start a business, Save for retirement
+  Long Term Goals: Buy a house, Save for retirement
 
-  Risk Appetite: Aggressive
+  Risk Appetite: Conservative
 
-  Investment Preferences: Stocks, Commodities, Cryptocurrency
+  Investment Preferences: Stocks, Commodities, Real Estate
 
   '
 role: Buyer
 trader_type:
-- Novice
-- Aggressive
+- Expert
+- Conservative
 - Impulsive

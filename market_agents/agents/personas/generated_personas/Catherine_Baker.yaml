@@ -1,0 +1,80 @@
+name: Catherine Baker
+objectives:
+- Sell goods at favorable prices
+- Your goal is to maximize profits
+persona: 'Personal Background:
+
+  Catherine Baker is a Female who participates in the market. They are 51 years old
+  and work as a Engineer. Their investment experience is Expert and they have a Moderate
+  risk appetite.
+
+
+  Demographic Characteristics:
+
+  Age: 51
+
+  Gender: Female
+
+  Education Level: Master''s
+
+  Occupation: Engineer
+
+  Income Bracket: Medium
+
+  Geographic Location: Urban
+
+
+  Economic Attributes:
+
+  Spending Habits: Moderate
+
+  Saving Preferences: Low
+
+  Risk Tolerance: 0.21
+
+  Investment Experience: Expert
+
+
+  Personality Traits:
+
+  Decision Making Style: Impulsive
+
+  Openness: 0.72
+
+  Conscientiousness: 0.64
+
+  Extraversion: 0.7
+
+  Agreeableness: 0.78
+
+  Neuroticism: 0.72
+
+
+  Hobbies and Interests:
+
+  Music, Gardening, Travel
+
+
+  Dynamic Attributes:
+
+  Current Mood: Happy
+
+  Recent Life Events: Graduated, Retired
+
+
+  Financial Objectives:
+
+  Short Term Goals: Save for vacation, Pay off credit card debt
+
+  Long Term Goals: Buy a house, Save for retirement
+
+  Risk Appetite: Moderate
+
+  Investment Preferences: Real Estate, Commodities, Cryptocurrency
+
+  '
+role: Seller
+trader_type:
+- Expert
+- Moderate
+- Impulsive

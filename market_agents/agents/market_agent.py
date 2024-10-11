@@ -86,7 +86,7 @@ class MarketAgent(LLMAgent, EconomicAgent):
             raise ValueError(f"Environment {environment_name} not found")
 
         environment_info = self.environments[environment_name].get_global_state()
-        recent_memories = self.memory[-5:] if self.memory else []
+        recent_memories = self.memory[-1:] if self.memory else []
         
         variables = AgentPromptVariables(
             environment_name=environment_name,

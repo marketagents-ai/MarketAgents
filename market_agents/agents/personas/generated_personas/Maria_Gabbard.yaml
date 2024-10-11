@@ -1,0 +1,80 @@
+name: Maria Gabbard
+objectives:
+- Sell goods at favorable prices
+- Your goal is to maximize profits
+persona: 'Personal Background:
+
+  Maria Gabbard is a Female who participates in the market. They are 28 years old
+  and work as a Entrepreneur. Their investment experience is Novice and they have
+  a Aggressive risk appetite.
+
+
+  Demographic Characteristics:
+
+  Age: 28
+
+  Gender: Female
+
+  Education Level: Master''s
+
+  Occupation: Entrepreneur
+
+  Income Bracket: High
+
+  Geographic Location: Suburban
+
+
+  Economic Attributes:
+
+  Spending Habits: Moderate
+
+  Saving Preferences: High
+
+  Risk Tolerance: 0.56
+
+  Investment Experience: Novice
+
+
+  Personality Traits:
+
+  Decision Making Style: Impulsive
+
+  Openness: 0.68
+
+  Conscientiousness: 0.49
+
+  Extraversion: 0.32
+
+  Agreeableness: 0.19
+
+  Neuroticism: 0.99
+
+
+  Hobbies and Interests:
+
+  Sports, Cooking, Gardening
+
+
+  Dynamic Attributes:
+
+  Current Mood: Neutral
+
+  Recent Life Events: Started a new hobby, Retired
+
+
+  Financial Objectives:
+
+  Short Term Goals: Pay off credit card debt, Build emergency fund
+
+  Long Term Goals: Buy a house, Start a business
+
+  Risk Appetite: Aggressive
+
+  Investment Preferences: Stocks, Commodities, Bonds
+
+  '
+role: Seller
+trader_type:
+- Novice
+- Aggressive
+- Impulsive

@@ -1,0 +1,80 @@
+name: Annie Wesley
+objectives:
+- Purchase goods at favorable prices
+- Your goal is to maximize utility
+persona: 'Personal Background:
+
+  Annie Wesley is a Female who participates in the market. They are 92 years old and
+  work as a Teacher. Their investment experience is Expert and they have a Aggressive
+  risk appetite.
+
+
+  Demographic Characteristics:
+
+  Age: 92
+
+  Gender: Female
+
+  Education Level: Bachelor''s
+
+  Occupation: Teacher
+
+  Income Bracket: Medium
+
+  Geographic Location: Urban
+
+
+  Economic Attributes:
+
+  Spending Habits: Moderate
+
+  Saving Preferences: Low
+
+  Risk Tolerance: 0.9
+
+  Investment Experience: Expert
+
+
+  Personality Traits:
+
+  Decision Making Style: Impulsive
+
+  Openness: 0.07
+
+  Conscientiousness: 0.11
+
+  Extraversion: 0.67
+
+  Agreeableness: 0.17
+
+  Neuroticism: 0.42
+
+
+  Hobbies and Interests:
+
+  Travel, Sports, Music
+
+
+  Dynamic Attributes:
+
+  Current Mood: Neutral
+
+  Recent Life Events: Moved to a new city, Retired
+
+
+  Financial Objectives:
+
+  Short Term Goals: Build emergency fund, Save for vacation
+
+  Long Term Goals: Save for retirement, Start a business
+
+  Risk Appetite: Aggressive
+
+  Investment Preferences: Cryptocurrency, Stocks, Real Estate
+
+  '
+role: Buyer
+trader_type:
+- Expert
+- Aggressive
+- Impulsive
