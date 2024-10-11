@@ -8,7 +8,7 @@ from market_agents.market_orchestrator import MarketOrchestrator, MarketOrchestr
 import os
 
 
-async def zi_exploration(buyer_params: ZiParams, seller_params: ZiParams):
+async def zi_exploration(buyer_params: ZiParams, seller_params: ZiParams,max_rounds: int = 1,num_agents: int = 25):
     load_dotenv()
         # Create a good
     apple = Good(name="apple", quantity=0)
@@ -17,8 +17,8 @@ async def zi_exploration(buyer_params: ZiParams, seller_params: ZiParams):
         ZiFactory(
             id=f"factory_episode_{0}",
             goods=["apple"],
-            num_buyers=25,  # Increase buyers by 1 each episode
-            num_sellers=25,     # Keep sellers constant
+            num_buyers=num_agents,  # Increase buyers by 1 each episode
+            num_sellers=num_agents,     # Keep sellers constant
             buyer_params=buyer_params,
             seller_params=seller_params
         )
@@ -29,7 +29,7 @@ async def zi_exploration(buyer_params: ZiParams, seller_params: ZiParams):
         factories=factories
     )
 
-    orchestrator = MarketOrchestrator(llm_agents=[], goods=[apple.name], max_rounds=1,scenario=scenario)
+    orchestrator = MarketOrchestrator(llm_agents=[], goods=[apple.name], max_rounds=max_rounds,scenario=scenario)
 
     # Run the market simulation
     await orchestrator.run_scenario()
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         max_relative_spread=0.2,
         is_buyer=False
     )
-    scenario,state = asyncio.run(zi_exploration(buyer_params, seller_params))
+    scenario,state = asyncio.run(zi_exploration(buyer_params, seller_params,max_rounds=10))
     file_path_state = state.save_to_json(r"C:\Users\Tommaso\Documents\Dev\MarketAgents\outputs\econ_results")
     loaded_state = MarketOrchestratorState.load_from_json(file_path_state)
     file_path_scenario = scenario.save_to_json(r"C:\Users\Tommaso\Documents\Dev\MarketAgents\outputs\econ_results")

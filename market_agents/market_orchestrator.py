@@ -11,6 +11,7 @@ from market_agents.simple_agent import SimpleAgent
 from pydantic import BaseModel, Field, computed_field
 from typing import List, Tuple, Optional, Dict, Union, Set
 import logging
+from statistics import mean, stdev
 
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,22 @@ class MarketStep(BaseModel):
     surplus: List[float]
 
 
-    
+class EpisodeSummary(BaseModel):
+    episode: int
+    surplus: float
+    theoretical_surplus: float
+    efficiency: float
+    quantity: int
+    average_price: float
+    min_price: float
+    max_price: float
+    std_price: float
+    equilibrium_price: float
+    equilibrium_quantity: int
+
 class MarketOrchestratorState(SavableBaseModel):
-    name:str = Field(default="orchestrator_state")
-    steps: List[MarketStep] = Field(default_factory=list)
+    name: str = Field(default="orchestrator_state")
+    steps: Dict[int, List[MarketStep]] = Field(default_factory=dict)
 
     def add_step(self, market_id: str,
                  participating_agent_ids: Set[str],
@@ -38,7 +51,7 @@ class MarketOrchestratorState(SavableBaseModel):
                  trades: List[Trade],
                  surplus: List[float],
                  market_summary: MarketSummary):
-        step_number = self.get_market_step_count(market_id) + 1
+        step_number = self.get_market_step_count(market_id, episode) + 1
         new_step = MarketStep(
             market_id=market_id,
             step_number=step_number,
@@ -49,37 +62,151 @@ class MarketOrchestratorState(SavableBaseModel):
             surplus=surplus,
             market_summary=market_summary
         )
-        self.steps.append(new_step)
+        if episode not in self.steps:
+            self.steps[episode] = []
+        self.steps[episode].append(new_step)
 
     @computed_field
     @property
-    def market_step_counts(self) -> Dict[str, int]:
-        return {market_id: self.get_market_step_count(market_id) 
+    def market_step_counts(self) -> Dict[str, Dict[int, int]]:
+        return {market_id: {episode: self.get_market_step_count(market_id, episode) 
+                            for episode in self.steps.keys()}
                 for market_id in self.get_market_ids()}
 
     @computed_field
     @property
     def agent_participation_counts(self) -> Dict[str, int]:
         agent_counts = {}
-        for step in self.steps:
-            for agent_id in step.participating_agent_ids:
-                agent_counts[agent_id] = agent_counts.get(agent_id, 0) + 1
+        for episode_steps in self.steps.values():
+            for step in episode_steps:
+                for agent_id in step.participating_agent_ids:
+                    agent_counts[agent_id] = agent_counts.get(agent_id, 0) + 1
         return agent_counts
 
-    def get_market_step_count(self, market_id: str) -> int:
-        return sum(1 for step in self.steps if step.market_id == market_id)
+    @computed_field
+    @property
+    def surplus(self) -> Dict[int, float]:
+        episode_surplus = {}
+        for episode, episode_steps in self.steps.items():
+            total_surplus = sum(sum(step.surplus) for step in episode_steps)
+            episode_surplus[episode] = total_surplus
+        return episode_surplus
+
+    @computed_field
+    @property
+    def theoretical_surplus(self) -> Dict[int, float]:
+        return {
+            episode: episode_steps[0].equilibrium.total_surplus
+            for episode, episode_steps in self.steps.items()
+            if episode_steps
+        }
+
+    @computed_field
+    @property
+    def efficiency(self) -> Dict[int, float]:
+        return {
+            episode: self.surplus[episode] / self.theoretical_surplus[episode]
+            if self.theoretical_surplus[episode] != 0 else 0
+            for episode in self.surplus.keys()
+        }
+
+    @computed_field
+    @property
+    def quantity(self) -> Dict[int, int]:
+        return {
+            episode: sum(sum(trade.quantity for trade in step.trades) for step in episode_steps)
+            for episode, episode_steps in self.steps.items()
+        }
+
+    @computed_field
+    @property
+    def average_price(self) -> Dict[int, float]:
+        return {
+            episode: mean(trade.price for step in episode_steps for trade in step.trades)
+            if any(step.trades for step in episode_steps) else 0
+            for episode, episode_steps in self.steps.items()
+        }
+
+    @computed_field
+    @property
+    def min_price(self) -> Dict[int, float]:
+        return {
+            episode: min((trade.price for step in episode_steps for trade in step.trades), default=0)
+            for episode, episode_steps in self.steps.items()
+        }
+
+    @computed_field
+    @property
+    def max_price(self) -> Dict[int, float]:
+        return {
+            episode: max((trade.price for step in episode_steps for trade in step.trades), default=0)
+            for episode, episode_steps in self.steps.items()
+        }
+
+    @computed_field
+    @property
+    def std_price(self) -> Dict[int, float]:
+        return {
+            episode: stdev((trade.price for step in episode_steps for trade in step.trades))
+            if len([trade for step in episode_steps for trade in step.trades]) > 1 else 0
+            for episode, episode_steps in self.steps.items()
+        }
+
+    @computed_field
+    @property
+    def equilibrium_price(self) -> Dict[int, float]:
+        return {
+            episode: episode_steps[0].equilibrium.price if episode_steps else 0
+            for episode, episode_steps in self.steps.items()
+        }
+
+    @computed_field
+    @property
+    def equilibrium_quantity(self) -> Dict[int, int]:
+        return {
+            episode: episode_steps[0].equilibrium.quantity if episode_steps else 0
+            for episode, episode_steps in self.steps.items()
+        }
+
+    @computed_field
+    @property
+    def summary(self) -> Dict[int, EpisodeSummary]:
+        summaries = {}
+        for episode in self.steps.keys():
+            summaries[episode] = EpisodeSummary(
+                episode=episode,
+                surplus=self.surplus[episode],
+                theoretical_surplus=self.theoretical_surplus[episode],
+                efficiency=self.efficiency[episode],
+                quantity=self.quantity[episode],
+                average_price=self.average_price[episode],
+                min_price=self.min_price[episode],
+                max_price=self.max_price[episode],
+                std_price=self.std_price[episode],
+                equilibrium_price=self.equilibrium_price[episode],
+                equilibrium_quantity=self.equilibrium_quantity[episode]
+            )
+        return summaries
+
+    def get_market_step_count(self, market_id: str, episode: int) -> int:
+        if episode not in self.steps:
+            return 0
+        return sum(1 for step in self.steps[episode] if step.market_id == market_id)
 
     def get_market_ids(self) -> Set[str]:
-        return {step.market_id for step in self.steps}
+        return {step.market_id for episode_steps in self.steps.values() for step in episode_steps}
 
     def get_participating_agents(self, market_id: str) -> Set[str]:
         return {agent_id 
-                for step in self.steps 
+                for episode_steps in self.steps.values()
+                for step in episode_steps 
                 if step.market_id == market_id 
                 for agent_id in step.participating_agent_ids}
 
-    def get_market_history(self, market_id: str) -> List[MarketStep]:
-        return [step for step in self.steps if step.market_id == market_id]
+    def get_market_history(self, market_id: str, episode: Optional[int] = None) -> List[MarketStep]:
+        if episode is not None:
+            return [step for step in self.steps.get(episode, []) if step.market_id == market_id]
+        return [step for episode_steps in self.steps.values() for step in episode_steps if step.market_id == market_id]
 
     
 
@@ -100,7 +227,7 @@ class MarketOrchestrator:
         self.agents = list(self.agents_dict.values())
         self.failed_actions: List[LLMOutput] = []
         if self.scenario:
-            name = self.scenario.name
+            name = self.scenario.name+"_state"
         else:
             name = "orchestrator_state"
         self.state = MarketOrchestratorState(name=name)
@@ -324,4 +451,3 @@ class MarketOrchestrator:
         else:
             for good in self.goods:
                 await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good)
-
