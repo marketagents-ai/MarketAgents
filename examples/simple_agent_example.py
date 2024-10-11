@@ -7,6 +7,8 @@ from market_agents.economics.econ_models import Good, Endowment, Basket, Bid, As
 from market_agents.environments.mechanisms.auction import AuctionObservation, AuctionLocalObservation, AuctionGlobalObservation
 from typing import List, Dict, Union
 from market_agents.inference.message_models import LLMPromptContext
+from naptha_sdk.client.naptha import agent as naptha_agent
+
 async def main():
     load_dotenv()
     
@@ -25,16 +27,20 @@ async def main():
     buyer_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool")
     seller_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool")
 
-    # Create simple agents
-    buyer = create_simple_agent(
-        agent_id="buyer_1",
-        llm_config=buyer_llm_config,
-        good=apple,
-        is_buyer=True,
-        endowment=Endowment(agent_id="buyer_1", initial_basket=Basket(cash=1000, goods=[Good(name="apple", quantity=0)])),
-        starting_value=20.0,
-        num_units=10
-    )
+    @naptha_agent("buyer_agent")
+    def buyer_agent():
+        # Create simple agents
+        buyer = create_simple_agent(
+            agent_id="buyer_1",
+            llm_config=buyer_llm_config,
+            good=apple,
+            is_buyer=True,
+            endowment=Endowment(agent_id="buyer_1", initial_basket=Basket(cash=1000, goods=[Good(name="apple", quantity=0)])),
+            starting_value=20.0,
+            num_units=10
+        )
+        return buyer
+    buyer = buyer_agent()
 
     seller = create_simple_agent(
         agent_id="seller_1",

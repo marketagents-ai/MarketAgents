@@ -1,0 +1,24 @@
+author: richard
+description: buyer_agent
+implementation:
+  package:
+    entrypoint: run.py
+inputs:
+  location: node
+  save: false
+  system_message: You are a helpful AI assistant.
+license: MIT
+models:
+  default_model_provider: ollama
+  ollama:
+    api_base: http://localhost:11434
+    max_tokens: 1000
+    model: ollama/llama3.1:70b
+    temperature: 0
+name: buyer_agent
+outputs:
+  filename: output.txt
+  location: node
+  save: false
+type: buyer_agent
+version: 0.1.0

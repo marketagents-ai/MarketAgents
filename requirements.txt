@@ -13,3 +13,4 @@ aiohttp
 scipy
 fastapi
 uvicorn
+git+https://github.com/napthaai/naptha-sdk.git@feat/run-agent-tools#egg=naptha-sdk
