@@ -1,36 +1,36 @@
-name: James Burns
+name: Lidia Mobley
 objectives:
 - Purchase goods at favorable prices
 - Your goal is to maximize utility
 persona: 'Personal Background:
 
-  James Burns is a Male who participates in the market. They are 48 years old and
+  Lidia Mobley is a Female who participates in the market. They are 94 years old and
   work as a Nurse. Their investment experience is Expert and they have a Conservative
   risk appetite.
 
 
   Demographic Characteristics:
 
-  Age: 48
+  Age: 94
 
-  Gender: Male
+  Gender: Female
 
   Education Level: Bachelor''s
 
   Occupation: Nurse
 
-  Income Bracket: Medium
+  Income Bracket: Low
 
-  Geographic Location: Urban
+  Geographic Location: Suburban
 
 
   Economic Attributes:
 
-  Spending Habits: Lavish
+  Spending Habits: Frugal
 
-  Saving Preferences: Medium
+  Saving Preferences: High
 
-  Risk Tolerance: 0.03
+  Risk Tolerance: 0.96
 
   Investment Experience: Expert
 
@@ -39,38 +39,38 @@ persona: 'Personal Background:
 
   Decision Making Style: Impulsive
 
-  Openness: 0.55
+  Openness: 0.11
 
-  Conscientiousness: 0.04
+  Conscientiousness: 0.4
 
-  Extraversion: 0.73
+  Extraversion: 0.68
 
-  Agreeableness: 0.49
+  Agreeableness: 0.09
 
-  Neuroticism: 0.55
+  Neuroticism: 0.47
 
 
   Hobbies and Interests:
 
-  Travel, Music, Cooking
+  Sports, Photography, Travel
 
 
   Dynamic Attributes:
 
   Current Mood: Happy
 
-  Recent Life Events: Started a new hobby, Graduated
+  Recent Life Events: Moved to a new city, Started a new hobby
 
 
   Financial Objectives:
 
-  Short Term Goals: Build emergency fund, Pay off credit card debt
+  Short Term Goals: Save for vacation, Build emergency fund
 
-  Long Term Goals: Buy a house, Save for retirement
+  Long Term Goals: Save for retirement, Buy a house
 
   Risk Appetite: Conservative
 
-  Investment Preferences: Stocks, Commodities, Real Estate
+  Investment Preferences: Bonds, Real Estate, Cryptocurrency
 
   '
 role: Buyer
