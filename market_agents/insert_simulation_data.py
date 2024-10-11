@@ -411,8 +411,10 @@ class SimulationDataInserter:
     def insert_ai_requests(self, requests_data):
         query = """
         INSERT INTO requests 
-        (prompt_context_id, start_time, end_time, total_time, model, max_tokens, temperature, messages, system, tools, tool_choice)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (prompt_context_id, start_time, end_time, total_time, model, 
+        max_tokens, temperature, messages, system, tools, tool_choice,
+        raw_response, completion_tokens, prompt_tokens, total_tokens)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         try:
             with self.conn.cursor() as cur:
@@ -425,10 +427,14 @@ class SimulationDataInserter:
                         request['model'],
                         request['max_tokens'],
                         request['temperature'],
-                        json.dumps(request['messages'], default=str),
+                        json.dumps(request['messages']),
                         request['system'],
-                        json.dumps(request['tools'], default=str),
-                        json.dumps(request['tool_choice'], default=str)
+                        json.dumps(request.get('tools', [])),
+                        json.dumps(request.get('tool_choice', {})),
+                        json.dumps(request['raw_response']),
+                        request['completion_tokens'],
+                        request['prompt_tokens'],
+                        request['total_tokens']
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(requests_data)} AI requests")
