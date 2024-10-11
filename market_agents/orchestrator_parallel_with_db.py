@@ -347,31 +347,34 @@ class Orchestrator:
     def insert_ai_requests(self, ai_requests):
         requests_data = []
         for request in ai_requests:
-            # Check if start_time and end_time are floats (Unix timestamps)
-            if isinstance(request.start_time, (float, int)):
-                start_time = datetime.fromtimestamp(request.start_time)
-            else:
-                start_time = request.start_time
-
-            if isinstance(request.end_time, (float, int)):
-                end_time = datetime.fromtimestamp(request.end_time)
-            else:
-                end_time = request.end_time
+            start_time = request.start_time
+            end_time = request.end_time
+            if isinstance(start_time, (float, int)):
+                start_time = datetime.fromtimestamp(start_time)
+            if isinstance(end_time, (float, int)):
+                end_time = datetime.fromtimestamp(end_time)
 
             total_time = (end_time - start_time).total_seconds()
 
+            # Extract system message
+            system_message = next((msg['content'] for msg in request.completion_kwargs.get('messages', []) if msg['role'] == 'system'), None)
+
             requests_data.append({
-                'prompt_context_id': request.source_id,
+                'prompt_context_id': str(request.source_id),
                 'start_time': start_time,
                 'end_time': end_time,
                 'total_time': total_time,
                 'model': request.completion_kwargs.get('model', ''),
-                'max_tokens': int(request.completion_kwargs.get('max_tokens', 0)),
-                'temperature': float(request.completion_kwargs.get('temperature', 0)),
+                'max_tokens': request.completion_kwargs.get('max_tokens', None),
+                'temperature': request.completion_kwargs.get('temperature', None),
                 'messages': request.completion_kwargs.get('messages', []),
-                'system': request.completion_kwargs.get('system', ''),
+                'system': system_message,
                 'tools': request.completion_kwargs.get('tools', []),
-                'tool_choice': request.completion_kwargs.get('tool_choice', {})
+                'tool_choice': request.completion_kwargs.get('tool_choice', {}),
+                'raw_response': request.raw_result,
+                'completion_tokens': request.usage.completion_tokens if request.usage else None,
+                'prompt_tokens': request.usage.prompt_tokens if request.usage else None,
+                'total_tokens': request.usage.total_tokens if request.usage else None
             })
 
         if requests_data:
