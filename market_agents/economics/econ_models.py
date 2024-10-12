@@ -8,6 +8,7 @@ import uuid
 import os
 from pathlib import Path
 import json
+import tempfile
 
 class SavableBaseModel(BaseModel):
     name:str
@@ -20,21 +21,39 @@ class SavableBaseModel(BaseModel):
         filename = f"{self.name.replace(' ', '_')}_{timestamp}.json"
         file_path = os.path.join(folder_path, filename)
 
-        # Convert to dict and save as JSON
-        data = self.model_dump(mode='json')
-        with open(file_path, 'w') as f:
-            json.dump(data, f, indent=2)
-
-        print(f"State saved to {file_path}")
+        try:
+            # Convert to dict
+            data = self.model_dump(mode='json')
+            
+            # Write to a temporary file first
+            with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
+                json.dump(data, temp_file, indent=2)
+            
+            # If the write was successful, move the temporary file to the final location
+            os.replace(temp_file.name, file_path)
+            
+            print(f"State saved to {file_path}")
+        except Exception as e:
+            print(f"Error saving state to {file_path}")
+            print(f"Error message: {str(e)}")
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+            raise
+        
         return file_path
 
     @classmethod
     def load_from_json(cls, file_path: str) -> Self:
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-        
-        # Convert JSON data back to MarketOrchestratorState
-        return cls.model_validate(data)
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            return cls.model_validate(data)
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON from {file_path}")
+            print(f"Error message: {str(e)}")
+            with open(file_path, 'r') as f:
+                print(f"File contents:\n{f.read()}")
+            raise
     
 class MarketAction(BaseModel):
     price: float = Field(..., description="Price of the order")

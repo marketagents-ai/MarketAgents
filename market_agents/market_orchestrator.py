@@ -1,5 +1,5 @@
-from market_agents.economics.econ_agent import EconomicAgent
-from market_agents.economics.econ_models import  Trade, Bid, Ask,SavableBaseModel
+from market_agents.economics.econ_agent import EconomicAgent, ZiFactory, ZiParams
+from market_agents.economics.econ_models import Good, Trade, Bid, Ask,SavableBaseModel
 from market_agents.economics.equilibrium import Equilibrium, EquilibriumResults
 from market_agents.economics.scenario import Scenario
 from market_agents.environments.environment import  EnvironmentStep
@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, computed_field
 from typing import List, Tuple, Optional, Dict, Union, Set
 import logging
 from statistics import mean, stdev
+from dotenv import load_dotenv
 
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 class MarketStep(BaseModel):
     market_id: str
     step_number: int
-    participating_agent_ids: Set[str]
+    participating_agent_ids: List[str]
     equilibrium: EquilibriumResults
     episode: int
     trades: List[Trade]
@@ -55,7 +56,7 @@ class MarketOrchestratorState(SavableBaseModel):
         new_step = MarketStep(
             market_id=market_id,
             step_number=step_number,
-            participating_agent_ids=participating_agent_ids,
+            participating_agent_ids=list(participating_agent_ids),
             equilibrium=equilibrium_results,
             episode=episode,
             trades=trades,
@@ -443,11 +444,40 @@ class MarketOrchestrator:
             for agent in relevant_llm_agents:
                     agent.archive_endowment()
 
-    async def run_scenario(self):
+    async def run_scenario(self,report:bool=True):
         if self.scenario:
             for episode in range(self.scenario.num_episodes):
                 for good in self.scenario.goods:
-                    await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good)
+                    await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good,report=report)
         else:
             for good in self.goods:
-                await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good)
+                await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good,report=report)
+
+
+async def zi_scenario(buyer_params: ZiParams, seller_params: ZiParams,max_rounds: int = 1,num_buyers: int = 25,num_sellers:int=25):
+    load_dotenv()
+        # Create a good
+    apple = Good(name="apple", quantity=0)
+    # Create DoubleAuction mechanism
+    factories = [
+        ZiFactory(
+            id=f"factory_episode_{0}",
+            goods=["apple"],
+            num_buyers=num_buyers,  # Increase buyers by 1 each episode
+            num_sellers=num_sellers,     # Keep sellers constant
+            buyer_params=buyer_params,
+            seller_params=seller_params
+        )
+    ]
+    scenario = Scenario(
+        name="Static Apple Market",
+        goods=["apple"],
+        factories=factories
+    )
+
+    orchestrator = MarketOrchestrator(llm_agents=[], goods=[apple.name], max_rounds=max_rounds,scenario=scenario)
+
+    # Run the market simulation
+    await orchestrator.run_scenario(report=False)
+    #plot the market results
+    return scenario,orchestrator.state
