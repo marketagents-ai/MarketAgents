@@ -705,7 +705,8 @@ class Orchestrator:
                         'memory_id': str(agent.id),
                         'environment_name': 'auction',
                         'monologue': str(agent.last_perception.get('monologue')),
-                        'strategy': str(agent.last_perception.get('strategy'))
+                        'strategy': str(agent.last_perception.get('strategy')),
+                        'confidence': agent.last_perception.get('confidence', 0)
                     })
 
             if perceptions_data:
@@ -795,10 +796,18 @@ class Orchestrator:
                             # Access the surplus from agent's last_step.info
                             environment_reward = agent.last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if agent.last_step else 0.0
                             self_reward = reflection.json_object.object.get("self_reward", 0.0)
-                            total_reward = environment_reward * 0.5 + self_reward * 0.5
+                            
+                            # Normalize environment_reward
+                            normalized_environment_reward = environment_reward / (1 + abs(environment_reward))
+                            normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
+                            
+                            # Weighted average of normalized environment_reward and self_reward
+                            total_reward = normalized_environment_reward * 0.5 + self_reward * 0.5
+                            
                             # Add logging for rewards
                             logger.info(
                                 f"Agent {agent.index} rewards - Environment Reward: {environment_reward}, "
+                                f"Normalized Environment Reward: {normalized_environment_reward}, "
                                 f"Self Reward: {self_reward}, Total Reward: {total_reward}"
                             )
                             agent.memory.append({
@@ -806,9 +815,9 @@ class Orchestrator:
                                 "content": reflection.json_object.object.get("reflection", ""),
                                 "strategy_update": reflection.json_object.object.get("strategy_update", ""),
                                 "observation": agent.last_observation,
-                                "environment_reward": environment_reward,
-                                "self_reward": self_reward,
-                                "total_reward": total_reward,
+                                "environment_reward": round(environment_reward, 4),
+                                "self_reward": round(self_reward, 4),
+                                "total_reward": round(total_reward, 4),
                                 "timestamp": datetime.now().isoformat()
                             })
                         else:
