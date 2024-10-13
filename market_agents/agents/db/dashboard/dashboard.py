@@ -28,7 +28,9 @@ load_dotenv()
 app = FastAPI()
 
 # Mount the static files directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
+base_dir = os.path.dirname(os.path.abspath(__file__))
+static_dir = os.path.join(base_dir, 'static')
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Database connection parameters
 DB_PARAMS = {
@@ -300,7 +302,7 @@ async def search_database(
 
 @app.get("/")
 async def read_root():
-    return FileResponse("static/index.html")
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 if __name__ == "__main__":
     import uvicorn
