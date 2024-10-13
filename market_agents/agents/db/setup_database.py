@@ -163,6 +163,7 @@ def create_tables(db_params):
         environment_name TEXT NOT NULL,
         monologue TEXT,
         strategy TEXT,
+        confidence FLOAT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
