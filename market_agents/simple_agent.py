@@ -128,8 +128,8 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
             for trade in local_observation.observation.trades:
                 if trade not in self.endowment.trades:
                     self.process_trade(trade)
-                else:
-                    print(f"Trade {trade} already in endowment")
+                # else:
+                #     print(f"Trade {trade} already in endowment")
         simple_agent_state = SimpleAgentState.from_agent_and_observation(self, local_observation)
         self.input_history.append(AuctionInput(observation=local_observation, state=simple_agent_state))
         if update_message:

@@ -298,18 +298,18 @@ class MarketOrchestrator:
             if "Bid" in output.json_object.name:
                 bid = Bid.model_validate(output.json_object.object)
                 current_value = agent.get_current_value(good_name)
-                print(f"bid price: {bid.price}, current_value: {current_value}")
+                # print(f"bid price: {bid.price}, current_value: {current_value}")
                 if current_value is not None and bid.price < current_value:
-                    print(f"adding bid to pending orders")
+                    # print(f"adding bid to pending orders")
                     market_action = bid
                 else:
                     print(f"not adding bid to pending orders")
             elif "Ask" in output.json_object.name:
                 ask = Ask.model_validate(output.json_object.object)
                 current_cost = agent.get_current_cost(good_name)
-                print(f"ask price: {ask.price}, current_cost: {current_cost}")
+                # print(f"ask price: {ask.price}, current_cost: {current_cost}")
                 if current_cost is not None and ask.price > current_cost:
-                    print(f"adding ask {ask} from agent {agent.id} with current_cost {current_cost} to pending orders")
+                    # print(f"adding ask {ask} from agent {agent.id} with current_cost {current_cost} to pending orders")
                     market_action = ask
                 else:
                     print(f"not adding ask to pending orders")
@@ -415,7 +415,7 @@ class MarketOrchestrator:
 
         for round in range(max_rounds):
             logger.info(f"Round {round + 1}")
-            print(f"Round {round + 1} with agent names: {[agent.id for agent in relevant_agents]}")
+            # print(f"Round {round + 1} with agent names: {[agent.id for agent in relevant_agents]}")
             # Run one step of the orchestrator
             step_result, surplus = await self.run_auction_step(good_name)
             per_trade_surplus.extend(surplus)

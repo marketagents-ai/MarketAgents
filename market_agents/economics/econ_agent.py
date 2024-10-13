@@ -276,7 +276,7 @@ class EconomicAgent(BaseModel):
         old_utility = self.calculate_utility(self.endowment.current_basket)
         self.endowment.add_trade(trade)
         new_utility = self.calculate_utility(self.endowment.current_basket)
-        logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}, old utility: {old_utility:.2f}, trades in endowment: {self.endowment.trades}, current basket: {self.endowment.current_basket} starting basket: {self.endowment.initial_basket}")
+        # logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}, old utility: {old_utility:.2f}, trades in endowment: {self.endowment.trades}, current basket: {self.endowment.current_basket} starting basket: {self.endowment.initial_basket}")
 
     def reset_pending_orders(self,good_name:str):
         self.pending_orders[good_name] = []
