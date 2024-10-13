@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto+Mono&display=swap');
+
+
+body {
+    font-family: Roboto, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #707070;
+}
+.dashboard {
+    max-width: 100%;
+    margin: 0 auto;
+    background-color: rgb(211, 211, 211);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+h1 {
+    color: #333;
+    text-align: center;
+}
+label {
+    font-weight: bold;
+}
+#tableSelect, #searchInput, #chartTypeSelect, #xColumnSelect, #yColumnSelect, #zColumnSelect {
+    width: 200px;
+    padding: 5px;
+    margin-right: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.refresh-button, #searchButton {
+    padding: 6px 12px;
+    background-color: #564caf;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.refresh-button:hover, #searchButton:hover {
+    background-color: #463e8d;
+}
+.chart-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    overflow-x: auto;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    font-size: 14px;
+    vertical-align: top;
+}
+th {
+    background-color: #f2f2f2;
+    cursor: pointer;
+    position: sticky;
+    top: 0;
+    text-transform: uppercase;
+}
+th:hover {
+    background-color: #ddd;
+}

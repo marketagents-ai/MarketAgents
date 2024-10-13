@@ -840,10 +840,26 @@ class Orchestrator:
         for trade in global_observation.all_trades:
             buyer = self.agent_dict.get(trade.buyer_id)
             seller = self.agent_dict.get(trade.seller_id)
+
+            if not buyer or not seller:
+                logger.warning(f"Skipping trade: buyer or seller not found. Buyer ID: {trade.buyer_id}, Seller ID: {trade.seller_id}")
+                continue
+
+            buyer_value = buyer.economic_agent.value_schedules[self.config.agent_config.good_name].get_value(trade.quantity)
+            seller_cost = seller.economic_agent.cost_schedules[self.config.agent_config.good_name].get_value(trade.quantity)
+            
+            logger.info(f"Buyer value: {buyer_value}, Seller cost: {seller_cost}, Trade price: {trade.price}")
+            
+            if trade.price > buyer_value or trade.price < seller_cost:
+                logger.warning(f"Skipping invalid trade: price={trade.price}, buyer_value={buyer_value}, seller_cost={seller_cost}")
+                continue
+            
             logger.info(f"Processing trade between buyer {buyer.index} and seller {seller.index}")
 
             buyer_utility_before = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
             seller_utility_before = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
+
+            logger.info(f"Buyer utility before: {buyer_utility_before}, Seller utility before: {seller_utility_before}")
 
             buyer.economic_agent.process_trade(trade)
             seller.economic_agent.process_trade(trade)
@@ -851,12 +867,15 @@ class Orchestrator:
             buyer_utility_after = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
             seller_utility_after = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
 
+            logger.info(f"Buyer utility after: {buyer_utility_after}, Seller utility after: {seller_utility_after}")
+
             buyer_surplus = buyer_utility_after - buyer_utility_before
             seller_surplus = seller_utility_after - seller_utility_before
 
-            # Store surplus per agent
-            agent_surpluses[buyer.id] = agent_surpluses.get(buyer.id, 0.0) + buyer_surplus
-            agent_surpluses[seller.id] = agent_surpluses.get(seller.id, 0.0) + seller_surplus
+            logger.info(f"Buyer surplus: {buyer_surplus}, Seller surplus: {seller_surplus}")
+
+            agent_surpluses[buyer.id] = agent_surpluses.get(buyer.id, 0) + buyer_surplus
+            agent_surpluses[seller.id] = agent_surpluses.get(seller.id, 0) + seller_surplus
 
             trade_surplus = buyer_surplus + seller_surplus
 
@@ -928,17 +947,17 @@ class Orchestrator:
         for agent in self.agents:
             file_path = self.log_folder / f"agent_{agent.index}_interactions.jsonl"
             with open(file_path, 'a') as f:
-                # Get all interactions that don't have a round number yet
-                new_interactions = [interaction for interaction in agent.interactions if 'round' not in interaction]
-                for interaction in new_interactions:
+                # Process all interactions
+                for interaction in agent.interactions:
                     interaction_with_round = {
                         "round": round_num,
                         **interaction
                     }
-                    json.dump(interaction_with_round, f)
+                    json.dump(interaction_with_round, f, default=str)
                     f.write('\n')
-                # Clear the processed interactions
-                agent.interactions = [interaction for interaction in agent.interactions if 'round' in interaction]
+            
+            # Clear all interactions after saving
+            agent.interactions.clear()
 
         logger.info(f"Saved agent interactions for round {round_num} to {self.log_folder}")
 

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Memory Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.18.2/plotly.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #707070;;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .search-container {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #search-input {
+            flex-grow: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+        }
+        #search-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #564caf;
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+        }
+        #search-button:hover {
+            background-color: #463e8d;
+        }
+        .loading {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+        }
+        #search-results {
+            margin-top: 20px;
+        }
+        .search-result {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .search-result h1 {
+            font-size: 1.5em;
+            color: #333;
+            margin-top: 0;
+        }
+        .search-result h2 {
+            font-size: 1.2em;
+            color: #444;
+        }
+        .search-result h3 {
+            font-size: 1.1em;
+            color: #555;
+        }
+        .search-result p {
+            margin-bottom: 10px;
+        }
+        .search-result strong {
+            font-weight: bold;
+        }
+        .search-result-score {
+            font-style: italic;
+            color: #666;
+            margin-top: 10px;
+        }
+        #agent-select {
+            margin-bottom: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        #embeddings-plot {
+            width: 100%;
+            height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Agent Memory Search</h1>
+        <section>
+            <h2>Embeddings Visualization</h2>
+            <div id="embeddings-loading" class="loading" style="display: none;">Loading embeddings...</div>
+            <div id="embeddings-plot"></div>
+        </section>        
+        <section>
+            <h2>Search Memories</h2>
+            <select id="agent-select">
+                <option value="all">All Agents</option>
+                <!-- Other options will be populated dynamically -->
+            </select>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Enter your query">
+                <button id="search-button">Search</button>
+            </div>
+            <div id="search-loading" class="loading" style="display: none;">Searching...</div>
+            <div id="search-results"></div>
+        </section>
+        
+
+    </div>
+
+    <script>
+        // Populate agent dropdown
+        function populateAgentDropdown() {
+            fetch('/agents')
+                .then(response => response.json())
+                .then(agents => {
+                    const select = document.getElementById('agent-select');
+                    agents.forEach(agent => {
+                        const option = document.createElement('option');
+                        option.value = agent;
+                        option.textContent = agent;
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error fetching agents:', error));
+        }
+
+        // Perform search
+        function performSearch() {
+            const query = document.getElementById('search-input').value;
+            const agent = document.getElementById('agent-select').value;
+            const searchLoading = document.getElementById('search-loading');
+            const searchResults = document.getElementById('search-results');
+
+            searchLoading.style.display = 'block';
+            searchResults.innerHTML = '';
+
+            fetch(`/search?query=${encodeURIComponent(query)}&agent=${encodeURIComponent(agent)}`)
+                .then(response => response.json())
+                .then(results => {
+                    searchLoading.style.display = 'none';
+                    results.forEach(result => {
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = 'search-result';
+                        resultDiv.innerHTML = `
+                            <h3>Agent: ${result.agent_id}</h3>
+                            <p>${marked.parse(result.content).replace(/<\/p>/g, '</p>\n')}</p>
+                            <div class="search-result-score">Score: ${result.score.toFixed(4)}</div>
+                        `;
+                        searchResults.appendChild(resultDiv);
+                    });
+                    updateEmbeddingsVisualization(results);
+                })
+                .catch(error => {
+                    console.error('Error performing search:', error);
+                    searchLoading.style.display = 'none';
+                    searchResults.innerHTML = '<p>An error occurred while searching. Please try again.</p>';
+                });
+        }
+
+        // Update embeddings visualization
+        function updateEmbeddingsVisualization(results) {
+            const embeddingsLoading = document.getElementById('embeddings-loading');
+            embeddingsLoading.style.display = 'block';
+
+            fetch('/embeddings_graph', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(results)
+            })
+            .then(response => response.json())
+            .then(data => {
+                embeddingsLoading.style.display = 'none';
+                if (data.error) {
+                    console.error(data.error);
+                    return;
+                }
+
+                const plot = document.getElementById('embeddings-plot');
+                Plotly.newPlot(plot, [{
+                    x: data.reduced_embeddings.map(e => e[0]),
+                    y: data.reduced_embeddings.map(e => e[1]),
+                    mode: 'markers',
+                    type: 'scatter',
+                    text: data.texts.map(t => t.substring(0, 50) + '...'),
+                    hoverinfo: 'text'
+                }], {
+                    title: 'Embeddings Visualization',
+                    xaxis: { title: 'Dimension 1' },
+                    yaxis: { title: 'Dimension 2' }
+                });
+            })
+            .catch(error => {
+                console.error('Error updating embeddings visualization:', error);
+                embeddingsLoading.style.display = 'none';
+                document.getElementById('embeddings-plot').innerHTML = '<p>An error occurred while loading the embeddings visualization. Please try again.</p>';
+            });
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', (event) => {
+            populateAgentDropdown();
+            document.getElementById('search-button').addEventListener('click', performSearch);
+            document.getElementById('search-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
