@@ -928,17 +928,17 @@ class Orchestrator:
         for agent in self.agents:
             file_path = self.log_folder / f"agent_{agent.index}_interactions.jsonl"
             with open(file_path, 'a') as f:
-                # Get all interactions that don't have a round number yet
-                new_interactions = [interaction for interaction in agent.interactions if 'round' not in interaction]
-                for interaction in new_interactions:
+                # Process all interactions
+                for interaction in agent.interactions:
                     interaction_with_round = {
                         "round": round_num,
                         **interaction
                     }
-                    json.dump(interaction_with_round, f)
+                    json.dump(interaction_with_round, f, default=str)
                     f.write('\n')
-                # Clear the processed interactions
-                agent.interactions = [interaction for interaction in agent.interactions if 'round' in interaction]
+            
+            # Clear all interactions after saving
+            agent.interactions.clear()
 
         logger.info(f"Saved agent interactions for round {round_num} to {self.log_folder}")
 

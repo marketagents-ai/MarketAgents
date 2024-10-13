@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MarketAgents SQL Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="dashboard">
+        <div>
+            <input type="text" id="searchInput" placeholder="SEARCH">
+
+            <label for="tableSelect"></label>
+            <select id="tableSelect"></select>
+            <label for="xColumnSelect">X</label>
+            <select id="xColumnSelect"></select>
+            <label for="yColumnSelect">Y</label>
+            <select id="yColumnSelect"></select>
+            <label for="fullTableCheckbox">
+            
+            <br><br>
+            <button id="refreshButton" class="refresh-button"> DO </button>
+            <input type="checkbox" id="fullTableCheckbox" checked>ALL</label>
+        </div>
+        <div class="chart-container">
+            <canvas id="dataChart"></canvas>
+        </div>
+        <div style="overflow-x: auto;">
+            <table id="dataTable">
+                <thead id="tableHead">
+                    <!-- Table headers will be dynamically inserted here -->
+                </thead>
+                <tbody id="tableBody">
+                    <!-- Table rows will be dynamically inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let chartInstance = null;
+
+        async function fetchTables() {
+            try {
+                const response = await fetch('/api/get-tables');
+                if (!response.ok) {
+                    throw new Error(`Error fetching tables: ${response.statusText}`);
+                }
+                const tables = await response.json();
+                await populateTableSelect(tables);
+                // Fetch columns for the initially selected table
+                const initialTable = document.getElementById('tableSelect').value;
+                if (initialTable) {
+                    const columns = await fetchColumnNames(initialTable);
+                    populateColumnSelects(columns);
+                }
+            } catch (error) {
+                console.error('Error fetching table list:', error);
+                alert('Failed to fetch table list. Please check the console for more details.');
+            }
+        }
+
+        async function populateTableSelect(tables) {
+            const tableSelect = document.getElementById('tableSelect');
+            tableSelect.innerHTML = '';
+            tables.forEach(table => {
+                const option = document.createElement('option');
+                option.value = table;
+                option.textContent = table;
+                tableSelect.appendChild(option);
+            });
+        }
+
+        async function fetchColumnNames(tableName) {
+            try {
+                const response = await fetch(`/api/column-names?table_name=${encodeURIComponent(tableName)}`);
+                if (!response.ok) {
+                    throw new Error(`Error fetching column names: ${response.statusText}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching column names:', error);
+                alert('Failed to fetch column names. Please check the console for more details.');
+                return [];
+            }
+        }
+
+        function populateColumnSelects(columns) {
+            const xSelect = document.getElementById('xColumnSelect');
+            const ySelect = document.getElementById('yColumnSelect');
+            xSelect.innerHTML = '';
+            ySelect.innerHTML = '';
+
+            columns.forEach(column => {
+                const xOption = document.createElement('option');
+                const yOption = document.createElement('option');
+                
+                xOption.value = column.name;
+                yOption.value = column.name;
+                xOption.textContent = `${column.name} (${column.type})`;
+                yOption.textContent = `${column.name} (${column.type})`;
+                
+                xSelect.appendChild(xOption);
+                ySelect.appendChild(yOption);
+            });
+        }
+
+        async function fetchData(tableName, xColumn, yColumn, fullTable) {
+            try {
+                let url = `/api/metrics-data?table_name=${encodeURIComponent(tableName)}`;
+                if (fullTable) {
+                    url += '&full_table=true';
+                } else {
+                    url += `&x_column=${encodeURIComponent(xColumn)}&y_column=${encodeURIComponent(yColumn)}`;
+                }
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Error fetching data: ${response.statusText}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                alert('Failed to fetch data. Please check the console for more details.');
+                return [];
+            }
+        }
+
+        async function performSearch(tableName, searchTerm) {
+            try {
+                const response = await fetch(`/api/search?table_name=${encodeURIComponent(tableName)}&search_term=${encodeURIComponent(searchTerm)}`);
+                if (!response.ok) {
+                    throw new Error(`Error searching: ${response.statusText}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error performing search:', error);
+                alert('Failed to perform search. Please check the console for more details.');
+                return [];
+            }
+        }
+
+        function populateTable(data) {
+            if (data.length === 0) {
+                document.getElementById('dataTable').style.display = 'none';
+                return;
+            } else {
+                document.getElementById('dataTable').style.display = 'table';
+            }
+
+            const tableHead = document.getElementById('tableHead');
+            const tableBody = document.getElementById('tableBody');
+            
+            // Clear existing table content
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            // Create table header
+            const headerRow = document.createElement('tr');
+            const keys = Object.keys(data[0]);
+            keys.forEach((key, index) => {
+                const th = document.createElement('th');
+                th.textContent = key;
+                th.onclick = () => sortTable(index);
+                headerRow.appendChild(th);
+            });
+            tableHead.appendChild(headerRow);
+
+            // Populate table body
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                keys.forEach(key => {
+                    const td = document.createElement('td');
+                    const value = row[key];
+                    if (value === null) {
+                        td.textContent = 'NULL';
+                    } else {
+                        td.textContent = value;
+                    }
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function sortTable(n) {
+            const table = document.getElementById('dataTable');
+            let rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+            switching = true;
+            dir = 'asc';
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName('TD')[n];
+                    y = rows[i + 1].getElementsByTagName('TD')[n];
+                    if (dir == 'asc') {
+                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else if (dir == 'desc') {
+                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                } else {
+                    if (switchcount == 0 && dir == 'asc') {
+                        dir = 'desc';
+                        switching = true;
+                    }
+                }
+            }
+        }
+
+        function initChart(data, xColumn, yColumn) {
+            if (data.length === 0) {
+                document.getElementById('dataChart').style.display = 'none';
+                return;
+            } else {
+                document.getElementById('dataChart').style.display = 'block';
+            }
+
+            const ctx = document.getElementById('dataChart').getContext('2d');
+
+            // Destroy previous chart instance if exists
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            // Parse data for x and y columns
+            const xData = data.map(row => row.x_value);
+            const yData = data.map(row => row.y_value);
+
+            // Determine chart type based on data
+            let chartType = 'line';
+            let xAxisType = 'category';
+            let yAxisType = 'linear';
+
+            if (xData.some(x => x instanceof Date)) {
+                xAxisType = 'time';
+                chartType = 'line';
+            }
+
+            if (yData.some(y => y instanceof Date)) {
+                yAxisType = 'time';
+                chartType = 'line';
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: chartType,
+                data: {
+                    labels: xData,
+                    datasets: [{
+                        label: yColumn,
+                        data: yData,
+                        backgroundColor: '#564caf',
+                        borderColor: '#463e8d',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            type: xAxisType,
+                            time: xAxisType === 'time' ? {
+                                unit: 'day',
+                                displayFormats: {
+                                    day: 'MMM D'
+                                }
+                            } : undefined,
+                            title: {
+                                display: true,
+                                text: xColumn
+                            }
+                        },
+                        y: {
+                            type: yAxisType,
+                            time: yAxisType === 'time' ? {
+                                unit: 'day',
+                                displayFormats: {
+                                    day: 'MMM D'
+                                }
+                            } : undefined,
+                            title: {
+                                display: true,
+                                text: yColumn
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: `${yColumn} vs ${xColumn}`
+                        }
+                    }
+                }
+            });
+        }
+
+        async function refreshDashboard() {
+            const tableSelect = document.getElementById('tableSelect');
+            const xColumnSelect = document.getElementById('xColumnSelect');
+            const yColumnSelect = document.getElementById('yColumnSelect');
+            const fullTableCheckbox = document.getElementById('fullTableCheckbox');
+            const searchInput = document.getElementById('searchInput');
+            const tableName = tableSelect.value;
+            const xColumn = xColumnSelect.value;
+            const yColumn = yColumnSelect.value;
+            const fullTable = fullTableCheckbox.checked;
+            const searchTerm = searchInput.value.trim();
+
+            if (!tableName) {
+                alert('Please select a table.');
+                return;
+            }
+
+            if (!fullTable && !searchTerm && (!xColumn || !yColumn)) {
+                alert('Please select columns for both axes, check "View Full Table", or enter a search term.');
+                return;
+            }
+
+            let data;
+            if (searchTerm) {
+                data = await performSearch(tableName, searchTerm);
+            } else {
+                data =await fetchData(tableName, xColumn, yColumn, fullTable);
+    }
+
+    populateTable(data);
+    
+    if (!fullTable && !searchTerm) {
+        initChart(data, xColumn, yColumn);
+    } else {
+        // Hide the chart when viewing full table or search results
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        document.getElementById('dataChart').style.display = 'none';
+    }
+}
+
+async function performSearch(tableName, searchTerm) {
+    try {
+        const response = await fetch(`/api/search?table_name=${encodeURIComponent(tableName)}&search_term=${encodeURIComponent(searchTerm)}`);
+        if (!response.ok) {
+            throw new Error(`Error searching: ${response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error performing search:', error);
+        alert('Failed to perform search. Please check the console for more details.');
+        return [];
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize all event listeners and other setup
+    const tableSelect = document.getElementById('tableSelect');
+    const fullTableCheckbox = document.getElementById('fullTableCheckbox');
+    const xColumnSelect = document.getElementById('xColumnSelect');
+    const yColumnSelect = document.getElementById('yColumnSelect');
+    const searchInput = document.getElementById('searchInput');
+    const refreshButton = document.getElementById('refreshButton');
+
+    tableSelect.addEventListener('change', async () => {
+        const columns = await fetchColumnNames(tableSelect.value);
+        populateColumnSelects(columns);
+    });
+
+    fullTableCheckbox.addEventListener('change', () => {
+        const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
+        xColumnSelect.disabled = disableColumns;
+        yColumnSelect.disabled = disableColumns;
+    });
+
+    searchInput.addEventListener('input', () => {
+        const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
+        xColumnSelect.disabled = disableColumns;
+        yColumnSelect.disabled = disableColumns;
+    });
+
+    refreshButton.addEventListener('click', refreshDashboard);
+
+    // Fetch tables after all other setup is complete
+    await fetchTables();
+});
+    </script>
+</body>
+</html>
