@@ -270,11 +270,13 @@ class EconomicAgent(BaseModel):
                     del self.pending_orders[trade.good_name]
             else:
                 raise ValueError(f"Trade {trade.trade_id} processed but matching ask not found for agent {self.id}")
-        
+        else:
+            raise ValueError(f"Agent is neither a buyer nor a seller for trade {trade}")
         # Only update the endowment after passing the value error checks
+        old_utility = self.calculate_utility(self.endowment.current_basket)
         self.endowment.add_trade(trade)
         new_utility = self.calculate_utility(self.endowment.current_basket)
-        logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}")
+        logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}, old utility: {old_utility:.2f}, trades in endowment: {self.endowment.trades}, current basket: {self.endowment.current_basket} starting basket: {self.endowment.initial_basket}")
 
     def reset_pending_orders(self,good_name:str):
         self.pending_orders[good_name] = []

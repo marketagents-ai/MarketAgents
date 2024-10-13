@@ -177,13 +177,11 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
         """
         # Check if source is SimpleAgent and set control flow flag
         is_simple_agent = isinstance(source_agent, SimpleAgent)
-        using_source_llm_config = False
 
         # Handle LLM config
         if llm_config is None:
             if is_simple_agent:
                 llm_config = source_agent.llm_config
-                using_source_llm_config = True
             else:
                 raise ValueError("LLMConfig must be provided when source is not a SimpleAgent")
 
@@ -192,6 +190,7 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
 
         # Handle endowment and trade reset
         new_endowment = copied_agent.endowment.model_copy(deep=True)
+        new_endowment.agent_id = new_id or copied_agent.id
         if reset_trades:
             new_endowment.initial_basket = new_endowment.current_basket
             new_endowment.trades = []
@@ -202,7 +201,10 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
             "endowment": new_endowment,
             "value_schedules": copied_agent.value_schedules,
             "cost_schedules": copied_agent.cost_schedules,
-            "llm_config": llm_config
+            "llm_config": llm_config,
+            "input_history": [],
+            "actions_history": [],
+            "history": None
         }
 
         # Copy additional SimpleAgent-specific attributes if source is SimpleAgent
@@ -210,35 +212,24 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
             new_data.update({
                 "system_string": source_agent.system_string,
                 "structured_output": source_agent.structured_output,
-                "use_schema_instruction": source_agent.use_schema_instruction
+                "use_schema_instruction": source_agent.use_schema_instruction,
+                "new_message": source_agent.new_message
             })
-
-        # Create the new SimpleAgent
-        new_agent = cls(**new_data)
-
-        # Reset histories for the new agent
-        new_agent.input_history = []
-        new_agent.actions_history = []
-        new_agent.history = None
-
-        # Set initial message
-        if is_simple_agent:
-            new_agent.new_message = source_agent.new_message
-            new_agent.structured_output = source_agent.structured_output
         else:
-            good_name = new_agent.good_name
-            if new_agent.is_buyer(good_name):
-                value = new_agent.get_current_value(good_name)
+            good_name = list(copied_agent.value_schedules.keys() or copied_agent.cost_schedules.keys())[0]
+            if copied_agent.is_buyer(good_name):
+                value = copied_agent.get_current_value(good_name)
                 profit_string = f"You can make a profit by buying at {value * 0.99} or lower" if value is not None else ""
-                new_agent.new_message = f"You are a buyer of {good_name} and your current value is {value}. This is the first round of the market so there are no bids or asks yet. {profit_string}"
-                new_agent.structured_output = BidTool()
+                new_data["new_message"] = f"You are a buyer of {good_name} and your current value is {value}. This is the first round of the market so there are no bids or asks yet. {profit_string}"
+                new_data["structured_output"] = BidTool()
             else:
-                cost = new_agent.get_current_cost(good_name)
+                cost = copied_agent.get_current_cost(good_name)
                 profit_string = f"You can make a profit by selling at {cost * 1.01} or higher" if cost is not None else ""
-                new_agent.new_message = f"You are a seller of {good_name} and your current cost is {cost}. This is the first round of the market so there are no bids or asks yet. {profit_string}"
-                new_agent.structured_output = AskTool()
+                new_data["new_message"] = f"You are a seller of {good_name} and your current cost is {cost}. This is the first round of the market so there are no bids or asks yet. {profit_string}"
+                new_data["structured_output"] = AskTool()
 
-        return new_agent
+        # Create and return the new SimpleAgent instance
+        return cls(**new_data)
 
 def create_simple_agent(agent_id: str, llm_config: LLMConfig, good: Good, is_buyer: bool, endowment: Endowment, starting_value:float, num_units:int=10):
     if is_buyer:
@@ -257,4 +248,4 @@ def create_simple_agent(agent_id: str, llm_config: LLMConfig, good: Good, is_buy
 
 
 def create_simple_agents_from_zi(agents: List[EconomicAgent], llm_config: LLMConfig) -> List[SimpleAgent]:
-    return [ SimpleAgent.from_agent(agent, llm_config) for agent in agents]
+    return [ SimpleAgent.from_agent(agent, llm_config,new_id="llm_clone_"+agent.id) for agent in agents]

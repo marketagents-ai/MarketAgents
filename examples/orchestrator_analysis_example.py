@@ -39,8 +39,8 @@ async def main():
     #     buyer_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
     #     seller_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
 
-    num_buyers = 1
-    num_sellers = 1
+    num_buyers = 10
+    num_sellers = 10
     # Create simple agents
     buyers = [
         create_simple_agent(
@@ -71,12 +71,13 @@ async def main():
     # Create DoubleAuction mechanism
 
 
-    orchestrator = MarketOrchestrator(llm_agents=agents, goods=[apple.name], ai_utils=parallel_ai,max_rounds=1)
+    orchestrator = MarketOrchestrator(llm_agents=agents, goods=[apple.name], ai_utils=parallel_ai,max_rounds=10)
 
     # Run the market simulation
     await orchestrator.run_scenario()
     #plot the market results
     print(orchestrator.state)
-
+    return orchestrator
 if __name__ == "__main__":
-    asyncio.run(main())
+    orchestrator = asyncio.run(main())
+    sate = orchestrator.state

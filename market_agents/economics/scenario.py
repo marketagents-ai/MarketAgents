@@ -14,6 +14,7 @@ class Scenario(SavableBaseModel):
     goods: List[str]
     factories: List[ZiFactory]
     _current_episode: int = 0
+    generate_zi_agents: bool = True
 
     @property
     def num_episodes(self) -> int:

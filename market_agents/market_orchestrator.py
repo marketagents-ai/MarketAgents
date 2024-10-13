@@ -6,8 +6,8 @@ from market_agents.environments.environment import  EnvironmentStep
 from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation, AuctionMarket, MarketSummary
 from market_agents.economics.analysis import analyze_and_plot_market_results
 from market_agents.inference.parallel_inference import ParallelAIUtilities
-from market_agents.inference.message_models import LLMPromptContext, LLMOutput
-from market_agents.simple_agent import SimpleAgent
+from market_agents.inference.message_models import LLMPromptContext, LLMOutput, LLMConfig
+from market_agents.simple_agent import SimpleAgent, create_simple_agents_from_zi
 from pydantic import BaseModel, Field, computed_field
 from typing import List, Tuple, Optional, Dict, Union, Set
 import logging
@@ -217,14 +217,14 @@ class MarketOrchestrator:
                 goods: List[str],
                 ai_utils: ParallelAIUtilities = ParallelAIUtilities(),
                 max_rounds: int = 10,
-                scenario: Optional[Scenario] = None):
+                scenario: Optional[Scenario] = None,clones_config:Optional[LLMConfig]=None):
         self.llm_agents = llm_agents
         self.goods = goods
         self.max_rounds = max_rounds
         self.markets = self.create_markets(self.goods)
         self.ai_utils = ai_utils
         self.scenario = scenario
-        self.agents_dict, self.llm_agents_dict, self.zi_agents_dict = self.create_agents_dicts()
+        self.agents_dict, self.llm_agents_dict, self.zi_agents_dict = self.create_agents_dicts(clones_config)
         self.agents = list(self.agents_dict.values())
         self.failed_actions: List[LLMOutput] = []
         if self.scenario:
@@ -243,15 +243,25 @@ class MarketOrchestrator:
             markets_dict[good] = AuctionMarket(name=f"Auction {good} Market",mechanism = DoubleAuction(good_name=good, max_rounds=self.max_rounds))
         return markets_dict
     
-    def create_agents_dicts(self) -> Tuple[Dict[str, Union[SimpleAgent, EconomicAgent]],
+    def create_agents_dicts(self, clones_config:Optional[LLMConfig]=None) -> Tuple[Dict[str, Union[SimpleAgent, EconomicAgent]],
                                             Dict[str, SimpleAgent], 
                                             Dict[str, EconomicAgent]]:
         zi_dict = {}
-        if self.scenario:
+        llm_cloned_dict = {}
+        if self.scenario and self.scenario.generate_zi_agents:
             zi_agents = self.scenario.agents
             zi_dict = {agent.id: agent for agent in zi_agents}
-        llm_dict = {agent.id: agent for agent in self.llm_agents}
+        if self.scenario and clones_config is not None:
+            llm_cloned_agents = create_simple_agents_from_zi(self.scenario.agents, clones_config)
+            self.llm_agents.extend(llm_cloned_agents)
+            llm_cloned_dict = {agent.id: agent for agent in llm_cloned_agents}
+        llm_dict = {**{agent.id: agent for agent in self.llm_agents}, **llm_cloned_dict}
         return {**zi_dict, **llm_dict}, llm_dict, zi_dict
+    
+    def clone_zi_dict(self, clones_config:LLMConfig) -> Dict[str, SimpleAgent]:
+        llm_cloned_agents = create_simple_agents_from_zi(list(self.zi_agents_dict.values()), clones_config)
+        self.llm_agents.extend(llm_cloned_agents)
+        return {agent.id: agent for agent in llm_cloned_agents}
     
     def get_zero_intelligence_agents(self) -> List[EconomicAgent]:
         return list(self.zi_agents_dict.values())
@@ -343,6 +353,7 @@ class MarketOrchestrator:
         buyer_utility_after = buyer.calculate_utility(buyer.endowment.current_basket)
         seller_utility_after = seller.calculate_utility(seller.endowment.current_basket)
         trade_surplus = buyer_utility_after - buyer_utility_before + seller_utility_after - seller_utility_before
+
         return trade_surplus
     
     def process_trades(self, global_observation: AuctionGlobalObservation) -> List[float]:
@@ -395,7 +406,7 @@ class MarketOrchestrator:
         
         return step_result, surplus
     
-    async def run_auction_episode(self, max_rounds: int, good_name: str,report:bool=True,reset_endowments:bool=True):
+    async def run_auction_episode(self, max_rounds: int, good_name: str,report:bool=True,reset_endowments:bool=False):
         relevant_agents = [agent for agent in self.agents if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
         
         all_trades: List[Trade] = []
@@ -434,7 +445,6 @@ class MarketOrchestrator:
         cumulative_surplus = [sum(per_trade_surplus[:i+1]) for i in range(len(per_trade_surplus))]
         cumulative_quantities = [sum(per_trade_quantities[:i+1]) for i in range(len(per_trade_quantities))]
         assert len(cumulative_quantities) == len(cumulative_surplus)
-        
         # Generate market report
         if report:
             self.generate_market_report(all_trades, relevant_agents, good_name, max_rounds, cumulative_quantities, cumulative_surplus)

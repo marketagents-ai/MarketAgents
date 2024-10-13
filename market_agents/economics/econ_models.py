@@ -122,13 +122,17 @@ class Endowment(BaseModel):
         temp_basket = deepcopy(self.initial_basket)
 
         for trade in self.trades:
+            print(f"trade: {trade} updating basket")
             if trade.buyer_id == self.agent_id:
+                print(f"buyer {trade.buyer_id} == {self.agent_id}")
                 temp_basket.cash -= trade.price * trade.quantity
                 temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) + trade.quantity)
             elif trade.seller_id == self.agent_id:
+                print(f"seller {trade.seller_id} == {self.agent_id}")
                 temp_basket.cash += trade.price * trade.quantity
                 temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) - trade.quantity)
-
+            else:
+                raise ValueError(f"Trade {trade} not for agent {self.agent_id}")
         # Create a new Basket instance with the calculated values
         return Basket(
             cash=temp_basket.cash,
