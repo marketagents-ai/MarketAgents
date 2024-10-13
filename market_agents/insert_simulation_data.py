@@ -354,8 +354,8 @@ class SimulationDataInserter:
 
     def insert_perceptions(self, perceptions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
-        INSERT INTO perceptions (memory_id, environment_name, monologue, strategy)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO perceptions (memory_id, environment_name, monologue, strategy, confidence)
+        VALUES (%s, %s, %s, %s, %s)
         """
         try:
             with self.conn.cursor() as cur:
@@ -368,7 +368,8 @@ class SimulationDataInserter:
                         memory_id,
                         perception['environment_name'],
                         perception['monologue'],
-                        perception['strategy']
+                        perception['strategy'],
+                        perception['confidence']
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(perceptions)} perceptions into the database")
