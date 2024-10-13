@@ -202,14 +202,35 @@ def create_combined_boxplots(df: pd.DataFrame, experiment: OneWayLLMExperiment, 
     plt.tight_layout(rect=(0, 0, 1, 0.93))  # Adjust the top margin to accommodate the subtitle
     return fig
 
-async def run_experiment(config: SimulationConfig, experiment: OneWayLLMExperiment, parallel_inference: ParallelAIUtilities) -> ExperimentResults:
+def load_cached_results(config: SimulationConfig, experiment: OneWayLLMExperiment) -> Optional[ExperimentResults]:
+    base_dir = get_experiment_base_dir(config, experiment)
+    file_path = os.path.join(base_dir, "results.json")
+    if not os.path.exists(file_path):
+        print(f"No cached results found for experiment: {experiment.primary_variable}")
+        return None
+    
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+    
+    return ExperimentResults.model_validate(data)
+
+async def run_experiment(config: SimulationConfig, experiment: OneWayLLMExperiment, parallel_inference: ParallelAIUtilities, use_cached_results: bool = True) -> ExperimentResults:
+    if use_cached_results:
+        cached_results = load_cached_results(config, experiment)
+        if cached_results:
+            print(f"Using cached results for {experiment.primary_variable}")
+            return cached_results
+    
+    print(f"Running new experiment for {experiment.primary_variable}")
     results = await run_simulations(config, experiment, parallel_inference)
-    return ExperimentResults(
+    experiment_results = ExperimentResults(
         results=results,
         config=config,
         primary_variable=experiment.primary_variable,
         llm_config=experiment.llm_clone_config
     )
+    save_results(experiment_results, config, experiment)
+    return experiment_results
 
 def get_experiment_base_dir(config: SimulationConfig, experiment: OneWayLLMExperiment) -> str:
     static_vars = [
@@ -255,7 +276,7 @@ async def main():
         max_relative_spread=0.2,
         seller_base_value=50.0,
         num_replicas=10,
-        max_rounds=10,
+        max_rounds=1,
         num_buyers=25,
         num_sellers=25,
         cost_spread=25,
@@ -270,8 +291,8 @@ async def main():
     )  
     experiments = [
         OneWayLLMExperiment(
-            primary_variable="max_rounds",
-            primary_values=[1,2,3,4,5,8,10],
+            primary_variable="num_buyers",
+            primary_values=[2,5,25,50,250,500],
             llm_clone_config=clones_config
         )
     ]
@@ -279,8 +300,8 @@ async def main():
     # Initialize ParallelAIUtilities
     parallel_inference = ParallelAIUtilities(
         oai_request_limits=RequestLimits(
-            max_requests_per_minute=2000,
-            max_tokens_per_minute=1000000,
+            max_requests_per_minute=30000,
+            max_tokens_per_minute=150000000,
            
         ),
         vllm_request_limits=RequestLimits(
@@ -288,9 +309,10 @@ async def main():
             max_tokens_per_minute=1000000,
         )
     )
+    use_cached_results = True
 
     for experiment in experiments:
-        results = await run_experiment(base_config, experiment, parallel_inference)
+        results = await run_experiment(base_config, experiment, parallel_inference, use_cached_results=True)
         save_results(results, base_config, experiment)
 
 if __name__ == "__main__":
