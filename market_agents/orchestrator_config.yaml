@@ -48,6 +48,30 @@ llm_configs:
     temperature: 1.0
     max_tokens: 16384
     use_cache: true
+#  - name: "qwen-low-temp"
+#    client: "vllm"
+#    model: "Qwen2.5-7B-Instruct"
+#    temperature: 0.2
+#    max_tokens: 512
+#    use_cache: true
+#  - name: "qwen-med-temp-1"
+#    client: "vllm"
+#    model: "Qwen2.5-7B-Instruct"
+#    temperature: 0.4
+#    max_tokens: 512
+#    use_cache: true
+#  - name: "qwen-med-temp-2"
+#    client: "vllm"
+#    model: "Qwen2.5-7B-Instruct"
+#    temperature: 0.6
+#    max_tokens: 512
+#    use_cache: true
+#  - name: "qwen-high-temp"
+#    client: "vllm"
+#    model: "Qwen2.5-7B-Instruct"
+#    temperature: 0.8
+#    max_tokens: 512
+#    use_cache: true
 environment_configs:
   auction:
     name: "Apple Market"
