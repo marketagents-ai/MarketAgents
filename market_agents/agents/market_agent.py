@@ -162,6 +162,9 @@ class MarketAgent(LLMAgent, EconomicAgent):
 
         if last_step:
             reward = last_step.info.get('agent_rewards', {}).get(self.id, 0.0)
+            # Ensure reward is a float and handle None
+            if reward is None:
+                reward = 0.0
             local_observation = last_step.global_observation.observations.get(self.id)
             if local_observation:
                 observation = local_observation.observation
@@ -169,7 +172,7 @@ class MarketAgent(LLMAgent, EconomicAgent):
                 observation = {}
         else:
             observation = {}
-            reward = 0.0
+            reward = 0.0  # Default to 0.0 if no last_step
 
         environment_info = environment.get_global_state()
         previous_strategy = self.memory[-1].get('strategy_update', 'No previous strategy') if self.memory else 'No previous strategy'
@@ -195,23 +198,29 @@ class MarketAgent(LLMAgent, EconomicAgent):
             self_reward = response.get("self_reward", 0.0)
             environment_reward = reward if reward is not None else 0.0
 
+            # Simple normalization of environment_reward
+            normalized_environment_reward = environment_reward / (1 + environment_reward)
+            normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
+
+            # Combine with self_reward using weighted average
             total_reward = (
-                environment_reward * environment_reward_weight +
+                normalized_environment_reward * environment_reward_weight +
                 self_reward * self_reward_weight
             )
-
+            # Store in memory
             self.memory.append({
                 "type": "reflection",
-                "content": response["reflection"],
-                "strategy_update": response["strategy_update"],
+                "content": response.get("reflection", ""),
+                "strategy_update": response.get("strategy_update", ""),
                 "observation": observation if isinstance(observation, dict) else observation.model_dump(),
-                "environment_reward": environment_reward,
-                "self_reward": self_reward,
-                "total_reward": total_reward,
+                "environment_reward": round(environment_reward, 4),
+                "self_reward": round(self_reward, 4),
+                "total_reward": round(total_reward, 4),
                 "timestamp": datetime.now().isoformat()
             })
-            return response["reflection"]
+            return response.get("reflection", "")
         else:
             return response
+
 
 
