@@ -2,101 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MarketAgents PostgreSQL Dashboard</title>
+    <title>MarketAgents SQL Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-    <style>
-        body {
-            font-family: Roboto, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #707070;
-        }
-        .dashboard {
-            max-width: 100%;
-            margin: 0 auto;
-            background-color: rgb(211, 211, 211);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        label {
-            font-weight: bold;
-        }
-        #tableSelect, #searchInput {
-            width: 200px;
-            padding: 5px;
-            margin-right: 10px;
-        }
-        .refresh-button, #searchButton {
-            padding: 6px 12px;
-            background-color: #564caf;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .refresh-button:hover, #searchButton:hover {
-            background-color: #463e8d;
-        }
-        .chart-container {
-            width: 100%;
-            max-width: 800px;
-            margin: 20px auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            overflow-x: auto;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-            font-size: 14px;
-        }
-        th {
-            background-color: #f2f2f2;
-            cursor: pointer;
-            position: sticky;
-            top: 0;
-        }
-        th:hover {
-            background-color: #ddd;
-        }
-        .expandable {
-            cursor: pointer;
-            color: blue;
-            text-decoration: underline;
-        }
-        .expanded pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            background-color: #f0f0f0;
-            padding: 10px;
-            border-radius: 5px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="dashboard">
         <div>
-            <input type="text" id="searchInput" placeholder="Enter search term">
-            <button id="searchButton" onclick="refreshDashboard()">Search</button>
-            <label for="tableSelect">Select Table:</label>
+            <input type="text" id="searchInput" placeholder="SEARCH">
+
+            <label for="tableSelect"></label>
             <select id="tableSelect"></select>
-            <label for="xColumnSelect">X-axis:</label>
+            <label for="xColumnSelect">X</label>
             <select id="xColumnSelect"></select>
-            <label for="yColumnSelect">Y-axis:</label>
+            <label for="yColumnSelect">Y</label>
             <select id="yColumnSelect"></select>
             <label for="fullTableCheckbox">
-                <input type="checkbox" id="fullTableCheckbox"> View Full Table
-            </label>
-            <button id="refreshButton" class="refresh-button">Load Data</button>
+            
+            <br><br>
+            <button id="refreshButton" class="refresh-button"> DO </button>
+            <input type="checkbox" id="fullTableCheckbox" checked>ALL</label>
         </div>
         <div class="chart-container">
             <canvas id="dataChart"></canvas>
@@ -123,14 +48,20 @@
                     throw new Error(`Error fetching tables: ${response.statusText}`);
                 }
                 const tables = await response.json();
-                populateTableSelect(tables);
+                await populateTableSelect(tables);
+                // Fetch columns for the initially selected table
+                const initialTable = document.getElementById('tableSelect').value;
+                if (initialTable) {
+                    const columns = await fetchColumnNames(initialTable);
+                    populateColumnSelects(columns);
+                }
             } catch (error) {
                 console.error('Error fetching table list:', error);
                 alert('Failed to fetch table list. Please check the console for more details.');
             }
         }
 
-        function populateTableSelect(tables) {
+        async function populateTableSelect(tables) {
             const tableSelect = document.getElementById('tableSelect');
             tableSelect.innerHTML = '';
             tables.forEach(table => {
@@ -165,30 +96,10 @@
                 const xOption = document.createElement('option');
                 const yOption = document.createElement('option');
                 
-                if (column.type === 'json' || column.type === 'jsonb') {
-                    xOption.value = column.name;
-                    yOption.value = column.name;
-                    xOption.textContent = `${column.name} (JSON)`;
-                    yOption.textContent = `${column.name} (JSON)`;
-                    
-                    if (column.json_structure) {
-                        Object.keys(column.json_structure).forEach(key => {
-                            const xNestedOption = document.createElement('option');
-                            const yNestedOption = document.createElement('option');
-                            xNestedOption.value = `${column.name}.${key}`;
-                            yNestedOption.value = `${column.name}.${key}`;
-                            xNestedOption.textContent = `${column.name}.${key}`;
-                            yNestedOption.textContent = `${column.name}.${key}`;
-                            xSelect.appendChild(xNestedOption);
-                            ySelect.appendChild(yNestedOption);
-                        });
-                    }
-                } else {
-                    xOption.value = column.name;
-                    yOption.value = column.name;
-                    xOption.textContent = `${column.name} (${column.type})`;
-                    yOption.textContent = `${column.name} (${column.type})`;
-                }
+                xOption.value = column.name;
+                yOption.value = column.name;
+                xOption.textContent = `${column.name} (${column.type})`;
+                yOption.textContent = `${column.name} (${column.type})`;
                 
                 xSelect.appendChild(xOption);
                 ySelect.appendChild(yOption);
@@ -229,18 +140,6 @@
             }
         }
 
-        function getNestedValue(obj, path, defaultValue = null) {
-            return path.split(/\.|\[|\]/)
-                .filter(Boolean)
-                .reduce((acc, part) => {
-                    if (acc === null || acc === undefined) return defaultValue;
-                    if (Array.isArray(acc) && /^\d+$/.test(part)) {
-                        return acc[parseInt(part, 10)];
-                    }
-                    return acc[part];
-                }, obj) ?? defaultValue;
-        }
-
         function populateTable(data) {
             if (data.length === 0) {
                 document.getElementById('dataTable').style.display = 'none';
@@ -272,13 +171,9 @@
                 const tr = document.createElement('tr');
                 keys.forEach(key => {
                     const td = document.createElement('td');
-                    const value = getNestedValue(row, key);
+                    const value = row[key];
                     if (value === null) {
                         td.textContent = 'NULL';
-                    } else if (typeof value === 'object') {
-                        td.textContent = JSON.stringify(value);
-                        td.classList.add('expandable');
-                        td.addEventListener('click', () => expandJsonCell(td, value));
                     } else {
                         td.textContent = value;
                     }
@@ -345,7 +240,7 @@
             const yData = data.map(row => row.y_value);
 
             // Determine chart type based on data
-            let chartType = 'bar';
+            let chartType = 'line';
             let xAxisType = 'category';
             let yAxisType = 'linear';
 
@@ -472,7 +367,7 @@ async function performSearch(tableName, searchTerm) {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', async () => {
-    await fetchTables();
+    // Initialize all event listeners and other setup
     const tableSelect = document.getElementById('tableSelect');
     const fullTableCheckbox = document.getElementById('fullTableCheckbox');
     const xColumnSelect = document.getElementById('xColumnSelect');
@@ -498,6 +393,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     refreshButton.addEventListener('click', refreshDashboard);
+
+    // Fetch tables after all other setup is complete
+    await fetchTables();
 });
     </script>
 </body>

@@ -1,3 +1,13 @@
+"""
+TODO
+
+- have the plotter x and y use json columns by re cachig the selections and ensuring type
+- repair search
+- add paging to replace hard sql limit
+- have X and Y when table transforms to inherit colmn names
+"""
+
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -61,24 +71,22 @@ def build_json_path_query(column):
         path = [sql.Literal(part) for part in parts[1:]]
         return sql.SQL('->').join([base] + path[:-1]) + sql.SQL('->>') + path[-1]
 
-def flatten_json(data, prefix=''):
+def flatten_json(data):
     flattened = {}
     if isinstance(data, dict):
         for key, value in data.items():
-            new_key = f"{prefix}{key}"
             if isinstance(value, (dict, list)):
-                flattened.update(flatten_json(value, f"{new_key}_"))
+                flattened.update(flatten_json(value))
             else:
-                flattened[new_key] = value
+                flattened[key] = value
     elif isinstance(data, list):
         for i, item in enumerate(data):
-            new_key = f"{prefix}{i}"
             if isinstance(item, (dict, list)):
-                flattened.update(flatten_json(item, f"{new_key}_"))
+                flattened.update(flatten_json(item))
             else:
-                flattened[new_key] = item
+                flattened[str(i)] = item
     else:
-        flattened[prefix.rstrip('_')] = data
+        flattened = data
     return flattened
 
 @app.get("/api/get-tables")
@@ -199,7 +207,7 @@ async def get_metrics_data(
                 if key in json_columns and value is not None:
                     try:
                         json_data = json.loads(value) if isinstance(value, str) else value
-                        flattened = flatten_json(json_data, f"{key}_")
+                        flattened = flatten_json(json_data)
                         processed_row.update(flattened)
                     except json.JSONDecodeError:
                         processed_row[key] = value
