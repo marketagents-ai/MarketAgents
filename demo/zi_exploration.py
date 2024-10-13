@@ -6,7 +6,7 @@ from market_agents.economics.econ_models import Good, Endowment, Basket
 from market_agents.economics.scenario import Scenario
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Tuple
-from market_agents.market_orchestrator import MarketOrchestrator, MarketOrchestratorState, zi_scenario
+from market_agents.market_orchestrator import MarketOrchestrator, MarketOrchestratorState, run_zi_scenario
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -78,7 +78,7 @@ async def run_single_simulation(config: SimulationConfig, experiment: TwoWayExpe
     setattr(current_config, experiment.primary_variable, primary_value)
     setattr(current_config, experiment.secondary_variable, secondary_value)
 
-    scenario, state = await zi_scenario(
+    scenario, state = await run_zi_scenario(
         buyer_params=ZiParams(
             id="buyer",
             initial_cash=1000,

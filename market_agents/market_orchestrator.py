@@ -5,7 +5,7 @@ from market_agents.economics.scenario import Scenario
 from market_agents.environments.environment import  EnvironmentStep
 from market_agents.environments.mechanisms.auction import DoubleAuction, AuctionAction, GlobalAuctionAction, AuctionGlobalObservation, AuctionMarket, MarketSummary
 from market_agents.economics.analysis import analyze_and_plot_market_results
-from market_agents.inference.parallel_inference import ParallelAIUtilities
+from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
 from market_agents.inference.message_models import LLMPromptContext, LLMOutput, LLMConfig
 from market_agents.simple_agent import SimpleAgent, create_simple_agents_from_zi
 from pydantic import BaseModel, Field, computed_field
@@ -406,7 +406,7 @@ class MarketOrchestrator:
         
         return step_result, surplus
     
-    async def run_auction_episode(self, max_rounds: int, good_name: str,report:bool=True,reset_endowments:bool=False):
+    async def run_auction_episode(self, max_rounds: int, good_name: str,report:bool=True,reset_endowments:bool=True):
         relevant_agents = [agent for agent in self.agents if good_name in agent.cost_schedules.keys() or good_name in agent.value_schedules.keys()]
         
         all_trades: List[Trade] = []
@@ -414,9 +414,8 @@ class MarketOrchestrator:
         per_trade_quantities: List[int] = []
 
         for round in range(max_rounds):
-            round_surplus : List[float]= []
             logger.info(f"Round {round + 1}")
-            
+            print(f"Round {round + 1} with agent names: {[agent.id for agent in relevant_agents]}")
             # Run one step of the orchestrator
             step_result, surplus = await self.run_auction_step(good_name)
             per_trade_surplus.extend(surplus)
@@ -458,13 +457,15 @@ class MarketOrchestrator:
         if self.scenario:
             for episode in range(self.scenario.num_episodes):
                 for good in self.scenario.goods:
+                    print(f"Running episode {episode} for good {good}")
                     await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good,report=report)
+                    print(f"Episode {episode} for good {good} completed")
         else:
             for good in self.goods:
                 await self.run_auction_episode(self.markets[good].mechanism.max_rounds, good,report=report)
 
 
-async def zi_scenario(buyer_params: ZiParams, seller_params: ZiParams,max_rounds: int = 1,num_buyers: int = 25,num_sellers:int=25):
+async def run_zi_scenario(buyer_params: ZiParams, seller_params: ZiParams,max_rounds: int = 1,num_buyers: int = 25,num_sellers:int=25):
     load_dotenv()
         # Create a good
     apple = Good(name="apple", quantity=0)
@@ -484,10 +485,36 @@ async def zi_scenario(buyer_params: ZiParams, seller_params: ZiParams,max_rounds
         goods=["apple"],
         factories=factories
     )
-
+    starting_scenario = scenario.model_copy(deep=True)
     orchestrator = MarketOrchestrator(llm_agents=[], goods=[apple.name], max_rounds=max_rounds,scenario=scenario)
 
     # Run the market simulation
     await orchestrator.run_scenario(report=False)
     #plot the market results
-    return scenario,orchestrator.state
+    return starting_scenario,orchestrator.state
+
+
+async def run_llm_matched_scenario(zi_scenario:Scenario, clones_config:Optional[LLMConfig]=None, ai_utils:Optional[ParallelAIUtilities]=None, max_rounds:int=10):
+    load_dotenv()
+    scenario = zi_scenario.model_copy(deep=True,update={"generate_zi_agents": False})
+    # Set up ParallelAIUtilities
+    
+    parallel_ai = ParallelAIUtilities(
+    ) if ai_utils is None else ai_utils
+
+    # Create a good
+
+
+    orchestrator = MarketOrchestrator(llm_agents=[],
+                                       goods=scenario.goods,
+                                       ai_utils=parallel_ai,
+                                       max_rounds=max_rounds,
+                                       scenario=scenario,
+                                       clones_config=LLMConfig(model="gpt-4o-mini",
+                                                               temperature=0.0,
+                                                               client="openai",
+                                                               response_format="tool",
+                                                               max_tokens=250) if clones_config is None else clones_config) 
+    # return orchestrator
+    await orchestrator.run_scenario()
+    return orchestrator

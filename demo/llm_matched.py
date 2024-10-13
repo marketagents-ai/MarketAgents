@@ -6,7 +6,7 @@ from market_agents.economics.econ_models import Good, Endowment, Basket
 from market_agents.economics.scenario import Scenario
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Tuple
-from market_agents.market_orchestrator import MarketOrchestrator, MarketOrchestratorState, zi_scenario
+from market_agents.market_orchestrator import MarketOrchestrator, MarketOrchestratorState, run_zi_scenario, run_llm_matched_scenario
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -17,35 +17,119 @@ from datetime import datetime
 from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
 from market_agents.inference.message_models import LLMConfig
 
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, BaseModel):
+            return obj.model_dump()
+        return super().default(obj)
 
-async def llm_matched_scenario(zi_scenario:Scenario, clones_config:Optional[LLMConfig]=None, ai_utils:Optional[ParallelAIUtilities]=None, max_rounds:int=10):
-    load_dotenv()
-    scenario = zi_scenario.model_copy(deep=True)
-    # Set up ParallelAIUtilities
-    oai_request_limits = RequestLimits(max_requests_per_minute=500, max_tokens_per_minute=200000)
-    anthropic_request_limits = RequestLimits(max_requests_per_minute=40, max_tokens_per_minute=10000)
-    parallel_ai = ParallelAIUtilities(
-        oai_request_limits=oai_request_limits,
-        anthropic_request_limits=anthropic_request_limits
-    ) if ai_utils is None else ai_utils
+class SimulationConfig(BaseModel):
+    num_units: int
+    noise_factor: float
+    max_relative_spread: float
+    seller_base_value: float
+    num_replicas: int
+    max_rounds: int
+    num_buyers: int
+    num_sellers: int
+    cost_spread: float
 
-    # Create a good
-    scenario.generate_zi_agents = False
+class SimulationResult(BaseModel):
+    state: MarketOrchestratorState
+    execution_time: float
+    price_delta: Optional[float] = None
+    
+class TwoWaySimulationResult(BaseModel):
+    zi_result: SimulationResult
+    llm_result: SimulationResult
+
+class ExperimentResults(BaseModel):
+    results: Dict[str, List[SimulationResult]]
+    config: SimulationConfig
+    primary_variable: str
+    secondary_variable: str
+
+class OneWayLLMExperiment(BaseModel):
+    primary_variable: str
+    primary_values: List[Any]
+    llm_clone_config: LLMConfig
+
+async def run_single_simulation(config: SimulationConfig, experiment: OneWayLLMExperiment, primary_value: Any, replica: int) -> Tuple[str,  TwoWaySimulationResult]:
+    key = f"{primary_value},{experiment.llm_clone_config}"
+    print(f"{experiment.primary_variable}: {primary_value}, llm_config: {experiment.llm_clone_config}, Replica {replica + 1}")
+    
+
+    # Create a copy of the config and update it with the experiment values
+    current_config = config.model_copy()
+    setattr(current_config, experiment.primary_variable, primary_value)
+    zi_start_time = time.time()
+    zi_scenario, zi_state = await run_zi_scenario(
+        buyer_params=ZiParams(
+            id="buyer",
+            initial_cash=1000,
+            initial_goods={},
+            base_values={"apple": current_config.seller_base_value + current_config.cost_spread / 2},
+            num_units=current_config.num_units,
+            noise_factor=current_config.noise_factor,
+            max_relative_spread=current_config.max_relative_spread,
+            is_buyer=True
+        ),
+        seller_params=ZiParams(
+            id="seller",
+            initial_cash=0,
+            initial_goods={"apple": current_config.num_units},
+            base_values={"apple": current_config.seller_base_value - current_config.cost_spread / 2},
+            num_units=current_config.num_units,
+            noise_factor=current_config.noise_factor,
+            max_relative_spread=current_config.max_relative_spread,
+            is_buyer=False
+        ),
+        max_rounds=current_config.max_rounds,
+        num_buyers=current_config.num_buyers,
+        num_sellers=current_config.num_sellers
+    )
+    zi_execution_time = time.time() - zi_start_time
+
+    # Calculate price delta using equilibrium price
+    zi_last_episode = max(zi_state.equilibrium_price.keys())
+    zi_equilibrium_price = zi_state.equilibrium_price[zi_last_episode]
+    zi_average_price = zi_state.average_price[zi_last_episode]
+    zi_price_delta = zi_average_price - zi_equilibrium_price if zi_average_price > 0 else None
+
+    llm_start_time = time.time()
+    llm_orchestrator = await run_llm_matched_scenario(zi_scenario, clones_config=experiment.llm_clone_config)
+    llm_execution_time = time.time() - llm_start_time
+    llm_state = llm_orchestrator.state
+
+    llm_last_episode = max(llm_state.equilibrium_price.keys())
+    llm_equilibrium_price = llm_state.equilibrium_price[llm_last_episode]   
+    llm_average_price = llm_state.average_price[llm_last_episode]
+    llm_price_delta = llm_average_price - llm_equilibrium_price if llm_average_price > 0 else None
+    zi_result = SimulationResult(state=zi_state, execution_time=zi_execution_time, price_delta=zi_price_delta)
+    llm_result = SimulationResult(state=llm_state, execution_time=llm_execution_time, price_delta=llm_price_delta)
+
+    return key, TwoWaySimulationResult(zi_result=zi_result, llm_result=llm_result)
 
 
-    orchestrator = MarketOrchestrator(llm_agents=[],
-                                       goods=scenario.goods,
-                                       ai_utils=parallel_ai,
-                                       max_rounds=max_rounds,
-                                       scenario=scenario,
-                                       clones_config=LLMConfig(model="gpt-4o-mini",
-                                                               temperature=0.0,
-                                                               client="openai",
-                                                               response_format="tool",
-                                                               max_tokens=250) if clones_config is None else clones_config) 
-    # return orchestrator
-    await orchestrator.run_scenario()
-    return orchestrator
+async def run_simulations(config: SimulationConfig, experiment: OneWayLLMExperiment) -> Dict[str, List[SimulationResult]]:
+    tasks = []
+    for primary_value in experiment.primary_values:
+        for i in range(config.num_replicas):
+            tasks.append(run_single_simulation(config, experiment, primary_value, i))
+    
+    results = await asyncio.gather(*tasks)
+    
+    grouped_results = {}
+    for key, result in results:
+        if key not in grouped_results:
+            grouped_results[key] = []
+        grouped_results[key].append(result)
+    
+    return grouped_results
+
+
 
 if __name__ == "__main__":
     apple = Good(name="apple", quantity=0)
@@ -88,5 +172,5 @@ if __name__ == "__main__":
         goods=["apple"],
         factories=factories
     )
-    orchestrator = asyncio.run(llm_matched_scenario(scenario, max_rounds=10))
+    orchestrator = asyncio.run(run_llm_matched_scenario(scenario, max_rounds=10))
     state = orchestrator.state
