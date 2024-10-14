@@ -12,6 +12,7 @@ class Engine:
     """
     def __init__(self, tools: list[Callable] = []):
         self.tools = tools
+        self.tools_map = {tool.__name__: tool for tool in tools}
         self.tools_json = self.convert_tools_to_json(tools)
 
     @classmethod
@@ -32,6 +33,7 @@ class Engine:
             tool: Tool to add.
         """
         self.tools.extend(tools)
+        self.tools_map.update({tool.__name__: tool for tool in tools})
         self.tools_json.extend(self.convert_tools_to_json(tools))
 
     def call_tool(self, tool: ChatCompletionToolParam):
@@ -43,7 +45,7 @@ class Engine:
             args: Arguments to pass to the tool.
         """
         try:
-            tool = self.tools.get(tool.function.name)
+            tool = self.tools_map.get(tool.function.name)
             if tool:
                 return tool(**tool.function.parameters)
             else:
