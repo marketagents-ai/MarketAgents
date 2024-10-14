@@ -93,4 +93,24 @@ tr {
     font-weight: bold;
 }
 
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #564caf;
+    color: white;
+    margin-bottom: 20px;
+}
 
+.dashboard-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+    color: white;
+}
+
+.logo {
+    height: 50px;
+    width: auto;
+}
