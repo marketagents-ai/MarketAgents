@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 import json
 import re
+import argparse
 
 # Load environment variables
 load_dotenv()
@@ -90,6 +91,24 @@ def flatten_json(data):
     else:
         flattened = data
     return flattened
+
+# Update argparse
+parser = argparse.ArgumentParser(description="SQL Dashboard with JSON handling options")
+parser.add_argument("--flatten-json", action="store_true", help="Flatten JSON columns into separate columns. If false, format as line-separated JSON.")
+args = parser.parse_args()
+
+def process_json_data(value, flatten=False):
+    if value is None:
+        return value
+    
+    try:
+        json_data = json.loads(value) if isinstance(value, str) else value
+        if flatten:
+            return flatten_json(json_data)
+        else:
+            return json.dumps(json_data, indent=2)  # Use indent=2 for pretty formatting
+    except json.JSONDecodeError:
+        return value
 
 @app.get("/api/get-tables")
 async def get_tables():
@@ -165,7 +184,9 @@ async def get_metrics_data(
     table_name: str = Query(..., min_length=1),
     x_column: str = Query(None),
     y_column: str = Query(None),
-    full_table: bool = Query(False)
+    full_table: bool = Query(False),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000)
 ):
     conn = None
     cursor = None
@@ -179,11 +200,16 @@ async def get_metrics_data(
 
         json_columns = [col for col, info in column_types.items() if info['type'] in ('json', 'jsonb')]
 
+        # Calculate offset
+        offset = (page - 1) * page_size
+
         if full_table:
             select_parts = [sql.Identifier(col) for col in column_types.keys()]
-            query = sql.SQL("SELECT {} FROM {} LIMIT 100").format(
+            query = sql.SQL("SELECT {} FROM {} OFFSET {} LIMIT {}").format(
                 sql.SQL(', ').join(select_parts),
-                sql.Identifier(table_name)
+                sql.Identifier(table_name),
+                sql.Literal(offset),
+                sql.Literal(page_size)
             )
         else:
             if not x_column or not y_column:
@@ -192,34 +218,47 @@ async def get_metrics_data(
             x_select = build_json_path_query(x_column)
             y_select = build_json_path_query(y_column)
 
-            query = sql.SQL("SELECT {} as x_value, {} as y_value FROM {} LIMIT 100").format(
+            query = sql.SQL("SELECT {} as x_value, {} as y_value FROM {} OFFSET {} LIMIT {}").format(
                 x_select,
                 y_select,
-                sql.Identifier(table_name)
+                sql.Identifier(table_name),
+                sql.Literal(offset),
+                sql.Literal(page_size)
             )
+
+        # Get total count
+        count_query = sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name))
+        cursor.execute(count_query)
+        total_count = cursor.fetchone()['count']
 
         cursor.execute(query)
         rows = cursor.fetchall()
 
-        # Process the rows
+        # Process the rows (keep existing processing logic)
         processed_rows = []
         for row in rows:
             processed_row = {}
             for key, value in row.items():
                 if key in json_columns and value is not None:
-                    try:
-                        json_data = json.loads(value) if isinstance(value, str) else value
-                        flattened = flatten_json(json_data)
-                        processed_row.update(flattened)
-                    except json.JSONDecodeError:
-                        processed_row[key] = value
+                    processed_row[key] = process_json_data(value, flatten=args.flatten_json)
                 elif isinstance(value, datetime):
                     processed_row[key] = value.isoformat()
                 else:
                     processed_row[key] = value
+            
+            if args.flatten_json:
+                processed_row = flatten_json(processed_row)
+            
             processed_rows.append(processed_row)
 
-        return processed_rows
+        return {
+            "data": processed_rows,
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total_count + page_size - 1) // page_size
+        }
+
     except Exception as e:
         print(f"An error occurred: {e}")
         if cursor:
@@ -230,12 +269,13 @@ async def get_metrics_data(
             cursor.close()
         if conn:
             conn.close()
-
 @app.get("/api/search")
 async def search_database(
     table_name: str = Query(..., min_length=1),
     search_term: str = Query(..., min_length=1),
-    columns: Optional[List[str]] = Query(None)
+    columns: Optional[List[str]] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000)
 ):
     conn = None
     cursor = None
@@ -280,17 +320,56 @@ async def search_database(
                     )
                 )
 
-        # Construct the full query
-        query = sql.SQL("SELECT * FROM {} WHERE {}").format(
+        # Calculate offset
+        offset = (page - 1) * page_size
+
+        # Construct the full query with pagination
+        query = sql.SQL("SELECT * FROM {} WHERE {} OFFSET {} LIMIT {}").format(
+            sql.Identifier(table_name),
+            sql.SQL(" OR ").join(where_clauses),
+            sql.Literal(offset),
+            sql.Literal(page_size)
+        )
+
+        # Construct the count query
+        count_query = sql.SQL("SELECT COUNT(*) FROM {} WHERE {}").format(
             sql.Identifier(table_name),
             sql.SQL(" OR ").join(where_clauses)
         )
 
-        # Execute the query
+        # Execute the count query
+        cursor.execute(count_query)
+        total_count = cursor.fetchone()['count']
+
+        # Execute the main query
         cursor.execute(query)
         results = cursor.fetchall()
 
-        return results
+        # Process the results
+        processed_results = []
+        for row in results:
+            processed_row = {}
+            for key, value in row.items():
+                if column_types[key]['type'] in ('json', 'jsonb') and value is not None:
+                    processed_row[key] = process_json_data(value, flatten=args.flatten_json)
+                elif isinstance(value, datetime):
+                    processed_row[key] = value.isoformat()
+                else:
+                    processed_row[key] = value
+            
+            if args.flatten_json:
+                processed_row = flatten_json(processed_row)
+            
+            processed_results.append(processed_row)
+
+        return {
+            "data": processed_results,
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total_count + page_size - 1) // page_size
+        }
+
     except Exception as e:
         print(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")

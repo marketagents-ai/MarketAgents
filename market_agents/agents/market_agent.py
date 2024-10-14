@@ -175,7 +175,12 @@ class MarketAgent(LLMAgent, EconomicAgent):
             reward = 0.0  # Default to 0.0 if no last_step
 
         environment_info = environment.get_global_state()
-        previous_strategy = self.memory[-1].get('strategy_update', 'No previous strategy') if self.memory else 'No previous strategy'
+        previous_strategy = "No previous strategy available"
+        if self.memory:
+            for memory_item in reversed(self.memory):
+                if 'strategy_update' in memory_item:
+                    previous_strategy = memory_item['strategy_update']
+                    break
 
         variables = AgentPromptVariables(
             environment_name=environment_name,
@@ -221,6 +226,3 @@ class MarketAgent(LLMAgent, EconomicAgent):
             return response.get("reflection", "")
         else:
             return response
-
-
-

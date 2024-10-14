@@ -14,6 +14,7 @@ body {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    
 }
 h1 {
     color: #333;
@@ -22,14 +23,15 @@ h1 {
 label {
     font-weight: bold;
 }
-#tableSelect, #searchInput, #chartTypeSelect, #xColumnSelect, #yColumnSelect, #zColumnSelect {
+#tableSelect, #searchInput, #chartTypeSelect, #xColumnSelect, #yColumnSelect, #zColumnSelect, #viewSelect, #pageInfo{
     width: 200px;
     padding: 5px;
     margin-right: 10px;
     font-weight: bold;
     text-transform: uppercase;
+    
 }
-.refresh-button, #searchButton {
+.refresh-button, #searchButton, #prevPage, #nextPage {
     padding: 6px 12px;
     background-color: #564caf;
     color: white;
@@ -37,7 +39,7 @@ label {
     border-radius: 5px;
     cursor: pointer;
 }
-.refresh-button:hover, #searchButton:hover {
+.refresh-button:hover, #searchButton:hover, #prevPage:hover, #nextPage:hover {
     background-color: #463e8d;
 }
 .chart-container {
@@ -67,4 +69,48 @@ th {
 }
 th:hover {
     background-color: #ddd;
+}
+tr {
+    word-wrap: break-word; 
+}
+
+.json-formatted {
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Roboto Mono', monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 12px;
+    line-height: 1.4;
+    max-height: 800px;
+    overflow-y: auto;
+}
+
+.json-key {
+    color: #8e32aa;
+    font-weight: bold;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #564caf;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.dashboard-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+    color: white;
+}
+
+.logo {
+    height: 50px;
+    width: auto;
 }

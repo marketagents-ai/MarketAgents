@@ -1,22 +1,15 @@
 # SQL Dashboard
 
-A VERY BASIC web-based SQL dashboard for visualizing and exploring PostgreSQL database data.
-
-TODO
-
-- have the plotter x and y use json columns by re cachig the selections and ensuring type
-- repair search
-- add paging to replace hard sql limit
-- have X and Y when table transforms to inherit column names
-
+A VERY BASIC web-based SQL dashboard for visualizing and exploring PostgreSQL database data, specifically for use with llm agent frameworks.
 
 ## Features
 
-- Dynamic table and column selection-ish
-- Data visualization using Chart.js
-- Full table view and specific column selection
+- `TABLE` and `CHART` generation from SQL query results
+- Simple data visualization using Chart.js
 - Search functionality across tables
-- Responsive design
+- Pagination
+- JSON Column Extraction (`--flatten-json` as argparse)
+- Pretty JSON formatting
 
 ## Tech Stack
 
@@ -46,6 +39,8 @@ TODO
    uvicorn main:app --reload
    ```
 6. Open `http://localhost:8000` in your browser
+
+---
 
 ## Extending the Dashboard
 
@@ -99,7 +94,7 @@ TODO
 
 ## Project Structure
 
-- `main.py`: FastAPI backend
+- `sqlDASHBOARD.py`: FastAPI backend
 - `static/index.html`: Frontend HTML and JavaScript
 - `static/styles.css`: CSS styles
 
