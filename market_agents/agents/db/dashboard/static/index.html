@@ -8,9 +8,10 @@
 </head>
 <body>
     <div class="dashboard">
-        <div>
-            <input type="text" id="searchInput" placeholder="SEARCH">
 
+        <div>
+            <button id="refreshButton" class="refresh-button"> ↺ </button>
+            <input type="text" id="searchInput" placeholder="SEARCH">
             <label for="tableSelect"></label>
             <select id="tableSelect"></select>
             <label for="xColumnSelect">X</label>
@@ -18,10 +19,12 @@
             <label for="yColumnSelect">Y</label>
             <select id="yColumnSelect"></select>
             <label for="fullTableCheckbox">
-            
-            <br><br>
-            <button id="refreshButton" class="refresh-button"> DO </button>
             <input type="checkbox" id="fullTableCheckbox" checked>ALL</label>
+        </div>
+        <div class="pagination">
+            <span id="pageInfo"></span>
+            <button id="prevPage"> ← </button>
+            <button id="nextPage"> → </button>
         </div>
         <div class="chart-container">
             <canvas id="dataChart"></canvas>
@@ -40,6 +43,9 @@
 
     <script>
         let chartInstance = null;
+        let currentPage = 1;
+        let totalPages = 1;
+        const pageSize = 100;
 
         async function fetchTables() {
             try {
@@ -106,9 +112,9 @@
             });
         }
 
-        async function fetchData(tableName, xColumn, yColumn, fullTable) {
+        async function fetchData(tableName, xColumn, yColumn, fullTable, page = 1) {
             try {
-                let url = `/api/metrics-data?table_name=${encodeURIComponent(tableName)}`;
+                let url = `/api/metrics-data?table_name=${encodeURIComponent(tableName)}&page=${page}&page_size=${pageSize}`;
                 if (fullTable) {
                     url += '&full_table=true';
                 } else {
@@ -122,13 +128,13 @@
             } catch (error) {
                 console.error('Error fetching data:', error);
                 alert('Failed to fetch data. Please check the console for more details.');
-                return [];
+                return { data: [], total_count: 0, page: 1, total_pages: 1 };
             }
         }
 
-        async function performSearch(tableName, searchTerm) {
+        async function performSearch(tableName, searchTerm, page = 1) {
             try {
-                const response = await fetch(`/api/search?table_name=${encodeURIComponent(tableName)}&search_term=${encodeURIComponent(searchTerm)}`);
+                const response = await fetch(`/api/search?table_name=${encodeURIComponent(tableName)}&search_term=${encodeURIComponent(searchTerm)}&page=${page}&page_size=${pageSize}`);
                 if (!response.ok) {
                     throw new Error(`Error searching: ${response.statusText}`);
                 }
@@ -136,8 +142,25 @@
             } catch (error) {
                 console.error('Error performing search:', error);
                 alert('Failed to perform search. Please check the console for more details.');
-                return [];
+                return { data: [], total_count: 0, page: 1, total_pages: 1 };
             }
+        }
+
+        function isJSON(str) {
+            try {
+                JSON.parse(str);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function formatJSON(json) {
+            return JSON.stringify(JSON.parse(json), null, 2)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"(\w+)":/g, '<span class="json-key">"$1"</span>:');
         }
 
         function populateTable(data) {
@@ -174,6 +197,12 @@
                     const value = row[key];
                     if (value === null) {
                         td.textContent = 'NULL';
+                    } else if (typeof value === 'string' && isJSON(value)) {
+                        const formattedJSON = formatJSON(value);
+                        const pre = document.createElement('pre');
+                        pre.className = 'json-formatted';
+                        pre.innerHTML = formattedJSON;
+                        td.appendChild(pre);
                     } else {
                         td.textContent = value;
                     }
@@ -309,7 +338,13 @@
             });
         }
 
-        async function refreshDashboard() {
+        function updatePaginationInfo(currentPage, totalPages) {
+            document.getElementById('pageInfo').textContent = ` ${currentPage} / ${totalPages} `;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        }
+
+        async function refreshDashboard(page = 1) {
             const tableSelect = document.getElementById('tableSelect');
             const xColumnSelect = document.getElementById('xColumnSelect');
             const yColumnSelect = document.getElementById('yColumnSelect');
@@ -331,72 +366,142 @@
                 return;
             }
 
-            let data;
+            let result;
             if (searchTerm) {
-                data = await performSearch(tableName, searchTerm);
+                result = await performSearch(tableName, searchTerm, page);
             } else {
-                data =await fetchData(tableName, xColumn, yColumn, fullTable);
-    }
+                result = await fetchData(tableName, xColumn, yColumn, fullTable, page);
+            }
 
-    populateTable(data);
-    
-    if (!fullTable && !searchTerm) {
-        initChart(data, xColumn, yColumn);
-    } else {
-        // Hide the chart when viewing full table or search results
-        if (chartInstance) {
-            chartInstance.destroy();
+            currentPage = result.page;
+            totalPages = result.total_pages;
+            updatePaginationInfo(currentPage, totalPages);
+
+            populateTable(result.data);
+            
+            if (!fullTable && !searchTerm) {
+                initChart(result.data, xColumn, yColumn);
+            } else {
+                // Hide the chart when viewing full table or search results
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+                document.getElementById('dataChart').style.display = 'none';
+            }
         }
-        document.getElementById('dataChart').style.display = 'none';
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', async () => {
+            const tableSelect = document.getElementById('tableSelect');
+            const fullTableCheckbox = document.getElementById('fullTableCheckbox');
+            const xColumnSelect = document.getElementById('xColumnSelect');
+            const yColumnSelect = document.getElementById('yColumnSelect');
+            const searchInput = document.getElementById('searchInput');
+            const refreshButton = document.getElementById('refreshButton');
+            const prevPageButton = document.getElementById('prevPage');
+            const nextPageButton = document.getElementById('nextPage');
+
+
+            tableSelect.addEventListener('change', async () => {
+                // Disable inputs while fetching new data
+                tableSelect.disabled = true;
+                xColumnSelect.disabled = true;
+                yColumnSelect.disabled = true;
+                fullTableCheckbox.disabled = true;
+                searchInput.disabled = true;
+
+                try {
+                    // Fetch column names for the new table
+                    const columns = await fetchColumnNames(tableSelect.value);
+                    
+                    // Populate column selects with new data
+                    populateColumnSelects(columns);
+
+                    // Reset selections and inputs
+                    xColumnSelect.selectedIndex = 0;
+                    yColumnSelect.selectedIndex = 0;
+                    fullTableCheckbox.checked = true;
+                    searchInput.value = '';
+
+                    // Re-enable inputs
+                    xColumnSelect.disabled = fullTableCheckbox.checked;
+                    yColumnSelect.disabled = fullTableCheckbox.checked;
+                    fullTableCheckbox.disabled = false;
+                    searchInput.disabled = false;
+
+                    // Reset current page and refresh the dashboard
+                    currentPage = 1;
+                    await refreshDashboard(1);
+                } catch (error) {
+                    console.error('Error changing table:', error);
+                    alert(`Failed to change table: ${error.message}`);
+                } finally {
+                    // Ensure table select is re-enabled even if an error occurred
+                    tableSelect.disabled = false;
+                }
+            });
+
+            fullTableCheckbox.addEventListener('change', () => {
+                const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
+                xColumnSelect.disabled = disableColumns;
+                yColumnSelect.disabled = disableColumns;
+            });
+
+            searchInput.addEventListener('input', () => {
+                const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
+                xColumnSelect.disabled = disableColumns;
+                yColumnSelect.disabled = disableColumns;
+            });
+
+            refreshButton.addEventListener('click', () => refreshDashboard(1));
+
+            prevPageButton.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    refreshDashboard(currentPage - 1);
+                }});
+
+nextPageButton.addEventListener('click', () => {
+    if (currentPage < totalPages) {
+        refreshDashboard(currentPage + 1);
     }
-}
-
-async function performSearch(tableName, searchTerm) {
-    try {
-        const response = await fetch(`/api/search?table_name=${encodeURIComponent(tableName)}&search_term=${encodeURIComponent(searchTerm)}`);
-        if (!response.ok) {
-            throw new Error(`Error searching: ${response.statusText}`);
-        }
-        return await response.json();
-    } catch (error) {
-        console.error('Error performing search:', error);
-        alert('Failed to perform search. Please check the console for more details.');
-        return [];
-    }
-}
-
-// Event listeners
-document.addEventListener('DOMContentLoaded', async () => {
-    // Initialize all event listeners and other setup
-    const tableSelect = document.getElementById('tableSelect');
-    const fullTableCheckbox = document.getElementById('fullTableCheckbox');
-    const xColumnSelect = document.getElementById('xColumnSelect');
-    const yColumnSelect = document.getElementById('yColumnSelect');
-    const searchInput = document.getElementById('searchInput');
-    const refreshButton = document.getElementById('refreshButton');
-
-    tableSelect.addEventListener('change', async () => {
-        const columns = await fetchColumnNames(tableSelect.value);
-        populateColumnSelects(columns);
-    });
-
-    fullTableCheckbox.addEventListener('change', () => {
-        const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
-        xColumnSelect.disabled = disableColumns;
-        yColumnSelect.disabled = disableColumns;
-    });
-
-    searchInput.addEventListener('input', () => {
-        const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
-        xColumnSelect.disabled = disableColumns;
-        yColumnSelect.disabled = disableColumns;
-    });
-
-    refreshButton.addEventListener('click', refreshDashboard);
-
-    // Fetch tables after all other setup is complete
-    await fetchTables();
 });
-    </script>
+
+// Fetch tables after all other setup is complete
+await fetchTables();
+
+// Initial refresh of the dashboard
+await refreshDashboard(1);
+});
+
+// Helper function to debounce function calls
+function debounce(func, wait) {
+let timeout;
+return function executedFunction(...args) {
+    const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+};
+}
+
+// Add event listener for search input with debounce
+const debouncedSearch = debounce(() => refreshDashboard(1), 300);
+document.getElementById('searchInput').addEventListener('input', debouncedSearch);
+
+// Add event listener for table selection change
+//document.getElementById('tableSelect').addEventListener('change', () => {
+//currentPage = 1;
+//refreshDashboard(1);
+//});
+
+// Add event listeners for column selection changes
+document.getElementById('xColumnSelect').addEventListener('change', () => refreshDashboard(1));
+document.getElementById('yColumnSelect').addEventListener('change', () => refreshDashboard(1));
+
+// Add event listener for full table checkbox
+document.getElementById('fullTableCheckbox').addEventListener('change', () => refreshDashboard(1));
+</script>
 </body>
 </html>

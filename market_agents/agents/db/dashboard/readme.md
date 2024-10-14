@@ -4,19 +4,15 @@ A VERY BASIC web-based SQL dashboard for visualizing and exploring PostgreSQL da
 
 TODO
 
-- have the plotter x and y use json columns by re cachig the selections and ensuring type
-- repair search
-- add paging to replace hard sql limit
-- have X and Y when table transforms to inherit column names
-
-
 ## Features
 
 - Dynamic table and column selection-ish
 - Data visualization using Chart.js
 - Full table view and specific column selection
 - Search functionality across tables
-- Responsive design
+- Pagination
+- JSON Column Extraction (`--flatten-json` as argparse)
+- Pretty JSON formatting
 
 ## Tech Stack
 
@@ -99,7 +95,7 @@ TODO
 
 ## Project Structure
 
-- `main.py`: FastAPI backend
+- `sqlDASHBOARD.py`: FastAPI backend
 - `static/index.html`: Frontend HTML and JavaScript
 - `static/styles.css`: CSS styles
 
