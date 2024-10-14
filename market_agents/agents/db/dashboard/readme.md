@@ -1,14 +1,11 @@
 # SQL Dashboard
 
-A VERY BASIC web-based SQL dashboard for visualizing and exploring PostgreSQL database data.
-
-TODO
+A VERY BASIC web-based SQL dashboard for visualizing and exploring PostgreSQL database data, specifically for use with llm agent frameworks.
 
 ## Features
 
-- Dynamic table and column selection-ish
-- Data visualization using Chart.js
-- Full table view and specific column selection
+- `TABLE` and `CHART` generation from SQL query results
+- Simple data visualization using Chart.js
 - Search functionality across tables
 - Pagination
 - JSON Column Extraction (`--flatten-json` as argparse)
@@ -42,6 +39,8 @@ TODO
    uvicorn main:app --reload
    ```
 6. Open `http://localhost:8000` in your browser
+
+---
 
 ## Extending the Dashboard
 

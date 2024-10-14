@@ -11,21 +11,25 @@
 
         <div>
             <button id="refreshButton" class="refresh-button"> ↺ </button>
+ 
+                <button id="prevPage" class="prev-page"> ← </button>
+                <span id="pageInfo"></span>
+                <button id="nextPage" class="next-page"> → </button>
+
             <input type="text" id="searchInput" placeholder="SEARCH">
             <label for="tableSelect"></label>
             <select id="tableSelect"></select>
+            <select id="viewSelect">
+                <option value="table">Table</option>
+                <option value="chart">Chart</option>
+            </select>
             <label for="xColumnSelect">X</label>
             <select id="xColumnSelect"></select>
             <label for="yColumnSelect">Y</label>
             <select id="yColumnSelect"></select>
-            <label for="fullTableCheckbox">
-            <input type="checkbox" id="fullTableCheckbox" checked>ALL</label>
+
         </div>
-        <div class="pagination">
-            <span id="pageInfo"></span>
-            <button id="prevPage"> ← </button>
-            <button id="nextPage"> → </button>
-        </div>
+
         <div class="chart-container">
             <canvas id="dataChart"></canvas>
         </div>
@@ -163,7 +167,7 @@
                 .replace(/"(\w+)":/g, '<span class="json-key">"$1"</span>:');
         }
 
-        function populateTable(data) {
+        function populateTable(data, xColumn, yColumn) {
             if (data.length === 0) {
                 document.getElementById('dataTable').style.display = 'none';
                 return;
@@ -183,7 +187,14 @@
             const keys = Object.keys(data[0]);
             keys.forEach((key, index) => {
                 const th = document.createElement('th');
-                th.textContent = key;
+                // Use actual column names for chart view
+                if (key === 'x_value' && xColumn) {
+                    th.textContent = xColumn;
+                } else if (key === 'y_value' && yColumn) {
+                    th.textContent = yColumn;
+                } else {
+                    th.textContent = key;
+                }
                 th.onclick = () => sortTable(index);
                 headerRow.appendChild(th);
             });
@@ -330,7 +341,7 @@
                             display: false
                         },
                         title: {
-                            display: true,
+                            display: false,
                             text: `${yColumn} vs ${xColumn}`
                         }
                     }
@@ -344,16 +355,29 @@
             document.getElementById('nextPage').disabled = currentPage >= totalPages;
         }
 
+        function updateInputStates() {
+            const viewSelect = document.getElementById('viewSelect');
+            const xColumnSelect = document.getElementById('xColumnSelect');
+            const yColumnSelect = document.getElementById('yColumnSelect');
+            const searchInput = document.getElementById('searchInput');
+
+            const isChartView = viewSelect.value === 'chart';
+            const hasSearchTerm = searchInput.value.trim() !== '';
+
+            xColumnSelect.disabled = !isChartView || hasSearchTerm;
+            yColumnSelect.disabled = !isChartView || hasSearchTerm;
+        }
+
         async function refreshDashboard(page = 1) {
             const tableSelect = document.getElementById('tableSelect');
             const xColumnSelect = document.getElementById('xColumnSelect');
             const yColumnSelect = document.getElementById('yColumnSelect');
-            const fullTableCheckbox = document.getElementById('fullTableCheckbox');
+            const viewSelect = document.getElementById('viewSelect');
             const searchInput = document.getElementById('searchInput');
             const tableName = tableSelect.value;
             const xColumn = xColumnSelect.value;
             const yColumn = yColumnSelect.value;
-            const fullTable = fullTableCheckbox.checked;
+            const isChartView = viewSelect.value === 'chart';
             const searchTerm = searchInput.value.trim();
 
             if (!tableName) {
@@ -361,8 +385,8 @@
                 return;
             }
 
-            if (!fullTable && !searchTerm && (!xColumn || !yColumn)) {
-                alert('Please select columns for both axes, check "View Full Table", or enter a search term.');
+            if (isChartView && !searchTerm && (!xColumn || !yColumn)) {
+                alert('Please select columns for both axes or enter a search term.');
                 return;
             }
 
@@ -370,30 +394,34 @@
             if (searchTerm) {
                 result = await performSearch(tableName, searchTerm, page);
             } else {
-                result = await fetchData(tableName, xColumn, yColumn, fullTable, page);
+                result = await fetchData(tableName, xColumn, yColumn, !isChartView, page);
             }
 
             currentPage = result.page;
             totalPages = result.total_pages;
             updatePaginationInfo(currentPage, totalPages);
 
-            populateTable(result.data);
+            // Pass xColumn and yColumn to populateTable
+            populateTable(result.data, isChartView ? xColumn : null, isChartView ? yColumn : null);
             
-            if (!fullTable && !searchTerm) {
+            if (isChartView && !searchTerm) {
                 initChart(result.data, xColumn, yColumn);
+                document.getElementById('dataChart').style.display = 'block';
             } else {
-                // Hide the chart when viewing full table or search results
                 if (chartInstance) {
                     chartInstance.destroy();
                 }
                 document.getElementById('dataChart').style.display = 'none';
             }
+
+            // Update input states after refreshing
+            updateInputStates();
         }
 
         // Event listeners
         document.addEventListener('DOMContentLoaded', async () => {
             const tableSelect = document.getElementById('tableSelect');
-            const fullTableCheckbox = document.getElementById('fullTableCheckbox');
+            const viewSelect = document.getElementById('viewSelect');
             const xColumnSelect = document.getElementById('xColumnSelect');
             const yColumnSelect = document.getElementById('yColumnSelect');
             const searchInput = document.getElementById('searchInput');
@@ -401,13 +429,12 @@
             const prevPageButton = document.getElementById('prevPage');
             const nextPageButton = document.getElementById('nextPage');
 
-
             tableSelect.addEventListener('change', async () => {
                 // Disable inputs while fetching new data
                 tableSelect.disabled = true;
                 xColumnSelect.disabled = true;
                 yColumnSelect.disabled = true;
-                fullTableCheckbox.disabled = true;
+                viewSelect.disabled = true;
                 searchInput.disabled = true;
 
                 try {
@@ -420,13 +447,15 @@
                     // Reset selections and inputs
                     xColumnSelect.selectedIndex = 0;
                     yColumnSelect.selectedIndex = 0;
-                    fullTableCheckbox.checked = true;
                     searchInput.value = '';
 
+                    // Set view to 'table' by default
+                    viewSelect.value = 'table';
+
                     // Re-enable inputs
-                    xColumnSelect.disabled = fullTableCheckbox.checked;
-                    yColumnSelect.disabled = fullTableCheckbox.checked;
-                    fullTableCheckbox.disabled = false;
+                    xColumnSelect.disabled = true;
+                    yColumnSelect.disabled = true;
+                    viewSelect.disabled = false;
                     searchInput.disabled = false;
 
                     // Reset current page and refresh the dashboard
@@ -441,16 +470,13 @@
                 }
             });
 
-            fullTableCheckbox.addEventListener('change', () => {
-                const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
-                xColumnSelect.disabled = disableColumns;
-                yColumnSelect.disabled = disableColumns;
+            viewSelect.addEventListener('change', () => {
+                updateInputStates();
+                refreshDashboard(1);
             });
 
             searchInput.addEventListener('input', () => {
-                const disableColumns = fullTableCheckbox.checked || searchInput.value.trim() !== '';
-                xColumnSelect.disabled = disableColumns;
-                yColumnSelect.disabled = disableColumns;
+                updateInputStates();
             });
 
             refreshButton.addEventListener('click', () => refreshDashboard(1));
@@ -460,48 +486,42 @@
                     refreshDashboard(currentPage - 1);
                 }});
 
-nextPageButton.addEventListener('click', () => {
-    if (currentPage < totalPages) {
-        refreshDashboard(currentPage + 1);
-    }
-});
+            nextPageButton.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    refreshDashboard(currentPage + 1);
+                }
+            });
 
-// Fetch tables after all other setup is complete
-await fetchTables();
+            // Fetch tables after all other setup is complete
+            await fetchTables();
 
-// Initial refresh of the dashboard
-await refreshDashboard(1);
-});
+            // Initial refresh of the dashboard
+            await refreshDashboard(1);
+        });
 
-// Helper function to debounce function calls
-function debounce(func, wait) {
-let timeout;
-return function executedFunction(...args) {
-    const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-};
-}
+        // Helper function to debounce function calls
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
 
-// Add event listener for search input with debounce
-const debouncedSearch = debounce(() => refreshDashboard(1), 300);
-document.getElementById('searchInput').addEventListener('input', debouncedSearch);
+        // Add event listener for search input with debounce
+        const debouncedSearch = debounce(() => refreshDashboard(1), 300);
+        document.getElementById('searchInput').addEventListener('input', debouncedSearch);
 
-// Add event listener for table selection change
-//document.getElementById('tableSelect').addEventListener('change', () => {
-//currentPage = 1;
-//refreshDashboard(1);
-//});
+        // Add event listeners for column selection changes
+        document.getElementById('xColumnSelect').addEventListener('change', () => refreshDashboard(1));
+        document.getElementById('yColumnSelect').addEventListener('change', () => refreshDashboard(1));
 
-// Add event listeners for column selection changes
-document.getElementById('xColumnSelect').addEventListener('change', () => refreshDashboard(1));
-document.getElementById('yColumnSelect').addEventListener('change', () => refreshDashboard(1));
-
-// Add event listener for full table checkbox
-document.getElementById('fullTableCheckbox').addEventListener('change', () => refreshDashboard(1));
-</script>
+        // Add event listener for full table checkbox
+        document.getElementById('viewSelect').addEventListener('change', () => refreshDashboard(1));
+    </script>
 </body>
 </html>

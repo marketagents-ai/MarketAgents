@@ -23,14 +23,15 @@ h1 {
 label {
     font-weight: bold;
 }
-#tableSelect, #searchInput, #chartTypeSelect, #xColumnSelect, #yColumnSelect, #zColumnSelect {
+#tableSelect, #searchInput, #chartTypeSelect, #xColumnSelect, #yColumnSelect, #zColumnSelect, #viewSelect, #pageInfo{
     width: 200px;
     padding: 5px;
     margin-right: 10px;
     font-weight: bold;
     text-transform: uppercase;
+    
 }
-.refresh-button, #searchButton {
+.refresh-button, #searchButton, #prevPage, #nextPage {
     padding: 6px 12px;
     background-color: #564caf;
     color: white;
@@ -38,7 +39,7 @@ label {
     border-radius: 5px;
     cursor: pointer;
 }
-.refresh-button:hover, #searchButton:hover {
+.refresh-button:hover, #searchButton:hover, #prevPage:hover, #nextPage:hover {
     background-color: #463e8d;
 }
 .chart-container {
@@ -92,14 +93,4 @@ tr {
     font-weight: bold;
 }
 
-.pagination {
-    display: flex;
-    justify-content: right;
-    margin-bottom: 20px;
-    font-weight: bold;
-    font-size: 18px;
-    padding-right: 10px;
-    padding-left: 10px;
-    padding-top: 5px;
-    padding-bottom: 5px;
-}
+
