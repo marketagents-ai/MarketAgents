@@ -1,3 +1,5 @@
+# insert_simulation_data.py
+
 import psycopg2
 import psycopg2.extras
 import os
@@ -8,25 +10,44 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from market_agents.economics.econ_models import BuyerPreferenceSchedule, SellerPreferenceSchedule
+from market_agents.economics.econ_models import Bid, BuyerPreferenceSchedule, SellerPreferenceSchedule
 
-
-def json_serial(self, obj):
+def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, datetime):
         return obj.isoformat()
     elif isinstance(obj, (BuyerPreferenceSchedule, SellerPreferenceSchedule)):
         return obj.dict()
+    elif hasattr(obj, 'model_dump'):
+        return obj.model_dump()
+    elif hasattr(obj, '__dict__'):
+        return obj.__dict__
     raise TypeError(f"Type {type(obj)} not serializable")
 
+def serialize_memory_data(memory_data):
+    if isinstance(memory_data, dict):
+        return {k: serialize_memory_data(v) for k, v in memory_data.items()}
+    elif isinstance(memory_data, list):
+        return [serialize_memory_data(v) for v in memory_data]
+    elif isinstance(memory_data, datetime):
+        return memory_data.isoformat()
+    elif hasattr(memory_data, 'model_dump'):
+        return serialize_memory_data(memory_data.model_dump())
+    elif hasattr(memory_data, '__dict__'):
+        return serialize_memory_data(vars(memory_data))
+    elif isinstance(memory_data, (str, int, float, bool, type(None))):
+        return memory_data
+    else:
+        return str(memory_data)
+
 class SimulationDataInserter:
-    def __init__(self):
+    def __init__(self, db_params):
         self.conn = psycopg2.connect(
-            dbname=os.environ.get('DB_NAME', 'market_simulation'),
-            user=os.environ.get('DB_USER', 'db_user'),
-            password=os.environ.get('DB_PASSWORD', 'db_pwd@123'),
-            host=os.environ.get('DB_HOST', 'localhost'),
-            port=os.environ.get('DB_PORT', '5433')
+            dbname=db_params.get('dbname', 'market_simulation'),
+            user=db_params.get('user', 'db_user'),
+            password=db_params.get('password', 'db_pwd@123'),
+            host=db_params.get('host', 'localhost'),
+            port=db_params.get('port', '5433')
         )
         self.cursor = self.conn.cursor()
 
@@ -97,6 +118,14 @@ class SimulationDataInserter:
 
         raise TypeError(f"Type {type(obj)} not serializable")
 
+    def check_tables_exist(self):
+        cursor = self.conn.cursor()
+        # Check if the 'agents' table exists
+        cursor.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name=%s)", ('agents',))
+        exists = cursor.fetchone()[0]
+        cursor.close()
+        return exists
+
     def insert_agent_memories(self, memories: List[Dict[str, Any]]):
         for memory in memories:
             try:
@@ -124,24 +153,26 @@ class SimulationDataInserter:
             schedules_data (List[Dict[str, Any]]): List of schedule dictionaries containing:
                 - agent_id (UUID)
                 - is_buyer (bool)
-                - values (BuyerPreferenceSchedule or SellerPreferenceSchedule)
+                - values (BuyerPreferenceSchedule or None)
+                - costs (SellerPreferenceSchedule or None)
                 - initial_endowment (Basket)
         """
         query = """
-        INSERT INTO preference_schedules (agent_id, is_buyer, values, initial_endowment)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO preference_schedules (agent_id, is_buyer, values, costs, initial_endowment)
+        VALUES (%s, %s, %s, %s, %s)
         """
         try:
             with self.conn.cursor() as cur:
                 for schedule in schedules_data:
                     logging.debug(f"Inserting schedule: {schedule}")
 
-                    # Serialize 'values' using json_serial
-                    try:
-                        values_json = json.dumps(schedule['values'], default=self.json_serial)
-                    except TypeError as e:
-                        logging.error(f"Error serializing 'values' for agent_id {schedule['agent_id']}: {e}")
-                        raise
+                    # Handle 'values' and 'costs' based on is_buyer
+                    if schedule['is_buyer']:
+                        values_json = json.dumps(schedule['values'], default=self.json_serial) if schedule['values'] else None
+                        costs_json = None
+                    else:
+                        values_json = None
+                        costs_json = json.dumps(schedule['costs'], default=self.json_serial) if schedule['costs'] else None
 
                     # Handle 'initial_endowment'
                     initial_endowment = schedule['initial_endowment']
@@ -164,6 +195,7 @@ class SimulationDataInserter:
                             schedule['agent_id'],
                             schedule['is_buyer'],
                             values_json,
+                            costs_json,
                             initial_endowment_json
                         ))
                     except psycopg2.Error as db_err:
@@ -409,7 +441,46 @@ class SimulationDataInserter:
             logging.error(f"Error inserting actions: {str(e)}")
             raise
 
-    def insert_ai_requests(self, requests_data):
+    def insert_ai_requests(self, ai_requests):
+        requests_data = []
+        for request in ai_requests:
+            start_time = request.start_time
+            end_time = request.end_time
+            if isinstance(start_time, (float, int)):
+                start_time = datetime.fromtimestamp(start_time)
+            if isinstance(end_time, (float, int)):
+                end_time = datetime.fromtimestamp(end_time)
+
+            total_time = (end_time - start_time).total_seconds()
+
+            # Extract system message
+            system_message = next((msg['content'] for msg in request.completion_kwargs.get('messages', []) if msg['role'] == 'system'), None)
+
+            requests_data.append({
+                'prompt_context_id': str(request.source_id),
+                'start_time': start_time,
+                'end_time': end_time,
+                'total_time': total_time,
+                'model': request.completion_kwargs.get('model', ''),
+                'max_tokens': request.completion_kwargs.get('max_tokens', None),
+                'temperature': request.completion_kwargs.get('temperature', None),
+                'messages': request.completion_kwargs.get('messages', []),
+                'system': system_message,
+                'tools': request.completion_kwargs.get('tools', []),
+                'tool_choice': request.completion_kwargs.get('tool_choice', {}),
+                'raw_response': request.raw_result,
+                'completion_tokens': request.usage.completion_tokens if request.usage else None,
+                'prompt_tokens': request.usage.prompt_tokens if request.usage else None,
+                'total_tokens': request.usage.total_tokens if request.usage else None
+            })
+
+        if requests_data:
+            try:
+                self._insert_ai_requests_to_db(requests_data)
+            except Exception as e:
+                logging.error(f"Error inserting AI requests: {e}")
+
+    def _insert_ai_requests_to_db(self, requests_data):
         query = """
         INSERT INTO requests 
         (prompt_context_id, start_time, end_time, total_time, model, 
@@ -442,6 +513,209 @@ class SimulationDataInserter:
         except Exception as e:
             self.conn.rollback()
             logging.error(f"Error inserting AI requests: {str(e)}")
+            raise
+
+    def insert_round_data(self, round_num, agents, agent_dict, trackers, config):
+        logging.info(f"Starting data insertion for round {round_num}")
+
+        try:
+            # Agents data
+            logging.info("Preparing agents data")
+            agents_data = [
+                {
+                    'id': str(agent.id),
+                    'role': agent.role,
+                    'is_llm': agent.use_llm,
+                    'max_iter': config.max_rounds,
+                    'llm_config': agent.llm_config if isinstance(agent.llm_config, dict) else agent.llm_config.dict()
+                }
+                for agent in agents
+            ]
+            logging.info(f"Inserting {len(agents_data)} agents")
+            agent_id_map = self.insert_agents(agents_data)
+            logging.info("Agents insertion complete")
+
+            # Memories data
+            logging.info("Preparing memories data")
+            memories_data = [
+                {
+                    'agent_id': str(agent.id),
+                    'step_id': round_num,
+                    'memory_data': serialize_memory_data(agent.memory[-1]) if agent.memory else {}
+                }
+                for agent in agents
+            ]
+            logging.info(f"Inserting {len(memories_data)} memories")
+            self.insert_agent_memories(memories_data)
+            logging.info("Memories insertion complete")
+
+            # Allocations data
+            logging.info("Preparing allocations data")
+            allocations_data = [
+                {
+                    'agent_id': str(agent.id),
+                    'goods': agent.economic_agent.endowment.current_basket.goods_dict.get(config.agent_config.good_name, 0),
+                    'cash': agent.economic_agent.endowment.current_basket.cash,
+                    'locked_goods': getattr(agent.economic_agent, 'locked_goods', {}).get(config.agent_config.good_name, 0),
+                    'locked_cash': getattr(agent.economic_agent, 'locked_cash', 0),
+                    'initial_goods': agent.economic_agent.endowment.initial_basket.goods_dict.get(config.agent_config.good_name, 0),
+                    'initial_cash': agent.economic_agent.endowment.initial_basket.cash
+                }
+                for agent in agents
+            ]
+            logging.info(f"Inserting {len(allocations_data)} allocations")
+            self.insert_allocations(allocations_data, agent_id_map)
+            logging.info("Allocations insertion complete")
+
+            # Schedules data
+            logging.info("Preparing schedules data")
+            schedules_data = [
+                {
+                    'agent_id': str(agent.id),
+                    'is_buyer': agent.role == "buyer",
+                    'values': agent.economic_agent.value_schedules.get(config.agent_config.good_name, {}),
+                    'costs': agent.economic_agent.cost_schedules.get(config.agent_config.good_name, {}),
+                    'initial_endowment': agent.economic_agent.endowment.initial_basket
+                }
+                for agent in agents
+            ]
+            logging.info(f"Inserting {len(schedules_data)} schedules")
+            self.insert_schedules(schedules_data)
+            logging.info("Schedules insertion complete")
+
+            # Orders data
+            logging.info("Preparing orders data")
+            orders_data = [
+                {
+                    'agent_id': str(agent.id),
+                    'is_buy': isinstance(order, Bid),
+                    'quantity': order.quantity,
+                    'price': order.price,
+                    'base_value': getattr(order, 'base_value', None),
+                    'base_cost': getattr(order, 'base_cost', None)
+                }
+                for agent in agents
+                for order in agent.economic_agent.pending_orders.get(config.agent_config.good_name, [])
+            ]
+            logging.info(f"Inserting {len(orders_data)} orders")
+            self.insert_orders(orders_data, agent_id_map)
+            logging.info("Orders insertion complete")
+
+            # Interactions data
+            logging.info("Preparing interactions data")
+            interactions_data = [
+                {
+                    'agent_id': str(agent.id),
+                    'round': round_num,
+                    'task': interaction['type'],
+                    'response': serialize_memory_data(interaction['content'])
+                }
+                for agent in agents
+                for interaction in agent.interactions
+            ]
+            logging.info(f"Inserting {len(interactions_data)} interactions")
+            self.insert_interactions(interactions_data, agent_id_map)
+            logging.info("Interactions insertion complete")
+
+            # Reflections data
+            logging.info("Preparing reflections data")
+            observations_data = []
+            reflections_data = []
+            for agent in agents:
+                if agent.memory and agent.memory[-1]['type'] == 'reflection':
+                    reflection = agent.memory[-1]
+                    observation = reflection.get('observation')
+                    observation_serialized = serialize_memory_data(observation)
+                    observations_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'auction',
+                        'observation': observation_serialized
+                    })
+                    reflections_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'auction',
+                        'reflection': reflection.get('content', ''),
+                        'self_reward': reflection.get('self_reward', 0),
+                        'environment_reward': reflection.get('environment_reward', 0),
+                        'total_reward': reflection.get('total_reward', 0),
+                        'strategy_update': reflection.get('strategy_update', '')
+                    })
+            logging.info(f"Inserting {len(observations_data)} observations")
+            self.insert_observations(observations_data, agent_id_map)
+            logging.info(f"Inserting {len(reflections_data)} reflections")
+            self.insert_reflections(reflections_data, agent_id_map)
+            logging.info("Reflections insertion complete")
+
+            # Perceptions data
+            logging.info("Preparing perceptions data")
+            perceptions_data = []
+            for agent in agents:
+                if agent.last_perception is not None:
+                    perceptions_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'auction',
+                        'monologue': str(agent.last_perception.get('monologue')),
+                        'strategy': str(agent.last_perception.get('strategy')),
+                        'confidence': agent.last_perception.get('confidence', 0)
+                    })
+
+            if perceptions_data:
+                logging.info(f"Inserting {len(perceptions_data)} perceptions")
+                self.insert_perceptions(perceptions_data, agent_id_map)
+                logging.info("Perceptions insertion complete")
+            else:
+                logging.info("No perceptions to insert")
+
+            # Actions data
+            logging.info("Preparing actions data")
+            actions_data = []
+            for agent in agents:
+                if hasattr(agent, 'last_action') and agent.last_action:
+                    actions_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'auction',
+                        'action': agent.last_action
+                    })
+
+            logging.info(f"Inserting {len(actions_data)} actions")
+            self.insert_actions(actions_data, agent_id_map)
+            logging.info("Actions insertion complete")
+
+            # Trades data
+            logging.info("Preparing trades data")
+            trades_data = []
+            for env_name, tracker in trackers.items():
+                for trade in tracker.all_trades:
+                    buyer_id = str(trade.buyer_id)
+                    seller_id = str(trade.seller_id)
+                    buyer = agent_dict.get(buyer_id)
+                    seller = agent_dict.get(seller_id)
+                    if buyer and seller:
+                        buyer_surplus = buyer.economic_agent.calculate_individual_surplus()
+                        seller_surplus = seller.economic_agent.calculate_individual_surplus()
+                        total_surplus = buyer_surplus + seller_surplus
+
+                        trades_data.append({
+                            'buyer_id': buyer_id,
+                            'seller_id': seller_id,
+                            'quantity': trade.quantity,
+                            'price': trade.price,
+                            'buyer_surplus': buyer_surplus,
+                            'seller_surplus': seller_surplus,
+                            'total_surplus': total_surplus,
+                            'round': round_num
+                        })
+
+            if trades_data:
+                logging.info(f"Inserting {len(trades_data)} trades")
+                self.insert_trades(trades_data, agent_id_map)
+                logging.info("Trades insertion complete")
+            else:
+                logging.info("No trades to insert")
+
+        except Exception as e:
+            logging.error(f"Error inserting data for round {round_num}: {str(e)}")
+            logging.exception("Exception details:")
             raise
 
 def addapt_uuid(uuid_value):
