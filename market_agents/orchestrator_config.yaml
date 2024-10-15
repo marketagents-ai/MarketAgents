@@ -1,15 +1,16 @@
-num_agents: 2 
+num_agents: 8 
 max_rounds: 2
 agent_config:
   num_units: 10
-  base_value: 100
-  use_llm: true
-  buyer_initial_cash: 1000  
-  buyer_initial_goods: 0    
-  seller_initial_cash: 0    
-  seller_initial_goods: 10  
-  good_name: "apple"
-  noise_factor: 0.1
+  buyer_base_value: 120.0
+  seller_base_value: 80.0
+  use_llm: False
+  buyer_initial_cash: 1000.0
+  buyer_initial_goods: 0
+  seller_initial_cash: 0
+  seller_initial_goods: 10
+  good_name: 'apple'
+  noise_factor: 0.05
   max_relative_spread: 0.2
 llm_configs:
   - name: "gpt-4o-mini-low-temp"
