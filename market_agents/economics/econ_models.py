@@ -1,11 +1,60 @@
 from pydantic import BaseModel, Field, computed_field, model_validator
 from functools import cached_property
-from typing import List, Dict
+from typing import List, Dict, Self
 import random
 from copy import deepcopy
 from datetime import datetime
 import uuid
+import os
+from pathlib import Path
+import json
+import tempfile
 
+class SavableBaseModel(BaseModel):
+    name:str
+    def save_to_json(self, folder_path: str) -> str:
+        # Create folder if it doesn't exist
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{self.name.replace(' ', '_')}_{timestamp}.json"
+        file_path = os.path.join(folder_path, filename)
+
+        try:
+            # Convert to dict
+            data = self.model_dump(mode='json')
+            
+            # Write to a temporary file first
+            with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
+                json.dump(data, temp_file, indent=2)
+            
+            # If the write was successful, move the temporary file to the final location
+            os.replace(temp_file.name, file_path)
+            
+            print(f"State saved to {file_path}")
+        except Exception as e:
+            print(f"Error saving state to {file_path}")
+            print(f"Error message: {str(e)}")
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+            raise
+        
+        return file_path
+
+    @classmethod
+    def load_from_json(cls, file_path: str) -> Self:
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            return cls.model_validate(data)
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON from {file_path}")
+            print(f"Error message: {str(e)}")
+            with open(file_path, 'r') as f:
+                print(f"File contents:\n{f.read()}")
+            raise
+    
 class MarketAction(BaseModel):
     price: float = Field(..., description="Price of the order")
     quantity: int = Field(default=1, ge=1,le=1, description="Quantity of the order")
@@ -73,13 +122,17 @@ class Endowment(BaseModel):
         temp_basket = deepcopy(self.initial_basket)
 
         for trade in self.trades:
+            # print(f"trade: {trade} updating basket")
             if trade.buyer_id == self.agent_id:
+                # print(f"buyer {trade.buyer_id} == {self.agent_id}")
                 temp_basket.cash -= trade.price * trade.quantity
                 temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) + trade.quantity)
             elif trade.seller_id == self.agent_id:
+                # print(f"seller {trade.seller_id} == {self.agent_id}")
                 temp_basket.cash += trade.price * trade.quantity
                 temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) - trade.quantity)
-
+            else:
+                raise ValueError(f"Trade {trade} not for agent {self.agent_id}")
         # Create a new Basket instance with the calculated values
         return Basket(
             cash=temp_basket.cash,

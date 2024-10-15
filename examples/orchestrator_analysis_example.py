@@ -8,21 +8,25 @@ from market_agents.environments.mechanisms.auction import DoubleAuction, Auction
 from market_agents.environments.environment import MultiAgentEnvironment
 from market_agents.market_orchestrator import MarketOrchestrator
 import os
-
+import datetime
 async def main():
     load_dotenv()
-    
+
+    start_time = datetime.datetime.now()
     # Set up ParallelAIUtilities
     oai_request_limits = RequestLimits(max_requests_per_minute=500, max_tokens_per_minute=200000)
     anthropic_request_limits = RequestLimits(max_requests_per_minute=40, max_tokens_per_minute=10000)
+    litellm_request_limits = RequestLimits(max_requests_per_minute=1000000, max_tokens_per_minute=10000000000)
     parallel_ai = ParallelAIUtilities(
         oai_request_limits=oai_request_limits,
-        anthropic_request_limits=anthropic_request_limits
+        anthropic_request_limits=anthropic_request_limits,
+        litellm_request_limits=litellm_request_limits
     )
 
     # Create a good
     apple = Good(name="apple", quantity=0)
-
+    num_buyers = 5000
+    num_sellers = 5000
     # Create LLM configs
     # buyer_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
     # seller_llm_config = LLMConfig(client="anthropic", model="claude-3-5-sonnet-20240620", response_format="tool", max_tokens=50)
@@ -30,22 +34,32 @@ async def main():
     litellm_model = os.getenv("LITELLM_MODEL")
     # buyer_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
     # seller_llm_config = LLMConfig(client="openai", model="gpt-4o-mini", response_format="tool", max_tokens=50)
-    #vllm config
+    # #vllm config
     if vllm_model is not None:
-        buyer_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
-        seller_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="structured_output", max_tokens=50)
-    # #litellm config
+        buyer_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="tool", max_tokens=50)
+        seller_llm_config = LLMConfig(client="vllm", model=vllm_model, response_format="tool", max_tokens=50)
+    # # #litellm config
     if litellm_model is not None:
-        buyer_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
-        seller_llm_config = LLMConfig(client="litellm", model=litellm_model, response_format="tool", max_tokens=50)
+        model_name_base = litellm_model[:-1]
+        lite_llm_buyer_configs=[]
+        lite_llm_seller_configs=[]
+        num_models =6 
+        
+        for i in range(num_buyers):
+            model_block = i%num_models
+            model_name = model_name_base + str(model_block)
+            lite_llm_buyer_configs.append(LLMConfig(client="litellm", model=model_name, response_format="tool", max_tokens=50))
+        for i in range(num_sellers):
+            model_block = i%num_models
+            model_name = model_name_base + str(model_block)
+            lite_llm_seller_configs.append(LLMConfig(client="litellm", model=model_name, response_format="tool", max_tokens=50))
 
-    num_buyers = 1
-    num_sellers = 1
+    
     # Create simple agents
     buyers = [
         create_simple_agent(
             agent_id=f"buyer_{i}",
-            llm_config=buyer_llm_config,
+            llm_config=buyer_llm_config if litellm_model is None else lite_llm_buyer_configs[i],
             good=apple,
             is_buyer=True,
             endowment=Endowment(agent_id=f"buyer_{i}", initial_basket=Basket(cash=1000, goods=[Good(name="apple", quantity=0)])),
@@ -57,7 +71,7 @@ async def main():
     sellers = [
         create_simple_agent(
             agent_id=f"seller_{i}",
-            llm_config=seller_llm_config,
+            llm_config=seller_llm_config if litellm_model is None else lite_llm_seller_configs[i],
             good=apple,
             is_buyer=False,
             endowment=Endowment(agent_id=f"seller_{i}", initial_basket=Basket(cash=0, goods=[Good(name="apple", quantity=10)])),
@@ -69,26 +83,17 @@ async def main():
     agents = buyers + sellers
 
     # Create DoubleAuction mechanism
-    double_auction = DoubleAuction(
-        max_rounds=10,
-        good_name="apple"
-    )
 
-    # Create MultiAgentEnvironment
-    environment = MultiAgentEnvironment(
-        name="Apple Market",
-        address="apple_market",
-        max_steps=10,
-        action_space=AuctionActionSpace(),
-        observation_space=AuctionObservationSpace(),
-        mechanism=double_auction
-    )
 
-    # Create MarketOrchestrator
-    orchestrator = MarketOrchestrator(agents=agents, markets=[environment], ai_utils=parallel_ai)
+    orchestrator = MarketOrchestrator(llm_agents=agents, goods=[apple.name], ai_utils=parallel_ai,max_rounds=5)
 
     # Run the market simulation
-    await orchestrator.simulate_market(max_rounds=10, good_name="apple")
-
+    await orchestrator.run_scenario()
+    #plot the market results
+    print(orchestrator.state)
+    end_time = datetime.datetime.now()
+    print(f"Time taken: {end_time - start_time}")
+    return orchestrator
 if __name__ == "__main__":
-    asyncio.run(main())
+    orchestrator = asyncio.run(main())
+    sate = orchestrator.state

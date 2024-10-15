@@ -134,8 +134,8 @@ async def main():
                     )
 
                     # Update agents with local observations
-                    buyer.update_local(global_observation.observations[buyer.id])
-                    seller.update_local(global_observation.observations[seller.id])
+                    buyer.update_state(global_observation.observations[buyer.id])
+                    seller.update_state(global_observation.observations[seller.id])
 
                     print(f"Trade executed at price: {trade_price}")
                     break

@@ -18,8 +18,8 @@ def analyze_and_plot_market_results(trades: List, agents: List[Union[EconomicAge
 
     # Get theoretical equilibrium results
     equilibrium_results = equilibrium.calculate_equilibrium()[good]
-    ce_price, ce_quantity = equilibrium_results["price"], int(equilibrium_results["quantity"])
-    theoretical_total_surplus = equilibrium_results["total_surplus"]
+    ce_price, ce_quantity = equilibrium_results.price, int(equilibrium_results.quantity)
+    theoretical_total_surplus = equilibrium_results.total_surplus
 
     # Calculate total practical surplus
     total_buyer_surplus = sum(agent.calculate_individual_surplus() for agent in agents if agent.is_buyer(good))

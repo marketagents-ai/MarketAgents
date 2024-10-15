@@ -1,8 +1,8 @@
-from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
+from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.economics.econ_models import Basket, Good, Trade, Endowment, Bid, Ask, SellerPreferenceSchedule, BuyerPreferenceSchedule
 from market_agents.inference.parallel_inference import ParallelAIUtilities
 from market_agents.inference.message_models import LLMPromptContext, StructuredTool, LLMConfig, LLMOutput
-from market_agents.environments.mechanisms.auction import AuctionLocalObservation, AuctionGlobalObservation
+from market_agents.environments.mechanisms.auction import AuctionLocalObservation, AuctionGlobalObservation, MarketSummary
 from typing import Optional, Union, Dict, Any, List
 from pydantic import Field, field_validator, model_validator, computed_field, BaseModel
 import json
@@ -33,7 +33,7 @@ class AskTool(StructuredTool):
     instruction_string: str = Field(default="Choose the price to ask for a quantity of 1 of a good in the market. The price must be positive float that must be strictly higher than your current evaluation of the good. You will see your current evalution in the most recent user messae together with the rest of the market state.")
 
 class SimpleAgentState(BaseModel):
-    market_summary: Dict[str, Any]
+    market_summary: MarketSummary
     trades: List[Trade]
     waiting_orders: List[Union[Bid, Ask]]
     current_basket: Basket
@@ -128,8 +128,8 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
             for trade in local_observation.observation.trades:
                 if trade not in self.endowment.trades:
                     self.process_trade(trade)
-                else:
-                    print(f"Trade {trade} already in endowment")
+                # else:
+                #     print(f"Trade {trade} already in endowment")
         simple_agent_state = SimpleAgentState.from_agent_and_observation(self, local_observation)
         self.input_history.append(AuctionInput(observation=local_observation, state=simple_agent_state))
         if update_message:
@@ -159,6 +159,77 @@ class SimpleAgent(LLMPromptContext, EconomicAgent):
             self.history = []
         self.history.append({"role": "user", "content": self.new_message})
         self.history.append({"role": "assistant", "content": llm_output.str_content or json.dumps(llm_output.json_object.object) if llm_output.json_object else "{}"})
+    
+    @classmethod
+    def from_agent(cls, 
+                   source_agent: Union[EconomicAgent, 'SimpleAgent'], 
+                   llm_config: Optional[LLMConfig] = None,
+                   reset_trades: bool = False,
+                   new_id: Optional[str] = None) -> 'SimpleAgent':
+        """
+        Initialize a SimpleAgent from another EconomicAgent or SimpleAgent.
+        
+        :param source_agent: The source agent to copy from
+        :param llm_config: Optional LLMConfig. If None and source is SimpleAgent, copy its LLM config
+        :param reset_trades: Whether to reset trades and make current basket the new starting basket
+        :param new_id: Optional new ID for the agent. If None, use the source agent's ID
+        :return: A new SimpleAgent instance
+        """
+        # Check if source is SimpleAgent and set control flow flag
+        is_simple_agent = isinstance(source_agent, SimpleAgent)
+
+        # Handle LLM config
+        if llm_config is None:
+            if is_simple_agent:
+                llm_config = source_agent.llm_config
+            else:
+                raise ValueError("LLMConfig must be provided when source is not a SimpleAgent")
+
+        # Deep copy the source agent
+        copied_agent = source_agent.model_copy(deep=True)
+
+        # Handle endowment and trade reset
+        new_endowment = copied_agent.endowment.model_copy(deep=True)
+        new_endowment.agent_id = new_id or copied_agent.id
+        if reset_trades:
+            new_endowment.initial_basket = new_endowment.current_basket
+            new_endowment.trades = []
+
+        # Prepare the new agent's data
+        new_data = {
+            "id": new_id or copied_agent.id,
+            "endowment": new_endowment,
+            "value_schedules": copied_agent.value_schedules,
+            "cost_schedules": copied_agent.cost_schedules,
+            "llm_config": llm_config,
+            "input_history": [],
+            "actions_history": [],
+            "history": None
+        }
+
+        # Copy additional SimpleAgent-specific attributes if source is SimpleAgent
+        if is_simple_agent:
+            new_data.update({
+                "system_string": source_agent.system_string,
+                "structured_output": source_agent.structured_output,
+                "use_schema_instruction": source_agent.use_schema_instruction,
+                "new_message": source_agent.new_message
+            })
+        else:
+            good_name = list(copied_agent.value_schedules.keys() or copied_agent.cost_schedules.keys())[0]
+            if copied_agent.is_buyer(good_name):
+                value = copied_agent.get_current_value(good_name)
+                profit_string = f"You can make a profit by buying at {value * 0.99} or lower" if value is not None else ""
+                new_data["new_message"] = f"You are a buyer of {good_name} and your current value is {value}. This is the first round of the market so there are no bids or asks yet. {profit_string}"
+                new_data["structured_output"] = BidTool()
+            else:
+                cost = copied_agent.get_current_cost(good_name)
+                profit_string = f"You can make a profit by selling at {cost * 1.01} or higher" if cost is not None else ""
+                new_data["new_message"] = f"You are a seller of {good_name} and your current cost is {cost}. This is the first round of the market so there are no bids or asks yet. {profit_string}"
+                new_data["structured_output"] = AskTool()
+
+        # Create and return the new SimpleAgent instance
+        return cls(**new_data)
 
 def create_simple_agent(agent_id: str, llm_config: LLMConfig, good: Good, is_buyer: bool, endowment: Endowment, starting_value:float, num_units:int=10):
     if is_buyer:
@@ -176,3 +247,5 @@ def create_simple_agent(agent_id: str, llm_config: LLMConfig, good: Good, is_buy
     return SimpleAgent(id=agent_id, llm_config=llm_config,structured_output=structured_output, endowment=endowment, value_schedules=value_schedules, cost_schedules=cost_schedules, new_message=new_message)
 
 
+def create_simple_agents_from_zi(agents: List[EconomicAgent], llm_config: LLMConfig) -> List[SimpleAgent]:
+    return [ SimpleAgent.from_agent(agent, llm_config,new_id="llm_clone_"+agent.id) for agent in agents]

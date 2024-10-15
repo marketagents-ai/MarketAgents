@@ -72,6 +72,7 @@ class StrObservation(LocalObservation):
 class LocalEnvironmentStep(BaseModel):
     """Represents the output of a single environment step for a single agent."""
     observation: LocalObservation
+    reward: Optional[float] = Field(default=None, description="Reward for the agent at this step")
     done: bool
     info: Dict[str, Any]
 
@@ -153,12 +154,12 @@ class ActionSpace(BaseModel):
         action_type = random.choice(self.allowed_actions)
         return action_type.sample(agent_id)
     
-    def get_action_schema(self) -> Type[BaseModel]:
+    def get_action_schema(self) -> Dict[str, Any]:
         """Get the schema for the allowed actions."""
         if not self.allowed_actions:
             raise ValueError("No allowed actions defined")
         # Assuming all allowed actions have the same schema
-        return self.allowed_actions[0].action_schema()  
+        return self.allowed_actions[0].model_json_schema() 
 
 class ObservationSpace(BaseModel):
     allowed_observations: List[Type[LocalObservation]] = Field(default_factory=list)
@@ -217,9 +218,9 @@ class MultiAgentEnvironment(BaseModel):
     Base class for multi-agent environments. With batched or sequential actions.
     """
     name: str = Field(..., description="Name of the environment")
-    address: str = Field(..., description="Address of the environment for orchestrator linking")
+    address: Optional[str] = Field(default=None, description="Address of the environment for orchestrator linking")
     current_step: int = Field(default=0, description="Current step/round of the simulation")
-    max_steps: int = Field(..., description="Maximum number of steps/rounds for this environment")
+    max_steps: int = Field(default=10, description="Maximum number of steps/rounds for this environment")
     action_space: ActionSpace = Field(default_factory=NotebookActionSpace, description="Action space of the environment")
     observation_space: ObservationSpace = Field(default_factory=NotebookObservationSpace, description="Observation space of the environment")
     history: EnvironmentHistory = Field(default_factory=EnvironmentHistory, description="History of environment steps")
