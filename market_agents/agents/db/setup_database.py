@@ -68,7 +68,8 @@ def create_tables(db_params):
         id SERIAL PRIMARY KEY,
         agent_id UUID REFERENCES agents(id),
         is_buyer BOOLEAN NOT NULL,
-        values JSONB NOT NULL,
+        values JSONB,
+        costs JSONB,
         initial_endowment JSONB,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )

@@ -13,11 +13,12 @@ from typing import Any, Dict, List
 
 import yaml
 from colorama import Fore, Style
+from market_agents.agents.db.setup_database import create_database, create_tables
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.agents.personas.persona import Persona, generate_persona, save_persona_to_file
 from market_agents.agents.protocols.acl_message import ACLMessage
-from market_agents.economics.econ_agent import create_economic_agent
-from market_agents.economics.econ_models import Ask, Bid, Trade
+from market_agents.economics.econ_agent import EconomicAgent
+from market_agents.economics.econ_models import Ask, Basket, Bid, BuyerPreferenceSchedule, Endowment, Good, SellerPreferenceSchedule, Trade
 from market_agents.environments.environment import EnvironmentStep, MultiAgentEnvironment
 from market_agents.environments.mechanisms.auction import (AuctionAction,
                                                            AuctionActionSpace,
@@ -30,7 +31,6 @@ from market_agents.inference.parallel_inference import (ParallelAIUtilities,
                                                         RequestLimits)
 from market_agents.insert_simulation_data import SimulationDataInserter
 from market_agents.logger_utils import *
-from market_agents.agents.db.setup_database import create_database, create_tables
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -63,7 +63,8 @@ logger.propagate = False
 
 class AgentConfig(BaseModel):
     num_units: int
-    base_value: float
+    buyer_base_value: float
+    seller_base_value: float
     use_llm: bool
     buyer_initial_cash: float
     buyer_initial_goods: int
@@ -181,16 +182,6 @@ class Orchestrator:
         self.latest_data = None
         self.trackers: Dict[str, AuctionTracker] = {}
         self.log_folder = Path("./outputs/interactions")
-        self.data_inserter = SimulationDataInserter()
-        oai_request_limits = RequestLimits(max_requests_per_minute=20000, max_tokens_per_minute=2000000)
-        anthropic_request_limits = RequestLimits(max_requests_per_minute=20000, max_tokens_per_minute=2000000)
-        self.ai_utils = ParallelAIUtilities(
-            oai_request_limits=oai_request_limits,
-            anthropic_request_limits=anthropic_request_limits
-        )
-        self.agent_surpluses = {}
-        self.agent_dict: Dict[str, MarketAgent] = {}  # Mapping from agent IDs to agents
-
         # Initialize database parameters from config
         self.db_params = {
             'dbname': self.config.database_config.db_name,
@@ -199,6 +190,15 @@ class Orchestrator:
             'host': self.config.database_config.db_host,
             'port': self.config.database_config.db_port
         }
+        self.data_inserter = SimulationDataInserter(self.db_params)
+        oai_request_limits = RequestLimits(max_requests_per_minute=20000, max_tokens_per_minute=2000000)
+        anthropic_request_limits = RequestLimits(max_requests_per_minute=20000, max_tokens_per_minute=2000000)
+        self.ai_utils = ParallelAIUtilities(
+            oai_request_limits=oai_request_limits,
+            anthropic_request_limits=anthropic_request_limits
+        )
+        self.agent_surpluses = {}
+        self.agent_dict: Dict[str, MarketAgent] = {}  # Mapping from agent IDs to agents
 
     def load_or_generate_personas(self) -> List[Persona]:
         personas_dir = Path("./market_agents/agents/personas/generated_personas")
@@ -240,51 +240,70 @@ class Orchestrator:
             if is_buyer:
                 initial_cash = agent_config.get('buyer_initial_cash', 1000)
                 initial_goods_quantity = agent_config.get('buyer_initial_goods', 0)
+                base_value = agent_config.get('buyer_base_value', 120.0)
             else:
                 initial_cash = agent_config.get('seller_initial_cash', 0)
                 initial_goods_quantity = agent_config.get('seller_initial_goods', 10)
+                base_value = agent_config.get('seller_base_value', 80.0)
 
             good_name = agent_config.get('good_name', 'apple')
             initial_goods = {good_name: initial_goods_quantity}
 
-            # Create economic agent
-            economic_agent = create_economic_agent(
-                agent_id=agent_uuid,
-                goods=[good_name],
-                buy_goods=[good_name] if is_buyer else [],
-                sell_goods=[good_name] if not is_buyer else [],
-                base_values={good_name: agent_config.get('base_value', 100)},
-                initial_cash=initial_cash,
-                initial_goods=initial_goods,
-                num_units=agent_config.get('num_units', 10),
-                noise_factor=agent_config.get('noise_factor', 0.1),
-                max_relative_spread=agent_config.get('max_relative_spread', 0.2),
+            # Create initial basket and endowment
+            initial_basket = Basket(
+                cash=initial_cash,
+                goods=[Good(name=good_name, quantity=initial_goods_quantity)]
+            )
+            endowment = Endowment(
+                initial_basket=initial_basket,
+                agent_id=agent_uuid
+            )
+
+            # Create preference schedules
+            if is_buyer:
+                value_schedules = {
+                    good_name: BuyerPreferenceSchedule(
+                        num_units=agent_config.get('num_units', 10),
+                        base_value=base_value,
+                        noise_factor=agent_config.get('noise_factor', 0.05)
+                    )
+                }
+                cost_schedules = {}
+            else:
+                value_schedules = {}
+                cost_schedules = {
+                    good_name: SellerPreferenceSchedule(
+                        num_units=agent_config.get('num_units', 10),
+                        base_value=base_value,
+                        noise_factor=agent_config.get('noise_factor', 0.05)
+                    )
+                }
+
+            economic_agent = EconomicAgent(
+                id=agent_uuid,
+                endowment=endowment,
+                value_schedules=value_schedules,
+                cost_schedules=cost_schedules,
+                max_relative_spread=agent_config.get('max_relative_spread', 0.2)
             )
 
             agent = MarketAgent.create(
                 agent_id=agent_uuid,
-                is_buyer=is_buyer,
-                num_units=agent_config.get('num_units', 10),
-                base_value=agent_config.get('base_value', 100),
                 use_llm=agent_config.get('use_llm', True),
-                initial_cash=initial_cash,
-                initial_goods=initial_goods_quantity,
-                good_name=good_name,
-                noise_factor=agent_config.get('noise_factor', 0.1),
-                max_relative_spread=agent_config.get('max_relative_spread', 0.2),
                 llm_config=llm_config,
                 environments=self.environments,
                 protocol=ACLMessage,
-                persona=persona
+                persona=persona,
+                econ_agent=economic_agent
             )
-            agent.economic_agent = economic_agent  # Assign the economic agent to the agent
+
             # Initialize last_perception and last_observation
             agent.last_perception = None
             agent.last_observation = None
             agent.last_step = None
-            agent.index = i  # For logging purposes
+            agent.index = i
             self.agents.append(agent)
-            self.agent_dict[agent.id] = agent  # Add to agent dictionary
+            self.agent_dict[agent.id] = agent
             log_agent_init(logger, agent.index, is_buyer, persona)
 
     def setup_environments(self):
@@ -319,75 +338,17 @@ class Orchestrator:
         # Create the database if it doesn't exist
         create_database(db_params=self.db_params)
         # Check if required tables exist
-        if not self.check_tables_exist():
+        if not self.data_inserter.check_tables_exist():
             create_tables(db_params=self.db_params)
-            # Optionally, insert test data if needed
-            # insert_test_data(db_params=self.db_params)
         else:
             logger.info("Required tables already exist.")
         logger.info("Database setup completed")
-
-    def check_tables_exist(self):
-        import psycopg2
-        conn = psycopg2.connect(
-            dbname=self.db_params['dbname'],
-            user=self.db_params['user'],
-            password=self.db_params['password'],
-            host=self.db_params['host'],
-            port=self.db_params['port']
-        )
-        cursor = conn.cursor()
-        # Check if the 'agents' table exists
-        cursor.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name=%s)", ('agents',))
-        exists = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
-        return exists
-
-    def insert_ai_requests(self, ai_requests):
-        requests_data = []
-        for request in ai_requests:
-            start_time = request.start_time
-            end_time = request.end_time
-            if isinstance(start_time, (float, int)):
-                start_time = datetime.fromtimestamp(start_time)
-            if isinstance(end_time, (float, int)):
-                end_time = datetime.fromtimestamp(end_time)
-
-            total_time = (end_time - start_time).total_seconds()
-
-            # Extract system message
-            system_message = next((msg['content'] for msg in request.completion_kwargs.get('messages', []) if msg['role'] == 'system'), None)
-
-            requests_data.append({
-                'prompt_context_id': str(request.source_id),
-                'start_time': start_time,
-                'end_time': end_time,
-                'total_time': total_time,
-                'model': request.completion_kwargs.get('model', ''),
-                'max_tokens': request.completion_kwargs.get('max_tokens', None),
-                'temperature': request.completion_kwargs.get('temperature', None),
-                'messages': request.completion_kwargs.get('messages', []),
-                'system': system_message,
-                'tools': request.completion_kwargs.get('tools', []),
-                'tool_choice': request.completion_kwargs.get('tool_choice', {}),
-                'raw_response': request.raw_result,
-                'completion_tokens': request.usage.completion_tokens if request.usage else None,
-                'prompt_tokens': request.usage.prompt_tokens if request.usage else None,
-                'total_tokens': request.usage.total_tokens if request.usage else None
-            })
-
-        if requests_data:
-            try:
-                self.data_inserter.insert_ai_requests(requests_data)
-            except Exception as e:
-                logging.error(f"Error inserting AI requests: {e}")
 
     async def run_parallel_ai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         results = await self.ai_utils.run_parallel_ai_completion(prompts, update_history=False)
         # Insert AI requests into the database
         ai_requests = self.ai_utils.get_all_requests()
-        self.insert_ai_requests(ai_requests)
+        self.data_inserter.insert_ai_requests(ai_requests)
         return results
 
     async def run_parallel_perceive(self, env_name: str) -> List[LLMPromptContext]:
@@ -513,261 +474,63 @@ class Orchestrator:
 
     def set_agent_system_messages(self, round_num: int, good_name: str):
         for agent in self.agents:
-            current_cash = agent.economic_agent.endowment.current_basket.cash
-            current_goods = agent.economic_agent.endowment.current_basket.goods_dict.get(good_name, 0)
+            current_cash = agent.economic_agent.current_cash
+            current_goods = agent.economic_agent.endowment.current_basket.get_good_quantity(good_name)
             if round_num == 1:
                 if agent.role == "buyer":
-                    # Use the value of purchasing one unit
-                    value_schedule = agent.economic_agent.value_schedules[good_name]
-                    current_value = value_schedule.get_value(1)
-                    suggested_price = current_value * 0.99
-                    agent.system = (
-                        f"This is the first round of the market so there are no bids or asks yet. "
-                        f"You have {current_cash:.2f} cash and {current_goods} units of {good_name}. "
-                        f"You can make a profit by buying at {suggested_price:.2f} or lower."
-                    )
-                elif agent.role == "seller":
-                    if current_goods <= 0:
-                        agent.system = f"You have no {good_name} to sell."
-                    else:
-                        cost_schedule = agent.economic_agent.cost_schedules[good_name]
-                        current_cost = cost_schedule.get_value(1)
-                        suggested_price = current_cost * 1.01
+                    current_value = agent.economic_agent.get_current_value(good_name)
+                    if current_value is not None:
+                        suggested_price = current_value * 0.99
                         agent.system = (
                             f"This is the first round of the market so there are no bids or asks yet. "
                             f"You have {current_cash:.2f} cash and {current_goods} units of {good_name}. "
-                            f"You can make a profit by selling at {suggested_price:.2f} or higher."
+                            f"You can make a profit by buying at {suggested_price:.2f} or lower."
                         )
-            else:
-                # Use marginal value and cost calculations for subsequent rounds
-                if agent.role == "buyer":
-                    value_schedule = agent.economic_agent.value_schedules[good_name]
-                    value_q_plus_1 = value_schedule.get_value(current_goods + 1)
-                    value_q = value_schedule.get_value(current_goods)
-                    marginal_value = value_q_plus_1 - value_q
-                    suggested_price = marginal_value * 0.99
-                    agent.system = (
-                        f"Your current cash: {current_cash:.2f}, goods: {current_goods}. "
-                        f"Your marginal value for the next unit of {good_name} is {marginal_value:.2f}. "
-                        f"You can make a profit by buying at {suggested_price:.2f} or lower."
-                    )
+                    else:
+                        agent.system = f"You have reached your maximum quantity for {good_name}."
                 elif agent.role == "seller":
                     if current_goods <= 0:
                         agent.system = f"You have no {good_name} to sell."
                     else:
-                        cost_schedule = agent.economic_agent.cost_schedules[good_name]
-                        cost_q = cost_schedule.get_value(current_goods)
-                        cost_q_minus_1 = cost_schedule.get_value(current_goods - 1)
-                        marginal_cost = cost_q - cost_q_minus_1
-                        suggested_price = marginal_cost * 1.01
+                        current_cost = agent.economic_agent.get_current_cost(good_name)
+                        if current_cost is not None:
+                            suggested_price = current_cost * 1.01
+                            agent.system = (
+                                f"This is the first round of the market so there are no bids or asks yet. "
+                                f"You have {current_cash:.2f} cash and {current_goods} units of {good_name}. "
+                                f"You can make a profit by selling at {suggested_price:.2f} or higher."
+                            )
+                        else:
+                            agent.system = f"You have no more {good_name} to sell."
+            else:
+                if agent.role == "buyer":
+                    marginal_value = agent.economic_agent.get_current_value(good_name)
+                    if marginal_value is not None:
+                        suggested_price = marginal_value * 0.99
                         agent.system = (
                             f"Your current cash: {current_cash:.2f}, goods: {current_goods}. "
-                            f"Your marginal cost for selling the next unit of {good_name} is {marginal_cost:.2f}. "
-                            f"You can make a profit by selling at {suggested_price:.2f} or higher."
-                    )
+                            f"Your marginal value for the next unit of {good_name} is {marginal_value:.2f}. "
+                            f"You can make a profit by buying at {suggested_price:.2f} or lower."
+                        )
+                    else:
+                        agent.system = f"You have reached your maximum quantity for {good_name}."
+                elif agent.role == "seller":
+                    if current_goods <= 0:
+                        agent.system = f"You have no {good_name} to sell."
+                    else:
+                        marginal_cost = agent.economic_agent.get_current_cost(good_name)
+                        if marginal_cost is not None:
+                            suggested_price = marginal_cost * 1.01
+                            agent.system = (
+                                f"Your current cash: {current_cash:.2f}, goods: {current_goods}. "
+                                f"Your marginal cost for selling the next unit of {good_name} is {marginal_cost:.2f}. "
+                                f"You can make a profit by selling at {suggested_price:.2f} or higher."
+                            )
+                        else:
+                            agent.system = f"You have no more {good_name} to sell."
 
-
-    def insert_round_data(self, round_num):
-        logging.info(f"Starting data insertion for round {round_num}")
-
-        try:
-            # Agents data
-            logging.info("Preparing agents data")
-            agents_data = [
-                {
-                    'id': str(agent.id),
-                    'role': agent.role,
-                    'is_llm': agent.use_llm,
-                    'max_iter': self.config.max_rounds,
-                    'llm_config': agent.llm_config if isinstance(agent.llm_config, dict) else agent.llm_config.dict()
-                }
-                for agent in self.agents
-            ]
-            logging.info(f"Inserting {len(agents_data)} agents")
-            agent_id_map = self.data_inserter.insert_agents(agents_data)
-            logging.info("Agents insertion complete")
-
-            # Memories data
-            logging.info("Preparing memories data")
-            memories_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'step_id': round_num,
-                    'memory_data': serialize_memory_data(agent.memory[-1]) if agent.memory else {}
-                }
-                for agent in self.agents
-            ]
-            logging.info(f"Inserting {len(memories_data)} memories")
-            self.data_inserter.insert_agent_memories(memories_data)
-            logging.info("Memories insertion complete")
-
-            # Allocations data
-            logging.info("Preparing allocations data")
-            allocations_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'goods': agent.economic_agent.endowment.current_basket.goods_dict.get(self.config.agent_config.good_name, 0),
-                    'cash': agent.economic_agent.endowment.current_basket.cash,
-                    'locked_goods': getattr(agent.economic_agent, 'locked_goods', {}).get(self.config.agent_config.good_name, 0),
-                    'locked_cash': getattr(agent.economic_agent, 'locked_cash', 0),
-                    'initial_goods': agent.economic_agent.endowment.initial_basket.goods_dict.get(self.config.agent_config.good_name, 0),
-                    'initial_cash': agent.economic_agent.endowment.initial_basket.cash
-                }
-                for agent in self.agents
-            ]
-            logging.info(f"Inserting {len(allocations_data)} allocations")
-            self.data_inserter.insert_allocations(allocations_data, agent_id_map)
-            logging.info("Allocations insertion complete")
-
-            logging.info("Preparing schedules data")
-            schedules_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'is_buyer': agent.role == "buyer",
-                    'values': agent.economic_agent.value_schedules.get(self.config.agent_config.good_name, {}),
-                    'initial_endowment': agent.economic_agent.endowment.initial_basket
-                }
-                for agent in self.agents
-            ]
-            logging.info(f"Inserting {len(schedules_data)} schedules")
-            self.data_inserter.insert_schedules(schedules_data)
-            logging.info("Schedules insertion complete")
-
-            # Orders data
-            logging.info("Preparing orders data")
-            orders_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'is_buy': isinstance(order, Bid),
-                    'quantity': order.quantity,
-                    'price': order.price,
-                    'base_value': getattr(order, 'base_value', None),
-                    'base_cost': getattr(order, 'base_cost', None)
-                }
-                for agent in self.agents
-                for order in agent.economic_agent.pending_orders.get(self.config.agent_config.good_name, [])
-            ]
-            logging.info(f"Inserting {len(orders_data)} orders")
-            self.data_inserter.insert_orders(orders_data, agent_id_map)
-            logging.info("Orders insertion complete")
-
-            # Interactions data
-            logging.info("Preparing interactions data")
-            interactions_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'round': round_num,
-                    'task': interaction['type'],
-                    'response': serialize_memory_data(interaction['content'])
-                }
-                for agent in self.agents
-                for interaction in agent.interactions
-            ]
-            logging.info(f"Inserting {len(interactions_data)} interactions")
-            self.data_inserter.insert_interactions(interactions_data, agent_id_map)
-            logging.info("Interactions insertion complete")
-
-            # Reflections data
-            logging.info("Preparing reflections data")
-            observations_data = []
-            reflections_data = []
-            for agent in self.agents:
-                if agent.memory and agent.memory[-1]['type'] == 'reflection':
-                    reflection = agent.memory[-1]
-                    observation = reflection.get('observation')
-                    observation_serialized = serialize_memory_data(observation)
-                    observations_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'observation': observation_serialized
-                    })
-                    reflections_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'reflection': reflection.get('content', ''),
-                        'self_reward': reflection.get('self_reward', 0),
-                        'environment_reward': reflection.get('environment_reward', 0),
-                        'total_reward': reflection.get('total_reward', 0),
-                        'strategy_update': reflection.get('strategy_update', '')
-                    })
-            logging.info(f"inserting {len(observations_data)} observations")
-            self.data_inserter.insert_observations(observations_data, agent_id_map)
-            logging.info(f"Inserting {len(reflections_data)} reflections")
-            self.data_inserter.insert_reflections(reflections_data, agent_id_map)
-            logging.info("Reflections insertion complete")
-
-            # Perceptions data
-            logging.info("Preparing perceptions data")
-            perceptions_data = []
-            for agent in self.agents:
-                if agent.last_perception is not None:
-                    perceptions_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'monologue': str(agent.last_perception.get('monologue')),
-                        'strategy': str(agent.last_perception.get('strategy')),
-                        'confidence': agent.last_perception.get('confidence', 0)
-                    })
-
-            if perceptions_data:
-                logging.info(f"Inserting {len(perceptions_data)} perceptions")
-                self.data_inserter.insert_perceptions(perceptions_data, agent_id_map)
-                logging.info("Perceptions insertion complete")
-            else:
-                logging.info("No perceptions to insert")
-
-                    # Now, prepare actions data
-            logging.info("Preparing actions data")
-            actions_data = []
-            for agent in self.agents:
-                # Assuming each agent has a last_action attribute that stores the LLM output
-                if hasattr(agent, 'last_action') and agent.last_action:
-                    actions_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'action': agent.last_action
-                    })
-            
-            logging.info(f"Inserting {len(actions_data)} actions")
-            self.data_inserter.insert_actions(actions_data, agent_id_map)
-            logging.info("Actions insertion complete")
-
-            # Trades data
-            logging.info("Preparing trades data")
-            trades_data = []
-            for env_name, tracker in self.trackers.items():
-                for trade in tracker.all_trades:
-                    buyer_id = str(trade.buyer_id)
-                    seller_id = str(trade.seller_id)
-                    buyer = self.agent_dict.get(buyer_id)
-                    seller = self.agent_dict.get(seller_id)
-                    if buyer and seller:
-                        buyer_surplus = buyer.economic_agent.calculate_individual_surplus()
-                        seller_surplus = seller.economic_agent.calculate_individual_surplus()
-                        total_surplus = buyer_surplus + seller_surplus
-
-                        trades_data.append({
-                            'buyer_id': buyer_id,
-                            'seller_id': seller_id,
-                            'quantity': trade.quantity,
-                            'price': trade.price,
-                            'buyer_surplus': buyer_surplus,
-                            'seller_surplus': seller_surplus,
-                            'total_surplus': total_surplus,
-                            'round': round_num
-                        })
-
-            if trades_data:
-                logging.info(f"Inserting {len(trades_data)} trades")
-                self.data_inserter.insert_trades(trades_data, agent_id_map)
-                logging.info("Trades insertion complete")
-            else:
-                logging.info("No trades to insert")
-
-        except Exception as e:
-            logging.error(f"Error inserting data for round {round_num}: {str(e)}")
-            logging.exception("Exception details:")
-            raise
+    def insert_ai_requests(self, ai_requests):
+        self.data_inserter.insert_ai_requests(ai_requests)
 
     async def run_simulation(self):
         import traceback
@@ -830,7 +593,7 @@ class Orchestrator:
 
                 # Insert data after each round
                 try:
-                    self.insert_round_data(round_num)
+                    self.data_inserter.insert_round_data(round_num, self.agents, self.agent_dict, self.trackers, self.config)
                     logger.info(f"Data for round {round_num} inserted successfully.")
                 except Exception as e:
                     logger.error(f"Error inserting data for round {round_num}: {str(e)}")
@@ -1027,6 +790,7 @@ class Orchestrator:
 
         if self.dashboard:
             dashboard_thread.join()
+
 
 if __name__ == "__main__":
     config = load_config()

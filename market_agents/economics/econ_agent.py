@@ -19,6 +19,18 @@ from market_agents.economics.econ_models import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
+
+class ZiParams(BaseModel):
+    id: str
+    initial_cash: float
+    initial_goods: Dict[str, int]
+    base_values: Dict[str, float]
+    num_units: int
+    noise_factor: float
+    max_relative_spread: float
+    is_buyer: bool
+
 class EconomicAgent(BaseModel):
     id: str
     endowment: Endowment
@@ -26,6 +38,61 @@ class EconomicAgent(BaseModel):
     cost_schedules: Dict[str, SellerPreferenceSchedule] = Field(default_factory=dict)
     max_relative_spread: float = Field(default=0.2)
     pending_orders: Dict[str, List[MarketAction]] = Field(default_factory=dict)
+    archived_endowments: List[Endowment] = Field(default_factory=list)
+
+    def archive_endowment(self, new_basket: Optional[Basket]=None):
+        #first we model_copy the current endowment and we add the copy to the list
+        #then we model_copy the current endowment with a new endowment without trades
+        self.archived_endowments.append(self.endowment.model_copy(deep=True))
+        if new_basket is None:
+            new_endowment = self.endowment.model_copy(deep=True,update={"trades":[]})
+        else:
+            new_endowment = self.endowment.model_copy(deep=True,update={"trades":[],"initial_basket":new_basket})
+        self.endowment = new_endowment
+
+    @classmethod
+    def from_zi_params(cls, params: ZiParams) -> 'EconomicAgent':
+        initial_goods_list = [
+            Good(name=name, quantity=quantity)
+            for name, quantity in params.initial_goods.items()
+        ]
+        
+        initial_basket = Basket(
+            cash=params.initial_cash,
+            goods=initial_goods_list
+        )
+        
+        endowment = Endowment(
+            initial_basket=initial_basket,
+            agent_id=params.id
+        )
+        
+        if params.is_buyer:
+            value_schedules = {
+                good: BuyerPreferenceSchedule(
+                    num_units=params.num_units,
+                    base_value=value,
+                    noise_factor=params.noise_factor
+                ) for good, value in params.base_values.items()
+            }
+            cost_schedules = {}
+        else:
+            value_schedules = {}
+            cost_schedules = {
+                good: SellerPreferenceSchedule(
+                    num_units=params.num_units,
+                    base_value=value,
+                    noise_factor=params.noise_factor
+                ) for good, value in params.base_values.items()
+            }
+        
+        return cls(
+            id=params.id,
+            endowment=endowment,
+            value_schedules=value_schedules,
+            cost_schedules=cost_schedules,
+            max_relative_spread=params.max_relative_spread
+        )
 
     @model_validator(mode='after')
     def validate_schedules(self):
@@ -86,7 +153,6 @@ class EconomicAgent(BaseModel):
         total_quantity = int(current_quantity + pending_quantity)
         if total_quantity > self.value_schedules[good_name].num_units:
             return None
-        print(f"total_quantity: {total_quantity}")
         return total_quantity+1
 
     
@@ -204,11 +270,13 @@ class EconomicAgent(BaseModel):
                     del self.pending_orders[trade.good_name]
             else:
                 raise ValueError(f"Trade {trade.trade_id} processed but matching ask not found for agent {self.id}")
-        
+        else:
+            raise ValueError(f"Agent is neither a buyer nor a seller for trade {trade}")
         # Only update the endowment after passing the value error checks
+        old_utility = self.calculate_utility(self.endowment.current_basket)
         self.endowment.add_trade(trade)
         new_utility = self.calculate_utility(self.endowment.current_basket)
-        logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}")
+        # logger.info(f"Agent {self.id} processed trade. New utility: {new_utility:.2f}, old utility: {old_utility:.2f}, trades in endowment: {self.endowment.trades}, current basket: {self.endowment.current_basket} starting basket: {self.endowment.initial_basket}")
 
     def reset_pending_orders(self,good_name:str):
         self.pending_orders[good_name] = []
@@ -241,7 +309,6 @@ class EconomicAgent(BaseModel):
     def calculate_individual_surplus(self) -> float:
         current_utility = self.calculate_utility(self.endowment.current_basket)
         surplus = current_utility - self.initial_utility
-        print(f"current_utility: {current_utility}, initial_utility: {self.initial_utility}, surplus: {surplus}")
         return surplus
 
 
@@ -293,50 +360,73 @@ class EconomicAgent(BaseModel):
         self.calculate_individual_surplus()
 
 
-def create_economic_agent(
-    agent_id: str,
-    goods: List[str],
-    buy_goods: List[str],
-    sell_goods: List[str],
-    base_values: Dict[str, float],
-    initial_cash: float,
-    initial_goods: Dict[str, int],
-    num_units: int = 20,
-    noise_factor: float = 0.1,
-    max_relative_spread: float = 0.2,
-) -> EconomicAgent:
-    initial_goods_list = [Good(name=name, quantity=quantity) for name, quantity in initial_goods.items()]
-    initial_basket = Basket(
-        cash=initial_cash,
-        goods=initial_goods_list
-    )
-    endowment = Endowment(
-        initial_basket=initial_basket,
-        agent_id=agent_id
-    )
-
-    value_schedules = {
-        good: BuyerPreferenceSchedule(
-            num_units=num_units,
-            base_value=base_values[good],
-            noise_factor=noise_factor
-        ) for good in buy_goods
-    }
-    cost_schedules = {
-        good: SellerPreferenceSchedule(
-            num_units=num_units,
-            base_value=base_values[good] * 0.7,  # Set seller base value lower than buyer base value
-            noise_factor=noise_factor
-        ) for good in sell_goods
-    }
-
-    return EconomicAgent(
-        id=agent_id,
-        endowment=endowment,
-        value_schedules=value_schedules,
-        cost_schedules=cost_schedules,
-        max_relative_spread=max_relative_spread
-    )
+class ZiFactory(BaseModel):
+    id: str
+    goods: List[str]
+    num_buyers: int
+    num_sellers: int
+    buyer_params: ZiParams
+    seller_params: ZiParams
+    
+    @computed_field
+    @cached_property
+    def agents(self) -> List[EconomicAgent]:
+        return self.buyers + self.sellers
+    
+    @computed_field
+    @cached_property
+    def buyers(self) -> List[EconomicAgent]:
+        return [self.create_buyer(i) for i in range(self.num_buyers)]
+    
+    @computed_field
+    @cached_property
+    def sellers(self) -> List[EconomicAgent]:
+        return [self.create_seller(i) for i in range(self.num_sellers)]
+    
+    def create_buyer(self, index: int) -> EconomicAgent:
+        params = self.buyer_params.model_copy(update={'id': f"buyer_{index}_{self.id}", 'is_buyer': True})
+        return EconomicAgent.from_zi_params(params)
+    
+    def create_seller(self, index: int) -> EconomicAgent:
+        params = self.seller_params.model_copy(update={'id': f"seller_{index}_{self.id}", 'is_buyer': False})
+        return EconomicAgent.from_zi_params(params)
+    
+def simulate_trading(buyers: List[EconomicAgent], sellers: List[EconomicAgent], goods: List[str], max_attempts: int = 1000):
+    trade_ids = {good: 0 for good in goods}
+    
+    for good in goods:
+        print(f"\nTrading {good}:")
+        for attempt in range(max_attempts):
+            for buyer in buyers:
+                for seller in sellers:
+                    buyer_value = buyer.get_current_value(good)
+                    seller_cost = seller.get_current_cost(good)
+                    if buyer_value is not None and seller_cost is not None:
+                        if buyer_value >= seller_cost:
+                            bid = buyer.generate_bid(good)
+                            ask = seller.generate_ask(good)
+                            if bid and ask:
+                                if bid.price >= ask.price:
+                                    trade_price = (bid.price + ask.price) / 2
+                                    trade = Trade(
+                                        trade_id=trade_ids[good],
+                                        buyer_id=buyer.id,
+                                        seller_id=seller.id,
+                                        price=trade_price,
+                                        quantity=1,
+                                        good_name=good,
+                                        bid_price=bid.price,
+                                        ask_price=ask.price
+                                    )
+                                    print(f"  Trade executed: Price {good} = {trade_price:.2f}, Quantity = 1")
+                                    
+                                    buyer.process_trade(trade)
+                                    seller.process_trade(trade)
+                                    trade_ids[good] += 1
+                        else:
+                            print(f"  No match found for {good} at attempt {attempt} because buyer_value {buyer_value} < seller_cost {seller_cost}")
+    
+    return trade_ids
 
 if __name__ == "__main__":
     # Set up logging for the main script
@@ -347,81 +437,61 @@ if __name__ == "__main__":
     
     # Define parameters for creating economic agents
     goods = ["apple", "banana"]
-    base_values = {"apple": 20.0, "banana": 16.0}  # Increased base values for buyers
-    initial_cash = 10000.0
-    initial_goods = {"apple": 0, "banana": 0}
-
-    # Create agents
-    buyer = create_economic_agent(
-        agent_id="agent_1",
-        goods=goods,
-        buy_goods=["apple", "banana"],
-        sell_goods=[],
-        base_values=base_values,
-        initial_cash=initial_cash,
-        initial_goods=initial_goods,
+    
+    buyer_params = ZiParams(
+        id="buyer_template",
+        initial_cash=10000.0,
+        initial_goods={"apple": 0, "banana": 0},
+        base_values={"apple": 100.0, "banana": 100.0},
         num_units=20,
         noise_factor=0.05,
-        max_relative_spread=0.2
+        max_relative_spread=0.2,
+        is_buyer=True
     )
-
-    seller = create_economic_agent(
-        agent_id="agent_2",
-        goods=goods,
-        buy_goods=[],
-        sell_goods=["apple", "banana"],
-        base_values={"apple": 15.0, "banana": 12.0},  # Lower base values for sellers
+    
+    seller_params = ZiParams(
+        id="seller_template",
         initial_cash=0,
         initial_goods={"apple": 20, "banana": 20},
+        base_values={"apple": 50, "banana": 50},
         num_units=20,
         noise_factor=0.05,
-        max_relative_spread=0.2
+        max_relative_spread=0.2,
+        is_buyer=False
     )
+    
+    factory = ZiFactory(
+        id="market_1",
+        goods=goods,
+        num_buyers=1,
+        num_sellers=1,
+        buyer_params=buyer_params,
+        seller_params=seller_params
+    )
+    
+    buyers = factory.buyers
+    sellers = factory.sellers
 
     # Print initial status
     print("Initial Status:")
-    buyer.print_status()
-    seller.print_status()
+    for buyer in buyers:
+        buyer.print_status()
+    for seller in sellers:
+        seller.print_status()
 
-    # Generate bids and asks until a match is found or max attempts reached
-    trade_ids = {good:0 for good in goods}
-    max_attempts = 1000
-    for good in goods:
-        print(f"\nTrading {good}:")
-        for attempt in range(max_attempts):
-            buyer_value = buyer.get_current_value(good)
-            seller_cost = seller.get_current_cost(good)
-            if buyer_value is not None and seller_cost is not None:
-                if buyer_value >= seller_cost:
-                    bid = buyer.generate_bid(good)
-                    ask = seller.generate_ask(good)
-                    if bid and ask:
-                        if bid.price >= ask.price:
-                            trade_price = (bid.price + ask.price) / 2
-                            trade = Trade(
-                                trade_id=trade_ids[good],
-                                buyer_id=buyer.id,
-                                seller_id=seller.id,
-                                price=trade_price,
-                                quantity=1,
-                                good_name=good,
-                                bid_price=bid.price,
-                                ask_price=ask.price
-                            )
-                            print(f"  Trade executed: Price good:{good}= {trade_price:.2f}, Quantity = 1")
-                            
-                            buyer.process_trade(trade)
-                            seller.process_trade(trade)
-                            trade_ids[good] += 1
-                else:
-                    print(f"  No match found for {good} at attempt {attempt} because buyer_value {buyer_value} < seller_cost {seller_cost}")
-                    break
-
+    # Simulate trading
+    trade_ids = simulate_trading(buyers, sellers, goods)
 
     # Print final status
     print("\nFinal Status:")
-    buyer.print_status()
-    seller.print_status()
+    for buyer in buyers:
+        buyer.print_status()
+    for seller in sellers:
+        seller.print_status()
+    
     print("trade_ids: ", trade_ids)
-    print("buyer surplus: ", buyer.calculate_individual_surplus())
-    print("seller surplus: ", seller.calculate_individual_surplus())
+    
+    for buyer in buyers:
+        print(f"buyer {buyer.id} surplus: ", buyer.calculate_individual_surplus())
+    for seller in sellers:
+        print(f"seller {seller.id} surplus: ", seller.calculate_individual_surplus())

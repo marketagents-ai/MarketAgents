@@ -4,78 +4,50 @@ from market_agents.agents.market_schemas import PerceptionSchema, ReflectionSche
 from pydantic import Field
 from market_agents.agents.base_agent.agent import Agent as LLMAgent
 from market_agents.inference.message_models import LLMConfig, LLMPromptContext
-from market_agents.economics.econ_agent import EconomicAgent, create_economic_agent
+from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.environments.environment import MultiAgentEnvironment, LocalObservation
 from market_agents.agents.protocols.protocol import Protocol
 from market_agents.agents.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
 from market_agents.agents.personas.persona import Persona
 
-class MarketAgent(LLMAgent, EconomicAgent):
+
+class MarketAgent(LLMAgent):
     memory: List[Dict[str, Any]] = Field(default_factory=list)
     last_perception: Optional[Dict[str, Any]] = None
     last_action: Optional[Dict[str, Any]] = None
     last_observation: Optional[LocalObservation] = Field(default_factory=dict)
     environments: Dict[str, MultiAgentEnvironment] = Field(default_factory=dict)
-    protocol: Type[Protocol] = Field(..., description="Communication protocol class")
+    protocol: Optional[Type[Protocol]] = None
     address: str = Field(default="", description="Agent's address")
     prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
+    economic_agent: Optional[EconomicAgent] = None
 
     @classmethod
     def create(
         cls,
-        agent_id: int,
-        is_buyer: bool,
-        num_units: int,
-        base_value: float,
+        agent_id: str,
         use_llm: bool,
-        initial_cash: float,
-        initial_goods: int,
-        good_name: str,
-        noise_factor: float = 0.1,
-        max_relative_spread: float = 0.2,
         llm_config: Optional[LLMConfig] = None,
-        environments: Dict[str, MultiAgentEnvironment] = {},
+        environments: Optional[Dict[str, MultiAgentEnvironment]] = None,
         protocol: Optional[Type[Protocol]] = None,
-        persona: Optional[Persona] = None
+        persona: Optional[Persona] = None,
+        econ_agent: Optional[EconomicAgent] = None,
     ) -> 'MarketAgent':
-    
-        econ_agent = create_economic_agent(
-            agent_id=str(agent_id),
-            goods=[good_name],
-            buy_goods=[good_name] if is_buyer else [],
-            sell_goods=[] if is_buyer else [good_name],
-            base_values={good_name: base_value},
-            initial_cash=initial_cash,
-            initial_goods={good_name: initial_goods},
-            num_units=num_units,
-            noise_factor=noise_factor,
-            max_relative_spread=max_relative_spread
-        )
-    
-        role = "buyer" if is_buyer else "seller"
-        llm_agent = LLMAgent(
-            id=str(agent_id),
-            role=role,
+
+        agent = cls(
+            id=agent_id,
+            role=persona.role if persona else "agent",
             persona=persona.persona if persona else None,
             objectives=persona.objectives if persona else None,
-            llm_config=llm_config or LLMConfig()
-        )
-
-        return cls(
-            id=str(agent_id),
-            preference_schedule=econ_agent.value_schedules[good_name] if is_buyer else econ_agent.cost_schedules[good_name],
-            endowment=econ_agent.endowment,
-            utility_function=econ_agent.calculate_utility,
-            max_relative_spread=econ_agent.max_relative_spread,
-            use_llm=use_llm, 
-            address=f"agent_{agent_id}_address",
+            llm_config=llm_config or LLMConfig(),
             environments=environments or {},
             protocol=protocol,
-            role=llm_agent.role,
-            persona=llm_agent.persona,
-            objectives=llm_agent.objectives,
-            llm_config=llm_agent.llm_config,
+            address=f"agent_{agent_id}_address",
+            use_llm=use_llm,
+            economic_agent=econ_agent,
         )
+
+        return agent
 
     async def perceive(
             self,
@@ -162,7 +134,6 @@ class MarketAgent(LLMAgent, EconomicAgent):
 
         if last_step:
             reward = last_step.info.get('agent_rewards', {}).get(self.id, 0.0)
-            # Ensure reward is a float and handle None
             if reward is None:
                 reward = 0.0
             local_observation = last_step.global_observation.observations.get(self.id)
@@ -172,15 +143,20 @@ class MarketAgent(LLMAgent, EconomicAgent):
                 observation = {}
         else:
             observation = {}
-            reward = 0.0  # Default to 0.0 if no last_step
+            reward = 0.0
 
         environment_info = environment.get_global_state()
-        previous_strategy = "No previous strategy available"
+        previous_strategy = None
         if self.memory:
             for memory_item in reversed(self.memory):
                 if 'strategy_update' in memory_item:
                     previous_strategy = memory_item['strategy_update']
                     break
+        
+        if previous_strategy is None:
+            previous_strategy = "No previous strategy available"
+        elif isinstance(previous_strategy, list):
+            previous_strategy = " ".join(previous_strategy)
 
         variables = AgentPromptVariables(
             environment_name=environment_name,
@@ -203,16 +179,14 @@ class MarketAgent(LLMAgent, EconomicAgent):
             self_reward = response.get("self_reward", 0.0)
             environment_reward = reward if reward is not None else 0.0
 
-            # Simple normalization of environment_reward
             normalized_environment_reward = environment_reward / (1 + environment_reward)
             normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
 
-            # Combine with self_reward using weighted average
             total_reward = (
                 normalized_environment_reward * environment_reward_weight +
                 self_reward * self_reward_weight
             )
-            # Store in memory
+            
             self.memory.append({
                 "type": "reflection",
                 "content": response.get("reflection", ""),
