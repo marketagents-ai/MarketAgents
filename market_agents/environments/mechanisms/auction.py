@@ -59,6 +59,10 @@ class AuctionGlobalObservation(GlobalObservation):
 class AuctionActionSpace(ActionSpace):
     allowed_actions: List[Type[LocalAction]] = [AuctionAction]
 
+    @classmethod
+    def get_action_schema(cls) -> Dict[str, Any]:
+        return MarketAction.model_json_schema()
+
 class AuctionObservationSpace(ObservationSpace):
     allowed_observations: List[Type[LocalObservation]] = [AuctionLocalObservation]
 
