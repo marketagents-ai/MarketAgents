@@ -1,4 +1,4 @@
-# econ_models.py
+# stock_models.py
 
 from pydantic import BaseModel, Field, computed_field, model_validator
 from functools import cached_property
@@ -7,9 +7,9 @@ from enum import Enum
 from copy import deepcopy
 from datetime import datetime
 import os
-from pathlib import Path
 import json
 import tempfile
+from pathlib import Path
 
 
 class SavableBaseModel(BaseModel):
@@ -49,10 +49,12 @@ class SavableBaseModel(BaseModel):
                 print(f"File contents:\n{f.read()}")
             raise
 
+
 class OrderType(str, Enum):
     BUY = "buy"
     SELL = "sell"
     HOLD = "hold"
+
 
 class MarketAction(BaseModel):
     order_type: OrderType = Field(..., description="Type of order: 'buy', 'sell', or 'hold'")
@@ -63,13 +65,14 @@ class MarketAction(BaseModel):
     def validate_order_type_and_fields(self):
         if self.order_type == OrderType.HOLD:
             if self.price is not None or self.quantity is not None:
-                raise ValueError("price and quantity must be None for 'hold' orders")
+                raise ValueError("Price and quantity must be None for 'hold' orders")
         else:
             if self.price is None or self.quantity is None:
-                raise ValueError("price and quantity must be specified for 'buy' and 'sell' orders")
+                raise ValueError("Price and quantity must be specified for 'buy' and 'sell' orders")
             if self.price <= 0 or self.quantity <= 0:
-                raise ValueError("price and quantity must be positive for 'buy' and 'sell' orders")
+                raise ValueError("Price and quantity must be positive for 'buy' and 'sell' orders")
         return self
+
 
 class StockOrder(MarketAction):
     agent_id: str
@@ -78,6 +81,7 @@ class StockOrder(MarketAction):
     @property
     def is_buy_order(self) -> bool:
         return self.order_type == OrderType.BUY
+
 
 class Trade(BaseModel):
     trade_id: int = Field(..., description="Unique identifier for the trade")
@@ -97,29 +101,68 @@ class Trade(BaseModel):
         return self
 
 
+class Position(BaseModel):
+    quantity: int
+    purchase_price: float
+
+
 class Stock(BaseModel):
     symbol: str
-    quantity: int
+    positions: List[Position] = Field(default_factory=list)
+
+    def total_quantity(self) -> int:
+        return sum(position.quantity for position in self.positions)
+
+    def average_cost(self) -> float:
+        total_quantity = self.total_quantity()
+        if total_quantity == 0:
+            return 0.0
+        total_cost = sum(position.quantity * position.purchase_price for position in self.positions)
+        return total_cost / total_quantity
 
 
 class Portfolio(BaseModel):
     cash: float
-    stocks: List[Stock]
+    stocks: List[Stock] = Field(default_factory=list)
 
     @computed_field
     @cached_property
     def stocks_dict(self) -> Dict[str, int]:
-        return {stock.symbol: stock.quantity for stock in self.stocks}
+        return {stock.symbol: stock.total_quantity() for stock in self.stocks}
 
-    def update_stock(self, symbol: str, quantity: int):
-        for stock in self.stocks:
-            if stock.symbol == symbol:
-                stock.quantity = quantity
+    def update_stock(self, symbol: str, quantity: int, purchase_price: Optional[float] = None):
+        stock = next((s for s in self.stocks if s.symbol == symbol), None)
+        if stock is None:
+            if quantity > 0:
+                stock = Stock(symbol=symbol, positions=[])
+                self.stocks.append(stock)
+            else:
                 return
-        self.stocks.append(Stock(symbol=symbol, quantity=quantity))
+        if stock is not None:
+            if purchase_price is not None and quantity > 0:
+                stock.positions.append(Position(quantity=quantity, purchase_price=purchase_price))
+            elif quantity < 0:
+                self.sell_stock_positions(stock, -quantity)
+            if stock.total_quantity() == 0:
+                self.stocks.remove(stock)
+
+    def sell_stock_positions(self, stock: Stock, quantity_to_sell: int):
+        positions = stock.positions
+        quantity_remaining = quantity_to_sell
+        while quantity_remaining > 0 and positions:
+            position = positions[0]
+            if position.quantity > quantity_remaining:
+                position.quantity -= quantity_remaining
+                quantity_remaining = 0
+            else:
+                quantity_remaining -= position.quantity
+                positions.pop(0)
 
     def get_stock_quantity(self, symbol: str) -> int:
-        return next((stock.quantity for stock in self.stocks if stock.symbol == symbol), 0)
+        stock = next((s for s in self.stocks if s.symbol == symbol), None)
+        if stock:
+            return stock.total_quantity()
+        return 0
 
 
 class Endowment(BaseModel):
@@ -135,17 +178,21 @@ class Endowment(BaseModel):
         for trade in self.trades:
             if trade.buyer_id == self.agent_id:
                 temp_portfolio.cash -= trade.price * trade.quantity
-                temp_portfolio.update_stock(trade.stock_symbol, temp_portfolio.get_stock_quantity(trade.stock_symbol) + trade.quantity)
+                temp_portfolio.update_stock(
+                    symbol=trade.stock_symbol,
+                    quantity=trade.quantity,
+                    purchase_price=trade.price
+                )
             elif trade.seller_id == self.agent_id:
                 temp_portfolio.cash += trade.price * trade.quantity
-                temp_portfolio.update_stock(trade.stock_symbol, temp_portfolio.get_stock_quantity(trade.stock_symbol) - trade.quantity)
+                temp_portfolio.update_stock(
+                    symbol=trade.stock_symbol,
+                    quantity=-trade.quantity
+                )
             else:
                 raise ValueError(f"Trade {trade} not for agent {self.agent_id}")
 
-        return Portfolio(
-            cash=temp_portfolio.cash,
-            stocks=[Stock(symbol=stock.symbol, quantity=stock.quantity) for stock in temp_portfolio.stocks]
-        )
+        return temp_portfolio
 
     def add_trade(self, trade: Trade):
         self.trades.append(trade)
@@ -157,9 +204,16 @@ class Endowment(BaseModel):
 
         if trade.buyer_id == self.agent_id:
             temp_portfolio.cash -= trade.price * trade.quantity
-            temp_portfolio.update_stock(trade.stock_symbol, temp_portfolio.get_stock_quantity(trade.stock_symbol) + trade.quantity)
+            temp_portfolio.update_stock(
+                symbol=trade.stock_symbol,
+                quantity=trade.quantity,
+                purchase_price=trade.price
+            )
         elif trade.seller_id == self.agent_id:
             temp_portfolio.cash += trade.price * trade.quantity
-            temp_portfolio.update_stock(trade.stock_symbol, temp_portfolio.get_stock_quantity(trade.stock_symbol) - trade.quantity)
+            temp_portfolio.update_stock(
+                symbol=trade.stock_symbol,
+                quantity=-trade.quantity
+            )
 
         return temp_portfolio
