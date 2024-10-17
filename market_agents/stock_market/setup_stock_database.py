@@ -1,3 +1,5 @@
+# setup_stock_database.py
+
 import psycopg2
 import psycopg2.extras
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -40,7 +42,7 @@ def create_tables(db_params):
     # Create pgvector extension
     cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-     # Create tables with correct UUID types
+    # Create tables with correct UUID types
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS agents (
         id UUID PRIMARY KEY,
@@ -66,11 +68,22 @@ def create_tables(db_params):
     CREATE TABLE IF NOT EXISTS allocations (
         id SERIAL PRIMARY KEY,
         agent_id UUID REFERENCES agents(id),
-        stocks INTEGER NOT NULL,
         cash DECIMAL(15, 2) NOT NULL,
-        initial_stocks INTEGER NOT NULL,
         initial_cash DECIMAL(15, 2) NOT NULL,
+        positions JSONB NOT NULL,
+        initial_positions JSONB NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE agent_positions (
+        agent_id UUID NOT NULL,
+        round INTEGER NOT NULL,
+        cash FLOAT NOT NULL,
+        positions JSONB NOT NULL,
+        PRIMARY KEY (agent_id, round),
+        FOREIGN KEY (agent_id) REFERENCES agents(id)
     )
     """)
 
@@ -78,9 +91,9 @@ def create_tables(db_params):
     CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
         agent_id UUID REFERENCES agents(id),
-        order_type VARCHAR(10) NOT NULL CHECK (order_type IN ('buy', 'sell')),
-        quantity INTEGER NOT NULL,
-        price DECIMAL(15, 2) NOT NULL,
+        order_type VARCHAR(10) NOT NULL CHECK (order_type IN ('buy', 'sell', 'hold')),
+        quantity INTEGER,
+        price DECIMAL(15, 2),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)

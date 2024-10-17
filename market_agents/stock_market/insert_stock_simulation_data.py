@@ -125,9 +125,10 @@ class SimulationDataInserter:
             logging.error(f"Error inserting agent memories: {e}")
             raise
 
+    
     def insert_allocations(self, allocations: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
-        INSERT INTO allocations (agent_id, stocks, cash, initial_stocks, initial_cash)
+        INSERT INTO allocations (agent_id, cash, initial_cash, positions, initial_positions)
         VALUES (%s, %s, %s, %s, %s)
         """
         try:
@@ -140,16 +141,42 @@ class SimulationDataInserter:
 
                     cur.execute(query, (
                         agent_id,
-                        allocation['stocks'],
                         allocation['cash'],
-                        allocation['initial_stocks'],
-                        allocation['initial_cash']
+                        allocation['initial_cash'],
+                        json.dumps(allocation['positions'], default=json_serial),
+                        json.dumps(allocation['initial_positions'], default=json_serial)
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(allocations)} allocations into the database")
         except Exception as e:
             self.conn.rollback()
             logging.error(f"Error inserting allocations: {str(e)}")
+            raise
+
+    def insert_agent_positions(self, positions_data: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
+        query = """
+        INSERT INTO agent_positions (agent_id, round, cash, positions)
+        VALUES (%s, %s, %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                for position in positions_data:
+                    agent_id = agent_id_map.get(str(position['agent_id']))
+                    if agent_id is None:
+                        logging.error(f"No matching UUID found for agent_id: {position['agent_id']}")
+                        continue
+
+                    cur.execute(query, (
+                        agent_id,
+                        position['round'],
+                        position['cash'],
+                        json.dumps(position['positions'], default=json_serial)
+                    ))
+            self.conn.commit()
+            logging.info(f"Inserted {len(positions_data)} agent positions into the database")
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(f"Error inserting agent positions: {str(e)}")
             raise
 
     def insert_orders(self, orders: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
@@ -205,6 +232,7 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting trades: {str(e)}")
             raise
+    
     def insert_interactions(self, interactions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO interactions (agent_id, round, task, response)
@@ -455,19 +483,71 @@ class SimulationDataInserter:
 
             # Allocations data
             logging.info("Preparing allocations data")
-            allocations_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'stocks': agent.economic_agent.current_stock_quantity,
+            allocations_data = []
+            for agent in agents:
+                agent_id = str(agent.id)
+
+                # Current positions
+                positions = []
+                for stock in agent.economic_agent.current_portfolio.stocks:
+                    stock_symbol = stock.symbol
+                    for position in stock.positions:
+                        positions.append({
+                            'stock_symbol': stock_symbol,
+                            'quantity': position.quantity,
+                            'purchase_price': position.purchase_price
+                        })
+
+                # Initial positions
+                initial_positions = []
+                for stock in agent.economic_agent.endowment.initial_portfolio.stocks:
+                    stock_symbol = stock.symbol
+                    for position in stock.positions:
+                        initial_positions.append({
+                            'stock_symbol': stock_symbol,
+                            'quantity': position.quantity,
+                            'purchase_price': position.purchase_price
+                        })
+
+                allocations_data.append({
+                    'agent_id': agent_id,
                     'cash': agent.economic_agent.current_cash,
-                    'initial_stocks': agent.economic_agent.endowment.initial_portfolio.get_stock_quantity(config.agent_config.stock_symbol),
-                    'initial_cash': agent.economic_agent.endowment.initial_portfolio.cash
-                }
-                for agent in agents
-            ]
+                    'initial_cash': agent.economic_agent.endowment.initial_portfolio.cash,
+                    'positions': positions,
+                    'initial_positions': initial_positions
+                })
+
             logging.info(f"Inserting {len(allocations_data)} allocations")
             self.insert_allocations(allocations_data, agent_id_map)
             logging.info("Allocations insertion complete")
+
+            # Agent Positions data
+            logging.info("Preparing agent positions data")
+            positions_data = []
+            for agent in agents:
+                agent_id = str(agent.id)
+
+                # Current positions
+                positions = []
+                for stock in agent.economic_agent.current_portfolio.stocks:
+                    stock_symbol = stock.symbol
+                    for position in stock.positions:
+                        positions.append({
+                            'stock_symbol': stock_symbol,
+                            'quantity': position.quantity,
+                            'purchase_price': position.purchase_price
+                        })
+
+                positions_data.append({
+                    'agent_id': agent_id,
+                    'round': round_num,
+                    'cash': agent.economic_agent.current_cash,
+                    'positions': positions
+                })
+
+            logging.info(f"Inserting {len(positions_data)} agent positions")
+            self.insert_agent_positions(positions_data, agent_id_map)
+            logging.info("Agent positions insertion complete")
 
             # Orders data
             logging.info("Preparing orders data")
@@ -500,34 +580,6 @@ class SimulationDataInserter:
             logging.info(f"Inserting {len(interactions_data)} interactions")
             self.insert_interactions(interactions_data, agent_id_map)
             logging.info("Interactions insertion complete")
-
-            # Reflections and Observations data
-            logging.info("Preparing reflections and observations data")
-            observations_data = []
-            reflections_data = []
-            for agent in agents:
-                if agent.last_observation:
-                    observations_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'stock_market',
-                        'observation': serialize_memory_data(agent.last_observation)
-                    })
-                if agent.memory and agent.memory[-1]['type'] == 'reflection':
-                    reflection = agent.memory[-1]
-                    reflections_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'stock_market',
-                        'reflection': reflection.get('content', ''),
-                        'self_reward': reflection.get('self_reward', 0),
-                        'environment_reward': reflection.get('environment_reward', 0),
-                        'total_reward': reflection.get('total_reward', 0),
-                        'strategy_update': reflection.get('strategy_update', '')
-                    })
-            logging.info(f"Inserting {len(observations_data)} observations")
-            self.insert_observations(observations_data, agent_id_map)
-            logging.info(f"Inserting {len(reflections_data)} reflections")
-            self.insert_reflections(reflections_data, agent_id_map)
-            logging.info("Reflections and observations insertion complete")
 
             # Perceptions data
             logging.info("Preparing perceptions data")
@@ -583,6 +635,34 @@ class SimulationDataInserter:
                 logging.info("Trades insertion complete")
             else:
                 logging.info("No trades to insert")
+
+            # Reflections and Observations data
+            logging.info("Preparing reflections and observations data")
+            observations_data = []
+            reflections_data = []
+            for agent in agents:
+                if agent.last_observation:
+                    observations_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'stock_market',
+                        'observation': serialize_memory_data(agent.last_observation)
+                    })
+                if agent.memory and agent.memory[-1]['type'] == 'reflection':
+                    reflection = agent.memory[-1]
+                    reflections_data.append({
+                        'memory_id': str(agent.id),
+                        'environment_name': 'stock_market',
+                        'reflection': reflection.get('content', ''),
+                        'self_reward': reflection.get('self_reward', 0),
+                        'environment_reward': reflection.get('environment_reward', 0),
+                        'total_reward': reflection.get('total_reward', 0),
+                        'strategy_update': reflection.get('strategy_update', '')
+                    })
+            logging.info(f"Inserting {len(observations_data)} observations")
+            self.insert_observations(observations_data, agent_id_map)
+            logging.info(f"Inserting {len(reflections_data)} reflections")
+            self.insert_reflections(reflections_data, agent_id_map)
+            logging.info("Reflections and observations insertion complete")
 
         except Exception as e:
             logging.error(f"Error inserting data for round {round_num}: {str(e)}")
