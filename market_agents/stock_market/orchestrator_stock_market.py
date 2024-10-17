@@ -18,7 +18,16 @@ from market_agents.agents.market_agent import MarketAgent
 from market_agents.agents.personas.persona import Persona, generate_persona, save_persona_to_file
 from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.environments.environment import EnvironmentStep, MultiAgentEnvironment
-from market_agents.stock_market.stock_models import MarketAction, OrderType, Trade, Portfolio, Stock, Endowment, StockOrder
+from market_agents.stock_market.stock_models import (
+    MarketAction,
+    OrderType,
+    Trade,
+    Portfolio,
+    Stock,
+    Position,
+    Endowment,
+    StockOrder
+)
 from market_agents.stock_market.stock_agent import StockEconomicAgent
 from market_agents.environments.mechanisms.stock_market import (
     StockMarket,
@@ -182,13 +191,34 @@ class Orchestrator:
             initial_cash = random.uniform(agent_config.initial_cash_min, agent_config.initial_cash_max)
             initial_stocks_quantity = random.randint(agent_config.initial_stocks_min, agent_config.initial_stocks_max)
 
+            # Assume a base market price for initialization
+            base_market_price = 150.0
+
+            # Generate positions
+            positions = []
+            remaining_quantity = initial_stocks_quantity
+            while remaining_quantity > 0:
+                # Random quantity for the position (up to remaining quantity)
+                position_quantity = random.randint(1, remaining_quantity)
+                remaining_quantity -= position_quantity
+
+                # Random purchase price (between base_market_price * 0.9 and base_market_price * 1.0)
+                purchase_price = random.uniform(base_market_price * 0.9, base_market_price * 1.0)
+
+                position = Position(quantity=position_quantity, purchase_price=purchase_price)
+                positions.append(position)
+
+            # Create Stock with positions
+            initial_stock = Stock(symbol=stock_symbol, positions=positions)
+
             # Create initial portfolio and endowment
-            initial_stocks = [Stock(symbol=stock_symbol, quantity=initial_stocks_quantity)]
-            initial_portfolio = Portfolio(cash=initial_cash, stocks=initial_stocks)
+            initial_portfolio = Portfolio(cash=initial_cash, stocks=[initial_stock])
             endowment = Endowment(
                 initial_portfolio=initial_portfolio,
                 agent_id=agent_uuid
             )
+
+            # **New Code Ends Here**
 
             # Create economic agent
             economic_agent = StockEconomicAgent(
@@ -281,16 +311,13 @@ class Orchestrator:
     async def run_parallel_reflect(self, env_name: str) -> List[LLMPromptContext]:
         reflect_prompts = []
         for agent in self.agents:
-            if agent.last_observation:
-                # Ensure agent.last_step is set
-                environment = self.environments[env_name]
-                last_step = environment.history.steps[-1][1] if environment.history.steps else None
-                agent.last_step = last_step
-                reflect_prompt = await agent.reflect(env_name, return_prompt=True)
-                reflect_prompts.append(reflect_prompt)
-            else:
-                logger.info(f"Skipping reflection for agent {agent.index} due to no observation")
+            environment = self.environments[env_name]
+            last_step = environment.history.steps[-1][1] if environment.history.steps else None
+            agent.last_step = last_step
+            reflect_prompt = await agent.reflect(env_name, return_prompt=True)
+            reflect_prompts.append(reflect_prompt)
         return reflect_prompts
+
 
     async def run_environment(self, env_name: str, round_num: int) -> EnvironmentStep:
         env = self.environments[env_name]
@@ -330,27 +357,27 @@ class Orchestrator:
                 try:
                     action_content = action.json_object.object if action.json_object else json.loads(action.str_content or '{}')
                     agent.last_action = action_content
-                    
+
                     order_type = OrderType(action_content.get('order_type', 'hold').lower())
-                    
+
                     if order_type == OrderType.HOLD or 'quantity' not in action_content:
                         market_action = MarketAction(order_type=OrderType.HOLD)
                     else:
                         if 'price' not in action_content:
                             raise ValueError(f"Missing price for {order_type.value} order: {action_content}")
-                        
+
                         price = float(action_content['price'])
                         quantity = int(action_content['quantity'])
-                        
+
                         if price <= 0 or quantity <= 0:
                             raise ValueError(f"Price and quantity must be positive for {order_type.value} order: price={price}, quantity={quantity}")
-                        
+
                         market_action = MarketAction(
                             order_type=order_type,
                             price=price,
                             quantity=quantity
                         )
-                    
+
                     stock_market_action = StockMarketAction(agent_id=agent.id, action=market_action)
                     agent_actions[agent.id] = stock_market_action
 
@@ -380,29 +407,36 @@ class Orchestrator:
         logger.info(f"Completed {env_name} step")
 
         return env_state
+
     def set_agent_system_messages(self, round_num: int):
         for agent in self.agents:
             current_cash = agent.economic_agent.current_cash
             current_stocks = agent.economic_agent.current_stock_quantity
+            average_cost = agent.economic_agent.calculate_average_cost()
             market_price = self.environments['stock_market'].mechanism.current_price
             portfolio_value = current_cash + (current_stocks * market_price)
             cash_ratio = current_cash / portfolio_value if portfolio_value > 0 else 1
             stock_ratio = (current_stocks * market_price) / portfolio_value if portfolio_value > 0 else 0
-            
+            unrealized_profit = agent.economic_agent.calculate_unrealized_profit(market_price)
+            expected_return = agent.economic_agent.expected_return
+
             agent.system = (
-                f"Round {round_num}: You are an active stock trader with the following portfolio:\n"
+                f"Round {round_num}: You are an aggressive stock trader with the following portfolio:\n"
                 f"- Cash: ${current_cash:.2f}\n"
                 f"- Shares of {agent.economic_agent.stock_symbol}: {current_stocks}\n"
-                f"- Current market price: ${market_price:.2f}\n"
-                f"- Total portfolio value: ${portfolio_value:.2f}\n"
-                f"- Cash ratio: {cash_ratio:.2f}\n"
-                f"- Stock ratio: {stock_ratio:.2f}\n\n"
-                f"As an active trader, you should aim to make trades frequently, especially in the early rounds. "
-                f"Even if there have been no trades yet, consider initiating trades to stimulate market activity. "
-                f"Your goal is to maximize profits through buying low and selling high.\n\n"
-                f"Decide on your next action: buy, sell, or hold. Strongly consider buying or selling, "
-                f"especially if you haven't made a trade recently. If buying or selling, specify the quantity and price. "
-                f"Remember, holding should only be chosen if you have a very compelling reason to do so."
+                f"- Average Cost Basis: ${average_cost:.2f}\n"
+                f"- Current Market Price: ${market_price:.2f}\n"
+                f"- Unrealized Profit/Loss: ${unrealized_profit:.2f}\n"
+                f"- Total Portfolio Value: ${portfolio_value:.2f}\n"
+                f"- Cash Ratio: {cash_ratio:.2f}\n"
+                f"- Stock Ratio: {stock_ratio:.2f}\n\n"
+                f"Your risk aversion level is {agent.economic_agent.risk_aversion:.2f} and expected return threshold is {expected_return:.2f}.\n\n"
+                f"As an aggressive trader, your primary goal is to make frequent trades to maximize profits. "
+                f"Sitting idle is not an option. You must either buy or sell in every round unless you don't have enough cash. "
+                f"Analyze your current portfolio and the market conditions to decide your next action. "
+                f"Remember, holding is not allowed. You MUST choose to either buy or sell. "
+                f"When deciding, consider taking calculated risks for potentially higher returns. "
+                f"Specify the quantity and price for your trade, aiming for larger trade sizes when possible."
             )
 
     def insert_ai_requests(self, ai_requests):
@@ -419,19 +453,40 @@ class Orchestrator:
                     env_state = await self.run_environment(env_name, round_num)
                     self.update_simulation_state(env_name, env_state)
 
+                # Process rewards using env_state
+                self.calculate_environment_rewards(env_state)
+
                 # Run parallel reflect
                 reflect_prompts = await self.run_parallel_reflect(env_name)
                 if reflect_prompts:
                     reflections = await self.run_parallel_ai_completion(reflect_prompts)
-                    agents_with_observations = [a for a in self.agents if a.last_observation]
-                    for agent, reflection in zip(agents_with_observations, reflections):
+                    for agent, reflection in zip(self.agents, reflections):
                         if reflection.json_object:
                             log_reflection(logger, agent.index, f"{Fore.MAGENTA}{reflection.json_object.object}{Style.RESET_ALL}")
+                            environment_reward = agent.environment_reward
+                            self_reward = reflection.json_object.object.get("self_reward", 0.0)
+
+                            # Normalize environment_reward
+                            normalized_environment_reward = environment_reward / (1 + abs(environment_reward))
+                            normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
+
+                            # Weighted average of normalized environment_reward and self_reward
+                            total_reward = normalized_environment_reward * 0.5 + self_reward * 0.5
+
+                            # Add logging for rewards
+                            logger.info(
+                                f"Agent {agent.index} rewards - Environment Reward: {environment_reward}, "
+                                f"Normalized Environment Reward: {normalized_environment_reward}, "
+                                f"Self Reward: {self_reward}, Total Reward: {total_reward}"
+                            )
                             agent.memory.append({
                                 "type": "reflection",
                                 "content": reflection.json_object.object.get("reflection", ""),
                                 "strategy_update": reflection.json_object.object.get("strategy_update", ""),
                                 "observation": agent.last_observation,
+                                "environment_reward": round(environment_reward, 4),
+                                "self_reward": round(self_reward, 4),
+                                "total_reward": round(total_reward, 4),
                                 "timestamp": datetime.now().isoformat()
                             })
                         else:
@@ -442,12 +497,11 @@ class Orchestrator:
                 self.save_round_data(round_num)
                 self.save_agent_interactions(round_num)
 
-                # Insert data after each round
-                try:
-                    self.data_inserter.insert_round_data(round_num, self.agents, self.environments, self.config)
-                    logger.info(f"Data for round {round_num} inserted successfully.")
-                except Exception as e:
-                    logger.error(f"Error inserting data for round {round_num}: {str(e)}")
+            try:
+                self.data_inserter.insert_round_data(round_num, self.agents, self.environments, self.config)
+                logger.info(f"Data for round {round_num} inserted successfully.")
+            except Exception as e:
+                logger.error(f"Error inserting data for round {round_num}: {str(e)}")
 
         except Exception as e:
             logger.error(f"Simulation failed: {str(e)}")
@@ -455,14 +509,52 @@ class Orchestrator:
             log_completion(logger, "SIMULATION COMPLETED")
             self.print_summary()
 
+    
+    def calculate_environment_rewards(self, env_state):
+        # Initialize environment rewards
+        for agent in self.agents:
+            agent.environment_reward = 0.0
+
+        # Get the list of trades executed in this round
+        trades = env_state.global_observation.all_trades
+
+        for trade in trades:
+            # Process seller's reward
+            seller_agent = self.agent_dict[trade.seller_id]
+            cost_basis, quantity_sold = seller_agent.economic_agent.remove_positions(trade.quantity)
+            realized_profit = (trade.price - cost_basis) * quantity_sold
+            seller_agent.environment_reward += realized_profit
+            # Update seller's cash
+            seller_agent.economic_agent.current_portfolio.cash += trade.price * trade.quantity
+
+            # Process buyer's reward (unrealized profit is zero at purchase)
+            buyer_agent = self.agent_dict[trade.buyer_id]
+            # Deduct cash from buyer
+            if buyer_agent.economic_agent.current_portfolio.cash >= trade.price * trade.quantity:
+                buyer_agent.economic_agent.current_portfolio.cash -= trade.price * trade.quantity
+            else:
+                raise ValueError(f"Agent {buyer_agent.id} does not have enough cash to complete the trade.")
+
+            # Buyer does not have realized profit yet, set environment_reward to zero
+            buyer_agent.environment_reward += 0.0
+
+            # Update positions for buyer
+            buyer_agent.economic_agent.add_position(trade.price, trade.quantity)
+
+        # Handle agents who didn't trade
+        for agent in self.agents:
+            if not hasattr(agent, 'environment_reward'):
+                agent.environment_reward = 0.0
+
+
     def update_simulation_state(self, env_name: str, env_state: EnvironmentStep):
         for agent in self.agents:
             agent_observation = env_state.global_observation.observations.get(agent.id)
             if agent_observation:
-                agent.last_observation = agent_observation
+                agent.last_observation = agent_observation.observation  # Assuming .observation holds the observation dict
                 agent.last_step = env_state
             else:
-                agent.last_perception = None  # Ensure it's set even if None
+                agent.last_observation = None  # Ensure it's set even if None
 
         if not self.simulation_data or 'state' not in self.simulation_data[-1]:
             self.simulation_data.append({'state': {}})
@@ -502,7 +594,7 @@ class Orchestrator:
                     }
                     json.dump(interaction_with_round, f, default=str)
                     f.write('\n')
-            
+
             # Clear all interactions after saving
             agent.interactions.clear()
 
