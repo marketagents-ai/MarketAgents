@@ -8,10 +8,8 @@ from typing import List, Dict, Any
 from psycopg2.extensions import register_adapter, AsIs
 import json
 import logging
-import uuid
 from datetime import datetime
 from market_agents.stock_market.stock_models import OrderType
-
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -88,12 +86,11 @@ class SimulationDataInserter:
                     logging.error(f"Error inserting agent {agent['id']}: {str(e)}")
         self.conn.commit()
         return agent_id_map
-    
+
     def json_serial(self, obj):
         """JSON serializer for objects not serializable by default json code"""
         if isinstance(obj, datetime):
             return obj.isoformat()
-
         raise TypeError(f"Type {type(obj)} not serializable")
 
     def check_tables_exist(self):
@@ -125,7 +122,6 @@ class SimulationDataInserter:
             logging.error(f"Error inserting agent memories: {e}")
             raise
 
-    
     def insert_allocations(self, allocations: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO allocations (agent_id, cash, initial_cash, positions, initial_positions)
@@ -232,7 +228,7 @@ class SimulationDataInserter:
             self.conn.rollback()
             logging.error(f"Error inserting trades: {str(e)}")
             raise
-    
+
     def insert_interactions(self, interactions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO interactions (agent_id, round, task, response)
@@ -339,8 +335,8 @@ class SimulationDataInserter:
     def insert_actions(self, actions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO actions (
-            memory_id, 
-            environment_name, 
+            memory_id,
+            environment_name,
             action
         )
         VALUES (%s, %s, %s)
@@ -354,7 +350,7 @@ class SimulationDataInserter:
                         continue
                     environment_name = action['environment_name']
                     action_data = action['action']
-                    
+
                     cur.execute(query, (
                         memory_id,
                         environment_name,
@@ -408,8 +404,8 @@ class SimulationDataInserter:
 
     def _insert_ai_requests_to_db(self, requests_data):
         query = """
-        INSERT INTO requests 
-        (prompt_context_id, start_time, end_time, total_time, model, 
+        INSERT INTO requests
+        (prompt_context_id, start_time, end_time, total_time, model,
         max_tokens, temperature, messages, system, tools, tool_choice,
         raw_response, completion_tokens, prompt_tokens, total_tokens)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -441,6 +437,28 @@ class SimulationDataInserter:
             logging.error(f"Error inserting AI requests: {str(e)}")
             raise
 
+    def insert_groupchat_messages(self, messages: List[Dict[str, Any]]):
+        query = """
+        INSERT INTO groupchat (message_id, agent_id, round, content, timestamp, topic)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                for message in messages:
+                    cur.execute(query, (
+                        message['message_id'],
+                        uuid.UUID(str(message['agent_id'])),
+                        message['round'],
+                        message['content'],
+                        message['timestamp'],
+                        message['topic']
+                    ))
+            self.conn.commit()
+            logging.info(f"Inserted {len(messages)} messages into the database")
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(f"Error inserting messages: {e}")
+            raise
 
     def insert_round_data(self, round_num, agents, environments, config):
         logging.info(f"Starting data insertion for round {round_num}")
@@ -473,7 +491,7 @@ class SimulationDataInserter:
                         'step_id': round_num,
                         'memory_data': serialize_memory_data(memory)
                     })
-            
+
             if memories_data:
                 logging.info(f"Inserting {len(memories_data)} memories")
                 self.insert_agent_memories(memories_data)
@@ -549,21 +567,24 @@ class SimulationDataInserter:
             self.insert_agent_positions(positions_data, agent_id_map)
             logging.info("Agent positions insertion complete")
 
-            # Orders data
-            logging.info("Preparing orders data")
-            orders_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'order_type': order.order_type.value,
-                    'quantity': order.quantity if order.order_type != OrderType.HOLD else None,
-                    'price': order.price if order.order_type != OrderType.HOLD else None
-                }
-                for agent in agents
-                for order in agent.economic_agent.pending_orders
-            ]
-            logging.info(f"Inserting {len(orders_data)} orders")
-            self.insert_orders(orders_data, agent_id_map)
-            logging.info("Orders insertion complete")
+            # Orders data (skip if 'stock_market' not present)
+            if 'stock_market' in environments:
+                logging.info("Preparing orders data")
+                orders_data = [
+                    {
+                        'agent_id': str(agent.id),
+                        'order_type': order.order_type.value,
+                        'quantity': order.quantity if order.order_type != OrderType.HOLD else None,
+                        'price': order.price if order.order_type != OrderType.HOLD else None
+                    }
+                    for agent in agents
+                    for order in agent.economic_agent.pending_orders
+                ]
+                logging.info(f"Inserting {len(orders_data)} orders")
+                self.insert_orders(orders_data, agent_id_map)
+                logging.info("Orders insertion complete")
+            else:
+                logging.warning("Stock market environment not present; skipping orders data insertion")
 
             # Interactions data
             logging.info("Preparing interactions data")
@@ -616,25 +637,28 @@ class SimulationDataInserter:
             self.insert_actions(actions_data, agent_id_map)
             logging.info("Actions insertion complete")
 
-            # Trades data
-            logging.info("Preparing trades data")
-            stock_market = environments['stock_market']
-            trades_data = [
-                {
-                    'buyer_id': trade.buyer_id,
-                    'seller_id': trade.seller_id,
-                    'quantity': trade.quantity,
-                    'price': trade.price,
-                    'round': round_num
-                }
-                for trade in stock_market.mechanism.trades
-            ]
-            if trades_data:
-                logging.info(f"Inserting {len(trades_data)} trades")
-                self.insert_trades(trades_data, agent_id_map)
-                logging.info("Trades insertion complete")
+            # Trades data (skip if 'stock_market' not present)
+            if 'stock_market' in environments:
+                logging.info("Preparing trades data")
+                stock_market = environments['stock_market']
+                trades_data = [
+                    {
+                        'buyer_id': trade.buyer_id,
+                        'seller_id': trade.seller_id,
+                        'quantity': trade.quantity,
+                        'price': trade.price,
+                        'round': round_num
+                    }
+                    for trade in stock_market.mechanism.trades
+                ]
+                if trades_data:
+                    logging.info(f"Inserting {len(trades_data)} trades")
+                    self.insert_trades(trades_data, agent_id_map)
+                    logging.info("Trades insertion complete")
+                else:
+                    logging.info("No trades to insert")
             else:
-                logging.info("No trades to insert")
+                logging.warning("Stock market environment not present; skipping trades data insertion")
 
             # Reflections and Observations data
             logging.info("Preparing reflections and observations data")
@@ -663,6 +687,27 @@ class SimulationDataInserter:
             logging.info(f"Inserting {len(reflections_data)} reflections")
             self.insert_reflections(reflections_data, agent_id_map)
             logging.info("Reflections and observations insertion complete")
+
+            # Messages data (skip if 'group_chat' not present)
+            logging.info("Preparing messages data")
+            if 'group_chat' in environments:
+                group_chat_env = environments['group_chat']
+                groupchat_data = []
+                current_topic = group_chat_env.mechanism.current_topic
+                for message in group_chat_env.mechanism.messages:
+                    groupchat_data.append({
+                        'message_id': str(uuid.uuid4()),
+                        'agent_id': str(message.agent_id),
+                        'round': round_num,
+                        'content': message.content,
+                        'timestamp': datetime.now(),
+                        'topic': current_topic
+                    })
+                logging.info(f"Inserting {len(groupchat_data)} messages")
+                self.insert_groupchat_messages(groupchat_data)
+                logging.info("Messages insertion complete")
+            else:
+                logging.warning("Group chat environment not present; skipping messages data insertion")
 
         except Exception as e:
             logging.error(f"Error inserting data for round {round_num}: {str(e)}")
