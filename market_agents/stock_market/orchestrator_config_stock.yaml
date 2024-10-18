@@ -53,6 +53,11 @@ environment_configs:
     address: "aapl_stock_market"
     max_rounds: 100
     stock_symbol: "AAPL"
+#  group_chat:
+#    name: "Stock Market Discussion"
+#    address: "group_chat"
+#    max_rounds: 5
+#    initial_topic: "Discuss the impact of recent FED rate cut of 50 bps on the stock market"
 protocol: "ACLMessage"
 database_config:
   db_type: "postgres"

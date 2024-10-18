@@ -4,6 +4,7 @@
 
 # File names for the Python scripts
 ORCHESTRATOR_SCRIPT="market_agents/stock_market/orchestrator_stock_market.py"
+#ORCHESTRATOR_SCRIPT="market_agents/stock_market/orchestrator_group_chat.py"
 DASHBOARD_SCRIPT="market_agents/agents/db/dashboard/dashboard.py"
 
 # Check if the Python scripts exist
