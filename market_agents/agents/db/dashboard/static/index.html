@@ -6,20 +6,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
-    <header class="dashboard-header">
-        <h1>MarketAgents LLM Dashboard</h1>
-        <img src="/static/marketagents_logo.jpg" alt="MarketAgents Logo" class="logo">
-    </header>
+<body><!--
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                <div class="market">MARKET</div>
+                <div class="agents">AGENTS</div>
+            </div>
+        </div>
+    </header>-->
     <div class="dashboard">
-
-        <div>
+        <div class="controls-container">
             <button id="refreshButton" class="refresh-button"> ↺ </button>
- 
-                <button id="prevPage" class="prev-page"> ← </button>
-                <span id="pageInfo"></span>
-                <button id="nextPage" class="next-page"> → </button>
-
+            <button id="exportMarkdownButton">Export Markdown</button>
+            <button id="prevPage" class="prev-page"> ← </button>
+            <span id="pageInfo"></span>
+            <button id="nextPage" class="next-page"> → </button>
             <input type="text" id="searchInput" placeholder="SEARCH">
             <label for="tableSelect"></label>
             <select id="tableSelect"></select>
@@ -31,11 +33,11 @@
             <select id="xColumnSelect"></select>
             <label for="yColumnSelect">Y</label>
             <select id="yColumnSelect"></select>
-
         </div>
 
         <div class="chart-container">
             <canvas id="dataChart"></canvas>
+            <pre id="markdownOutput" class="markdown-output"></pre>
         </div>
         <div style="overflow-x: auto;">
             <table id="dataTable">
@@ -232,20 +234,32 @@
             let rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
             switching = true;
             dir = 'asc';
+
+            function getValue(cell) {
+                const value = cell.textContent.trim();
+                if (/^-?\d+$/.test(value)) {
+                    return parseInt(value, 10);
+                } else if (/^-?\d*\.?\d+$/.test(value)) {
+                    return parseFloat(value);
+                } else {
+                    return value.toLowerCase();
+                }
+            }
+
             while (switching) {
                 switching = false;
                 rows = table.rows;
                 for (i = 1; i < (rows.length - 1); i++) {
                     shouldSwitch = false;
-                    x = rows[i].getElementsByTagName('TD')[n];
-                    y = rows[i + 1].getElementsByTagName('TD')[n];
-                    if (dir == 'asc') {
-                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                    x = getValue(rows[i].getElementsByTagName('TD')[n]);
+                    y = getValue(rows[i + 1].getElementsByTagName('TD')[n]);
+                    if (dir === 'asc') {
+                        if (x > y) {
                             shouldSwitch = true;
                             break;
                         }
-                    } else if (dir == 'desc') {
-                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                    } else if (dir === 'desc') {
+                        if (x < y) {
                             shouldSwitch = true;
                             break;
                         }
@@ -256,7 +270,7 @@
                     switching = true;
                     switchcount++;
                 } else {
-                    if (switchcount == 0 && dir == 'asc') {
+                    if (switchcount === 0 && dir === 'asc') {
                         dir = 'desc';
                         switching = true;
                     }
@@ -411,11 +425,13 @@
             if (isChartView && !searchTerm) {
                 initChart(result.data, xColumn, yColumn);
                 document.getElementById('dataChart').style.display = 'block';
+                document.getElementById('markdownOutput').style.display = 'none';
             } else {
                 if (chartInstance) {
                     chartInstance.destroy();
                 }
                 document.getElementById('dataChart').style.display = 'none';
+                document.getElementById('markdownOutput').style.display = 'none';
             }
 
             // Update input states after refreshing
@@ -501,6 +517,12 @@
 
             // Initial refresh of the dashboard
             await refreshDashboard(1);
+
+            const exportMarkdownButton = document.getElementById('exportMarkdownButton');
+            exportMarkdownButton.addEventListener('click', () => {
+                const markdown = tableToMarkdown();
+                displayMarkdown(markdown);
+            });
         });
 
         // Helper function to debounce function calls
@@ -526,6 +548,54 @@
 
         // Add event listener for full table checkbox
         document.getElementById('viewSelect').addEventListener('change', () => refreshDashboard(1));
+
+        function tableToMarkdown() {
+            const table = document.getElementById('dataTable');
+            const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+
+            let markdown = '';
+            let useTable = true;
+
+            // Check if any cell content is longer than 512 characters
+            rows.forEach(row => {
+                Array.from(row.cells).forEach(cell => {
+                    if (cell.textContent.length > 512) {
+                        useTable = false;
+                    }
+                });
+            });
+
+            if (useTable) {
+                // Create table header
+                markdown += '| ' + headers.join(' | ') + ' |\n';
+                markdown += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
+
+                // Create table rows
+                rows.forEach(row => {
+                    const cells = Array.from(row.cells).map(cell => cell.textContent);
+                    markdown += '| ' + cells.join(' | ') + ' |\n';
+                });
+            } else {
+                // Create paragraphs
+                rows.forEach((row, rowIndex) => {
+                    markdown += `Row ${rowIndex + 1}:\n\n`;
+                    Array.from(row.cells).forEach((cell, cellIndex) => {
+                        markdown += `${headers[cellIndex]}: ${cell.textContent}\n\n`;
+                    });
+                    markdown += '---\n\n';
+                });
+            }
+
+            return markdown;
+        }
+
+        function displayMarkdown(markdown) {
+            const markdownOutput = document.getElementById('markdownOutput');
+            markdownOutput.textContent = markdown;
+            markdownOutput.style.display = 'block';
+            document.getElementById('dataChart').style.display = 'none';
+        }
     </script>
 </body>
 </html>

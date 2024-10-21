@@ -1,0 +1,137 @@
+# File: config/attribute_relationships.yaml
+
+age:
+  relationships:
+    - secondary_attribute: education_level
+      weight: 0.8
+      conditions: [age<22]
+    - secondary_attribute: occupation
+      weight: 0.7
+      conditions: []
+    - secondary_attribute: income
+      weight: 0.6
+      conditions: [age>25]
+    - secondary_attribute: investment_preferences
+      weight: 0.5
+      conditions: [age>30]
+    - secondary_attribute: risk_tolerance
+      weight: 0.3
+      conditions: [age>50]
+    - secondary_attribute: occupation
+      weight: 0.8
+      conditions: [age>=60]
+      value: Retired
+
+occupation:
+  relationships:
+    - secondary_attribute: education_level
+      weight: 1.0
+      conditions: []
+    - secondary_attribute: income
+      weight: 1.0
+      conditions: []
+
+education_level:
+  relationships:
+    - secondary_attribute: occupation
+      weight: 0.7
+      conditions: []
+    - secondary_attribute: income
+      weight: 0.6
+      conditions: [age>25]
+    - secondary_attribute: investment_preferences
+      weight: 0.4
+      conditions: []
+
+income:
+  relationships:
+    - secondary_attribute: investment_preferences
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: risk_tolerance
+      weight: 0.5
+      conditions: []
+
+openness:
+  relationships:
+    - secondary_attribute: risk_tolerance
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: cognitive_style
+      weight: 0.5
+      conditions: []
+
+conscientiousness:
+  relationships:
+    - secondary_attribute: stress_level
+      weight: -0.4
+      conditions: []
+    - secondary_attribute: income
+      weight: 0.3
+      conditions: []
+
+extraversion:
+  relationships:
+    - secondary_attribute: stress_level
+      weight: -0.3
+      conditions: []
+    - secondary_attribute: hobbies_and_interests
+      weight: 0.4
+      conditions: []
+
+agreeableness:
+  relationships:
+    - secondary_attribute: emotional_intelligence
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: values
+      weight: 0.4
+      conditions: []
+
+neuroticism:
+  relationships:
+    - secondary_attribute: stress_level
+      weight: 0.6
+      conditions: []
+    - secondary_attribute: risk_tolerance
+      weight: -0.4
+      conditions: []
+
+stress_level:
+  relationships:
+    - secondary_attribute: risk_tolerance
+      weight: -0.3
+      conditions: []
+    - secondary_attribute: emotional_intelligence
+      weight: -0.4
+      conditions: []
+
+life_events:
+  relationships:
+    - secondary_attribute: stress_level
+      weight: 0.5
+      conditions: []
+    - secondary_attribute: short_term_goals
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: long_term_goals
+      weight: 0.3
+      conditions: []
+
+cognitive_style:
+  relationships:
+    - secondary_attribute: investment_preferences
+      weight: 0.4
+      conditions: []
+    - secondary_attribute: decision_making_style
+      weight: 0.5
+      conditions: []
+
+role:
+  relationships:
+    - secondary_attribute: risk_tolerance
+      weight: 0.3
+      conditions: []
+    - secondary_attribute: investment_preferences
+      weight: 0.4
+      conditions: []
