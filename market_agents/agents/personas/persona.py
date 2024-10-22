@@ -1,26 +1,39 @@
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
 import yaml
 import random
 from pathlib import Path
 import names
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class PersonaSchema(BaseModel):
+    demographic_characteristics: Dict[str, Any] = Field(..., description="Demographic information about the persona")
+    economic_attributes: Dict[str, Any] = Field(..., description="Economic attributes of the persona")
+    personality_traits: Dict[str, Any] = Field(..., description="Personality traits of the persona")
+    hobbies_and_interests: List[str] = Field(..., description="Hobbies and interests of the persona")
+    dynamic_attributes: Dict[str, Any] = Field(..., description="Dynamic attributes of the persona")
+    financial_objectives: Dict[str, Any] = Field(..., description="Financial objectives of the persona")
 
 class Persona(BaseModel):
     name: str
     role: str
     persona: str
     objectives: List[str]
-    trader_type: List[str] 
-    
+    trader_type: List[str]
+    schema: PersonaSchema
+
+    def log_persona(self):
+        logger.info(f"Persona created: {self.name}")
+        logger.debug(f"Persona details: {self.model_dump_json(indent=2)}")
+
 def generate_persona() -> Persona:
-    # Gender and Name
     gender = random.choice(["Male", "Female", "Non-binary"])
     name = names.get_full_name(gender=gender.lower())
-    
-    # Role
     role = random.choice(["Buyer", "Seller"])
     
-    # Occupation Mapping
     occupation_data = {
         'Doctor': {
             'education_levels': ["Master's", "PhD"],
@@ -64,15 +77,11 @@ def generate_persona() -> Persona:
         }
     }
     
-    # Select an occupation and get the corresponding data
     occupation = random.choice(list(occupation_data.keys()))
     occupation_info = occupation_data[occupation]
-    
-    # Select an education level and income bracket consistent with the occupation
     education_level = random.choice(occupation_info['education_levels'])
     income_bracket = random.choice(occupation_info['income_brackets'])
     
-    # Determine minimum age based on education level
     def get_min_age_for_education(education_level):
         if education_level == "High School":
             return 18
@@ -85,16 +94,14 @@ def generate_persona() -> Persona:
         elif education_level == "PhD":
             return 27
         else:
-            return 18  # Default minimum age
+            return 18
 
     min_age = get_min_age_for_education(education_level)
     age = random.randint(min_age, 100)
     
-    # Investment Experience and Risk Appetite
     investment_experience = random.choice(['Novice', 'Intermediate', 'Expert'])
     risk_appetite = random.choice(['Conservative', 'Moderate', 'Aggressive'])
     
-    # Demographic Characteristics
     demographic_characteristics = {
         "age": age,
         "gender": gender,
@@ -104,7 +111,6 @@ def generate_persona() -> Persona:
         "geographic_location": random.choice(["Urban", "Suburban", "Rural"])
     }
     
-    # Economic Attributes
     economic_attributes = {
         "spending_habits": random.choice(["Frugal", "Moderate", "Lavish"]),
         "saving_preferences": random.choice(["Low", "Medium", "High"]),
@@ -112,7 +118,6 @@ def generate_persona() -> Persona:
         "investment_experience": investment_experience
     }
     
-    # Personality Traits
     personality_traits = {
         "decision_making_style": random.choice(["Rational", "Emotional", "Impulsive", "Collaborative"]),
         "openness": round(random.uniform(0.0, 1.0), 2),
@@ -122,12 +127,10 @@ def generate_persona() -> Persona:
         "neuroticism": round(random.uniform(0.0, 1.0), 2)
     }
     
-    # Hobbies and Interests (Unique Selection)
     hobbies_list = ["Reading", "Sports", "Cooking", "Travel", "Music", "Art", "Gardening", "Photography", "Technology"]
     hobbies_and_interests = random.sample(hobbies_list, k=3)
     hobbies_and_interests_str = ", ".join(hobbies_and_interests)
     
-    # Dynamic Attributes
     recent_life_events_list = random.sample(
         ["Got a promotion", "Moved to a new city", "Started a new hobby", "Graduated", "Retired"],
         k=2
@@ -138,7 +141,6 @@ def generate_persona() -> Persona:
     }
     recent_life_events_str = ", ".join(dynamic_attributes["recent_life_events"])
     
-    # Financial Objectives
     short_term_goals_list = random.sample(
         ["Build emergency fund", "Pay off credit card debt", "Save for vacation"],
         k=2
@@ -161,11 +163,9 @@ def generate_persona() -> Persona:
     long_term_goals_str = ", ".join(financial_objectives["long_term_goals"])
     investment_preferences_str = ", ".join(financial_objectives["investment_preferences"])
     
-    # Read Persona Template
     with open('./market_agents/agents/personas/persona_template.yaml', 'r') as file:
         template = file.read()
     
-    # Format Persona Description
     persona_description = template.format(
         name=name,
         age=age,
@@ -193,22 +193,34 @@ def generate_persona() -> Persona:
         investment_preferences=investment_preferences_str
     )
     
-    # Objectives
     objectives = [
         f"{'Purchase' if role == 'Buyer' else 'Sell'} goods at favorable prices",
         f"Your goal is to {'maximize utility' if role == 'Buyer' else 'maximize profits'}"
     ]
 
-    # Trader Type
     trader_type = [investment_experience, risk_appetite, personality_traits["decision_making_style"]]
 
-    return Persona(
+    schema = PersonaSchema(
+        demographic_characteristics=demographic_characteristics,
+        economic_attributes=economic_attributes,
+        personality_traits=personality_traits,
+        hobbies_and_interests=hobbies_and_interests,
+        dynamic_attributes=dynamic_attributes,
+        financial_objectives=financial_objectives
+    )
+
+    persona = Persona(
         name=name,
         role=role,
         persona=persona_description,
         objectives=objectives,
-        trader_type=trader_type  # Now a list of traits
+        trader_type=trader_type,
+        schema=schema
     )
+
+    persona.log_persona()
+
+    return persona
 
 def save_persona_to_file(persona: Persona, output_dir: Path):
     output_dir = Path(output_dir)
