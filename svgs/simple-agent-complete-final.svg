@@ -1,0 +1,126 @@
+<svg viewBox="0 0 1200 650" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="1200" height="650" fill="#ffffff"/>
+    
+    <!-- Agent Core Structure Box -->
+    <rect x="50" y="50" width="700" height="200" fill="#f0f7ff" stroke="#2c5282" stroke-width="2" rx="5"/>
+    <text x="60" y="80" font-family="Arial" font-size="16" fill="#2c5282" font-weight="bold">Agent Core Structure (LLM-driven Buyer/Seller)</text>
+    
+    <!-- Agent Components -->
+    <rect x="70" y="100" width="160" height="80" fill="#fff" stroke="#4299e1" stroke-width="2" rx="3"/>
+    <text x="85" y="125" font-family="Arial" font-size="14">Market State</text>
+    <text x="85" y="145" font-family="Arial" font-size="12">- Market Summary</text>
+    <text x="85" y="165" font-family="Arial" font-size="12">- Waiting Orders</text>
+    
+    <rect x="240" y="100" width="160" height="80" fill="#fff" stroke="#4299e1" stroke-width="2" rx="3"/>
+    <text x="255" y="125" font-family="Arial" font-size="14">LLM Context</text>
+    <text x="255" y="145" font-family="Arial" font-size="12">- System Prompt</text>
+    <text x="255" y="165" font-family="Arial" font-size="12">- Chat History</text>
+    
+    <rect x="410" y="100" width="160" height="80" fill="#fff" stroke="#4299e1" stroke-width="2" rx="3"/>
+    <text x="425" y="125" font-family="Arial" font-size="14">Action Tools</text>
+    <text x="425" y="145" font-family="Arial" font-size="12">- Bid/Ask Schema</text>
+    <text x="425" y="165" font-family="Arial" font-size="12">- Action History</text>
+    
+    <rect x="580" y="100" width="160" height="80" fill="#fff" stroke="#4299e1" stroke-width="2" rx="3"/>
+    <text x="595" y="125" font-family="Arial" font-size="14">Economic State</text>
+    <text x="595" y="145" font-family="Arial" font-size="12">- Current Basket</text>
+    <text x="595" y="165" font-family="Arial" font-size="12">- Trade History</text>
+
+    <!-- State Transition Diagram -->
+    <rect x="50" y="280" width="700" height="300" fill="#fff5f7" stroke="#742a2a" stroke-width="2" rx="5"/>
+    <text x="60" y="310" font-family="Arial" font-size="16" fill="#742a2a" font-weight="bold">State Transition Flow</text>
+
+    <!-- LLM Boundary Box -->
+    <rect x="150" y="340" width="250" height="150" fill="#e6fffa" stroke="#234e52" stroke-width="2" rx="5" fill-opacity="0.3"/>
+    <text x="170" y="360" font-family="Arial" font-size="14" fill="#234e52">LLM Processing</text>
+
+    <!-- Market Environment Boundary Box -->
+    <rect x="450" y="340" width="250" height="150" fill="#fdf6e3" stroke="#653818" stroke-width="2" rx="5" fill-opacity="0.3"/>
+    <text x="470" y="360" font-family="Arial" font-size="14" fill="#653818">Market Environment</text>
+
+    <!-- Main State Nodes -->
+    <circle cx="200" cy="400" r="35" fill="#fff" stroke="#c53030" stroke-width="2"/>
+    <text x="200" y="395" font-family="Arial" font-size="12" text-anchor="middle">State</text>
+    <text x="200" y="410" font-family="Arial" font-size="12" text-anchor="middle">Update</text>
+
+    <circle cx="350" cy="400" r="35" fill="#fff" stroke="#c53030" stroke-width="2"/>
+    <text x="350" y="395" font-family="Arial" font-size="12" text-anchor="middle">Order</text>
+    <text x="350" y="410" font-family="Arial" font-size="12" text-anchor="middle">Generation</text>
+
+    <!-- Market Environment Nodes -->
+    <circle cx="500" cy="400" r="35" fill="#fff" stroke="#c53030" stroke-width="2"/>
+    <text x="500" y="395" font-family="Arial" font-size="12" text-anchor="middle">Order</text>
+    <text x="500" y="410" font-family="Arial" font-size="12" text-anchor="middle">Matching</text>
+
+    <circle cx="650" cy="400" r="35" fill="#fff" stroke="#c53030" stroke-width="2"/>
+    <text x="650" y="395" font-family="Arial" font-size="12" text-anchor="middle">Trade</text>
+    <text x="650" y="410" font-family="Arial" font-size="12" text-anchor="middle">Execution</text>
+
+    <!-- Arrows -->
+    <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#742a2a"/>
+        </marker>
+        <marker id="bluearrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#2c5282"/>
+        </marker>
+    </defs>
+    
+    <!-- Main Flow -->
+    <line x1="235" y1="400" x2="315" y2="400" stroke="#742a2a" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <line x1="385" y1="400" x2="465" y2="400" stroke="#742a2a" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <line x1="535" y1="400" x2="615" y2="400" stroke="#742a2a" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <!-- Modified feedback curve -->
+    <path d="M 650 435 Q 650 550 200 550 Q 200 435 200 435" 
+          fill="none" stroke="#742a2a" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="400" y="565" font-family="Arial" font-size="12" fill="#742a2a">Update Endowment</text>
+
+    <!-- Process Description Box -->
+    <rect x="800" y="50" width="350" height="580" fill="#f0f8f7" stroke="#234e52" stroke-width="2" rx="5"/>
+    <text x="810" y="80" font-family="Arial" font-size="16" fill="#234e52" font-weight="bold">Internal LLM Processing Flow</text>
+
+    <!-- Process Steps with corrected spacing -->
+    <rect x="850" y="100" width="250" height="80" fill="#fff" stroke="#2c7a7b" stroke-width="2" rx="3"/>
+    <text x="875" y="120" font-family="Arial" font-size="14">1. Local Observation Processing</text>
+    <text x="875" y="140" font-family="Arial" font-size="11">- Process new trades in endowment</text>
+    <text x="875" y="155" font-family="Arial" font-size="11">- Update current basket</text>
+    <text x="875" y="170" font-family="Arial" font-size="11">- Calculate current evaluation</text>
+
+    <rect x="850" y="210" width="250" height="80" fill="#fff" stroke="#2c7a7b" stroke-width="2" rx="3"/>
+    <text x="875" y="230" font-family="Arial" font-size="14">2. State Construction</text>
+    <text x="875" y="250" font-family="Arial" font-size="11">- Create SimpleAgentState</text>
+    <text x="875" y="265" font-family="Arial" font-size="11">- Update input_history</text>
+    <text x="875" y="280" font-family="Arial" font-size="11">- Store AuctionInput</text>
+
+    <rect x="850" y="320" width="250" height="80" fill="#fff" stroke="#2c7a7b" stroke-width="2" rx="3"/>
+    <text x="875" y="340" font-family="Arial" font-size="14">3. Message Formatting</text>
+    <text x="875" y="360" font-family="Arial" font-size="11">- Convert state to string</text>
+    <text x="875" y="375" font-family="Arial" font-size="11">- Add profit guidance</text>
+    <text x="875" y="390" font-family="Arial" font-size="11">- Format market summary</text>
+
+    <rect x="850" y="430" width="250" height="80" fill="#fff" stroke="#2c7a7b" stroke-width="2" rx="3"/>
+    <text x="875" y="450" font-family="Arial" font-size="14">4. LLM Response Processing</text>
+    <text x="875" y="470" font-family="Arial" font-size="11">- Parse json_object to Bid/Ask</text>
+    <text x="875" y="485" font-family="Arial" font-size="11">- Validate against schema</text>
+
+    <rect x="850" y="540" width="250" height="60" fill="#fff" stroke="#2c7a7b" stroke-width="2" rx="3"/>
+    <text x="875" y="560" font-family="Arial" font-size="14">5. History Update</text>
+    <text x="875" y="580" font-family="Arial" font-size="11">- Add to actions_history</text>
+    <text x="875" y="595" font-family="Arial" font-size="11">- Update chat context</text>
+
+    <!-- Data Flow Arrows with Transformation Labels -->
+    <line x1="975" y1="180" x2="975" y2="210" stroke="#234e52" stroke-width="2" marker-end="url(#bluearrow)"/>
+    <text x="990" y="200" font-family="Arial" font-size="10" fill="#234e52">SimpleAgentState</text>
+
+    <line x1="975" y1="290" x2="975" y2="320" stroke="#234e52" stroke-width="2" marker-end="url(#bluearrow)"/>
+    <text x="990" y="310" font-family="Arial" font-size="10" fill="#234e52">str(state)</text>
+
+    <line x1="975" y1="400" x2="975" y2="430" stroke="#234e52" stroke-width="2" marker-end="url(#bluearrow)"/>
+    <text x="990" y="420" font-family="Arial" font-size="10" fill="#234e52">LLMOutput</text>
+
+    <line x1="975" y1="510" x2="975" y2="540" stroke="#234e52" stroke-width="2" marker-end="url(#bluearrow)"/>
+    <text x="990" y="530" font-family="Arial" font-size="10" fill="#234e52">Action Object</text>
+
+</svg>

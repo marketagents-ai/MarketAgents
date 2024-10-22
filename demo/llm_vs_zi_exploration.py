@@ -276,19 +276,26 @@ async def main():
         max_relative_spread=0.2,
         seller_base_value=50.0,
         num_replicas=10,
-        max_rounds=1,
+        max_rounds=5,
         num_buyers=25,
-        num_sellers=25,
+        num_sellers=2,
         cost_spread=25,
         match_buyers_sellers=True
     )
-    clones_config = LLMConfig(
-        model="gpt-4o-mini",
-        temperature=0.0,
-        client="openai",
-        response_format="tool",
-        max_tokens=250
-    )  
+    provider = "openai"
+    vllm_model = os.getenv("VLLM_MODEL")
+    if vllm_model is not None and provider == "vllm":
+        clones_config = LLMConfig(client="vllm", model=vllm_model, response_format="tool", max_tokens=250)
+    elif provider == "openai":
+        clones_config = LLMConfig(
+            model="gpt-4o-mini",
+            temperature=0.0,
+            client="openai",
+            response_format="tool",
+            max_tokens=250
+        ) 
+
+    
     experiments = [
         OneWayLLMExperiment(
             primary_variable="num_buyers",
@@ -305,8 +312,8 @@ async def main():
            
         ),
         vllm_request_limits=RequestLimits(
-            max_requests_per_minute=2000,
-            max_tokens_per_minute=1000000,
+            max_requests_per_minute=30000,
+            max_tokens_per_minute=150000000,
         )
     )
     use_cached_results = True
