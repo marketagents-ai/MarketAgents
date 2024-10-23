@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto+Mono&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
 body {
     font-family: Roboto, sans-serif;
@@ -11,30 +11,39 @@ body {
 
 .header-container {
     margin-bottom: 20px;
-    max-width: 150px;
-    line-height: 1;   
-
-}
-
-@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
-.logo {
-    padding: 16px 24px;
+    line-height: 1;
+    columns: 2;
+    column-gap: 20px;
+    display: flex;
+    justify-content: space-between;
+    padding: 24px 24px;
     background-color: #564caf;
     color: whitesmoke;
-    border: 2px solid whitesmoke;
-    border-radius: 5px;
+    border: 0px solid whitesmoke;
+    border-radius: 8px;
     cursor: default;
     text-align: center;
     font-family: 'VT323', monospace;
     font-size: 24px;
-    width: 150px;
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
     text-transform: uppercase;
     letter-spacing: 2px;
     image-rendering: pixelated;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+}
+
+.header-right {
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'VT323', monospace;
+    color: rgb(211, 211, 211);
+    font-style: italic;
 }
 
 .market {
@@ -85,7 +94,7 @@ label {
     
     
 }
-.refresh-button, #searchButton, #prevPage, #nextPage {
+.refresh-button, #searchButton, #prevPage, #nextPage, #pageSizeInput {
     padding: 6px 12px;
     background-color: #564caf;
     color: white;
@@ -99,8 +108,11 @@ label {
 .chart-container {
     width: 80%;
     max-width: 1080px;
+    height: 500px;
     margin: 20px auto;
+    position: relative;
 }
+
 table {
     width: 100%;
     border-collapse: collapse;

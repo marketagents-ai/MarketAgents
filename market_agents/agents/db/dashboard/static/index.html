@@ -3,18 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <title>MarketAgents SQL Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.1/plotly.min.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body><!--
+<body>
     <header>
         <div class="header-container">
-            <div class="logo">
-                <div class="market">MARKET</div>
-                <div class="agents">AGENTS</div>
+            <div class="header-left">
+                <div class="logo">
+                    <div class="market">MARKET</div>
+                    <div class="agents">AGENTS</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="title">AGENT DASHBOARD</div>
             </div>
         </div>
-    </header>-->
+    </header>
     <div class="dashboard">
         <div class="controls-container">
             <button id="refreshButton" class="refresh-button"> ↺ </button>
@@ -22,6 +27,7 @@
             <button id="prevPage" class="prev-page"> ← </button>
             <span id="pageInfo"></span>
             <button id="nextPage" class="next-page"> → </button>
+            <input type="number" id="pageSizeInput" min="1" max="1000" value="100">
             <input type="text" id="searchInput" placeholder="SEARCH">
             <label for="tableSelect"></label>
             <select id="tableSelect"></select>
@@ -35,27 +41,22 @@
             <select id="yColumnSelect"></select>
         </div>
 
-        <div class="chart-container">
-            <canvas id="dataChart"></canvas>
+        <div class="chart-container" style="display: none;">
+            <div id="dataChart"></div>
             <pre id="markdownOutput" class="markdown-output"></pre>
         </div>
         <div style="overflow-x: auto;">
             <table id="dataTable">
-                <thead id="tableHead">
-                    <!-- Table headers will be dynamically inserted here -->
-                </thead>
-                <tbody id="tableBody">
-                    <!-- Table rows will be dynamically inserted here -->
-                </tbody>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
             </table>
         </div>
     </div>
 
     <script>
-        let chartInstance = null;
         let currentPage = 1;
         let totalPages = 1;
-        const pageSize = 100;
+        let pageSize = 100;
 
         async function fetchTables() {
             try {
@@ -65,7 +66,6 @@
                 }
                 const tables = await response.json();
                 await populateTableSelect(tables);
-                // Fetch columns for the initially selected table
                 const initialTable = document.getElementById('tableSelect').value;
                 if (initialTable) {
                     const columns = await fetchColumnNames(initialTable);
@@ -184,16 +184,13 @@
             const tableHead = document.getElementById('tableHead');
             const tableBody = document.getElementById('tableBody');
             
-            // Clear existing table content
             tableHead.innerHTML = '';
             tableBody.innerHTML = '';
 
-            // Create table header
             const headerRow = document.createElement('tr');
             const keys = Object.keys(data[0]);
             keys.forEach((key, index) => {
                 const th = document.createElement('th');
-                // Use actual column names for chart view
                 if (key === 'x_value' && xColumn) {
                     th.textContent = xColumn;
                 } else if (key === 'y_value' && yColumn) {
@@ -206,7 +203,6 @@
             });
             tableHead.appendChild(headerRow);
 
-            // Populate table body
             data.forEach(row => {
                 const tr = document.createElement('tr');
                 keys.forEach(key => {
@@ -279,92 +275,86 @@
         }
 
         function initChart(data, xColumn, yColumn) {
+            const chartContainer = document.querySelector('.chart-container');
+            
             if (data.length === 0) {
+                chartContainer.style.display = 'none';
                 document.getElementById('dataChart').style.display = 'none';
                 return;
-            } else {
-                document.getElementById('dataChart').style.display = 'block';
             }
 
-            const ctx = document.getElementById('dataChart').getContext('2d');
+            chartContainer.style.display = 'block';
+            document.getElementById('dataChart').style.display = 'block';
 
-            // Destroy previous chart instance if exists
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-
-            // Parse data for x and y columns
             const xData = data.map(row => row.x_value);
             const yData = data.map(row => row.y_value);
 
-            // Determine chart type based on data
-            let chartType = 'line';
-            let xAxisType = 'category';
-            let yAxisType = 'linear';
+            // Determine if data is temporal
+            const isDateX = xData.some(x => x instanceof Date);
+            const isDateY = yData.some(y => y instanceof Date);
 
-            if (xData.some(x => x instanceof Date)) {
-                xAxisType = 'time';
-                chartType = 'line';
-            }
-
-            if (yData.some(y => y instanceof Date)) {
-                yAxisType = 'time';
-                chartType = 'line';
-            }
-
-            chartInstance = new Chart(ctx, {
-                type: chartType,
-                data: {
-                    labels: xData,
-                    datasets: [{
-                        label: yColumn,
-                        data: yData,
-                        backgroundColor: '#564caf',
-                        borderColor: '#463e8d',
-                        borderWidth: 1
-                    }]
+            const trace = {
+                x: xData,
+                y: yData,
+                mode: 'lines+markers',
+                type: 'scatter',
+                name: yColumn,
+                line: {
+                    color: '#463e8d',
+                    width: 2
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: {
-                            type: xAxisType,
-                            time: xAxisType === 'time' ? {
-                                unit: 'day',
-                                displayFormats: {
-                                    day: 'MMM D'
-                                }
-                            } : undefined,
-                            title: {
-                                display: true,
-                                text: xColumn
-                            }
-                        },
-                        y: {
-                            type: yAxisType,
-                            time: yAxisType === 'time' ? {
-                                unit: 'day',
-                                displayFormats: {
-                                    day: 'MMM D'
-                                }
-                            } : undefined,
-                            title: {
-                                display: true,
-                                text: yColumn
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        title: {
-                            display: false,
-                            text: `${yColumn} vs ${xColumn}`
-                        }
-                    }
+                marker: {
+                    color: '#564caf',
+                    size: 6
                 }
-            });
+            };
+
+            const layout = {
+                title: {
+                    text: `${yColumn} vs ${xColumn}`,
+                    font: {
+                        size: 16
+                    }
+                },
+                xaxis: {
+                    title: xColumn,
+                    type: isDateX ? 'date' : 'auto',
+                    gridcolor: '#e1e1e1',
+                    zeroline: false
+                },
+                yaxis: {
+                    title: yColumn,
+                    type: isDateY ? 'date' : 'auto',
+                    gridcolor: '#e1e1e1',
+                    zeroline: false
+                },
+                plot_bgcolor: '#ffffff',
+                paper_bgcolor: '#ffffff',
+                margin: {
+                    l: 60,
+                    r: 30,
+                    t: 50,
+                    b: 50
+                },
+                showlegend: false,
+                hovermode: 'closest'
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'chart_export',
+                    height: 500,
+                    width: 700,
+                    scale: 2
+                }
+            };
+
+            Plotly.newPlot('dataChart', [trace], layout, config);
         }
 
         function updatePaginationInfo(currentPage, totalPages) {
@@ -419,22 +409,21 @@
             totalPages = result.total_pages;
             updatePaginationInfo(currentPage, totalPages);
 
-            // Pass xColumn and yColumn to populateTable
             populateTable(result.data, isChartView ? xColumn : null, isChartView ? yColumn : null);
             
             if (isChartView && !searchTerm) {
                 initChart(result.data, xColumn, yColumn);
-                document.getElementById('dataChart').style.display = 'block';
                 document.getElementById('markdownOutput').style.display = 'none';
             } else {
-                if (chartInstance) {
-                    chartInstance.destroy();
+                const chartContainer = document.querySelector('.chart-container');
+                chartContainer.style.display = 'none';
+                if (document.getElementById('dataChart')) {
+                    Plotly.purge('dataChart');
                 }
                 document.getElementById('dataChart').style.display = 'none';
                 document.getElementById('markdownOutput').style.display = 'none';
             }
 
-            // Update input states after refreshing
             updateInputStates();
         }
 
@@ -448,9 +437,9 @@
             const refreshButton = document.getElementById('refreshButton');
             const prevPageButton = document.getElementById('prevPage');
             const nextPageButton = document.getElementById('nextPage');
+            const pageSizeInput = document.getElementById('pageSizeInput');
 
             tableSelect.addEventListener('change', async () => {
-                // Disable inputs while fetching new data
                 tableSelect.disabled = true;
                 xColumnSelect.disabled = true;
                 yColumnSelect.disabled = true;
@@ -458,34 +447,26 @@
                 searchInput.disabled = true;
 
                 try {
-                    // Fetch column names for the new table
                     const columns = await fetchColumnNames(tableSelect.value);
-                    
-                    // Populate column selects with new data
                     populateColumnSelects(columns);
 
-                    // Reset selections and inputs
                     xColumnSelect.selectedIndex = 0;
                     yColumnSelect.selectedIndex = 0;
                     searchInput.value = '';
 
-                    // Set view to 'table' by default
                     viewSelect.value = 'table';
 
-                    // Re-enable inputs
                     xColumnSelect.disabled = true;
                     yColumnSelect.disabled = true;
                     viewSelect.disabled = false;
                     searchInput.disabled = false;
 
-                    // Reset current page and refresh the dashboard
                     currentPage = 1;
                     await refreshDashboard(1);
                 } catch (error) {
                     console.error('Error changing table:', error);
                     alert(`Failed to change table: ${error.message}`);
                 } finally {
-                    // Ensure table select is re-enabled even if an error occurred
                     tableSelect.disabled = false;
                 }
             });
@@ -504,7 +485,8 @@
             prevPageButton.addEventListener('click', () => {
                 if (currentPage > 1) {
                     refreshDashboard(currentPage - 1);
-                }});
+                }
+            });
 
             nextPageButton.addEventListener('click', () => {
                 if (currentPage < totalPages) {
@@ -512,10 +494,16 @@
                 }
             });
 
-            // Fetch tables after all other setup is complete
-            await fetchTables();
+            pageSizeInput.addEventListener('change', () => {
+                pageSize = parseInt(pageSizeInput.value, 10);
+                if (isNaN(pageSize) || pageSize < 1 || pageSize > 1000) {
+                    pageSize = 100;
+                    pageSizeInput.value = '100';
+                }
+                refreshDashboard(1);
+            });
 
-            // Initial refresh of the dashboard
+            await fetchTables();
             await refreshDashboard(1);
 
             const exportMarkdownButton = document.getElementById('exportMarkdownButton');
@@ -525,7 +513,6 @@
             });
         });
 
-        // Helper function to debounce function calls
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -538,15 +525,11 @@
             };
         }
 
-        // Add event listener for search input with debounce
         const debouncedSearch = debounce(() => refreshDashboard(1), 300);
         document.getElementById('searchInput').addEventListener('input', debouncedSearch);
 
-        // Add event listeners for column selection changes
         document.getElementById('xColumnSelect').addEventListener('change', () => refreshDashboard(1));
         document.getElementById('yColumnSelect').addEventListener('change', () => refreshDashboard(1));
-
-        // Add event listener for full table checkbox
         document.getElementById('viewSelect').addEventListener('change', () => refreshDashboard(1));
 
         function tableToMarkdown() {
@@ -557,7 +540,6 @@
             let markdown = '';
             let useTable = true;
 
-            // Check if any cell content is longer than 512 characters
             rows.forEach(row => {
                 Array.from(row.cells).forEach(cell => {
                     if (cell.textContent.length > 512) {
@@ -567,17 +549,14 @@
             });
 
             if (useTable) {
-                // Create table header
                 markdown += '| ' + headers.join(' | ') + ' |\n';
                 markdown += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
 
-                // Create table rows
                 rows.forEach(row => {
                     const cells = Array.from(row.cells).map(cell => cell.textContent);
                     markdown += '| ' + cells.join(' | ') + ' |\n';
                 });
             } else {
-                // Create paragraphs
                 rows.forEach((row, rowIndex) => {
                     markdown += `Row ${rowIndex + 1}:\n\n`;
                     Array.from(row.cells).forEach((cell, cellIndex) => {
@@ -591,9 +570,18 @@
         }
 
         function displayMarkdown(markdown) {
+            const chartContainer = document.querySelector('.chart-container');
             const markdownOutput = document.getElementById('markdownOutput');
-            markdownOutput.textContent = markdown;
+            
+            if (markdown.trim() === '') {
+                chartContainer.style.display = 'none';
+                markdownOutput.style.display = 'none';
+                return;
+            }
+            
+            chartContainer.style.display = 'block';
             markdownOutput.style.display = 'block';
+            markdownOutput.textContent = markdown;
             document.getElementById('dataChart').style.display = 'none';
         }
     </script>
