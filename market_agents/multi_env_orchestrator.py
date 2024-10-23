@@ -1,4 +1,4 @@
-# joint_orchestrator.py
+# multi_env_orchestrator.py
 
 import asyncio
 import json
@@ -44,42 +44,15 @@ from market_agents.inference.message_models import LLMConfig, LLMOutput, LLMProm
 from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
 from market_agents.insert_simulation_data import SimulationDataInserter
 from market_agents.logger_utils import (
-    log_section,
-    log_environment_setup,
-    log_agent_init,
-    log_running,
-    log_perception,
-    log_action,
-    log_reflection,
-    log_round,
-    log_completion
+    setup_logger, print_ascii_art, log_section, log_agent_init, log_perception, log_action, log_reflection,
+    log_round, log_environment_setup, log_completion, log_trade
 )
 
-# Set up logging for this module
-logger = logging.getLogger(__name__)
-logger.handlers = []
+import warnings
+warnings.filterwarnings("ignore", module="pydantic")
 
-# Create a formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# Add a file handler to log to a file
-file_handler = logging.FileHandler('joint_orchestrator.log')
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Add a stream handler to log to console
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
-
-# Set the logger's level to INFO
-logger.setLevel(logging.INFO)
-
-# Prevent propagation to avoid double logging
-logger.propagate = False
-
+# Set up logging using logger_utils
+logger = setup_logger(__name__)
 
 class AgentConfig(BaseModel):
     num_units: int
@@ -108,7 +81,7 @@ class GroupChatConfig(BaseModel):
     max_rounds: int
     initial_topic: str
     sub_rounds: int = Field(default=3)
-    group_size: int = Field(default=100)
+    # Removed group_size as we are using a single batch
 
 
 class LLMConfigModel(BaseModel):
@@ -224,7 +197,7 @@ class Orchestrator:
         self.environments: Dict[str, MultiAgentEnvironment] = {}
         self.dashboard = None
         self.database = None
-        self.simulation_order = ['group_chat', 'auction']
+        # Removed self.simulation_order as it's no longer needed for multiple environments
         self.simulation_data: List[Dict[str, Any]] = []
         self.latest_data = None
         self.trackers: Dict[str, Union[AuctionTracker, GroupChatTracker]] = {}
@@ -244,9 +217,7 @@ class Orchestrator:
             oai_request_limits=oai_request_limits,
             anthropic_request_limits=anthropic_request_limits
         )
-        self.group_size = config.environment_configs['group_chat'].group_size
-        self.sub_rounds_per_group_chat = config.environment_configs['group_chat'].sub_rounds
-        self.agent_batches: List[List[MarketAgent]] = []
+        # Removed batching attributes
         self.agent_surpluses = {}
         self.agent_dict: Dict[str, MarketAgent] = {}
         self.topic_proposer = None
@@ -270,12 +241,7 @@ class Orchestrator:
 
         return existing_personas[:self.config.num_agents]
     
-    def batch_agents(self):
-        self.agent_batches = [
-            self.agents[i:i + self.group_size]
-            for i in range(0, len(self.agents), self.group_size)
-        ]
-        logger.info(f"Agents divided into {len(self.agent_batches)} batches of up to {self.group_size} agents each.")
+    # Removed batch_agents method as batching is no longer needed
 
     def generate_agents(self):
         log_section(logger, "INITIALIZING MARKET AGENTS")
@@ -297,17 +263,30 @@ class Orchestrator:
                 persona.role = "seller"
 
             agent_config = self.config.agent_config.dict()
+            good_name = agent_config.get('good_name', 'apple')
+            
             if is_buyer:
                 initial_cash = agent_config.get('buyer_initial_cash', 1000)
                 initial_goods_quantity = agent_config.get('buyer_initial_goods', 0)
                 base_value = agent_config.get('buyer_base_value', 120.0)
+                value_schedule = BuyerPreferenceSchedule(
+                    num_units=agent_config.get('num_units', 10),
+                    base_value=base_value,
+                    noise_factor=agent_config.get('noise_factor', 0.05)
+                )
+                value_schedules = {good_name: value_schedule}
+                cost_schedules = {}
             else:
                 initial_cash = agent_config.get('seller_initial_cash', 0)
                 initial_goods_quantity = agent_config.get('seller_initial_goods', 10)
                 base_value = agent_config.get('seller_base_value', 80.0)
-
-            good_name = agent_config.get('good_name', 'apple')
-            initial_goods = {good_name: initial_goods_quantity}
+                cost_schedule = SellerPreferenceSchedule(
+                    num_units=agent_config.get('num_units', 10),
+                    base_value=base_value,
+                    noise_factor=agent_config.get('noise_factor', 0.05)
+                )
+                value_schedules = {}
+                cost_schedules = {good_name: cost_schedule}
 
             # Create initial basket and endowment
             initial_basket = Basket(
@@ -319,26 +298,7 @@ class Orchestrator:
                 agent_id=agent_uuid
             )
 
-            # Create preference schedules
-            if is_buyer:
-                value_schedules = {
-                    good_name: BuyerPreferenceSchedule(
-                        num_units=agent_config.get('num_units', 10),
-                        base_value=base_value,
-                        noise_factor=agent_config.get('noise_factor', 0.05)
-                    )
-                }
-                cost_schedules = {}
-            else:
-                value_schedules = {}
-                cost_schedules = {
-                    good_name: SellerPreferenceSchedule(
-                        num_units=agent_config.get('num_units', 10),
-                        base_value=base_value,
-                        noise_factor=agent_config.get('noise_factor', 0.05)
-                    )
-                }
-
+            # Create economic agent
             economic_agent = EconomicAgent(
                 id=agent_uuid,
                 endowment=endowment,
@@ -347,6 +307,7 @@ class Orchestrator:
                 max_relative_spread=agent_config.get('max_relative_spread', 0.2)
             )
 
+            # Create MarketAgent
             agent = MarketAgent.create(
                 agent_id=agent_uuid,
                 use_llm=agent_config.get('use_llm', True),
@@ -357,20 +318,23 @@ class Orchestrator:
                 econ_agent=economic_agent
             )
 
-            # Initialize last_perception and last_observation
+            # Initialize agent attributes
             agent.last_perception = None
             agent.last_observation = None
             agent.last_step = None
             agent.index = i
+
+            # Append to agents list and dictionary
             self.agents.append(agent)
             self.agent_dict[agent.id] = agent
+
+            # Log agent initialization using log_agent_init
             log_agent_init(logger, agent.index, is_buyer, persona)
-        
+
         # Initialize topic_proposer
         self.topic_proposer = random.choice(self.agents)
         self.topic_proposer.system = "You are the group chat topic proposer agent. Your role is to propose interesting and relevant topics for the group discussion."
-        self.batch_agents()
-        logger.info(f"Topic proposer initialized: Agent {self.topic_proposer.id}")
+        logger.info(f"Topic proposer initialized: Agent {self.topic_proposer.id} with role: {'Buyer' if self.topic_proposer.role == 'buyer' else 'Seller'}")
 
     def setup_environments(self):
         log_section(logger, "CONFIGURING ENVIRONMENTS")
@@ -396,29 +360,28 @@ class Orchestrator:
             logger.error("Auction configuration not found in environment_configs.")
             raise ValueError("Auction configuration missing.")
 
-        # Create GroupChat Environments per Batch
+        # Create a single GroupChat Environment with all agents
         group_chat_config = self.config.environment_configs.get('group_chat')
         if group_chat_config:
-            for batch_index, batch in enumerate(self.agent_batches):
-                group_chat = GroupChat(
-                    max_rounds=group_chat_config.max_rounds,
-                    current_topic=group_chat_config.initial_topic,  # Fixed here
-                    speaker_order=[str(agent.id) for agent in batch],
-                    sequential=False,
-                    sub_rounds=self.sub_rounds_per_group_chat
-                )
-                group_chat_env_name = f"group_chat_batch_{batch_index}"
-                group_chat_env = MultiAgentEnvironment(
-                    name=f"{group_chat_config.name}_batch_{batch_index}",
-                    address=f"{group_chat_config.address}_{batch_index}",
-                    max_steps=group_chat_config.max_rounds,
-                    action_space=GroupChatActionSpace(),
-                    observation_space=GroupChatObservationSpace(),
-                    mechanism=group_chat
-                )
-                self.environments[group_chat_env_name] = group_chat_env
-                self.trackers[group_chat_env_name] = GroupChatTracker()
-                log_environment_setup(logger, group_chat_env_name)
+            group_chat = GroupChat(
+                max_rounds=group_chat_config.max_rounds,
+                current_topic=group_chat_config.initial_topic,  # Fixed here
+                speaker_order=[str(agent.id) for agent in self.agents],
+                sequential=False,
+                sub_rounds=group_chat_config.sub_rounds
+            )
+            group_chat_env_name = "group_chat_single_batch"
+            group_chat_env = MultiAgentEnvironment(
+                name=group_chat_config.name,
+                address=group_chat_config.address,
+                max_steps=group_chat_config.max_rounds,
+                action_space=GroupChatActionSpace(),
+                observation_space=GroupChatObservationSpace(),
+                mechanism=group_chat
+            )
+            self.environments[group_chat_env_name] = group_chat_env
+            self.trackers[group_chat_env_name] = GroupChatTracker()
+            log_environment_setup(logger, group_chat_env_name)
         else:
             logger.error("GroupChat configuration not found in environment_configs.")
             raise ValueError("GroupChat configuration missing.")
@@ -435,9 +398,10 @@ class Orchestrator:
         # Check if required tables exist
         if not self.data_inserter.check_tables_exist():
             create_tables(db_params=self.db_params)
+            logger.info("Database tables created.")
         else:
             logger.info("Required tables already exist.")
-        logger.info("Database setup completed")
+        log_completion(logger, "Database setup completed")
 
     async def run_parallel_ai_completion(self, prompts: List[LLMPromptContext]) -> List[LLMOutput]:
         # Implement batching within AI completions if necessary
@@ -447,32 +411,32 @@ class Orchestrator:
         self.data_inserter.insert_ai_requests(ai_requests)
         return results
 
-    async def run_parallel_perceive(self, env_name: str, batch: List[MarketAgent] = None) -> List[LLMPromptContext]:
+    async def run_parallel_perceive(self, env_name: str, agents_subset: List[MarketAgent] = None) -> List[LLMPromptContext]:
         perceive_prompts = []
-        if env_name.startswith('group_chat_batch_'):
-            # Per batch perceive
-            for agent in batch:
-                perceive_prompt = await agent.perceive(env_name, return_prompt=True)
-                perceive_prompts.append(perceive_prompt)
-        else:
-            # For auction perceive all agents
+        if env_name == 'group_chat_single_batch':
+            # Perceive for all agents in the single group chat
             for agent in self.agents:
                 perceive_prompt = await agent.perceive(env_name, return_prompt=True)
                 perceive_prompts.append(perceive_prompt)
+        elif env_name == 'auction':
+            # Perceive for all agents in the auction
+            for agent in self.agents:
+                perceive_prompt = await agent.perceive(env_name, return_prompt=True)
+                perceive_prompts.append(perceive_prompt)
+        else:
+            logger.error(f"Unknown environment: {env_name}")
+            raise ValueError(f"Unknown environment: {env_name}")
         return perceive_prompts
 
-    async def run_parallel_generate_action(self, env_name: str, perceptions: List[str], batch: List[MarketAgent] = None) -> List[LLMPromptContext]:
+    async def run_parallel_generate_action(self, env_name: str, perceptions: List[str]) -> List[LLMPromptContext]:
         action_prompts = []
-        if env_name.startswith('group_chat_batch_'):
-            # Per batch generate_action
-            for agent, perception in zip(batch, perceptions):
-                action_prompt = await agent.generate_action(env_name, perception, return_prompt=True)
-                action_prompts.append(action_prompt)
-        else:
-            # For auction generate_action for all agents
+        if env_name in ['group_chat_single_batch', 'auction']:
             for agent, perception in zip(self.agents, perceptions):
                 action_prompt = await agent.generate_action(env_name, perception, return_prompt=True)
                 action_prompts.append(action_prompt)
+        else:
+            logger.error(f"Unknown environment: {env_name}")
+            raise ValueError(f"Unknown environment: {env_name}")
         return action_prompts
 
     async def run_parallel_reflect(self, env_name: str) -> List[LLMPromptContext]:
@@ -482,22 +446,21 @@ class Orchestrator:
                 reflect_prompt = await agent.reflect(env_name, return_prompt=True)
                 reflect_prompts.append(reflect_prompt)
             else:
-                logger.info(f"Skipping reflection for agent {agent.index} due to no observation")
+                log_skipped(logger, f"Skipping reflection for agent {agent.index} due to no observation")
         return reflect_prompts
 
     def set_agent_system_messages(self, env_name: str, round_num: int, sub_round_num: int = None, **kwargs):
-        if env_name.startswith('group_chat_batch_'):
-            # Extract batch index
-            batch_index = env_name.split('_')[-1]
-            for agent in self.agent_batches[int(batch_index)]:
-                if sub_round_num:
+        if env_name == 'group_chat_single_batch':
+            if sub_round_num:
+                for agent in self.agents:
                     agent.system = (
                         f"You are participating in sub-round {sub_round_num} of round {round_num} "
                         f"in a group chat about '{kwargs.get('current_topic', 'various topics')}'. "
                         f"Your role is {'buyer' if agent.role == 'buyer' else 'seller'}. "
                         "Engage in the discussion and share your insights."
                     )
-                else:
+            else:
+                for agent in self.agents:
                     agent.system = (
                         f"You are participating in round {round_num} "
                         f"in a group chat about '{kwargs.get('current_topic', 'various topics')}'. "
@@ -562,85 +525,65 @@ class Orchestrator:
                             else:
                                 agent.system = f"You have no more {good_name} to sell."
 
-    async def run_environment(self, env_name: str, round_num: int, sub_round_num: int = None, batch: List[MarketAgent] = None) -> EnvironmentStep:
+    async def run_environment(self, env_name: str, round_num: int, sub_round_num: int = None) -> EnvironmentStep:
         env = self.environments[env_name]
         tracker = self.trackers[env_name]
 
-        log_running(logger, env_name)
-
+        log_environment_setup(logger, env_name)
+        if sub_round_num:
+            logger.info(f"Sub-round {sub_round_num}")
+        
         if env_name == 'auction':
             # Reset pending orders at the beginning of the auction round
             for agent in self.agents:
                 agent.economic_agent.reset_all_pending_orders()
 
         # Set system messages for agents based on environment
-        if env_name.startswith('group_chat_batch_'):
+        if env_name == 'group_chat_single_batch':
             self.set_agent_system_messages(env_name, round_num, sub_round_num=sub_round_num, current_topic=self.current_topic)
         elif env_name == 'auction':
             good_name = env.mechanism.good_name
             self.set_agent_system_messages(env_name, round_num, good_name=good_name)
 
         # Run parallel perceive
-        if env_name.startswith('group_chat_batch_'):
-            batch_index = int(env_name.split('_')[-1])
-            batch_agents = self.agent_batches[batch_index]
-            perception_prompts = await self.run_parallel_perceive(env_name, batch=batch_agents)
-        else:
-            perception_prompts = await self.run_parallel_perceive(env_name)
-        
+        perception_prompts = await self.run_parallel_perceive(env_name)
         perceptions = await self.run_parallel_ai_completion(perception_prompts)
         perceptions_map = {perception.source_id: perception for perception in perceptions}
 
-        if env_name.startswith('group_chat_batch_'):
-            batch_index = int(env_name.split('_')[-1])
-            batch_agents = self.agent_batches[batch_index]
-            for agent in batch_agents:
-                perception = perceptions_map.get(agent.id)
-                if perception:
-                    log_section(logger, f"Current Agent:\nAgent {agent.index} with persona:\n{agent.persona}")
-                    perception_content = perception.json_object.object if perception.json_object else perception.str_content
-                    log_perception(logger, agent.index, f"{Fore.CYAN}{perception_content}{Style.RESET_ALL}")
-                    agent.last_perception = perception_content
-                else:
-                    logger.warning(f"No perception found for agent {agent.index} in {env_name}")
-                    agent.last_perception = None  # Ensure it's set even if None
-        else:
+        if env_name == 'group_chat_single_batch':
             for agent in self.agents:
                 perception = perceptions_map.get(agent.id)
                 if perception:
-                    log_section(logger, f"Current Agent:\nAgent {agent.index} with persona:\n{agent.persona}")
-                    if env_name == 'group_chat':
+                    log_section(logger, agent.persona)
+                    perception_content = perception.json_object.object if perception.json_object else perception.str_content
+                    log_perception(logger, agent.index, json.dumps(perception_content, indent=2))
+                    agent.last_perception = perception_content
+                else:
+                    log_skipped(logger, f"No perception found for agent {agent.index} in {env_name}")
+                    agent.last_perception = None
+        elif env_name == 'auction':
+            for agent in self.agents:
+                perception = perceptions_map.get(agent.id)
+                if perception:
+                    log_section(logger, agent.persona)
+                    if env_name == 'auction':
                         perception_content = perception.json_object.object if perception.json_object else perception.str_content
-                        log_perception(logger, agent.index, f"{Fore.CYAN}{perception_content}{Style.RESET_ALL}")
-                        agent.last_perception = perception_content
-                    elif env_name == 'auction':
-                        perception_content = perception.json_object.object if perception.json_object else None
-                        log_perception(logger, agent.index, f"{Fore.CYAN}{json.dumps(perception_content)}{Style.RESET_ALL}")
+                        log_perception(logger, agent.index, json.dumps(perception_content, indent=2))
                         agent.last_perception = perception_content
                 else:
-                    logger.warning(f"No perception found for agent {agent.index} in {env_name}")
-                    agent.last_perception = None  # Ensure it's set even if None
+                    log_skipped(logger, f"No perception found for agent {agent.index} in {env_name}")
+                    agent.last_perception = None
 
         # Extract perception content to pass to generate_action
-        if env_name.startswith('group_chat_batch_'):
-            batch_index = int(env_name.split('_')[-1])
-            batch_agents = self.agent_batches[batch_index]
-            perception_contents = [agent.last_perception or "" for agent in batch_agents]
-        else:
-            perception_contents = [agent.last_perception or "" for agent in self.agents]
+        perception_contents = [agent.last_perception or "" for agent in self.agents]
 
         # Run parallel generate_action
-        if env_name.startswith('group_chat_batch_'):
-            batch_index = int(env_name.split('_')[-1])
-            batch_agents = self.agent_batches[batch_index]
-            action_prompts = await self.run_parallel_generate_action(env_name, perception_contents, batch=batch_agents)
-        else:
-            action_prompts = await self.run_parallel_generate_action(env_name, perception_contents)
+        action_prompts = await self.run_parallel_generate_action(env_name, perception_contents)
 
         actions = await self.run_parallel_ai_completion(action_prompts)
         actions_map = {action.source_id: action for action in actions}
 
-        if env_name.startswith('group_chat_batch_'):
+        if env_name == 'group_chat_single_batch':
             global_action = self.process_group_chat_actions(actions_map)
         elif env_name == 'auction':
             global_action = self.process_auction_actions(actions_map, env)
@@ -648,12 +591,12 @@ class Orchestrator:
         try:
             env_state = env.step(global_action)
         except Exception as e:
-            logger.error(f"Error in environment {env_name}: {str(e)}")
+            log_section(logger, f"Error in environment {env_name}: {str(e)}")
             raise e  # Re-raise the exception to be caught in run_simulation
 
         logger.info(f"Completed {env_name} step")
 
-        if env_name.startswith('group_chat_batch_') and isinstance(env_state.global_observation, GroupChatGlobalObservation):
+        if env_name == 'group_chat_single_batch' and isinstance(env_state.global_observation, GroupChatGlobalObservation):
             self.process_group_chat_messages(env_state.global_observation, tracker)
         elif env_name == 'auction' and isinstance(env_state.global_observation, AuctionGlobalObservation):
             self.process_trades(env_state.global_observation, tracker)
@@ -672,9 +615,11 @@ class Orchestrator:
                 )
                 group_chat_action = GroupChatAction(agent_id=agent_id, action=group_chat_message)
                 agent_actions[agent_id] = group_chat_action.model_dump()
-                # Use the agent's index for logging instead of trying to convert the UUID to an int
                 agent = next((a for a in self.agents if a.id == agent_id), None)
-                log_action(logger, agent.index if agent else "Unknown", f"{Fore.BLUE}Message: {group_chat_message.content}{Style.RESET_ALL}")
+                if agent:
+                    log_action(logger, agent.index, f"Message: {group_chat_message.content}")
+                else:
+                    log_skipped(logger, f"Unknown agent {agent_id} attempted to send a message.")
             except (KeyError, ValueError, json.JSONDecodeError) as e:
                 logger.error(f"Error creating GroupChatAction for agent {agent_id}: {str(e)}")
                 continue
@@ -687,13 +632,11 @@ class Orchestrator:
             try:
                 action_content = action_output.json_object.object if action_output.json_object else json.loads(action_output.str_content or '{}')
                 if 'price' in action_content and 'quantity' in action_content:
-                    # Optionally, you can modify quantity or other parameters here
                     action_content['quantity'] = 1  # Ensuring quantity is 1 as per original code
 
-                    # Determine if the agent is a buyer or seller
                     agent = self.agent_dict.get(agent_id)
                     if not agent:
-                        logger.warning(f"Agent with ID {agent_id} not found.")
+                        log_skipped(logger, f"Agent with ID {agent_id} not found.")
                         continue
 
                     if agent.role == "buyer":
@@ -704,13 +647,10 @@ class Orchestrator:
                         raise ValueError(f"Invalid agent role: {agent.role}")
 
                     agent_actions[agent_id] = AuctionAction(agent_id=agent_id, action=auction_action)
-
-                    # Update agent's pending orders
                     agent.economic_agent.pending_orders.setdefault(good_name, []).append(auction_action)
 
                     action_type = "Bid" if isinstance(auction_action, Bid) else "Ask"
-                    color = Fore.BLUE if action_type == "Bid" else Fore.GREEN
-                    log_action(logger, agent.index, f"{color}{action_type}: {auction_action}{Style.RESET_ALL}")
+                    log_action(logger, agent.index, f"{action_type}: {auction_action}")
                 else:
                     raise ValueError(f"Invalid action content: {action_content}")
             except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -727,48 +667,60 @@ class Orchestrator:
             seller = self.agent_dict.get(trade.seller_id)
 
             if not buyer or not seller:
-                logger.warning(f"Skipping trade: buyer or seller not found. Buyer ID: {trade.buyer_id}, Seller ID: {trade.seller_id}")
+                log_skipped(logger, f"Skipping trade: buyer or seller not found. Buyer ID: {trade.buyer_id}, Seller ID: {trade.seller_id}")
                 continue
 
-            buyer_value = buyer.economic_agent.value_schedules[self.config.agent_config.good_name].get_value(trade.quantity)
-            seller_cost = seller.economic_agent.cost_schedules[self.config.agent_config.good_name].get_value(trade.quantity)
+            # Log roles of buyer and seller
+            logger.info(f"Trade Details: Trade ID: {trade.trade_id}, Buyer ID: {buyer.id}, Role: {buyer.role}, Seller ID: {seller.id}, Role: {seller.role}")
 
-            logger.info(f"Buyer value: {buyer_value}, Seller cost: {seller_cost}, Trade price: {trade.price}")
+            if buyer.role != "buyer" or seller.role != "seller":
+                logger.error(f"Agent roles mismatch: Buyer ID: {buyer.id} is '{buyer.role}', Seller ID: {seller.id} is '{seller.role}'")
+                raise ValueError(f"Agent is neither a buyer nor a seller for trade {trade}")
 
-            if trade.price > buyer_value or trade.price < seller_cost:
-                logger.warning(f"Skipping invalid trade: price={trade.price}, buyer_value={buyer_value}, seller_cost={seller_cost}")
+            try:
+                buyer_value = buyer.economic_agent.value_schedules[self.config.agent_config.good_name].get_value(trade.quantity)
+                seller_cost = seller.economic_agent.cost_schedules[self.config.agent_config.good_name].get_value(trade.quantity)
+
+                logger.info(f"Buyer value: {buyer_value}, Seller cost: {seller_cost}, Trade price: {trade.price}")
+
+                if trade.price > buyer_value or trade.price < seller_cost:
+                    log_skipped(logger, f"Skipping invalid trade: price={trade.price}, buyer_value={buyer_value}, seller_cost={seller_cost}")
+                    continue
+
+                logger.info(f"Processing trade between Buyer {buyer.index} and Seller {seller.index}")
+
+                buyer_utility_before = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
+                seller_utility_before = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
+
+                logger.info(f"Buyer utility before: {buyer_utility_before}, Seller utility before: {seller_utility_before}")
+
+                buyer.economic_agent.process_trade(trade)
+                seller.economic_agent.process_trade(trade)
+
+                buyer_utility_after = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
+                seller_utility_after = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
+
+                logger.info(f"Buyer utility after: {buyer_utility_after}, Seller utility after: {seller_utility_after}")
+
+                buyer_surplus = buyer_utility_after - buyer_utility_before
+                seller_surplus = seller_utility_after - seller_utility_before
+
+                logger.info(f"Buyer surplus: {buyer_surplus}, Seller surplus: {seller_surplus}")
+
+                agent_surpluses[buyer.id] = agent_surpluses.get(buyer.id, 0) + buyer_surplus
+                agent_surpluses[seller.id] = agent_surpluses.get(seller.id, 0) + seller_surplus
+
+                trade_surplus = buyer_surplus + seller_surplus
+
+                tracker.add_trade(trade)
+                round_surplus += trade_surplus
+                round_quantity += trade.quantity
+                log_trade(logger, buyer.index, seller.index, self.config.agent_config.good_name, trade.price)
+
+            except Exception as e:
+                logger.error(f"Error processing trade: {e}")
+                logger.exception("Exception details:")
                 continue
-
-            logger.info(f"Processing trade between buyer {buyer.index} and seller {seller.index}")
-
-            buyer_utility_before = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
-            seller_utility_before = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
-
-            logger.info(f"Buyer utility before: {buyer_utility_before}, Seller utility before: {seller_utility_before}")
-
-            buyer.economic_agent.process_trade(trade)
-            seller.economic_agent.process_trade(trade)
-
-            buyer_utility_after = buyer.economic_agent.calculate_utility(buyer.economic_agent.endowment.current_basket)
-            seller_utility_after = seller.economic_agent.calculate_utility(seller.economic_agent.endowment.current_basket)
-
-            logger.info(f"Buyer utility after: {buyer_utility_after}, Seller utility after: {seller_utility_after}")
-
-            buyer_surplus = buyer_utility_after - buyer_utility_before
-            seller_surplus = seller_utility_after - seller_utility_before
-
-            logger.info(f"Buyer surplus: {buyer_surplus}, Seller surplus: {seller_surplus}")
-
-            agent_surpluses[buyer.id] = agent_surpluses.get(buyer.id, 0) + buyer_surplus
-            agent_surpluses[seller.id] = agent_surpluses.get(seller.id, 0) + seller_surplus
-
-            trade_surplus = buyer_surplus + seller_surplus
-
-            tracker.add_trade(trade)
-            round_surplus += trade_surplus
-            round_quantity += trade.quantity
-            logger.info(f"Executed trade: {trade}")
-            logger.info(f"Trade surplus: {trade_surplus}")
 
         tracker.add_round_data(round_surplus, round_quantity)
         logger.info(f"Round summary - Surplus: {round_surplus}, Quantity: {round_quantity}")
@@ -779,16 +731,20 @@ class Orchestrator:
     def process_group_chat_messages(self, global_observation: GroupChatGlobalObservation, tracker: GroupChatTracker):
         for message in global_observation.all_messages:
             tracker.add_message(message)
+            agent = next((a for a in self.agents if a.id == message.agent_id), None)
+            if agent:
+                log_action(logger, agent.index, f"Group Chat Message: {message.content}")
+            else:
+                log_skipped(logger, f"Unknown agent {message.agent_id} sent a message.")
         if global_observation.current_topic != self.current_topic:
             self.current_topic = global_observation.current_topic
             tracker.add_topic(self.current_topic)
+            logger.info(f"New topic introduced: {self.current_topic}")
         logger.info(f"Processed {len(global_observation.all_messages)} messages in group chat")
 
     def update_simulation_state(self, env_name: str, env_state: EnvironmentStep):
-        if env_name.startswith('group_chat_batch_'):
-            batch_index = int(env_name.split('_')[-1])
-            batch_agents = self.agent_batches[batch_index]
-            for agent in batch_agents:
+        if env_name == 'group_chat_single_batch':
+            for agent in self.agents:
                 agent_observation = env_state.global_observation.observations.get(agent.id)
                 if agent_observation:
                     agent.last_observation = agent_observation
@@ -835,85 +791,45 @@ class Orchestrator:
     def insert_ai_requests(self, ai_requests):
         self.data_inserter.insert_ai_requests(ai_requests)
 
-    async def generate_initial_topic(self) -> str:
-        if self.topic_proposer is None:
-            raise ValueError("topic_proposer is not initialized")
+    async def generate_topic_for_group_chat(self, topic_proposer: MarketAgent, round_num: int) -> str:
+        group_chat_env_name = "group_chat_single_batch"
         
-        # Reference a valid group_chat_batch environment, e.g., group_chat_batch_0
-        if not self.agent_batches:
-            raise ValueError("No agent batches available for group chat.")
-
-        first_batch_env_name = "group_chat_batch_0" if len(self.agent_batches) > 0 else None
-        if not first_batch_env_name or first_batch_env_name not in self.environments:
-            raise ValueError("No valid group_chat_batch_x environment found for topic generation.")
-
-        topic_action = await self.topic_proposer.generate_action(
-            first_batch_env_name,  # Updated environment name
-            "Consider recent economic events, market trends, or financial news."
-        )
-        logger.debug(f"Topic proposer {self.topic_proposer.id} generated action: {topic_action}")
-
-        try:
-            if isinstance(topic_action, dict):
-                if 'content' in topic_action:
-                    if isinstance(topic_action['content'], dict) and 'action' in topic_action['content']:
-                        content = topic_action['content']['action']['content']
-                    else:
-                        content = topic_action['content']
-                elif 'action' in topic_action:
-                    content = topic_action['action']['content']
-                else:
-                    raise ValueError("Unexpected topic_action structure")
-            else:
-                raise ValueError("topic_action is not a dictionary")
-
-            logger.info(f"Proposed topic: {Fore.YELLOW}{content}{Style.RESET_ALL}")
-            return content
-        except Exception as e:
-            logger.error(f"Invalid topic action structure: {e}")
-            default_topic = "Default topic: Recent market trends"
-            logger.info(f"Using default topic: {Fore.YELLOW}{default_topic}{Style.RESET_ALL}")
-            return default_topic
-
-    async def generate_new_topic_based_on_market(self) -> str:
+        # Get the good name from the auction config
+        auction_config = self.config.environment_configs.get('auction')
+        if not auction_config:
+            logger.error("Auction configuration not found.")
+            good_name = "unknown good"
+        else:
+            good_name = auction_config.good_name
+        
+        # Check if market data is available (i.e., after the first round)
         auction_env = self.environments.get('auction')
-        if not auction_env:
-            logger.error("Auction environment not found.")
-            return "Default topic: Market Overview"
-
-        # Get the latest global state
-        latest_observation = auction_env.get_global_state()
-        if not latest_observation:
-            logger.warning("No global state available.")
-            return "Initial market discussion"
-
-        # Select a random batch
-        batch_index = random.randint(0, len(self.agent_batches) - 1)
-        group_chat_env_name = f"group_chat_batch_{batch_index}"
-
-        if group_chat_env_name not in self.environments:
-            logger.error(f"Group chat environment {group_chat_env_name} not found.")
-            return "General market discussion"
-
-        # Select a random agent from the chosen batch as the topic proposer
-        topic_proposer = random.choice(self.agent_batches[batch_index])
-
-        # Prepare the prompt with the latest market data
-        prompt = (
-            f"Consider the following market data:\n{latest_observation}\n\n"
-            f"Based on this information and the current topic '{self.current_topic}', "
-            "propose an interesting and relevant topic for the next round of market discussion. "
-            "The topic should be related to the current market conditions, trends, or potential strategies. "
-            "Suggest a single, concise topic (1-2 sentences) that captures an important "
-            "aspect of the current market situation or a relevant economic concept."
-        )
-
-        # Use the topic proposer's generate_action method
-        topic_action = await topic_proposer.generate_action(
-            group_chat_env_name,
-            prompt
-        )
-
+        if auction_env and round_num > 1:
+            latest_observation = auction_env.get_global_state()
+            if not latest_observation:
+                log_skipped(logger, "No global state available for auction; reverting to a general topic prompt.")
+                latest_observation = f"General market trends and strategies for the {good_name} market"
+            
+            # Market-based prompt for subsequent rounds
+            prompt = (
+                f"Consider the following market data for the {good_name} market:\n{latest_observation}\n\n"
+                f"Based on this information and the current topic '{self.current_topic}', "
+                f"propose an interesting and relevant topic for the next round of {good_name} market discussion. "
+                "The topic should be related to the current market conditions, trends, or potential strategies. "
+                "Suggest a single, concise topic (1-2 sentences) that captures an important aspect "
+                f"of the current {good_name} market situation or a relevant economic concept."
+            )
+        else:
+            # General prompt for the first round (or if no market data is available)
+            prompt = (
+                f"Consider recent economic events, market trends, or financial news related to the {good_name} market "
+                "to propose a relevant discussion topic. Focus on aspects that might affect supply, demand, "
+                f"or pricing of {good_name}s in the upcoming auction rounds."
+            )
+        
+        # Generate the topic using the topic proposer
+        topic_action = await topic_proposer.generate_action(group_chat_env_name, prompt)
+    
         logger.debug(f"Topic proposer {topic_proposer.id} generated action: {topic_action}")
 
         try:
@@ -931,108 +847,68 @@ class Orchestrator:
                 raise ValueError("topic_action is not a dictionary")
         except Exception as e:
             logger.error(f"Invalid topic action structure: {e}")
-            new_topic = "General market trends and strategies"
+            new_topic = f"Default topic for discussion: General {good_name} market discussion"
 
-        logger.info(f"Generated new topic based on market: {new_topic}")
+        # Colored print for the new topic
+        print(f"{Fore.CYAN}Generated new topic:{Fore.YELLOW} {new_topic}{Style.RESET_ALL}")
+        logger.info(f"Generated new topic: {new_topic}")
         return new_topic
 
     async def run_simulation(self):
         log_section(logger, "SIMULATION COMMENCING")
 
-        # Initialize the first topic
-        initial_topic = await self.generate_initial_topic()
-        self.current_topic = initial_topic
-
         # Limit the number of concurrent group chat tasks to prevent resource exhaustion
         semaphore = asyncio.Semaphore(100)  # Adjust based on system capabilities
 
-        async def run_group_chat(env_name: str, round_num: int, sub_round_num: int, batch: List[MarketAgent]):
+        async def run_group_chat(env_name: str, round_num: int, sub_round_num: int):
             async with semaphore:
-                await self.run_environment(env_name, round_num, sub_round_num=sub_round_num, batch=batch)
+                await self.run_environment(env_name, round_num, sub_round_num=sub_round_num)
 
         try:
             for round_num in range(1, self.config.max_rounds + 1):
                 log_round(logger, round_num)
+            
+                # Generate a topic for the group chat
+                new_topic = await self.generate_topic_for_group_chat(self.topic_proposer, round_num)
+                
+                # Update the environment with the new topic
+                self.current_topic = new_topic
+                self.environments["group_chat_single_batch"].mechanism.current_topic = new_topic
+                logger.info(f"Updated topic for group_chat_single_batch: {new_topic}")
 
-                # Run multiple sub-rounds within group chats
-                for sub_round in range(1, self.sub_rounds_per_group_chat + 1):
-                    group_chat_tasks = []
-                    for batch_index, batch in enumerate(self.agent_batches):
-                        group_chat_env_name = f"group_chat_batch_{batch_index}"
-                        task = asyncio.create_task(
-                            run_group_chat(
-                                env_name=group_chat_env_name,
-                                round_num=round_num,
-                                sub_round_num=sub_round,
-                                batch=batch
-                            )
+                # Run multiple sub-rounds within the group chat
+                for sub_round in range(1, self.config.environment_configs['group_chat'].sub_rounds + 1):
+                    task = asyncio.create_task(
+                        run_group_chat(
+                            env_name="group_chat_single_batch",
+                            round_num=round_num,
+                            sub_round_num=sub_round
                         )
-                        group_chat_tasks.append(task)
-                    await asyncio.gather(*group_chat_tasks)
+                    )
+                    await task  # Sequential execution; use gather if parallelism is desired
 
                 # After group chats, run auction
                 env_name = 'auction'
                 env_state = await self.run_environment(env_name, round_num)
                 self.update_simulation_state(env_name, env_state)
 
-                # Generate a new topic based on auction results
-                new_topic = await self.generate_new_topic_based_on_market()
-                self.simulation_data[-1]['new_topic'] = new_topic
-                logger.info(f"New topic for next round: {new_topic}")
-                self.current_topic = new_topic
-
-                # Update all group_chat_batch_x environments with the new topic
-                for batch_index, batch in enumerate(self.agent_batches):
-                    group_chat_env_name = f"group_chat_batch_{batch_index}"
-                    self.environments[group_chat_env_name].mechanism.current_topic = self.current_topic
-                    logger.info(f"Updated topic for {group_chat_env_name}: {self.current_topic}")
-
-                # Run reflections for all environments (only auction in this case)
+               # Run reflections for all environments (only auction in this case)
                 reflect_prompts = await self.run_parallel_reflect('auction')
                 if reflect_prompts:
                     reflections = await self.run_parallel_ai_completion(reflect_prompts)
                     agents_with_observations = [a for a in self.agents if a.last_observation]
                     for agent, reflection in zip(agents_with_observations, reflections):
                         if reflection.json_object:
-                            log_reflection(logger, agent.index, f"{Fore.MAGENTA}{reflection.json_object.object}{Style.RESET_ALL}")
-                            # Handle reflection content based on environment
-                            if 'auction' in reflection.json_object.object:
-                                environment_reward = self.agent_surpluses.get(agent.id, 0.0)
-                                self_reward = reflection.json_object.object.get("self_reward", 0.0)
-
-                                # Normalize environment_reward
-                                normalized_environment_reward = environment_reward / (1 + abs(environment_reward))
-                                normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
-
-                                # Weighted average of normalized_environment_reward and self_reward
-                                total_reward = normalized_environment_reward * 0.5 + self_reward * 0.5
-
-                                # Add logging for rewards
-                                logger.info(
-                                    f"Agent {agent.index} rewards - Environment Reward: {environment_reward}, "
-                                    f"Normalized Environment Reward: {normalized_environment_reward}, "
-                                    f"Self Reward: {self_reward}, Total Reward: {total_reward}"
-                                )
-                                agent.memory.append({
-                                    "type": "reflection",
-                                    "content": reflection.json_object.object.get("reflection", ""),
-                                    "strategy_update": reflection.json_object.object.get("strategy_update", ""),
-                                    "observation": agent.last_observation,
-                                    "environment_reward": round(environment_reward, 4),
-                                    "self_reward": round(self_reward, 4),
-                                    "total_reward": round(total_reward, 4),
-                                    "timestamp": datetime.now().isoformat()
-                                })
-                            elif 'group_chat' in reflection.json_object.object:
-                                agent.memory.append({
-                                    "type": "reflection",
-                                    "content": reflection.json_object.object.get("reflection", ""),
-                                    "strategy_update": reflection.json_object.object.get("strategy_update", ""),
-                                    "observation": agent.last_observation,
-                                    "timestamp": datetime.now().isoformat()
-                                })
+                            log_reflection(logger, agent.index, json.dumps(reflection.json_object.object))
+                            agent.memory.append({
+                                "type": "reflection",
+                                "content": reflection.json_object.object.get("reflection", ""),
+                                "strategy_update": reflection.json_object.object.get("strategy_update", ""),
+                                "observation": agent.last_observation,
+                                "timestamp": datetime.now().isoformat()
+                            })
                         else:
-                            logger.warning(f"No reflection JSON object for agent {agent.index} in 'auction'")
+                            log_skipped(logger, f"No reflection JSON object for agent {agent.index} in 'auction'")
                 else:
                     logger.info("No reflections generated for 'auction' this round.")
 
@@ -1135,7 +1011,7 @@ class Orchestrator:
         group_chat_total_messages = 0
         group_chat_total_topics = 0
         for env_name, tracker in self.trackers.items():
-            if env_name.startswith('group_chat_batch_'):
+            if env_name == 'group_chat_single_batch':
                 group_chat_total_messages += tracker.get_summary()['total_messages']
                 group_chat_total_topics += tracker.get_summary()['total_topics']
 
@@ -1156,6 +1032,7 @@ class Orchestrator:
             print()
 
     async def start(self):
+        print_ascii_art()
         log_section(logger, "JOINT ORCHESTRATOR INITIALIZING")
         self.generate_agents()
         self.setup_environments()
