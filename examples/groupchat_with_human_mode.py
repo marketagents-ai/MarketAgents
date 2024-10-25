@@ -3,7 +3,8 @@ import os
 import random
 from pathlib import Path
 from typing import Dict, Any, List, Type
-
+import psycopg2
+from psycopg2.extras import execute_values
 import yaml
 from pydantic import BaseModel, Field
 from market_agents.agents.market_agent import MarketAgent
@@ -15,6 +16,7 @@ from market_agents.environments.mechanisms.group_chat import (
 from market_agents.inference.message_models import LLMConfig
 from market_agents.agents.personas.persona import Persona, generate_persona, save_persona_to_file
 from market_agents.agents.protocols.acl_message import ACLMessage
+from market_agents.economics.econ_agent import EconomicAgent
 
 from colorama import Fore, Style, init
 
@@ -76,18 +78,32 @@ class GroupChatOrchestrator:
         self.current_topic = None
         self.timeline: List[Dict[str, Any]] = []
         self.human_mode = config.human_mode
+        self.db_params = {
+            'dbname': 'market_simulation',
+            'user': 'db_user',
+            'password': 'db_pwd@123',
+            'host': 'localhost',
+            'port': '5433'
+        }
+        self.conn = psycopg2.connect(**self.db_params)
 
     def setup_agents(self):
         personas = self.load_or_generate_personas()
         for i, persona in enumerate(personas):
             agent = MarketAgent.create(
-                agent_id=i,
-                is_buyer=True,
-                **self.config.agent_config,
+                agent_id=str(i),
+                use_llm=self.config.agent_config.get('use_llm', True),
                 llm_config=self.config.llm_config,
                 environments={"group_chat": self.environment},
                 protocol=self.config.protocol,
-                persona=persona
+                persona=persona,
+                econ_agent=EconomicAgent(
+                    id=str(i),
+                    initial_cash=self.config.agent_config.get('initial_cash', 1000),
+                    initial_goods=self.config.agent_config.get('initial_goods', 0),
+                    good_name=self.config.agent_config.get('good_name', "apple"),
+                    endowment={"value": 100} 
+                )
             )
             self.agents.append(agent)
             logger.debug(f"Initialized agent {agent.id} with persona {persona}")
@@ -146,6 +162,7 @@ class GroupChatOrchestrator:
             print("No input received within 15 seconds. Continuing...")
             return ""
 
+
     async def run_simulation(self):
         # Generate the initial topic
         self.current_topic = await self.generate_initial_topic()
@@ -158,9 +175,30 @@ class GroupChatOrchestrator:
             await self.process_round()
         
         self.generate_report()
+    
 
-
-
+    def insert_groupchat_data(self, round_data: Dict[str, Any]):
+        query = """
+        INSERT INTO groupchat (round_number, topic, agent_id, message_type, content, is_human)
+        VALUES %s
+        """
+        values = [
+            (
+                round_data['round'],
+                round_data['topic'],
+                str(message.agent_id),
+                message.message_type,
+                message.content,
+                message.agent_id == 'human'
+            )
+            for message in round_data['messages']
+        ]
+        
+        with self.conn.cursor() as cur:
+            execute_values(cur, query, values)
+        self.conn.commit()
+    
+    
     async def process_round(self):
         actions = {}
         round_num = len(self.timeline) + 1
@@ -242,7 +280,13 @@ class GroupChatOrchestrator:
         
         all_messages = [GroupChatMessage(**action['action']) for action in actions.values()]
         current_topic = step_result.global_observation.current_topic or self.current_topic
+        round_data = {
+            "round": len(self.timeline) + 1,
+            "topic": current_topic,
+            "messages": all_messages
+        }
         self.update_timeline(all_messages, current_topic)
+        self.insert_groupchat_data(round_data)
         self.current_topic = current_topic
 
         logger.info("\nAgent reflections:")
@@ -302,8 +346,6 @@ def run_simulation():
             use_cache=True
         ),
         agent_config={
-            'num_units': 1,
-            'base_value': 100,
             'use_llm': True,
             'initial_cash': 1000,
             'initial_goods': 0,

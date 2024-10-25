@@ -241,6 +241,19 @@ def create_tables(db_params):
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS groupchat (
+        id SERIAL PRIMARY KEY,
+        round_number INTEGER NOT NULL,
+        topic TEXT NOT NULL,
+        agent_id UUID NOT NULL,
+        message_type VARCHAR(20) NOT NULL,
+        content TEXT NOT NULL,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        is_human BOOLEAN DEFAULT FALSE,
+        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+    )
+    """)
 
     # Create indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_requests_prompt_context_id ON requests(prompt_context_id)")
@@ -255,6 +268,10 @@ def create_tables(db_params):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_actions_memory_id ON actions(memory_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reflections_memory_id ON reflections(memory_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_observations_memory_id ON observations(memory_id)")
+
+    cursor.execute("CREATE INDEX idx_groupchat_round_number ON groupchat(round_number);")
+    cursor.execute("CREATE INDEX idx_groupchat_agent_id ON groupchat(agent_id);")
+
 
     conn.commit()
     print("Tables, indexes, and pgvector extension created successfully.")
