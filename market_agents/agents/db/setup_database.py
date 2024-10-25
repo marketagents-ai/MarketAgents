@@ -45,9 +45,15 @@ def create_tables(db_params):
     CREATE TABLE IF NOT EXISTS agents (
         id UUID PRIMARY KEY,
         role VARCHAR(10) NOT NULL CHECK (role IN ('buyer', 'seller')),
-        is_llm BOOLEAN NOT NULL,
-        max_iter INTEGER NOT NULL,
+        persona TEXT,
+        system TEXT,
+        task TEXT,
+        tools JSONB,
+        output_format JSONB,
         llm_config JSONB,
+        max_retries INTEGER DEFAULT 2,
+        metadata JSONB,
+        interactions JSONB,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -289,6 +295,57 @@ def insert_test_data(db_params):
     cursor.close()
     conn.close()
 
+
+def drop_all_tables(db_params):
+    """
+    Drop all tables in the specified database.
+    """
+    conn = psycopg2.connect(
+        dbname=db_params['dbname'],
+        user=db_params['user'],
+        password=db_params['password'],
+        host=db_params['host'],
+        port=db_params['port']
+    )
+    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    cursor = conn.cursor()
+
+    drop_tables_sql = """
+    DO $$ 
+    DECLARE 
+        r RECORD;
+    BEGIN
+        -- Disable foreign key checks
+        EXECUTE 'SET CONSTRAINTS ALL DEFERRED';
+
+        -- Drop all tables in the public schema
+        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+            EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+        END LOOP;
+
+        -- Re-enable foreign key checks
+        EXECUTE 'SET CONSTRAINTS ALL IMMEDIATE';
+    END $$;
+    """
+
+    try:
+        cursor.execute(drop_tables_sql)
+        print("All tables have been dropped successfully.")
+    except Exception as e:
+        print(f"An error occurred while dropping tables: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# Update your main function or add a new one to include this functionality
+def reset_database(db_params):
+    create_database(db_params)
+    drop_all_tables(db_params)
+    create_tables(db_params)
+    print("Database reset complete.")
+
+
+
 if __name__ == "__main__":
     # Example usage with default parameters
     db_params = {
@@ -300,5 +357,7 @@ if __name__ == "__main__":
     }
     create_database(db_params)
     create_tables(db_params)
+    #To Rebuild the DB
+    # reset_database(db_params)
     # Optionally insert test data
     # insert_test_data(db_params)

@@ -59,13 +59,21 @@ class SimulationDataInserter:
 
     def insert_agents(self, agents_data):
         query = """
-            INSERT INTO agents (id, role, is_llm, max_iter, llm_config)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO agents (
+                id, role, persona, system, task, tools, output_format, llm_config, max_retries, metadata, interactions
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 role = EXCLUDED.role,
-                is_llm = EXCLUDED.is_llm,
-                max_iter = EXCLUDED.max_iter,
-                llm_config = EXCLUDED.llm_config
+                persona = EXCLUDED.persona,
+                system = EXCLUDED.system,
+                task = EXCLUDED.task,
+                tools = EXCLUDED.tools,
+                output_format = EXCLUDED.output_format,
+                llm_config = EXCLUDED.llm_config,
+                max_retries = EXCLUDED.max_retries,
+                metadata = EXCLUDED.metadata,
+                interactions = EXCLUDED.interactions
             RETURNING id
         """
         agent_id_map = {}
@@ -77,26 +85,15 @@ class SimulationDataInserter:
                     cur.execute(query, (
                         agent_id,
                         agent['role'],
-                        agent['is_llm'],
-                        agent['max_iter'],
-                        json.dumps(agent['llm_config'])
-                    ))
-                    inserted_id = cur.fetchone()
-                    if inserted_id:
-                        agent_id_map[str(agent['id'])] = inserted_id[0]
-                    else:
-                        logging.warning(f"No id returned for agent: {agent['id']}")
-                self.conn.commit()
-            except ValueError as e:
-                agent_id = uuid.uuid4()
-                logging.warning(f"Invalid UUID format for agent: {agent['id']}. Generated new UUID: {agent_id}")
-                with self.conn.cursor() as cur:
-                    cur.execute(query, (
-                        agent_id,
-                        agent['role'],
-                        agent['is_llm'],
-                        agent['max_iter'],
-                        json.dumps(agent['llm_config'])
+                        json.dumps(agent.get('persona', {})),
+                        agent.get('system'),
+                        agent.get('task'),
+                        json.dumps(agent.get('tools', {})),
+                        json.dumps(agent.get('output_format', {})),
+                        json.dumps(agent.get('llm_config', {}), default=lambda o: str(o)),
+                        agent.get('max_retries', 2),
+                        json.dumps(agent.get('metadata', {})),
+                        json.dumps(agent.get('interactions', []))
                     ))
                     inserted_id = cur.fetchone()
                     if inserted_id:
@@ -521,16 +518,19 @@ class SimulationDataInserter:
         try:
             # Agents data
             logging.info("Preparing agents data")
-            agents_data = [
-                {
-                    'id': str(agent.id),
-                    'role': agent.role,
-                    'is_llm': agent.use_llm,
-                    'max_iter': config.max_rounds,
-                    'llm_config': agent.llm_config if isinstance(agent.llm_config, dict) else agent.llm_config.dict()
-                }
-                for agent in agents
-            ]
+            agents_data = [{
+                'id': agent.id,
+                'role': agent.role,
+                'persona': agent.persona if isinstance(agent.persona, dict) else (agent.persona.model_dump() if hasattr(agent.persona, 'model_dump') else str(agent.persona)),
+                'system': agent.system,
+                'task': agent.task,
+                'tools': agent.tools,
+                'output_format': agent.output_format,
+                'llm_config': agent.llm_config,
+                'max_retries': agent.max_retries,
+                'metadata': agent.metadata,
+                'interactions': agent.interactions
+            } for agent in agents]
             logging.info(f"Inserting {len(agents_data)} agents")
             agent_id_map = self.insert_agents(agents_data)
             logging.info("Agents insertion complete")
@@ -539,7 +539,7 @@ class SimulationDataInserter:
             logging.info("Preparing memories data")
             memories_data = [
                 {
-                    'agent_id': str(agent.id),
+                    'agent_id': agent_id_map[str(agent.id)],
                     'step_id': round_num,
                     'memory_data': serialize_memory_data(agent.memory[-1]) if agent.memory else {}
                 }
@@ -553,7 +553,7 @@ class SimulationDataInserter:
             logging.info("Preparing allocations data")
             allocations_data = [
                 {
-                    'agent_id': str(agent.id),
+                    'agent_id': agent_id_map[str(agent.id)],
                     'goods': agent.economic_agent.endowment.current_basket.goods_dict.get(config.agent_config.good_name, 0),
                     'cash': agent.economic_agent.endowment.current_basket.cash,
                     'locked_goods': getattr(agent.economic_agent, 'locked_goods', {}).get(config.agent_config.good_name, 0),

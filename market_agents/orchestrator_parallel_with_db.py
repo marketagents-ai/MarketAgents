@@ -297,14 +297,24 @@ class Orchestrator:
                 econ_agent=economic_agent
             )
 
-            # Initialize last_perception and last_observation
+            # Set additional attributes after creating the agent
+            agent.task = None
+            agent.tools = {}
+            agent.output_format = {}
+            agent.metadata = {}
+            agent.interactions = []
+            agent.system = None  # Will be set later
             agent.last_perception = None
             agent.last_observation = None
             agent.last_step = None
             agent.index = i
+
             self.agents.append(agent)
             self.agent_dict[agent.id] = agent
             log_agent_init(logger, agent.index, is_buyer, persona)
+
+        # After creating all agents, set their system messages
+        self.set_agent_system_messages(1, good_name)
 
     def setup_environments(self):
         log_section(logger, "CONFIGURING MARKET ENVIRONMENTS")
