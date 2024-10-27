@@ -1,6 +1,7 @@
 # auction_orchestrator.py
 
 import asyncio
+from datetime import datetime
 import json
 import logging
 from typing import List, Dict, Any
@@ -131,7 +132,7 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         for agent in self.agents:
             perception = perceptions_map.get(agent.id)
             if perception:
-                log_persona(self.logger,agent.index, agent.persona)
+                log_persona(self.logger, agent.index, agent.persona)
                 log_perception(self.logger, agent.index, f"{perception.json_object.object if perception.json_object else perception.str_content}")
                 agent.last_perception = perception.json_object.object if perception.json_object else None
             else:
@@ -198,6 +199,10 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         # Store the last environment state
         self.last_env_state = env_state
 
+        # Run reflection step
+        log_section(self.logger, "AGENT REFLECTIONS")
+        await self.run_reflection()
+
     async def run_parallel_perceive(self) -> List[Any]:
         perceive_prompts = []
         for agent in self.agents:
@@ -211,6 +216,60 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
             action_prompt = await agent.generate_action(self.environment_name, perception, return_prompt=True)
             action_prompts.append(action_prompt)
         return action_prompts
+
+    async def run_parallel_reflect(self) -> List[Any]:
+        reflect_prompts = []
+        agents_with_observations = []
+        for agent in self.agents:
+            if agent.last_observation:
+                reflect_prompt = await agent.reflect(self.environment_name, return_prompt=True)
+                reflect_prompts.append(reflect_prompt)
+                agents_with_observations.append(agent)
+            else:
+                self.logger.info(f"Skipping reflection for agent {agent.index} due to no observation")
+        return reflect_prompts, agents_with_observations
+
+    async def run_reflection(self):
+        # Run agents' reflection in parallel
+        reflect_prompts, agents_with_observations = await self.run_parallel_reflect()
+        if reflect_prompts:
+            reflections = await self.ai_utils.run_parallel_ai_completion(reflect_prompts, update_history=False)
+            self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
+
+            for agent, reflection in zip(agents_with_observations, reflections):
+                if reflection.json_object:
+                    log_reflection(self.logger, agent.index, f"{reflection.json_object.object}")
+                    # Access the surplus from agent's last_step.info
+                    environment_reward = agent.last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if agent.last_step else 0.0
+                    self_reward = reflection.json_object.object.get("self_reward", 0.0)
+                    
+                    # Normalize environment_reward
+                    normalized_environment_reward = environment_reward / (1 + abs(environment_reward))
+                    normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
+                    
+                    # Weighted average of normalized environment_reward and self_reward
+                    total_reward = normalized_environment_reward * 0.5 + self_reward * 0.5
+                    
+                    # Add logging for rewards
+                    self.logger.info(
+                        f"Agent {agent.index} rewards - Environment Reward: {environment_reward}, "
+                        f"Normalized Environment Reward: {normalized_environment_reward}, "
+                        f"Self Reward: {self_reward}, Total Reward: {total_reward}"
+                    )
+                    agent.memory.append({
+                        "type": "reflection",
+                        "content": reflection.json_object.object.get("reflection", ""),
+                        "strategy_update": reflection.json_object.object.get("strategy_update", ""),
+                        "observation": agent.last_observation,
+                        "environment_reward": round(environment_reward, 4),
+                        "self_reward": round(self_reward, 4),
+                        "total_reward": round(total_reward, 4),
+                        "timestamp": datetime.now().isoformat()
+                    })
+                else:
+                    self.logger.warning(f"No reflection JSON object for agent {agent.index}")
+        else:
+            self.logger.info("No reflections generated this round.")
 
     def set_agent_system_messages(self, round_num: int, good_name: str):
         # Set system messages for agents based on their role and round number
@@ -326,6 +385,10 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
             except Exception as e:
                 self.logger.error(f"Error updating agent {agent_id} state: {str(e)}")
                 self.logger.exception("Exception details:")
+
+        # Store agent_surpluses for reflection
+        env_state.info['agent_rewards'] = agent_surpluses
+        self.agent_surpluses = agent_surpluses
 
         # Store the last environment state
         self.last_env_state = env_state
