@@ -1,85 +1,102 @@
-# Group Chat Environment TODO
+# Group Chat Mechanism & Environment TODO
 
-## 1. Create GroupChatMechanism class which will be used as a mechanism for MultiAgentEnvironment group chat environment class
-- [ ] Inherit from `Mechanism` class which will be the attribute of MultiAgentEnvironment class
-- [ ] Define attributes:
+## 1. Create GroupChatMechanism class
+- [ ] Inherit from `Mechanism` class
+- [ ] Define core attributes:
   - [ ] `max_rounds`: int
-  - [ ] `current_round`: int
-  - [ ] `messages`: List[Dict[str, Any]]
+  - [ ] `current_round`: int 
+  - [ ] `sub_rounds`: int
+  - [ ] `messages`: List[GroupChatMessage]
   - [ ] `topics`: List[str]
   - [ ] `current_topic`: str
-  - [ ] `speaker_order`: List[str]
-  - [ ] `current_speaker_index`: int
+  - [ ] `cohorts`: Dict[str, List[str]] # cohort_id -> agent_ids
+  - [ ] `topic_proposers`: Dict[str, str] # cohort_id -> proposer_id
+  - [ ] `parallel`: bool = True
 
-## 2. Create GroupChatAction class
-- [ ] Inherit from `LocalAction`
+## 2. Create GroupChatMessage class
+- [ ] Inherit from `BaseModel`
+- [ ] Define message types:
+  - [ ] `propose_topic`
+  - [ ] `group_message` 
 - [ ] Define attributes:
-  - [ ] `message`: str
-  - [ ] `propose_topic`: Optional[str]
+  - [ ] `content`: str
+  - [ ] `message_type`: MessageType
+  - [ ] `agent_id`: str
+  - [ ] `cohort_id`: str
+  - [ ] `sub_round`: int
 
-## 3. Create GroupChatObservation class
-- [ ] Inherit from `LocalObservation`
-- [ ] Define attributes:
-  - [ ] `messages`: List[Dict[str, Any]]
+## 3. Create GroupChatAction & Observation classes
+- [ ] GroupChatAction (LocalAction):
+  - [ ] `action`: GroupChatMessage
+  - [ ] `cohort_id`: str
+- [ ] GroupChatObservation (LocalObservation):
+  - [ ] `messages`: List[GroupChatMessage]
   - [ ] `current_topic`: str
-  - [ ] `current_speaker`: str
-
-## 4. Create GroupChatGlobalObservation class
-- [ ] Inherit from `GlobalObservation`
-- [ ] Define attributes:
+  - [ ] `cohort_id`: str
+  - [ ] `is_proposer`: bool
+- [ ] GroupChatGlobalObservation:
   - [ ] `observations`: Dict[str, GroupChatObservation]
-  - [ ] `all_messages`: List[Dict[str, Any]]
-  - [ ] `current_topic`: str
-  - [ ] `speaker_order`: List[str]
+  - [ ] `cohorts`: Dict[str, List[str]]
+  - [ ] `topics`: Dict[str, str] # cohort_id -> topic
 
-## 5. Create GroupChatActionSpace class
-- [ ] Inherit from `ActionSpace`
-- [ ] Define `allowed_actions` attribute with `GroupChatAction`
+## 4. Create CohortManager class
+- [ ] Define cohort formation strategies:
+  - [ ] Random assignment
+  - [ ] Similarity-based (optional)
+  - [ ] Interest-based (optional)
+- [ ] Methods:
+  - [ ] `form_cohorts(agents: List[str], size: int) -> Dict[str, List[str]]`
+  - [ ] `select_topic_proposers(cohorts: Dict) -> Dict[str, str]`
+  - [ ] `shuffle_cohorts()`
 
-## 6. Create GroupChatObservationSpace class
-- [ ] Inherit from `ObservationSpace`
-- [ ] Define `allowed_observations` attribute with `GroupChatObservation`
+## 5. Implement GroupChatMechanism methods
+- [ ] Protocol state handlers:
+  - [ ] `handle_cohort_formation()`
+  - [ ] `handle_topic_proposal()`
+  - [ ] `handle_group_discussion()`
+- [ ] Core methods:
+  - [ ] `step(action: GlobalAction) -> EnvironmentStep`
+  - [ ] `process_parallel_messages(messages: List[GroupChatMessage])`
+  - [ ] `get_global_state()`
+  - [ ] `reset()`
 
-## 7. Implement GroupChatMechanism methods
-- [ ] `step(action: GlobalAction) -> EnvironmentStep`:
-  - [ ] Update current round
-  - [ ] Process new messages and topic proposals
-  - [ ] Update speaker order if needed
-  - [ ] Create observations for each agent
-  - [ ] Return `EnvironmentStep` with global observation and done status
-- [ ] `get_global_state() -> Dict[str, Any]`:
-  - [ ] Return current state of the group chat
-- [ ] `reset() -> None`:
-  - [ ] Reset all attributes to initial state
+## 6. Update GroupChatOrchestrator
+- [ ] Add parallel execution support:
+  - [ ] `run_parallel_sub_rounds()`
+  - [ ] `process_batch_messages()`
+- [ ] Add cohort management:
+  - [ ] `initialize_cohorts()`
+  - [ ] `rotate_cohorts_between_rounds()`
+- [ ] Add topic management:
+  - [ ] `assign_topic_proposers()`
+  - [ ] `collect_proposed_topics()`
 
-## 8. Create GroupChatEnvironment class
-- [ ] Inherit from `MultiAgentEnvironment`
-- [ ] Initialize with `GroupChat`, `GroupChatActionSpace`, and `GroupChatObservationSpace`
-- [ ] Implement `step`, `reset`, and other necessary methods
+## 7. Extend MarketAgent
+- [ ] Add protocol-aware methods:
+  - [ ] `handle_cohort_assignment(cohort_id: str)`
+  - [ ] `generate_topic_proposal()`
+  - [ ] `generate_group_message()`
+  - [ ] `process_group_messages()`
 
-## 9. Update Orchestrator
-- [ ] Add method to run group chat before auction
-- [ ] Integrate group chat results into auction setup
+## 8. Implement Metrics & Analytics
+- [ ] Track cohort interactions:
+  - [ ] Message frequency
+  - [ ] Topic engagement
+  - [ ] Agent participation
+- [ ] Analyze emergent behaviors:
+  - [ ] Cooperation patterns
+  - [ ] Deception detection
+  - [ ] Information cascades
 
-## 10. Extend MarketAgent
-- [ ] Add methods for participating in group chat:
-  - [ ] `generate_message()`
-  - [ ] `propose_topic()`
-  - [ ] `process_group_chat_observation()`
+## 9. Testing & Validation
+- [ ] Test parallel execution
+- [ ] Test cohort formation
+- [ ] Test protocol state transitions
+- [ ] Test with large agent populations (1000+)
+- [ ] Validate emergent behaviors
 
-## 11. Implement logging for group chat
-- [ ] Create a logger as a timeline for group chat messages
-- [ ] Log all messages with timestamps
-
-## 12. Create utility functions
-- [ ] `select_next_speaker()`
-- [ ] `process_topic_proposals()`
-
-## 13. Testing
-- [ ] Write unit tests for GroupChat
-- [ ] Write integration tests for GroupChatEnvironment
-- [ ] Test group chat with multiple agents
-
-## 14. Documentation
-- [ ] Add docstrings to all new classes and methods
-- [ ] Update README with information about the group chat feature
+## 10. Documentation
+- [ ] Protocol specification
+- [ ] Cohort management strategies
+- [ ] Parallel execution model
+- [ ] Emergent behavior analysis
