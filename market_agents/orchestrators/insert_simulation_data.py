@@ -106,7 +106,7 @@ class SimulationDataInserter:
 
     def insert_groupchat_messages(self, messages: List[Dict[str, Any]], round_num: int):
         query = """
-        INSERT INTO groupchat (message_id, agent_id, round, sub_round, batch, content, timestamp, topic)
+        INSERT INTO groupchat (message_id, agent_id, round, sub_round, cohort_id, content, timestamp, topic)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         try:
@@ -117,13 +117,13 @@ class SimulationDataInserter:
                         message['agent_id'],
                         round_num,
                         message['sub_round'],
-                        message['batch'],
+                        message['cohort_id'],  # Use cohort_id instead of batch
                         message['content'],
                         message['timestamp'],
                         message.get('topic')
                     ))
             self.conn.commit()
-            logging.info(f"Inserted {len(messages)} group chat messages with sub-round and batch info")
+            logging.info(f"Inserted {len(messages)} group chat messages")
         except Exception as e:
             self.conn.rollback()
             logging.error(f"Error inserting group chat messages: {str(e)}")
@@ -681,29 +681,25 @@ class SimulationDataInserter:
 
             groupchat_data = []
             for env_name, env in environments.items():
-                if env_name.startswith('group_chat'):
-                    batch_index = int(env_name.split('_')[-1])
-                    group_chat_env = env
-                    current_topic = group_chat_env.mechanism.current_topic
-                    #sub_round_num = group_chat_env.mechanism.sub_round
-                    for message in group_chat_env.mechanism.messages:
+                if hasattr(env, 'mechanism') and hasattr(env.mechanism, 'topics'):  # Check if it's a group chat environment
+                    for message in env.mechanism.messages:
                         groupchat_data.append({
                             'message_id': str(uuid.uuid4()),
                             'agent_id': str(message.agent_id),
                             'round': round_num,
-                            'sub_round': None,
-                            'batch': batch_index,
+                            'sub_round': getattr(message, 'sub_round', None),
+                            'cohort_id': message.cohort_id,  # Add cohort_id from message
                             'content': message.content,
                             'timestamp': message.timestamp if hasattr(message, 'timestamp') else datetime.now(),
-                            'topic': current_topic
+                            'topic': env.mechanism.topics.get(message.cohort_id, '')  # Get topic for specific cohort
                         })
             
             if groupchat_data:
-                logging.info(f"Inserting {len(groupchat_data)} group chat messages with sub-round and batch info")
+                logging.info(f"Inserting {len(groupchat_data)} group chat messages")
                 self.insert_groupchat_messages(groupchat_data, round_num)
                 logging.info("Group chat messages insertion complete")
             else:
-                logging.warning("No group chat data found; skipping group chat data insertion")
+                logging.info("No group chat data to insert")
 
         except Exception as e:
             self.conn.rollback()
