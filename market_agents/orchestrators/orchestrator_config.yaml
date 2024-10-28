@@ -1,0 +1,43 @@
+# orchestrator_config.yaml
+
+num_agents: 10
+max_rounds: 2
+environment_order:
+  - group_chat
+  - auction
+agent_config:
+  num_units: 10
+  buyer_base_value: 120.0
+  seller_base_value: 80.0
+  use_llm: true
+  buyer_initial_cash: 1000.0
+  buyer_initial_goods: 0
+  seller_initial_cash: 0.0
+  seller_initial_goods: 10
+  good_name: "strawberry"
+  noise_factor: 0.05
+  max_relative_spread: 0.2
+llm_configs:
+  - name: "gpt4o-mini-high-temp"
+    client: "openai"
+    model: "gpt-4o-mini"
+    temperature: 0.7
+    max_tokens: 1024
+    use_cache: false
+environment_configs:
+  group_chat:
+    name: "group_chat"
+    address: "localhost:8000"
+    max_rounds: 5
+    initial_topic: "Initial Market Discussion"
+    sub_rounds: 3
+    group_size: 5
+  auction:
+    name: "auction"
+    address: "localhost:8001"
+    max_rounds: 5
+    good_name: "strawberry"
+protocol: "acl_message"
+database_config:
+  db_host: "localhost"
+  db_port: "5433"

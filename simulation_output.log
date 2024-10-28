@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/home/interstellarninja/projects/MarketAgents/market_agents/orchestrator_parallel_with_db.py", line 796, in <module>
+    config = load_config()
+             ^^^^^^^^^^^^^
+  File "/home/interstellarninja/projects/MarketAgents/market_agents/orchestrator_parallel_with_db.py", line 120, in load_config
+    return OrchestratorConfig(**yaml_data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/interstellarninja/anaconda3/envs/market-agents/lib/python3.11/site-packages/pydantic_settings/main.py", line 152, in __init__
+    super().__init__(
+  File "/home/interstellarninja/anaconda3/envs/market-agents/lib/python3.11/site-packages/pydantic/main.py", line 212, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for OrchestratorConfig
+environment_configs.group_chat.good_name
+  Field required [type=missing, input_value={'name': 'group_chat', 'a...ds': 3, 'group_size': 5}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.9/v/missing

@@ -1,0 +1,64 @@
+num_agents: 8
+max_rounds: 2
+agent_config:
+  initial_cash_min: 500.0
+  initial_cash_max: 2000.0
+  initial_stocks_min: 5
+  initial_stocks_max: 20
+  risk_aversion: 0.5
+  expected_return: 0.05
+  use_llm: False
+  stock_symbol: 'AAPL'
+  max_relative_spread: 0.05
+llm_configs:
+  - name: "gpt-4o-mini-low-temp"
+    client: "openai"
+    model: "gpt-4o-mini"
+    temperature: 0.2
+    max_tokens: 2048
+    use_cache: true
+  - name: "gpt-4o-mini-med-temp"
+    client: "openai"
+    model: "gpt-4o-mini"
+    temperature: 0.6
+    max_tokens: 4096
+    use_cache: true
+  - name: "gpt-4o-mini-high-temp"
+    client: "openai"
+    model: "gpt-4o-mini"
+    temperature: 1.0
+    max_tokens: 8192
+    use_cache: true
+  - name: "gpt-4o-low-temp"
+    client: "openai"
+    model: "gpt-4o"
+    temperature: 0.2
+    max_tokens: 4096
+    use_cache: true
+  - name: "gpt-4o-med-temp"
+    client: "openai"
+    model: "gpt-4o"
+    temperature: 0.6
+    max_tokens: 8192
+    use_cache: true
+  - name: "gpt-4o-high-temp"
+    client: "openai"
+    model: "gpt-4o"
+    temperature: 1.0
+    max_tokens: 16384
+    use_cache: true
+environment_configs:
+  stock_market:
+    name: "AAPL Stock Market"
+    address: "aapl_stock_market"
+    max_rounds: 100
+    stock_symbol: "AAPL"
+#  group_chat:
+#    name: "Stock Market Discussion"
+#    address: "group_chat"
+#    max_rounds: 5
+#    initial_topic: "Discuss the impact of recent FED rate cut of 50 bps on the stock market"
+protocol: "ACLMessage"
+database_config:
+  db_type: "postgres"
+  db_name: "market_simulation"

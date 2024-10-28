@@ -3,6 +3,7 @@
 # Script to run market simulation with parallel orchestration, dashboard, and time tracking
 
 # File names for the Python scripts
+#ORCHESTRATOR_SCRIPT="market_agents/orchestrator_parallel_with_db.py"
 ORCHESTRATOR_SCRIPT="market_agents/orchestrator_parallel_with_db.py"
 DASHBOARD_SCRIPT="market_agents/agents/db/dashboard/dashboard.py"
 

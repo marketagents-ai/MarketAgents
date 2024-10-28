@@ -1,4 +1,13 @@
 import logging
+from colorama import Fore, Back, Style
+import json
+import pyfiglet
+
+def print_ascii_art():
+    ascii_art = pyfiglet.figlet_format("MARKET AGENTS", font="slant")
+    print(Fore.CYAN + ascii_art + Style.RESET_ALL)
+
+import logging
 
 def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)

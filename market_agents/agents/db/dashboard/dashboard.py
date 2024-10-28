@@ -1,13 +1,3 @@
-"""
-TODO
-
-- have the plotter x and y use json columns by re cachig the selections and ensuring type
-- repair search
-- add paging to replace hard sql limit
-- have X and Y when table transforms to inherit colmn names
-"""
-
-
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -269,6 +259,7 @@ async def get_metrics_data(
             cursor.close()
         if conn:
             conn.close()
+
 @app.get("/api/search")
 async def search_database(
     table_name: str = Query(..., min_length=1),

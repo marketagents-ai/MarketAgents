@@ -203,6 +203,18 @@ def create_tables(db_params):
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS groupchat (
+        message_id UUID PRIMARY KEY,
+        agent_id UUID REFERENCES agents(id),
+        round INTEGER NOT NULL,
+        sub_round INTEGER,
+        cohort_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        topic TEXT
+    )
+    """)
     # Create a new table for vector embeddings
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS memory_embeddings (

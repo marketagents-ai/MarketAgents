@@ -1,0 +1,23 @@
+Name: {name}
+Age: {age}
+Gender: {gender}
+Role: {role}
+Occupation: {occupation}
+Education Level: {education_level}
+Income: {income}
+Personality Traits:
+  - Openness: {openness}
+  - Conscientiousness: {conscientiousness}
+  - Extraversion: {extraversion}
+  - Agreeableness: {agreeableness}
+  - Neuroticism: {neuroticism}
+Hobbies and Interests: {hobbies_and_interests}
+Values: {values}
+Life Events: {life_events}
+Short-term Goals: {short_term_goals}
+Long-term Goals: {long_term_goals}
+Investment Preferences: {investment_preferences}
+Stress Level: {stress_level}
+Risk Tolerance: {risk_tolerance}
+Emotional Intelligence: {emotional_intelligence}
+Cognitive Style: {cognitive_style}

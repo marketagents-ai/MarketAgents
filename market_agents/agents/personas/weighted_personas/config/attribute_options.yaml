@@ -1,0 +1,285 @@
+# File: config/attribute_options.yaml
+
+openness:
+  range: '0-100'
+
+conscientiousness:
+  range: '0-100'
+
+extraversion:
+  range: '0-100'
+
+agreeableness:
+  range: '0-100'
+
+neuroticism:
+  range: '0-100'
+
+gender:
+  options:
+    - value: Male
+      distribution: 49
+    - value: Female
+      distribution: 49
+    - value: Non-binary
+      distribution: 2
+
+age:
+  range: '18-80'
+
+education_level:
+  options:
+    - value: No Formal Education
+      distribution: 0.05
+    - value: High School
+      distribution: 0.3
+    - value: Vocational Training
+      distribution: 0.15
+    - value: Bachelor's Degree
+      distribution: 0.3
+    - value: Master's Degree
+      distribution: 0.15
+    - value: PhD
+      distribution: 0.05
+
+occupation:
+  options:
+    - value: Student
+      valid_education: [High School, Bachelor's Degree, Master's Degree, PhD]
+      valid_income_range: [5000, 30000]
+      min_age: 18
+    - value: Software Engineer
+      valid_education: [Bachelor's Degree, Master's Degree, PhD]
+      valid_income_range: [70000, 200000]
+      min_age: 22
+    - value: Teacher
+      valid_education: [Bachelor's Degree, Master's Degree, PhD]
+      valid_income_range: [35000, 75000]
+      min_age: 22
+    - value: Doctor
+      valid_education: [PhD]
+      valid_income_range: [100000, 300000]
+      min_age: 28
+    - value: Artist
+      valid_education: [High School, Vocational Training, Bachelor's Degree, Master's Degree]
+      valid_income_range: [20000, 100000]
+      min_age: 18
+    - value: Entrepreneur
+      valid_education: [High School, Vocational Training, Bachelor's Degree, Master's Degree, PhD]
+      valid_income_range: [30000, 500000]
+      min_age: 22
+    - value: Nurse
+      valid_education: [Vocational Training, Bachelor's Degree, Master's Degree]
+      valid_income_range: [50000, 120000]
+      min_age: 22
+    - value: Police Officer
+      valid_education: [High School, Vocational Training, Bachelor's Degree]
+      valid_income_range: [45000, 90000]
+      min_age: 21
+    - value: Chef
+      valid_education: [High School, Vocational Training, Bachelor's Degree]
+      valid_income_range: [30000, 80000]
+      min_age: 18
+    - value: Lawyer
+      valid_education: [PhD]
+      valid_income_range: [70000, 200000]
+      min_age: 25
+    - value: Graphic Designer
+      valid_education: [Vocational Training, Bachelor's Degree, Master's Degree]
+      valid_income_range: [40000, 90000]
+      min_age: 20
+    - value: Financial Analyst
+      valid_education: [Bachelor's Degree, Master's Degree]
+      valid_income_range: [60000, 150000]
+      min_age: 22
+    - value: Pharmacist
+      valid_education: [PhD]
+      valid_income_range: [90000, 140000]
+      min_age: 25
+    - value: Electrician
+      valid_education: [Vocational Training, High School]
+      valid_income_range: [40000, 90000]
+      min_age: 18
+    - value: Journalist
+      valid_education: [Bachelor's Degree, Master's Degree]
+      valid_income_range: [35000, 80000]
+      min_age: 22
+    - value: Social Worker
+      valid_education: [Bachelor's Degree, Master's Degree]
+      valid_income_range: [35000, 70000]
+      min_age: 22
+    - value: Data Scientist
+      valid_education: [Master's Degree, PhD]
+      valid_income_range: [80000, 180000]
+      min_age: 23
+    - value: Real Estate Agent
+      valid_education: [High School, Vocational Training, Bachelor's Degree]
+      valid_income_range: [30000, 100000]
+      min_age: 20
+    - value: Pilot
+      valid_education: [Bachelor's Degree, Vocational Training]
+      valid_income_range: [60000, 200000]
+      min_age: 23
+    - value: Unemployed
+      valid_education: [No Formal Education, High School, Vocational Training, Bachelor's Degree, Master's Degree, PhD]
+      valid_income_range: [0, 15000]
+      min_age: 18
+    - value: Retired
+      valid_education: [No Formal Education, High School, Vocational Training, Bachelor's Degree, Master's Degree, PhD]
+      valid_income_range: [20000, 100000]
+      min_age: 60
+
+income:
+  range: '20000-300000'
+
+hobbies_and_interests:
+  options:
+    - Reading
+    - Traveling
+    - Cooking
+    - Sports
+    - Music
+    - Arts
+    - Gaming
+    - Gardening
+    - Socializing
+    - Volunteering
+    - Photography
+    - Astronomy
+    - Urban Exploration
+    - Birdwatching
+    - Geocaching
+    - Rock Climbing
+    - Calligraphy
+    - Metal Detecting
+    - Foraging
+    - Cosplay
+    - Ceramics and Pottery
+    - Archery
+    - Board Game Design
+    - Kite Flying
+    - Juggling
+    - Historical Reenactment
+    - Bonsai Cultivation
+    - Lockpicking (as a puzzle hobby)
+    - Virtual Reality Experiences
+    - Genealogy Research
+    - LARPing (Live Action Role-Playing)
+    - Knife Throwing
+    - Tarot Reading and Divination
+    - Ice Sculpting
+    - Urban Beekeeping
+    - Perfume Blending
+    - Blacksmithing
+    - Escape Room Creation
+    - Underwater Basket Weaving
+    - Sound Bathing (Meditation with Sounds)
+    - Robot Building and Programming
+    - Guerilla Gardening (Planting in Public Spaces)
+    - Extreme Ironing (Ironing in Unusual Locations)
+    - Collecting Rare and Antique Maps
+    - Synesthesia Art Exploration
+    - Sand Art in a Bottle
+    - Competitive Dog Grooming
+    - Snowflake Photography
+    - Dumpster Diving for Art Supplies
+    - Tree Climbing (as a Sport)
+    - Driftwood Sculpting
+    - Hooping (Hula Hooping as a Dance Form)
+    - Infrared Photography
+    - Plant Communication (Experimenting with Plant Biofeedback Devices)
+    - Nocturnal Wildlife Tracking
+    - Handcrafted Musical Instrument Making
+    - Virtual World Building (like in Second Life)
+    - Hypnotherapy Practice
+    - Virtual Reality Archeology
+    - Extreme Hammocking (Setting Up Hammocks in High or Unusual Places)
+    - Time Capsule Creation
+    - Amateur Meteorology
+    - Mushroom Cultivation (Mycology)
+    - Paragliding or Paramotoring
+    - Steampunk Prop Creation
+    - Falconry
+
+values:
+  options:
+    - Family
+    - Career
+    - Wealth
+    - Health
+    - Happiness
+    - Knowledge
+    - Freedom
+    - Security
+    - Justice
+    - Creativity
+    - Harmony
+
+life_events:
+  options:
+    - Graduated
+    - Married
+    - Divorced
+    - Had a child
+    - Changed career
+    - Moved to a new city
+    - Lost a loved one
+    - Started a business
+
+short_term_goals:
+  options:
+    - Learn a new skill
+    - Get a promotion
+    - Save money
+    - Travel to a new country
+    - Buy a house
+    - Improve health
+    - Start a hobby
+    - Volunteer
+
+long_term_goals:
+  options:
+    - Retire early
+    - Start a family
+    - Become financially independent
+    - Achieve a high-level position
+    - Make a significant contribution to society
+    - Travel the world
+    - Write a book
+    - Start a foundation
+
+investment_preferences:
+  options:
+    - Stocks
+    - Bonds
+    - Real Estate
+    - Cryptocurrency
+    - Savings Account
+    - Mutual Funds
+    - Commodities
+    - None
+
+stress_level:
+  range: '0-100'
+
+risk_tolerance:
+  range: '0-100'
+
+emotional_intelligence:
+  range: '0-100'
+
+cognitive_style:
+  options:
+    - Analytical
+    - Creative
+    - Practical
+    - Logical
+    - Intuitive
+    - Reflective
+
+role:
+  options:
+    - value: Buyer
+      distribution: 0.5
+    - value: Seller
+      distribution: 0.5

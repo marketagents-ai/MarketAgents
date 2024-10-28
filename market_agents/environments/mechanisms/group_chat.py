@@ -1,3 +1,5 @@
+# group_chat.py
+
 import random
 from typing import List, Dict, Any, Union, Type, Literal
 from pydantic import BaseModel, Field
@@ -13,6 +15,8 @@ class GroupChatMessage(BaseModel):
     content: str
     message_type: Literal["propose_topic", "group_message"]
     agent_id: str
+    cohort_id: str
+    sub_round: int
 
 class GroupChatAction(LocalAction):
     action: GroupChatMessage
@@ -24,7 +28,9 @@ class GroupChatAction(LocalAction):
             action=GroupChatMessage(
                 content="Sample message", 
                 message_type="group_message",
-                agent_id=agent_id
+                agent_id=agent_id,
+                cohort_id="sample_cohort",
+                sub_round=1
             )
         )
 
@@ -38,7 +44,6 @@ class GroupChatGlobalAction(GlobalAction):
 class GroupChatObservation(BaseModel):
     messages: List[GroupChatMessage]
     current_topic: str
-    current_speaker: str
 
 class GroupChatLocalObservation(LocalObservation):
     observation: GroupChatObservation
@@ -47,7 +52,6 @@ class GroupChatGlobalObservation(GlobalObservation):
     observations: Dict[str, GroupChatLocalObservation]
     all_messages: List[GroupChatMessage]
     current_topic: str
-    speaker_order: List[str]
 
 class GroupChatActionSpace(ActionSpace):
     allowed_actions: List[Type[LocalAction]] = [GroupChatAction]
@@ -59,12 +63,7 @@ class GroupChat(Mechanism):
     max_rounds: int = Field(..., description="Maximum number of chat rounds")
     current_round: int = Field(default=0, description="Current round number")
     messages: List[GroupChatMessage] = Field(default_factory=list)
-    topics: List[str] = Field(default_factory=list)
-    current_topic: str = Field(..., description="Current discussion topic")
-    speaker_order: List[str] = Field(default_factory=list)
-    current_speaker_index: int = Field(default=0)
-    actions: GroupChatGlobalAction = Field(default=None)
-
+    topics: Dict[str, str] = Field(default_factory=dict)  # cohort_id -> topic
     sequential: bool = Field(default=False, description="Whether the mechanism is sequential")
 
     def step(self, action: Union[GroupChatAction, GroupChatGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
@@ -108,7 +107,7 @@ class GroupChat(Mechanism):
 
             local_step = LocalEnvironmentStep(
                 observation=observation,
-                reward=0,  # Implement reward function if needed
+                reward=0,
                 done=done,
                 info={
                     "current_round": self.current_round,
@@ -119,7 +118,6 @@ class GroupChat(Mechanism):
             )
 
             return local_step
-
         else:
             # Non-sequential mode: expect a GlobalAction
             if isinstance(action, dict):
@@ -144,17 +142,16 @@ class GroupChat(Mechanism):
             observations = self._create_observations(new_messages)
             done = self.current_round >= self.max_rounds
 
-            # Optionally, update topic if a propose_topic message is found
+            # Update topics if a propose_topic message is found
             for message in new_messages:
                 if message.message_type == "propose_topic":
-                    self._update_topic(message.content)
+                    self._update_topic(message.cohort_id, message.content)
 
             # Create global_observation
             global_observation = GroupChatGlobalObservation(
                 observations=observations,
                 all_messages=self.messages,
-                current_topic=self.current_topic,
-                speaker_order=self.speaker_order
+                current_topic="",
             )
 
             # Return an EnvironmentStep with your custom global_observation
@@ -163,9 +160,7 @@ class GroupChat(Mechanism):
                 done=done,
                 info={
                     "current_round": self.current_round,
-                    "current_topic": self.current_topic,
                     "all_messages": [message.dict() for message in self.messages],
-                    "speaker_order": self.speaker_order
                 }
             )
 
@@ -179,32 +174,20 @@ class GroupChat(Mechanism):
                 new_messages.append(action.action)
             except Exception as e:
                 logger.error(f"Failed to parse action for agent {agent_id}: {e}")
-                continue  # Skip invalid actions
+                continue 
         return new_messages
 
-    def _update_topic(self, new_topic: str):
-        self.topics.append(new_topic)
-        self.current_topic = new_topic
-        logger.info(f"Updated topic to: {new_topic}")
-
-    def _create_observation(self, new_messages: List[GroupChatMessage], agent_id: str) -> GroupChatLocalObservation:
-        observation = GroupChatObservation(
-            messages=new_messages,
-            current_topic=self.current_topic,
-            current_speaker=self.speaker_order[self.current_speaker_index]
-        )
-        return GroupChatLocalObservation(
-            agent_id=agent_id,
-            observation=observation
-        )
+    def _update_topic(self, cohort_id: str, new_topic: str):
+        self.topics[cohort_id] = new_topic
+        logger.info(f"Updated topic for cohort {cohort_id} to: {new_topic}")
 
     def _create_observations(self, new_messages: List[GroupChatMessage]) -> Dict[str, GroupChatLocalObservation]:
         observations = {}
-        for agent_id in self.speaker_order:
+        for message in new_messages:
+            agent_id = message.agent_id
             observation = GroupChatObservation(
-                messages=new_messages,
-                current_topic=self.current_topic,
-                current_speaker=self.speaker_order[self.current_speaker_index]
+                messages=[msg for msg in new_messages if msg.cohort_id == message.cohort_id],
+                current_topic=self.topics.get(message.cohort_id, "")
             )
             observations[agent_id] = GroupChatLocalObservation(
                 agent_id=agent_id,
@@ -216,17 +199,10 @@ class GroupChat(Mechanism):
         return {
             "current_round": self.current_round,
             "messages": [message.dict() for message in self.messages],
-            "current_topic": self.current_topic,
-            "speaker_order": self.speaker_order,
-            "current_speaker_index": self.current_speaker_index
+            "topics": self.topics,
         }
 
     def reset(self) -> None:
         self.current_round = 0
         self.messages = []
-        self.current_speaker_index = 0
         logger.info("GroupChat mechanism has been reset.")
-
-    def _select_next_speaker(self) -> str:
-        self.current_speaker_index = (self.current_speaker_index + 1) % len(self.speaker_order)
-        return self.speaker_order[self.current_speaker_index]
