@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pydantic import Field
+from colorama import Fore, Style
 
 from market_agents.orchestrators.base_orchestrator import BaseEnvironmentOrchestrator
 from market_agents.agents.market_agent import MarketAgent
@@ -21,7 +22,7 @@ from market_agents.environments.mechanisms.group_chat import (
     GroupChatGlobalObservation
 )
 from market_agents.inference.message_models import LLMOutput, LLMPromptContext
-from market_agents.orchestrators.config import GroupChatConfig
+from market_agents.orchestrators.config import GroupChatConfig, OrchestratorConfig
 from market_agents.orchestrators.logger_utils import (
     log_section,
     log_environment_setup,
@@ -32,7 +33,12 @@ from market_agents.orchestrators.logger_utils import (
     log_reflection,
     log_round,
     log_completion,
-    print_ascii_art
+    print_ascii_art,
+    log_cohort_formation,
+    log_topic_proposal,
+    log_sub_round_start,
+    log_group_chat_summary,
+    log_group_message
 )
 from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
 
@@ -52,6 +58,8 @@ class CohortManager:
             cohort_agents = self.agents[i:i + self.cohort_size]
             cohort_id = f"cohort_{i // self.cohort_size}"
             self.cohorts[cohort_id] = cohort_agents
+            # Log cohort formation
+            log_cohort_formation(logging.getLogger(), cohort_id, [agent.index for agent in cohort_agents])
 
     def select_topic_proposers(self):
         # Rotate proposers within each cohort
@@ -67,7 +75,7 @@ class CohortManager:
 class GroupChatTracker:
     def __init__(self):
         self.messages: List[GroupChatMessage] = []
-        self.topics: Dict[str, str] = {}  # cohort_id -> topic
+        self.topics: Dict[str, str] = {}
 
     def add_message(self, message: GroupChatMessage):
         self.messages.append(message)
@@ -88,11 +96,13 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
     cohort_manager: CohortManager = Field(default=None)
     sub_rounds_per_step: int = Field(default=2)
     agent_dict: Dict[str, MarketAgent] = Field(default_factory=dict)
-    topics: Dict[str, str] = Field(default_factory=dict)  # cohort_id -> topic
+    topics: Dict[str, str] = Field(default_factory=dict)
+    orchestrator_config: OrchestratorConfig = Field(default=None)
 
     def __init__(
         self,
         config: GroupChatConfig,
+        orchestrator_config: OrchestratorConfig,
         agents: List[MarketAgent],
         ai_utils,
         data_inserter: SimulationDataInserter,
@@ -103,10 +113,9 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
             agents=agents,
             ai_utils=ai_utils,
             data_inserter=data_inserter,
-            logger=logger,
+            logger=logger
         )
-
-        
+        self.orchestrator_config = orchestrator_config
         self.cohort_manager = CohortManager(self.agents, self.config.group_size)
         self.sub_rounds_per_step = self.config.sub_rounds
         self.agent_dict = {agent.id: agent for agent in agents}
@@ -131,9 +140,16 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
             self.environments[cohort_id] = group_chat_env
             self.trackers[cohort_id] = GroupChatTracker()
             log_environment_setup(self.logger, cohort_id)
-        # Assign environments to agents
+        
+        # Assign environments to agents without overwriting existing environments
         for agent in self.agents:
-            agent.environments[self.environment_name] = self.environments[cohort_id]
+            if not hasattr(agent, 'environments') or agent.environments is None:
+                agent.environments = {}
+            # Find agent's cohort and assign corresponding environment
+            for cohort_id, cohort_agents in self.cohort_manager.cohorts.items():
+                if agent in cohort_agents:
+                    agent.environments[self.environment_name] = self.environments[cohort_id]
+                    break
 
     async def run_environment(self, round_num: int):
         # Keep cohorts the same across rounds; do not rotate cohorts
@@ -164,45 +180,57 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
         # Generate prompts for topic proposers
         proposer_prompts = []
         proposer_agents = []
+        
+        # First collect all prompts
         for cohort_id, proposer in self.cohort_manager.topic_proposers.items():
-            self.set_proposer_system_message(proposer, cohort_id)
-            perceive_prompt = await proposer.perceive(self.environment_name, return_prompt=True)
-            proposer_prompts.append(perceive_prompt)
+            # Set the topic proposer system message
+            good_name = self.orchestrator_config.agent_config.good_name
+            proposer.system = f"You are the group chat topic proposer agent. Your role is to propose interesting and relevant topics for group discussion about {good_name}."
+            
+            # Create the prompt
+            prompt = await proposer.generate_action(
+                self.environment_name,
+                f"Consider recent events, trends, or news related to {good_name}. Propose a specific topic for discussion that would be relevant to market participants.",
+                return_prompt=True  # Important: return the prompt instead of executing it
+            )
+            proposer_prompts.append(prompt)
             proposer_agents.append(proposer)
         
-        # Run AI completions
-        proposals = await self.ai_utils.run_parallel_ai_completion(proposer_prompts, update_history=False)
+        # Run all prompts in parallel
+        topic_proposals = await self.ai_utils.run_parallel_ai_completion(proposer_prompts, update_history=False)
         self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
         
-        # Assign topics to cohorts
-        for proposal, proposer in zip(proposals, proposer_agents):
+        # Process each proposal
+        for proposal, proposer in zip(topic_proposals, proposer_agents):
             try:
                 cohort_id = next(cid for cid, agent in self.cohort_manager.topic_proposers.items() if agent.id == proposer.id)
                 
-                # Extract topic from proposal using the same logic as the example
+                # Extract topic from proposal
                 if proposal.json_object:
                     action_content = proposal.json_object.object
-                    if isinstance(action_content, dict):
-                        if 'content' in action_content:
-                            if isinstance(action_content['content'], dict) and 'action' in action_content['content']:
-                                topic = action_content['content']['action']['content']
-                            else:
-                                topic = action_content['content']
-                        elif 'action' in action_content:
-                            topic = action_content['action']['content']
+                    if 'content' in action_content:
+                        if isinstance(action_content['content'], dict) and 'action' in action_content['content']:
+                            topic = action_content['content']['action']['content']
                         else:
-                            topic = "Default topic: Recent market trends"
+                            topic = action_content['content']
+                    elif 'action' in action_content:
+                        topic = action_content['action']['content']
+                    else:
+                        raise ValueError("Unexpected topic_action structure")
                 else:
                     # If no JSON object, try to use str_content
-                    topic = proposal.str_content.strip() if proposal.str_content else "Default topic: Recent market trends"
-                
+                    topic = proposal.str_content.strip() if proposal.str_content else None
+                    if not topic:
+                        raise ValueError("No valid topic content found")
+
                 self.topics[cohort_id] = topic
                 self.trackers[cohort_id].add_topic(cohort_id, topic)
-                self.logger.info(f"Cohort {cohort_id} topic proposed by Agent {proposer.index}: {topic}")
+                log_topic_proposal(self.logger, cohort_id, proposer.index, topic)
                 
             except Exception as e:
                 self.logger.error(f"Error processing topic proposal for cohort {cohort_id}: {str(e)}")
-                default_topic = "Default topic: Recent market trends"
+                good_name = self.orchestrator_config.agent_config.good_name
+                default_topic = f"Default topic: Recent {good_name} market trends"
                 self.topics[cohort_id] = default_topic
                 self.trackers[cohort_id].add_topic(cohort_id, default_topic)
                 self.logger.warning(f"Using default topic for cohort {cohort_id}: {default_topic}")
@@ -211,7 +239,7 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
         env = self.environments[cohort_id]
         tracker = self.trackers[cohort_id]
         topic = self.topics.get(cohort_id, "No Topic")
-        log_running(self.logger, f"{cohort_id} - Sub-round {sub_round_num}")
+        log_sub_round_start(self.logger, cohort_id, sub_round_num)
         # Set system messages for agents
         self.set_agent_system_messages(cohort_id, topic, round_num, sub_round_num=sub_round_num)
         # Run agents' perception in parallel
@@ -258,7 +286,7 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
                         )
                         group_chat_action = GroupChatAction(agent_id=agent.id, action=group_chat_message)
                         agent_actions[agent.id] = group_chat_action.model_dump()
-                        log_action(self.logger, agent.index, f"Message: {group_chat_message.content}")
+                        log_group_message(self.logger, cohort_id, agent.index, group_chat_message.content, sub_round_num)
                     else:
                         raise ValueError(f"Invalid action content: {action_content}")
                 except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -310,12 +338,34 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
             for agent, reflection in zip(agents_with_observations, reflections):
                 if reflection.json_object:
                     log_reflection(self.logger, agent.index, f"{reflection.json_object.object}")
-                    # Append reflection to agent memory
+                    
+                    # Extract rewards similar to auction orchestrator
+                    environment_reward = agent.last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if agent.last_step else 0.0
+                    self_reward = reflection.json_object.object.get("self_reward", 0.0)
+                    
+                    # Normalize environment_reward
+                    normalized_environment_reward = environment_reward / (1 + abs(environment_reward))
+                    normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
+                    
+                    # Weighted average of normalized environment_reward and self_reward
+                    total_reward = normalized_environment_reward * 0.5 + self_reward * 0.5
+                    
+                    # Add logging for rewards
+                    self.logger.info(
+                        f"Agent {agent.index} rewards - Environment Reward: {environment_reward}, "
+                        f"Normalized Environment Reward: {normalized_environment_reward}, "
+                        f"Self Reward: {self_reward}, Total Reward: {total_reward}"
+                    )
+                    
+                    # Store in agent memory with rewards
                     agent.memory.append({
                         "type": "reflection",
                         "content": reflection.json_object.object.get("reflection", ""),
                         "strategy_update": reflection.json_object.object.get("strategy_update", ""),
                         "observation": agent.last_observation,
+                        "environment_reward": round(environment_reward, 4),
+                        "self_reward": round(self_reward, 4),
+                        "total_reward": round(total_reward, 4),
                         "timestamp": datetime.now().isoformat()
                     })
                 else:
@@ -399,18 +449,20 @@ class GroupChatOrchestrator(BaseEnvironmentOrchestrator):
         self.print_summary()
 
     async def process_round_results(self, round_num: int):
-        # Save round data to the database
+        """Process and store results from the current round"""
         try:
+            # Pass the full orchestrator_config instead of environment-specific config
             self.data_inserter.insert_round_data(
-                round_num,
-                self.agents,
-                self.environments,
-                self.config,
-                self.trackers
+                round_num=round_num,
+                agents=self.agents,
+                environments=self.environments,
+                config=self.orchestrator_config,  # Use the full config here
+                trackers=self.trackers
             )
             self.logger.info(f"Data for round {round_num} inserted successfully.")
         except Exception as e:
-            self.logger.error(f"Error inserting data for round {round_num}: {str(e)}")
+            self.logger.error(f"Error processing round {round_num} results: {str(e)}")
+            raise e
 
     def print_summary(self):
         log_section(self.logger, "GROUP CHAT SIMULATION SUMMARY")

@@ -87,7 +87,7 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         self.environment = None
         self.tracker = AuctionTracker()
         self.agent_surpluses: Dict[str, float] = {}
-
+        
     def setup_environment(self):
         log_section(self.logger, "CONFIGURING AUCTION ENVIRONMENT")
         # Create the auction mechanism
@@ -104,9 +104,11 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
             observation_space=AuctionObservationSpace(),
             mechanism=double_auction
         )
-        # Assign the environment to agents
+        # Assign the environment to agents without overwriting existing environments
         for agent in self.agents:
-            agent.environments = {self.environment_name: self.environment}
+            if not hasattr(agent, 'environments') or agent.environments is None:
+                agent.environments = {}
+            agent.environments[self.environment_name] = self.environment
         log_environment_setup(self.logger, self.environment_name)
 
     async def run_environment(self, round_num: int):
