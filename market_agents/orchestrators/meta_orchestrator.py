@@ -165,7 +165,7 @@ class MetaOrchestrator:
                 agent_id=agent_uuid,
                 use_llm=agent_config.get('use_llm', True),
                 llm_config=llm_config,
-                environments={},  # Environments will be assigned later
+                environments={},
                 protocol=ACLMessage,
                 persona=persona,
                 econ_agent=economic_agent
@@ -181,11 +181,18 @@ class MetaOrchestrator:
 
     def _initialize_environment_orchestrators(self) -> Dict[str, BaseEnvironmentOrchestrator]:
         orchestrators = {}
+        
+        # Generate agents first if not already done
+        if not self.agents:
+            self.generate_agents()
+        
+        # Initialize orchestrators based on environment order
         for env_name in self.environment_order:
             env_config = self.config.environment_configs.get(env_name)
             if not env_config:
                 self.logger.warning(f"Configuration for environment '{env_name}' not found.")
                 continue
+                
             if env_name == 'auction':
                 orchestrator = AuctionOrchestrator(
                     config=env_config,
@@ -198,6 +205,7 @@ class MetaOrchestrator:
             elif env_name == 'group_chat':
                 orchestrator = GroupChatOrchestrator(
                     config=env_config,
+                    orchestrator_config=self.config,
                     agents=self.agents,
                     ai_utils=self.ai_utils,
                     data_inserter=self.data_inserter,
@@ -206,29 +214,46 @@ class MetaOrchestrator:
             else:
                 self.logger.warning(f"Unknown environment: {env_name}")
                 continue
+            
+            # Initialize environment for this orchestrator
+            orchestrator.setup_environment()
             orchestrators[env_name] = orchestrator
+            self.logger.info(f"Initialized {env_name} environment")
+            
+        # Verify environments are properly set for all agents
+        for agent in self.agents:
+            env_names = agent.environments.keys() if hasattr(agent, 'environments') else []
+            self.logger.info(f"Agent {agent.index} has environments: {list(env_names)}")
+            
         return orchestrators
 
     async def run_simulation(self):
-        self.generate_agents()
-        # Initialize environment orchestrators after agents are generated
+        # Initialize environment orchestrators once at the start
         self.environment_orchestrators = self._initialize_environment_orchestrators()
-        for orchestrator in self.environment_orchestrators.values():
-            orchestrator.setup_environment()
-
+        
+        # Run simulation rounds - each round includes both environments in sequence
         for round_num in range(1, self.config.max_rounds + 1):
             log_round(self.logger, round_num)
+            
+            # Run each environment in sequence within the same round
             for env_name in self.environment_order:
                 orchestrator = self.environment_orchestrators.get(env_name)
                 if orchestrator is None:
                     self.logger.warning(f"No orchestrator found for environment '{env_name}'. Skipping.")
                     continue
+                    
                 log_environment_setup(self.logger, env_name)
-                await orchestrator.run_environment(round_num)
-                # Optionally process and store results
-                await orchestrator.process_round_results(round_num)
-                # Optionally, implement logic to generate new topics or adjust agent states between environments
-            # If you have any per-round logic that depends on multiple environments, handle it here
+                try:
+                    # Run the environment for this round
+                    await orchestrator.run_environment(round_num)
+                    # Process results but maintain environment assignments
+                    await orchestrator.process_round_results(round_num)
+                    
+                    self.logger.info(f"Completed {env_name} environment for round {round_num}")
+                except Exception as e:
+                    self.logger.error(f"Error running {env_name} environment: {str(e)}")
+                    raise e
+
         # Print summaries for each environment
         for orchestrator in self.environment_orchestrators.values():
             orchestrator.print_summary()
