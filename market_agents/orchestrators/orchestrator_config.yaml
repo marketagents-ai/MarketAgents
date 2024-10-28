@@ -1,6 +1,6 @@
 # orchestrator_config.yaml
 
-num_agents: 4
+num_agents: 10
 max_rounds: 2
 environment_order:
   - group_chat
@@ -14,7 +14,7 @@ agent_config:
   buyer_initial_goods: 0
   seller_initial_cash: 0.0
   seller_initial_goods: 10
-  good_name: "apple"
+  good_name: "strawberry"
   noise_factor: 0.05
   max_relative_spread: 0.2
 llm_configs:
