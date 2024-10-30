@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/home/erebus/Desktop/Sandbox/test/MarketAgents/market_agents/orchestrator_parallel_with_db.py", line 105, in <module>
+    class OrchestratorConfig(BaseSettings):
+  File "/home/erebus/Desktop/Sandbox/test/MarketAgents/market_agents/orchestrator_parallel_with_db.py", line 112, in OrchestratorConfig
+    database_config: DatabaseConfig = DatabaseConfig()
+                                      ^^^^^^^^^^^^^^^^
+  File "/home/erebus/miniconda3/envs/market/lib/python3.11/site-packages/pydantic_settings/main.py", line 152, in __init__
+    super().__init__(
+  File "/home/erebus/miniconda3/envs/market/lib/python3.11/site-packages/pydantic/main.py", line 193, in __init__
+    self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for DatabaseConfig
+db_user
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+db_password
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing

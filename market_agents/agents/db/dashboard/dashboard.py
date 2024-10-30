@@ -39,6 +39,18 @@ def get_db_connection():
         logger.error(f"Unable to connect to the database: {e}")
         raise
 
+def get_valid_table_names(cursor):
+    query = """
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_type = 'BASE TABLE'
+    ORDER BY table_name
+    """
+    cursor.execute(query)
+    tables = [row[0] for row in cursor.fetchall()]
+    return tables
+
 def get_column_types(cursor, table_name):
     query = """
     SELECT column_name, data_type, is_nullable
@@ -111,16 +123,10 @@ async def get_tables():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        query = """
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_type = 'BASE TABLE'
-        ORDER BY table_name
-        """
-        cursor.execute(query)
-        all_tables = [row[0] for row in cursor.fetchall()]
+        # Fetch all table names
+        all_tables = get_valid_table_names(cursor)
         
+        # Filter non-empty tables
         non_empty_tables = []
         for table in all_tables:
             count_query = sql.SQL("SELECT EXISTS(SELECT 1 FROM {} LIMIT 1)").format(sql.Identifier(table))
@@ -147,6 +153,11 @@ async def get_column_names(table_name: str = Query(..., min_length=1)):
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
+        # Validate table name
+        valid_tables = get_valid_table_names(cursor)
+        if table_name not in valid_tables:
+            raise HTTPException(status_code=400, detail="Invalid table name provided.")
+
         column_types = get_column_types(cursor, table_name)
         if not column_types:
             raise HTTPException(status_code=404, detail="Table not found or has no columns.")
@@ -161,6 +172,9 @@ async def get_column_names(table_name: str = Query(..., min_length=1)):
             columns.append(column_info)
 
         return columns
+    except HTTPException as he:
+        logger.error(f"HTTP error occurred: {he.detail}")
+        raise he
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         if cursor:
@@ -188,17 +202,23 @@ async def get_metrics_data(
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
+        # Validate table name
+        valid_tables = get_valid_table_names(cursor)
+        if table_name not in valid_tables:
+            raise HTTPException(status_code=400, detail="Invalid table name provided.")
+
         column_types = get_column_types(cursor, table_name)
         if not column_types:
             raise HTTPException(status_code=404, detail="Table not found or has no columns.")
 
+        valid_columns = list(column_types.keys())
         json_columns = [col for col, info in column_types.items() if info['type'] in ('json', 'jsonb')]
 
         # Calculate offset
         offset = (page - 1) * page_size
 
         if full_table:
-            select_parts = [sql.Identifier(col) for col in column_types.keys()]
+            select_parts = [sql.Identifier(col) for col in valid_columns]
             query = sql.SQL("SELECT {} FROM {} OFFSET {} LIMIT {}").format(
                 sql.SQL(', ').join(select_parts),
                 sql.Identifier(table_name),
@@ -208,6 +228,12 @@ async def get_metrics_data(
         else:
             if not x_column or not y_column:
                 raise HTTPException(status_code=400, detail="X and Y columns must be specified when not fetching full table.")
+
+            # Validate column names
+            if x_column.split('.')[0] not in valid_columns:
+                raise HTTPException(status_code=400, detail=f"Invalid x_column provided: {x_column}")
+            if y_column.split('.')[0] not in valid_columns:
+                raise HTTPException(status_code=400, detail=f"Invalid y_column provided: {y_column}")
             
             x_select = build_json_path_query(x_column)
             y_select = build_json_path_query(y_column)
@@ -253,6 +279,9 @@ async def get_metrics_data(
             "total_pages": (total_count + page_size - 1) // page_size
         }
 
+    except HTTPException as he:
+        logger.error(f"HTTP error occurred: {he.detail}")
+        raise he
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         if cursor:
@@ -279,34 +308,47 @@ async def search_database(
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
+        # Validate table name
+        valid_tables = get_valid_table_names(cursor)
+        if table_name not in valid_tables:
+            raise HTTPException(status_code=400, detail="Invalid table name provided.")
+
         # Get column types
         column_types = get_column_types(cursor, table_name)
         if not column_types:
             raise HTTPException(status_code=404, detail="Table not found or has no columns.")
 
+        valid_columns = list(column_types.keys())
+
         # If no specific columns are provided, search all columns
         if not columns:
-            columns = list(column_types.keys())
+            columns = valid_columns
+        else:
+            # Validate provided columns
+            for col in columns:
+                if col.split('.')[0] not in valid_columns:
+                    raise HTTPException(status_code=400, detail=f"Invalid column provided: {col}")
 
         # Construct the WHERE clause
         where_clauses = []
         params = []
         for col in columns:
-            if column_types[col]['type'] in ('json', 'jsonb'):
-                # For JSON columns, use the ->> operator to search as text
+            base_col = col.split('.')[0]
+            if column_types[base_col]['type'] in ('json', 'jsonb'):
+                # For JSON columns, use CAST to text and search
                 where_clauses.append(
-                    sql.SQL("CAST({} AS TEXT) ILIKE %s").format(sql.Identifier(col))
+                    sql.SQL("CAST({} AS TEXT) ILIKE %s").format(sql.Identifier(base_col))
                 )
                 params.append(f'%{search_term}%')
-            elif column_types[col]['type'] in ('text', 'varchar', 'char'):
+            elif column_types[base_col]['type'] in ('text', 'varchar', 'char'):
                 where_clauses.append(
-                    sql.SQL("{} ILIKE %s").format(sql.Identifier(col))
+                    sql.SQL("{} ILIKE %s").format(sql.Identifier(base_col))
                 )
                 params.append(f'%{search_term}%')
             else:
                 # For other types, cast to text before searching
                 where_clauses.append(
-                    sql.SQL("CAST({} AS TEXT) ILIKE %s").format(sql.Identifier(col))
+                    sql.SQL("CAST({} AS TEXT) ILIKE %s").format(sql.Identifier(base_col))
                 )
                 params.append(f'%{search_term}%')
 
@@ -360,6 +402,9 @@ async def search_database(
             "total_pages": (total_count + page_size - 1) // page_size
         }
 
+    except HTTPException as he:
+        logger.error(f"HTTP error occurred: {he.detail}")
+        raise he
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
