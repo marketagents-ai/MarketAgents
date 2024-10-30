@@ -9,9 +9,14 @@ from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from datetime import datetime
 import json
+import logging
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -31,7 +36,7 @@ def get_db_connection():
     try:
         return psycopg2.connect(**DB_PARAMS)
     except psycopg2.Error as e:
-        print(f"Unable to connect to the database: {e}")
+        logger.error(f"Unable to connect to the database: {e}")
         raise
 
 def get_column_types(cursor, table_name):
@@ -57,7 +62,11 @@ def build_json_path_query(column):
     else:
         base = sql.Identifier(parts[0])
         path = [sql.Literal(part) for part in parts[1:]]
-        return sql.SQL('->').join([base] + path[:-1]) + sql.SQL('->>') + path[-1]
+        query = base
+        for p in path[:-1]:
+            query = sql.SQL("{}->{}").format(query, p)
+        query = sql.SQL("{}->>{}").format(query, path[-1])
+        return query
 
 def flatten_json(data):
     flattened = {}
@@ -122,7 +131,7 @@ async def get_tables():
         
         return non_empty_tables
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching table names.")
     finally:
         if cursor:
@@ -153,7 +162,7 @@ async def get_column_names(table_name: str = Query(..., min_length=1)):
 
         return columns
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         if cursor:
             cursor.execute("ROLLBACK")
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching column names.")
@@ -245,7 +254,7 @@ async def get_metrics_data(
         }
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         if cursor:
             cursor.execute("ROLLBACK")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
@@ -286,9 +295,9 @@ async def search_database(
             if column_types[col]['type'] in ('json', 'jsonb'):
                 # For JSON columns, use the ->> operator to search as text
                 where_clauses.append(
-                    sql.SQL("{} ->> %s ILIKE %s").format(sql.Identifier(col))
+                    sql.SQL("CAST({} AS TEXT) ILIKE %s").format(sql.Identifier(col))
                 )
-                params.extend(['', f'%{search_term}%'])
+                params.append(f'%{search_term}%')
             elif column_types[col]['type'] in ('text', 'varchar', 'char'):
                 where_clauses.append(
                     sql.SQL("{} ILIKE %s").format(sql.Identifier(col))
@@ -352,7 +361,7 @@ async def search_database(
         }
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
     finally:
         if cursor:
