@@ -1,17 +1,14 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import create_model
-from typing import Optional, List, Any, Dict
+from typing import Optional, List
 import os
 import psycopg2
 from psycopg2 import sql
-from psycopg2.extras import RealDictCursor, Json
+from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from datetime import datetime
 import json
-import re
-import argparse
 
 # Load environment variables
 load_dotenv()
@@ -67,23 +64,22 @@ def flatten_json(data):
     if isinstance(data, dict):
         for key, value in data.items():
             if isinstance(value, (dict, list)):
-                flattened.update(flatten_json(value))
+                nested = flatten_json(value)
+                for nested_key, nested_value in nested.items():
+                    flattened[f"{key}.{nested_key}"] = nested_value
             else:
                 flattened[key] = value
     elif isinstance(data, list):
         for i, item in enumerate(data):
             if isinstance(item, (dict, list)):
-                flattened.update(flatten_json(item))
+                nested = flatten_json(item)
+                for nested_key, nested_value in nested.items():
+                    flattened[f"{i}.{nested_key}"] = nested_value
             else:
                 flattened[str(i)] = item
     else:
-        flattened = data
+        return data
     return flattened
-
-# Update argparse
-parser = argparse.ArgumentParser(description="SQL Dashboard with JSON handling options")
-parser.add_argument("--flatten-json", action="store_true", help="Flatten JSON columns into separate columns. If false, format as line-separated JSON.")
-args = parser.parse_args()
 
 def process_json_data(value, flatten=False):
     if value is None:
@@ -174,7 +170,8 @@ async def get_metrics_data(
     y_column: str = Query(None),
     full_table: bool = Query(False),
     page: int = Query(1, ge=1),
-    page_size: int = Query(100, ge=1, le=1000)
+    page_size: int = Query(100, ge=1, le=1000),
+    flatten_json: bool = Query(False)
 ):
     conn = None
     cursor = None
@@ -222,19 +219,19 @@ async def get_metrics_data(
         cursor.execute(query)
         rows = cursor.fetchall()
 
-        # Process the rows (keep existing processing logic)
+        # Process the rows
         processed_rows = []
         for row in rows:
             processed_row = {}
             for key, value in row.items():
                 if key in json_columns and value is not None:
-                    processed_row[key] = process_json_data(value, flatten=args.flatten_json)
+                    processed_row[key] = process_json_data(value, flatten=flatten_json)
                 elif isinstance(value, datetime):
                     processed_row[key] = value.isoformat()
                 else:
                     processed_row[key] = value
             
-            if args.flatten_json:
+            if flatten_json:
                 processed_row = flatten_json(processed_row)
             
             processed_rows.append(processed_row)
@@ -264,7 +261,8 @@ async def search_database(
     search_term: str = Query(..., min_length=1),
     columns: Optional[List[str]] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(100, ge=1, le=1000)
+    page_size: int = Query(100, ge=1, le=1000),
+    flatten_json: bool = Query(False)
 ):
     conn = None
     cursor = None
@@ -283,55 +281,49 @@ async def search_database(
 
         # Construct the WHERE clause
         where_clauses = []
+        params = []
         for col in columns:
             if column_types[col]['type'] in ('json', 'jsonb'):
                 # For JSON columns, use the ->> operator to search as text
                 where_clauses.append(
-                    sql.SQL("{} ->> {} ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(''),  # Empty string means the entire JSON object
-                        sql.Literal(f'%{search_term}%')
-                    )
+                    sql.SQL("{} ->> %s ILIKE %s").format(sql.Identifier(col))
                 )
+                params.extend(['', f'%{search_term}%'])
             elif column_types[col]['type'] in ('text', 'varchar', 'char'):
                 where_clauses.append(
-                    sql.SQL("{} ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(f'%{search_term}%')
-                    )
+                    sql.SQL("{} ILIKE %s").format(sql.Identifier(col))
                 )
+                params.append(f'%{search_term}%')
             else:
                 # For other types, cast to text before searching
                 where_clauses.append(
-                    sql.SQL("CAST({} AS TEXT) ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(f'%{search_term}%')
-                    )
+                    sql.SQL("CAST({} AS TEXT) ILIKE %s").format(sql.Identifier(col))
                 )
+                params.append(f'%{search_term}%')
 
         # Calculate offset
         offset = (page - 1) * page_size
 
         # Construct the full query with pagination
-        query = sql.SQL("SELECT * FROM {} WHERE {} OFFSET {} LIMIT {}").format(
+        where_clause = sql.SQL(" OR ").join(where_clauses)
+        query = sql.SQL("SELECT * FROM {} WHERE {} OFFSET %s LIMIT %s").format(
             sql.Identifier(table_name),
-            sql.SQL(" OR ").join(where_clauses),
-            sql.Literal(offset),
-            sql.Literal(page_size)
+            where_clause
         )
+        params.extend([offset, page_size])
 
         # Construct the count query
         count_query = sql.SQL("SELECT COUNT(*) FROM {} WHERE {}").format(
             sql.Identifier(table_name),
-            sql.SQL(" OR ").join(where_clauses)
+            where_clause
         )
 
         # Execute the count query
-        cursor.execute(count_query)
+        cursor.execute(count_query, params[:-2])  # Exclude offset and limit
         total_count = cursor.fetchone()['count']
 
         # Execute the main query
-        cursor.execute(query)
+        cursor.execute(query, params)
         results = cursor.fetchall()
 
         # Process the results
@@ -340,13 +332,13 @@ async def search_database(
             processed_row = {}
             for key, value in row.items():
                 if column_types[key]['type'] in ('json', 'jsonb') and value is not None:
-                    processed_row[key] = process_json_data(value, flatten=args.flatten_json)
+                    processed_row[key] = process_json_data(value, flatten=flatten_json)
                 elif isinstance(value, datetime):
                     processed_row[key] = value.isoformat()
                 else:
                     processed_row[key] = value
             
-            if args.flatten_json:
+            if flatten_json:
                 processed_row = flatten_json(processed_row)
             
             processed_results.append(processed_row)
