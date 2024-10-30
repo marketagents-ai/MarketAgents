@@ -10,7 +10,7 @@ __pycache__
 
 # log files
 llm_agents/logs*
-
+*.log
 # Any and all venv folders anywhere in the project
 **/venv
 **/venv/*
