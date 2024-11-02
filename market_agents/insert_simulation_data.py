@@ -140,6 +140,40 @@ class SimulationDataInserter:
                 self.conn.rollback()
                 logging.error(f"Error inserting agent memory: {e}")
         logging.info(f"Inserted {len(memories)} agent memories into the database")
+    def insert_persona(self, personas: List[Dict[str, Any]]):
+        """Insert personas into the database."""
+        for persona_data in personas:
+            try:
+                # Convert agent_id to UUID if present and not already UUID
+                agent_id = None
+                if 'agent_id' in persona_data:
+                    agent_id = uuid.UUID(str(persona_data['agent_id'])) if isinstance(persona_data['agent_id'], (str, int)) else persona_data['agent_id']
+
+                with self.conn.cursor() as cur:
+                    cur.execute("""
+                    INSERT INTO personas (
+                        agent_id, name, role, persona, objectives, trader_type
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """, (
+                        agent_id,
+                        persona_data['name'],
+                        persona_data['role'].lower(),
+                        persona_data['persona'],
+                        psycopg2.extras.Json(persona_data['objectives']),
+                        psycopg2.extras.Json(persona_data['trader_type'])
+                    ))
+                    self.conn.commit()
+                    
+            except ValueError as e:
+                logging.error(f"Invalid UUID format for agent_id in persona: {persona_data.get('agent_id')}. Error: {str(e)}")
+            except Exception as e:
+                self.conn.rollback()
+                logging.error(f"Error inserting persona: {str(e)}")
+                logging.error(f"Persona data: {persona_data}")
+        
+        logging.info(f"Inserted {len(personas)} personas into the database")
 
 
     def insert_schedules(self, schedules_data: List[Dict[str, Any]]):
