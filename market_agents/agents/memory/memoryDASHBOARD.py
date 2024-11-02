@@ -2,6 +2,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.wsgi import WSGIMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional, Any
 import json
@@ -33,10 +34,13 @@ import re
 app = FastAPI()
 
 # Initialize Dash app
-dash_app = dash.Dash(__name__)
+dash_app = dash.Dash(__name__, server=False)
 
 # Serve static files (for the GUI)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount the Dash app onto the FastAPI app
+app.mount("/dash", WSGIMiddleware(dash_app.server))
 
 # Set the path to the folder containing JSON files
 JSON_FOLDER = "test_jsonl"
@@ -356,7 +360,7 @@ dash_app.layout = html.Div([
             style_table={'overflowX': 'auto'},
             style_cell={'textAlign': 'left', 'minWidth': '100px', 'width': '180px', 'maxWidth': '300px'},
             style_data={'whiteSpace': 'normal', 'height': 'auto'},
-            markdown_options={'html': True}  # Enable HTML rendering for markdown content
+                markdown_options={'html': True}  # Enable HTML rendering for markdown content
         )
     ], style={'margin': '20px'}),
     
