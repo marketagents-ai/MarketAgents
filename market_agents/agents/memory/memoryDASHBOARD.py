@@ -29,9 +29,7 @@ import base64
 from io import BytesIO
 import re
 
-#import nltk
-#nltk.download('punkt_tab')
-
+# Initialize FastAPI app
 app = FastAPI()
 
 # Initialize Dash app
@@ -51,16 +49,23 @@ def load_data():
     print(colorama.Fore.CYAN + "Loading and embedding data:" + colorama.Fore.RESET)
     for filename in tqdm(os.listdir(JSON_FOLDER), desc="Processing files"):
         if filename.endswith(".jsonl"):
-            with open(os.path.join(JSON_FOLDER, filename), "r") as f:
-                for line in f:
-                    data = json.loads(line)
-                    agent_id = re.search(r'agent_(\d+)', filename)
-                    if agent_id:
-                        agent_id = f"agent_{agent_id.group(1)}"
-                        memory_id = f"{agent_id}_{data['id']}"
-                        memory_manager.add_memory(agent_id, json.dumps(data), {"type": "interaction", "id": memory_id})
-                    else:
-                        print(f"Warning: Could not determine agent ID from filename {filename}")
+            file_path = os.path.join(JSON_FOLDER, filename)
+            try:
+                with open(file_path, "r") as f:
+                    for line in f:
+                        try:
+                            data = json.loads(line)
+                            agent_id_match = re.search(r'agent_(\d+)', filename)
+                            if agent_id_match:
+                                agent_id = f"agent_{agent_id_match.group(1)}"
+                                memory_id = f"{agent_id}_{data['id']}"
+                                memory_manager.add_memory(agent_id, json.dumps(data), {"type": "interaction", "id": memory_id})
+                            else:
+                                print(f"Warning: Could not determine agent ID from filename {filename}")
+                        except json.JSONDecodeError as e:
+                            print(f"Warning: Failed to parse JSON line in {filename}: {e}")
+            except Exception as e:
+                print(f"Warning: Failed to read file {file_path}: {e}")
     print(colorama.Fore.GREEN + "Data loading and embedding complete!" + colorama.Fore.RESET)
 
 # Load data
@@ -243,7 +248,6 @@ def json_to_markdown(data: Union[DataModel, Dict]) -> str:
         return format_observation(data)
     else:
         return json.dumps(data.dict(), indent=2)  # Fallback to simple JSON formatting
-
 
 @app.get("/agents")
 async def get_agents():
