@@ -446,7 +446,7 @@ class RawOutput(SQLModel, table=True):
     class Config:
         arbitrary_types_allowed = True
 
-    
+
 class ProcessedOutput(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     content: Optional[str] = None
@@ -469,7 +469,7 @@ if __name__ == "__main__":
                 raise ValueError("Chat thread id is not set, can not create processed output")
             dummy_usage = Usage(prompt_tokens=69, completion_tokens=420, total_tokens=69420)
             dummy_json_object = GeneratedJsonObject(name="dummy_json_object", object={"dummy": "object"})
-            dummy_raw_output = RawOutput(raw_result="dummy_raw_output", client=LLMClient.openai, start_time=10, end_time=20)
+            dummy_raw_output = RawOutput(raw_result="dummy_raw_output", client=LLMClient.openai, start_time=10, end_time=20, chat_thread_id=first_chat.id)
             dummy_processed_output = ProcessedOutput(usage=dummy_usage, json_object=dummy_json_object, raw_output=dummy_raw_output, time_taken=10, llm_client=LLMClient.openai, chat_thread=first_chat)
             session.add(dummy_processed_output)
             session.commit()

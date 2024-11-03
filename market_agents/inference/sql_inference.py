@@ -27,7 +27,8 @@ class ParallelAIUtilities:
                  vllm_request_limits: Optional[RequestLimits] = None,
                  litellm_request_limits: Optional[RequestLimits] = None,
                  local_cache: bool = True,
-                 cache_folder: Optional[str] = None, engine: Optional[Engine] = None):
+                 cache_folder: Optional[str] = None,
+                engine: Optional[Engine] = None):
         load_dotenv()
         self.openai_key = os.getenv("OPENAI_KEY")
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
@@ -61,7 +62,8 @@ class ParallelAIUtilities:
     def _update_chat_thread_history(self, chat_threads: List[ChatThread], llm_outputs: List[ProcessedOutput]) -> List[ChatThread]:
         chat_thread_hashmap = self._create_chat_thread_hashmap(chat_threads)
         for output in llm_outputs:
-            chat_thread_hashmap[output.chat_thread_id].add_chat_turn_history(output)
+            if output.raw_output.chat_thread_id:
+                chat_thread_hashmap[output.raw_output.chat_thread_id].add_chat_turn_history(output)
         return list(chat_thread_hashmap.values())
     
     
