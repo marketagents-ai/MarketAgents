@@ -118,7 +118,12 @@ class ChatSnapshot(SQLModel, table=True):
     structured_output_name: Optional[str] = None
     structured_output_id: Optional[int] = Field(default=None, foreign_key="tool.id")
     llm_config_id: int = Field( foreign_key="llmconfig.id")
-    
+
+
+class ChatThreadProcessedOutputLinkage(SQLModel, table=True):
+    chat_thread_id: int = Field(foreign_key="chatthread.id",primary_key=True)
+    processed_output_id: int = Field(foreign_key="processedoutput.id",primary_key=True)
+
 class ChatThread (SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     system_string: Optional[str] = None
@@ -134,7 +139,7 @@ class ChatThread (SQLModel, table=True):
 
     llm_config: LLMConfig = Relationship(back_populates="chats")
     llm_config_id: Optional[int] = Field(default=None, foreign_key="llmconfig.id")
-
+    processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage)
     @computed_field
     @property
     def oai_response_format(self) -> Optional[Union[ResponseFormatText, ResponseFormatJSONObject, ResponseFormatJSONSchema]]:
@@ -205,8 +210,8 @@ class ChatThread (SQLModel, table=True):
         
     def add_chat_turn_history(self, llm_output:'ProcessedOutput'):
         """ add a chat turn to the history without safely model copy just normal append """
-        if llm_output.chat_thread_id != self.id:
-            raise ValueError(f"ProcessedOutput chat_thread_id {llm_output.chat_thread_id} does not match the chat_thread id {self.id}")
+        if llm_output.chat_thread != self:
+            raise ValueError(f"ProcessedOutput chat_thread_id {llm_output.chat_thread} does not match the chat_thread id {self}")
         if self.history is None:
             self.history = []
         self.history.append({"role": "user", "content": self.new_message})
@@ -214,6 +219,7 @@ class ChatThread (SQLModel, table=True):
         if response is None:
             raise ValueError("ProcessedOutput content or json_object is None, can not add to history")
         self.history.append({"role": "assistant", "content": response})
+        self.processed_outputs.append(llm_output)
     
     def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
@@ -259,6 +265,7 @@ class OutputJsonObjectLinkage(SQLModel, table=True):
 class RawProcessedLinkage(SQLModel, table=True):
     raw_output_id: int = Field(foreign_key="rawoutput.id",primary_key=True)
     processed_output_id: int = Field(foreign_key="processedoutput.id",primary_key=True)
+
 
 class Usage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -433,13 +440,13 @@ class RawOutput(SQLModel, table=True):
         content, json_object, usage, error = self._parse_result()
         if json_object is None or usage is None or self.chat_thread_id is None:
             raise ValueError("No JSON object or usage found or chat_thread_id in the raw output, can not create processed output")
-        processed_output = ProcessedOutput(content=content, json_object=json_object, usage=usage, error=error, time_taken=self.time_taken, llm_client=self.client, raw_output=self, chat_thread_id=self.chat_thread_id)
+        processed_output = ProcessedOutput(content=content, json_object=json_object, usage=usage, error=error, time_taken=self.time_taken, llm_client=self.client, raw_output=self)
         return processed_output
 
     class Config:
         arbitrary_types_allowed = True
 
-
+    
 class ProcessedOutput(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     content: Optional[str] = None
@@ -449,7 +456,7 @@ class ProcessedOutput(SQLModel, table=True):
     error: Optional[str] = None
     time_taken: float
     llm_client: LLMClient
-    chat_thread_id: int = Field(default=None, foreign_key="chatthread.id")
+    chat_thread: 'ChatThread' = Relationship(back_populates="processed_outputs", link_model=ChatThreadProcessedOutputLinkage)
 
 
 if __name__ == "__main__":
@@ -463,7 +470,7 @@ if __name__ == "__main__":
             dummy_usage = Usage(prompt_tokens=69, completion_tokens=420, total_tokens=69420)
             dummy_json_object = GeneratedJsonObject(name="dummy_json_object", object={"dummy": "object"})
             dummy_raw_output = RawOutput(raw_result="dummy_raw_output", client=LLMClient.openai, start_time=10, end_time=20)
-            dummy_processed_output = ProcessedOutput(usage=dummy_usage, json_object=dummy_json_object, raw_output=dummy_raw_output, time_taken=10, llm_client=LLMClient.openai, chat_thread_id=first_chat.id)
+            dummy_processed_output = ProcessedOutput(usage=dummy_usage, json_object=dummy_json_object, raw_output=dummy_raw_output, time_taken=10, llm_client=LLMClient.openai, chat_thread=first_chat)
             session.add(dummy_processed_output)
             session.commit()
         return dummy_processed_output

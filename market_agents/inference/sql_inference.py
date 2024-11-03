@@ -2,16 +2,17 @@ import asyncio
 import json
 from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field, ValidationError
-from .sql_models import RawOutput, ProcessedOutput, ChatThread , LLMClient 
-from .clients_models import AnthropicRequest, OpenAIRequest, VLLMRequest
-from .oai_parallel import process_api_requests_from_file, OAIApiFromFileConfig
+from market_agents.inference.sql_models import RawOutput, ProcessedOutput, ChatThread , LLMClient 
+from market_agents.inference.clients_models import AnthropicRequest, OpenAIRequest, VLLMRequest
+from market_agents.inference.oai_parallel import process_api_requests_from_file, OAIApiFromFileConfig
 import os
 from dotenv import load_dotenv
 import time
 from openai.types.chat import ChatCompletionToolParam
 from anthropic.types.beta.prompt_caching import PromptCachingBetaToolParam
 from anthropic.types.message_create_params import ToolChoiceToolChoiceTool
-
+from sqlalchemy import Engine
+from sqlmodel import Session
 
 
 class RequestLimits(BaseModel):
@@ -26,7 +27,7 @@ class ParallelAIUtilities:
                  vllm_request_limits: Optional[RequestLimits] = None,
                  litellm_request_limits: Optional[RequestLimits] = None,
                  local_cache: bool = True,
-                 cache_folder: Optional[str] = None):
+                 cache_folder: Optional[str] = None, engine: Optional[Engine] = None):
         load_dotenv()
         self.openai_key = os.getenv("OPENAI_KEY")
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
@@ -41,6 +42,7 @@ class ParallelAIUtilities:
         self.local_cache = local_cache
         self.cache_folder = self._setup_cache_folder(cache_folder)
         self.all_requests = []
+        self.engine = engine
 
     def _setup_cache_folder(self, cache_folder: Optional[str]) -> str:
         if cache_folder:
@@ -53,29 +55,35 @@ class ParallelAIUtilities:
         os.makedirs(full_path, exist_ok=True)
         return full_path
     
-    def _create_prompt_hashmap(self, prompts: List[ChatThread]) -> Dict[int, ChatThread]:
-        return {p.id: p for p in prompts if p.id is not None}
+    def _create_chat_thread_hashmap(self, chat_threads: List[ChatThread]) -> Dict[int, ChatThread]:
+        return {p.id: p for p in chat_threads if p.id is not None}
     
-    def _update_prompt_history(self, prompts: List[ChatThread], llm_outputs: List[ProcessedOutput]):
-        prompt_hashmap = self._create_prompt_hashmap(prompts)
+    def _update_chat_thread_history(self, chat_threads: List[ChatThread], llm_outputs: List[ProcessedOutput]) -> List[ChatThread]:
+        chat_thread_hashmap = self._create_chat_thread_hashmap(chat_threads)
         for output in llm_outputs:
-            prompt_hashmap[output.chat_thread_id].add_chat_turn_history(output)
-        return list(prompt_hashmap.values())
+            chat_thread_hashmap[output.chat_thread_id].add_chat_turn_history(output)
+        return list(chat_thread_hashmap.values())
+    
+    
+    def _update_chat_thread_db(self,llm_outputs: List[ChatThread]):
+        with Session(self.engine) as session:
+            for output in llm_outputs:
+                output.update_db_from_session(session)
 
-    async def run_parallel_ai_completion(self, prompts: List[ChatThread], update_history:bool=True) -> List[ProcessedOutput]:
-        openai_prompts = [p for p in prompts if p.llm_config.client == "openai"]
-        anthropic_prompts = [p for p in prompts if p.llm_config.client == "anthropic"]
-        vllm_prompts = [p for p in prompts if p.llm_config.client == "vllm"] 
-        litellm_prompts = [p for p in prompts if p.llm_config.client == "litellm"]
-        tasks = []
-        if openai_prompts:
-            tasks.append(self._run_openai_completion(openai_prompts))
-        if anthropic_prompts:
-            tasks.append(self._run_anthropic_completion(anthropic_prompts))
-        if vllm_prompts:
-            tasks.append(self._run_vllm_completion(vllm_prompts))
-        if litellm_prompts:
-            tasks.append(self._run_litellm_completion(litellm_prompts))
+    async def run_parallel_ai_completion(self, chat_threads: List[ChatThread], update_history:bool=True, update_db:bool=True) -> List[ProcessedOutput]:
+        openai_chat_threads = [p for p in chat_threads if p.llm_config.client == "openai"]
+        anthropic_chat_threads = [p for p in chat_threads if p.llm_config.client == "anthropic"]
+        vllm_chat_threads = [p for p in chat_threads if p.llm_config.client == "vllm"] 
+        litellm_chat_threads = [p for p in chat_threads if p.llm_config.client == "litellm"]
+        tasks  = []
+        if openai_chat_threads:
+            tasks.append(self._run_openai_completion(openai_chat_threads))
+        if anthropic_chat_threads:
+            tasks.append(self._run_anthropic_completion(anthropic_chat_threads))
+        if vllm_chat_threads:
+            tasks.append(self._run_vllm_completion(vllm_chat_threads))
+        if litellm_chat_threads:
+            tasks.append(self._run_litellm_completion(litellm_chat_threads))
 
         results = await asyncio.gather(*tasks)
         flattened_results = [item for sublist in results for item in sublist]
@@ -84,7 +92,9 @@ class ParallelAIUtilities:
         self.all_requests.extend(flattened_results)
         
         if update_history:
-            prompts = self._update_prompt_history(prompts, flattened_results)
+            chat_threads = self._update_chat_thread_history(chat_threads, flattened_results)
+        if update_db:
+            self._update_chat_thread_db(chat_threads)
         
         return flattened_results
     
@@ -93,12 +103,12 @@ class ParallelAIUtilities:
         self.all_requests = []  
         return requests
 
-    async def _run_openai_completion(self, prompts: List[ChatThread]) -> List[ProcessedOutput]:
+    async def _run_openai_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         requests_file = os.path.join(self.cache_folder, f'openai_requests_{timestamp}.jsonl')
         results_file = os.path.join(self.cache_folder, f'openai_results_{timestamp}.jsonl')
-        self._prepare_requests_file(prompts, "openai", requests_file)
-        config = self._create_oai_completion_config(prompts[0], requests_file, results_file)
+        self._prepare_requests_file(chat_threads, "openai", requests_file)
+        config = self._create_oai_completion_config(chat_threads[0], requests_file, results_file)
         if config:
             try:
                 await process_api_requests_from_file(config)
@@ -108,12 +118,12 @@ class ParallelAIUtilities:
                     self._delete_files(requests_file, results_file)
         return []
 
-    async def _run_anthropic_completion(self, prompts: List[ChatThread]) -> List[ProcessedOutput]:
+    async def _run_anthropic_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         requests_file = os.path.join(self.cache_folder, f'anthropic_requests_{timestamp}.jsonl')
         results_file = os.path.join(self.cache_folder, f'anthropic_results_{timestamp}.jsonl')
-        self._prepare_requests_file(prompts, "anthropic", requests_file)
-        config = self._create_anthropic_completion_config(prompts[0], requests_file, results_file)
+        self._prepare_requests_file(chat_threads, "anthropic", requests_file)
+        config = self._create_anthropic_completion_config(chat_threads[0], requests_file, results_file)
         if config:
             try:
                 await process_api_requests_from_file(config)
@@ -123,12 +133,12 @@ class ParallelAIUtilities:
                     self._delete_files(requests_file, results_file)
         return []
     
-    async def _run_vllm_completion(self, prompts: List[ChatThread]) -> List[ProcessedOutput]:
+    async def _run_vllm_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         requests_file = os.path.join(self.cache_folder, f'vllm_requests_{timestamp}.jsonl')
         results_file = os.path.join(self.cache_folder, f'vllm_results_{timestamp}.jsonl')
-        self._prepare_requests_file(prompts, "vllm", requests_file)
-        config = self._create_vllm_completion_config(prompts[0], requests_file, results_file)
+        self._prepare_requests_file(chat_threads, "vllm", requests_file)
+        config = self._create_vllm_completion_config(chat_threads[0], requests_file, results_file)
         if config:
             try:
                 await process_api_requests_from_file(config)
@@ -138,12 +148,12 @@ class ParallelAIUtilities:
                     self._delete_files(requests_file, results_file)
         return []
     
-    async def _run_litellm_completion(self, prompts: List[ChatThread]) -> List[ProcessedOutput]:
+    async def _run_litellm_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         requests_file = os.path.join(self.cache_folder, f'litellm_requests_{timestamp}.jsonl')
         results_file = os.path.join(self.cache_folder, f'litellm_results_{timestamp}.jsonl')
-        self._prepare_requests_file(prompts, "litellm", requests_file)
-        config = self._create_litellm_completion_config(prompts[0], requests_file, results_file)
+        self._prepare_requests_file(chat_threads, "litellm", requests_file)
+        config = self._create_litellm_completion_config(chat_threads[0], requests_file, results_file)
         if config:
             try:
                 await process_api_requests_from_file(config)
@@ -155,13 +165,13 @@ class ParallelAIUtilities:
 
     
 
-    def _prepare_requests_file(self, prompts: List[ChatThread], client: str, filename: str):
+    def _prepare_requests_file(self, chat_threads: List[ChatThread], client: str, filename: str):
         requests = []
-        for prompt in prompts:
-            request = self._convert_prompt_to_request(prompt, client)
+        for chat_thread in chat_threads:
+            request = self._convert_chat_thread_to_request(chat_thread, client)
             if request:
                 metadata = {
-                    "chat_thread_id": prompt.id,
+                    "chat_thread_id": chat_thread.id,
                     "start_time": time.time(),
                     "end_time": None,
                     "total_time": None
@@ -197,89 +207,89 @@ class ParallelAIUtilities:
         
 
     
-    def _get_openai_request(self, prompt: ChatThread) -> Optional[Dict[str, Any]]:
-        messages = prompt.oai_messages
+    def _get_openai_request(self, chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
+        messages = chat_thread.oai_messages
         request = {
-            "model": prompt.llm_config.model,
+            "model": chat_thread.llm_config.model,
             "messages": messages,
-            "max_tokens": prompt.llm_config.max_tokens,
-            "temperature": prompt.llm_config.temperature,
+            "max_tokens": chat_thread.llm_config.max_tokens,
+            "temperature": chat_thread.llm_config.temperature,
         }
-        if prompt.oai_response_format:
-            request["response_format"] = prompt.oai_response_format
-        if prompt.llm_config.response_format == "tool" and prompt.structured_output:
-            tool = prompt.get_tool()
+        if chat_thread.oai_response_format:
+            request["response_format"] = chat_thread.oai_response_format
+        if chat_thread.llm_config.response_format == "tool" and chat_thread.structured_output:
+            tool = chat_thread.get_tool()
             if tool:
                 request["tools"] = [tool]
-                request["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
+                request["tool_choice"] = {"type": "function", "function": {"name": chat_thread.structured_output.schema_name}}
         if self._validate_openai_request(request):
             return request
         else:
             return None
     
-    def _get_anthropic_request(self, prompt: ChatThread) -> Optional[Dict[str, Any]]:
-        system_content, messages = prompt.anthropic_messages    
+    def _get_anthropic_request(self, chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
+        system_content, messages = chat_thread.anthropic_messages    
         request = {
-            "model": prompt.llm_config.model,
-            "max_tokens": prompt.llm_config.max_tokens,
-            "temperature": prompt.llm_config.temperature,
+            "model": chat_thread.llm_config.model,
+            "max_tokens": chat_thread.llm_config.max_tokens,
+            "temperature": chat_thread.llm_config.temperature,
             "messages": messages,
             "system": system_content if system_content else None
         }
-        if prompt.llm_config.response_format == "tool" and prompt.structured_output:
-            tool = prompt.get_tool()
+        if chat_thread.llm_config.response_format == "tool" and chat_thread.structured_output:
+            tool = chat_thread.get_tool()
             if tool:
                 request["tools"] = [tool]
-                request["tool_choice"] = ToolChoiceToolChoiceTool(name=prompt.structured_output.schema_name, type="tool")
+                request["tool_choice"] = ToolChoiceToolChoiceTool(name=chat_thread.structured_output.schema_name, type="tool")
 
         if self._validate_anthropic_request(request):
             return request
         else:
             return None
         
-    def _get_vllm_request(self, prompt: ChatThread) -> Optional[Dict[str, Any]]:
-        messages = prompt.vllm_messages  # Use vllm_messages instead of oai_messages
+    def _get_vllm_request(self, chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
+        messages = chat_thread.vllm_messages  # Use vllm_messages instead of oai_messages
         request = {
-            "model": prompt.llm_config.model,
+            "model": chat_thread.llm_config.model,
             "messages": messages,
-            "max_tokens": prompt.llm_config.max_tokens,
-            "temperature": prompt.llm_config.temperature,
+            "max_tokens": chat_thread.llm_config.max_tokens,
+            "temperature": chat_thread.llm_config.temperature,
         }
-        if prompt.llm_config.response_format == "tool" and prompt.structured_output:
-            tool = prompt.get_tool()
+        if chat_thread.llm_config.response_format == "tool" and chat_thread.structured_output:
+            tool = chat_thread.get_tool()
             if tool:
                 request["tools"] = [tool]
-                request["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
-        if prompt.llm_config.response_format == "json_object":
+                request["tool_choice"] = {"type": "function", "function": {"name": chat_thread.structured_output.schema_name}}
+        if chat_thread.llm_config.response_format == "json_object":
             raise ValueError("VLLM does not support json_object response format otherwise infinite whitespaces are returned")
-        if prompt.oai_response_format and prompt.oai_response_format:
-            request["response_format"] = prompt.oai_response_format
+        if chat_thread.oai_response_format and chat_thread.oai_response_format:
+            request["response_format"] = chat_thread.oai_response_format
         
         if self._validate_vllm_request(request):
             return request
         else:
             return None
         
-    def _get_litellm_request(self, prompt: ChatThread) -> Optional[Dict[str, Any]]:
-        if prompt.llm_config.response_format == "json_object":
+    def _get_litellm_request(self, chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
+        if chat_thread.llm_config.response_format == "json_object":
             raise ValueError("VLLM does not support json_object response format otherwise infinite whitespaces are returned")
-        return self._get_openai_request(prompt)
+        return self._get_openai_request(chat_thread)
         
-    def _convert_prompt_to_request(self, prompt: ChatThread, client: str) -> Optional[Dict[str, Any]]:
+    def _convert_chat_thread_to_request(self, chat_thread: ChatThread, client: str) -> Optional[Dict[str, Any]]:
         if client == "openai":
-            return self._get_openai_request(prompt)
+            return self._get_openai_request(chat_thread)
         elif client == "anthropic":
-            return self._get_anthropic_request(prompt)
+            return self._get_anthropic_request(chat_thread)
         elif client == "vllm":
-            return self._get_vllm_request(prompt)
+            return self._get_vllm_request(chat_thread)
         elif client =="litellm":
-            return self._get_litellm_request(prompt)
+            return self._get_litellm_request(chat_thread)
         else:
             raise ValueError(f"Invalid client: {client}")
 
 
-    def _create_oai_completion_config(self, prompt: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
-        if prompt.llm_config.client == "openai" and self.openai_key:
+    def _create_oai_completion_config(self, chat_thread: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
+        if chat_thread.llm_config.client == "openai" and self.openai_key:
             return OAIApiFromFileConfig(
                 requests_filepath=requests_file,
                 save_filepath=results_file,
@@ -293,8 +303,8 @@ class ParallelAIUtilities:
             )
         return None
 
-    def _create_anthropic_completion_config(self, prompt: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
-        if prompt.llm_config.client == "anthropic" and self.anthropic_key:
+    def _create_anthropic_completion_config(self, chat_thread: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
+        if chat_thread.llm_config.client == "anthropic" and self.anthropic_key:
             return OAIApiFromFileConfig(
                 requests_filepath=requests_file,
                 save_filepath=results_file,
@@ -308,8 +318,8 @@ class ParallelAIUtilities:
             )
         return None
     
-    def _create_vllm_completion_config(self, prompt: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
-        if prompt.llm_config.client == "vllm":
+    def _create_vllm_completion_config(self, chat_thread: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
+        if chat_thread.llm_config.client == "vllm":
             return OAIApiFromFileConfig(
                 requests_filepath=requests_file,
                 save_filepath=results_file,
@@ -323,8 +333,8 @@ class ParallelAIUtilities:
             )
         return None
     
-    def _create_litellm_completion_config(self, prompt: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
-        if prompt.llm_config.client == "litellm":
+    def _create_litellm_completion_config(self, chat_thread: ChatThread, requests_file: str, results_file: str) -> Optional[OAIApiFromFileConfig]:
+        if chat_thread.llm_config.client == "litellm":
             return OAIApiFromFileConfig(
                 requests_filepath=requests_file,
                 save_filepath=results_file,
