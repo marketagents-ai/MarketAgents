@@ -203,14 +203,17 @@ class ChatThread (SQLModel, table=True):
     def vllm_messages(self) -> List[ChatCompletionMessageParam]:
         return msg_dict_to_oai(self.messages)
         
-    # def add_chat_turn_history(self, llm_output:'LLMOutput'):
-    #     """ add a chat turn to the history without safely model copy just normal append """
-    #     if llm_output.source_id != self.id:
-    #         raise ValueError(f"LLMOutput source_id {llm_output.source_id} does not match the prompt context id {self.id}")
-    #     if self.history is None:
-    #         self.history = []
-    #     self.history.append({"role": "user", "content": self.new_message})
-    #     self.history.append({"role": "assistant", "content": llm_output.str_content or json.dumps(llm_output.json_object.object) if llm_output.json_object else "{}"})
+    def add_chat_turn_history(self, llm_output:'ProcessedOutput'):
+        """ add a chat turn to the history without safely model copy just normal append """
+        if llm_output.chat_thread_id != self.id:
+            raise ValueError(f"ProcessedOutput chat_thread_id {llm_output.chat_thread_id} does not match the chat_thread id {self.id}")
+        if self.history is None:
+            self.history = []
+        self.history.append({"role": "user", "content": self.new_message})
+        response = json.dumps(llm_output.json_object.object) if llm_output.json_object else llm_output.content
+        if response is None:
+            raise ValueError("ProcessedOutput content or json_object is None, can not add to history")
+        self.history.append({"role": "assistant", "content": response})
     
     def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
@@ -276,6 +279,7 @@ class RawOutput(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     raw_result: Union[str, dict, ChatCompletion, AnthropicMessage, PromptCachingBetaMessage] = Field(sa_column=Column(JSON))
     completion_kwargs: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    chat_thread_id: Optional[int] = Field(default=None, foreign_key="chatthread.id")
     start_time: float
     end_time: float
     client:LLMClient 
@@ -427,9 +431,9 @@ class RawOutput(SQLModel, table=True):
     
     def create_processed_output(self) -> 'ProcessedOutput':
         content, json_object, usage, error = self._parse_result()
-        if json_object is None or usage is None:
-            raise ValueError("No JSON object or usage found in the raw output, can not create processed output")
-        processed_output = ProcessedOutput(content=content, json_object=json_object, usage=usage, error=error, time_taken=self.time_taken, llm_client=self.client, raw_output=self)
+        if json_object is None or usage is None or self.chat_thread_id is None:
+            raise ValueError("No JSON object or usage found or chat_thread_id in the raw output, can not create processed output")
+        processed_output = ProcessedOutput(content=content, json_object=json_object, usage=usage, error=error, time_taken=self.time_taken, llm_client=self.client, raw_output=self, chat_thread_id=self.chat_thread_id)
         return processed_output
 
     class Config:
@@ -445,15 +449,21 @@ class ProcessedOutput(SQLModel, table=True):
     error: Optional[str] = None
     time_taken: float
     llm_client: LLMClient
+    chat_thread_id: int = Field(default=None, foreign_key="chatthread.id")
 
 
 if __name__ == "__main__":
     def create_processed_output(engine:Engine) -> ProcessedOutput:
         with Session(engine) as session:
+            first_chat = session.exec(select(ChatThread)).first()
+            if first_chat is None:
+                raise ValueError("No chat thread found, can not create processed output")
+            elif first_chat.id is None:
+                raise ValueError("Chat thread id is not set, can not create processed output")
             dummy_usage = Usage(prompt_tokens=69, completion_tokens=420, total_tokens=69420)
             dummy_json_object = GeneratedJsonObject(name="dummy_json_object", object={"dummy": "object"})
             dummy_raw_output = RawOutput(raw_result="dummy_raw_output", client=LLMClient.openai, start_time=10, end_time=20)
-            dummy_processed_output = ProcessedOutput(usage=dummy_usage, json_object=dummy_json_object, raw_output=dummy_raw_output, time_taken=10, llm_client=LLMClient.openai)
+            dummy_processed_output = ProcessedOutput(usage=dummy_usage, json_object=dummy_json_object, raw_output=dummy_raw_output, time_taken=10, llm_client=LLMClient.openai, chat_thread_id=first_chat.id)
             session.add(dummy_processed_output)
             session.commit()
         return dummy_processed_output
