@@ -62,17 +62,19 @@ class ParallelAIUtilities:
     def _update_chat_thread_history(self, chat_threads: List[ChatThread], llm_outputs: List[ProcessedOutput]) -> List[ChatThread]:
         chat_thread_hashmap = self._create_chat_thread_hashmap(chat_threads)
         for output in llm_outputs:
-            if output.raw_output.chat_thread_id:
-                chat_thread_hashmap[output.raw_output.chat_thread_id].add_chat_turn_history(output)
+            if output.chat_thread_id:
+                chat_thread_hashmap[output.chat_thread_id].add_chat_turn_history(output)
         return list(chat_thread_hashmap.values())
     
     
-    def _update_chat_thread_db(self,llm_outputs: List[ChatThread]):
-        with Session(self.engine) as session:
-            for output in llm_outputs:
+    def _update_chat_thread_db(self,llm_outputs: List[ChatThread], session: Session):
+        for output in llm_outputs:
                 output.update_db_from_session(session)
 
     async def run_parallel_ai_completion(self, chat_threads: List[ChatThread], update_history:bool=True, update_db:bool=True) -> List[ProcessedOutput]:
+
+            
+
         openai_chat_threads = [p for p in chat_threads if p.llm_config.client == "openai"]
         anthropic_chat_threads = [p for p in chat_threads if p.llm_config.client == "anthropic"]
         vllm_chat_threads = [p for p in chat_threads if p.llm_config.client == "vllm"] 
@@ -95,17 +97,23 @@ class ParallelAIUtilities:
         
         if update_history:
             chat_threads = self._update_chat_thread_history(chat_threads, flattened_results)
-        if update_db:
-            self._update_chat_thread_db(chat_threads)
+        if self.engine:
+            print("Updating DB")
+            with Session(self.engine) as session:
+                for result in flattened_results:
+                    session.add(result)
+                session.commit()
+
         
         return flattened_results
-    
+        
     def get_all_requests(self):
         requests = self.all_requests
         self.all_requests = []  
         return requests
 
     async def _run_openai_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
+        
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         requests_file = os.path.join(self.cache_folder, f'openai_requests_{timestamp}.jsonl')
         results_file = os.path.join(self.cache_folder, f'openai_results_{timestamp}.jsonl')

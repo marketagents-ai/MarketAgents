@@ -34,7 +34,8 @@ from anthropic.types.beta.prompt_caching import (
 from anthropic.types.beta.prompt_caching.prompt_caching_beta_cache_control_ephemeral_param import PromptCachingBetaCacheControlEphemeralParam
 from anthropic.types.model_param import ModelParam
 from market_agents.inference.utils import msg_dict_to_oai, msg_dict_to_anthropic, parse_json_string
-
+import uuid
+from uuid import UUID
 
 class Tool(SQLModel, table=True):
     id: Optional[int]  = Field(default=None, primary_key=True)
@@ -126,6 +127,7 @@ class ChatThreadProcessedOutputLinkage(SQLModel, table=True):
 
 class ChatThread (SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
     system_string: Optional[str] = None
     history: Optional[List[Dict[str, str]]] = Field(default=None, sa_column=Column(JSON))
     new_message: str
@@ -134,12 +136,12 @@ class ChatThread (SQLModel, table=True):
     
     use_schema_instruction: bool = Field(default=False, description="Whether to use the schema instruction")
     use_history: bool = Field(default=True, description="Whether to use the history")
-    structured_output: Optional[Tool] = Relationship(back_populates="chats")
+    structured_output: Optional[Tool] = Relationship(back_populates="chats",sa_relationship_kwargs={"lazy": "joined"})
     structured_output_id: Optional[int] = Field(default=None, foreign_key="tool.id")
-
-    llm_config: LLMConfig = Relationship(back_populates="chats")
+    warm: bool = Field(default=True, description="Warm Threads will be used for inference")
+    llm_config: LLMConfig = Relationship(back_populates="chats",sa_relationship_kwargs={"lazy": "joined"})
     llm_config_id: Optional[int] = Field(default=None, foreign_key="llmconfig.id")
-    processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage)
+    processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
     @computed_field
     @property
     def oai_response_format(self) -> Optional[Union[ResponseFormatText, ResponseFormatJSONObject, ResponseFormatJSONSchema]]:
@@ -210,8 +212,8 @@ class ChatThread (SQLModel, table=True):
         
     def add_chat_turn_history(self, llm_output:'ProcessedOutput'):
         """ add a chat turn to the history without safely model copy just normal append """
-        if llm_output.chat_thread != self:
-            raise ValueError(f"ProcessedOutput chat_thread_id {llm_output.chat_thread} does not match the chat_thread id {self}")
+        if llm_output.chat_thread_id != self.id:
+            raise ValueError(f"ProcessedOutput chat_thread_id {llm_output.chat_thread_id} does not match the chat_thread id {self.id}")
         if self.history is None:
             self.history = []
         self.history.append({"role": "user", "content": self.new_message})
@@ -439,8 +441,9 @@ class RawOutput(SQLModel, table=True):
     def create_processed_output(self) -> 'ProcessedOutput':
         content, json_object, usage, error = self._parse_result()
         if json_object is None or usage is None or self.chat_thread_id is None:
+            print(f"content: {content}, json_object: {json_object}, usage: {usage}, error: {error}, chat_thread_id: {self.chat_thread_id}")
             raise ValueError("No JSON object or usage found or chat_thread_id in the raw output, can not create processed output")
-        processed_output = ProcessedOutput(content=content, json_object=json_object, usage=usage, error=error, time_taken=self.time_taken, llm_client=self.client, raw_output=self)
+        processed_output = ProcessedOutput(content=content, json_object=json_object, usage=usage, error=error, time_taken=self.time_taken, llm_client=self.client, raw_output=self, chat_thread_id=self.chat_thread_id)
         return processed_output
 
     class Config:
@@ -450,13 +453,14 @@ class RawOutput(SQLModel, table=True):
 class ProcessedOutput(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     content: Optional[str] = None
-    json_object: GeneratedJsonObject = Relationship(back_populates="processed_output", link_model=OutputJsonObjectLinkage)
-    usage: Usage = Relationship(back_populates="processed_output", link_model=OutputUsageLinkage)
-    raw_output: 'RawOutput' = Relationship(link_model=RawProcessedLinkage)
+    json_object: GeneratedJsonObject = Relationship(back_populates="processed_output", link_model=OutputJsonObjectLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    usage: Usage = Relationship(back_populates="processed_output", link_model=OutputUsageLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    raw_output: 'RawOutput' = Relationship(link_model=RawProcessedLinkage,sa_relationship_kwargs={"lazy": "joined"})
     error: Optional[str] = None
     time_taken: float
     llm_client: LLMClient
-    chat_thread: 'ChatThread' = Relationship(back_populates="processed_outputs", link_model=ChatThreadProcessedOutputLinkage)
+    chat_thread_id: int = Field(foreign_key="chatthread.id")
+    chat_thread: 'ChatThread' = Relationship(back_populates="processed_outputs", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
 
 
 if __name__ == "__main__":
@@ -470,7 +474,8 @@ if __name__ == "__main__":
             dummy_usage = Usage(prompt_tokens=69, completion_tokens=420, total_tokens=69420)
             dummy_json_object = GeneratedJsonObject(name="dummy_json_object", object={"dummy": "object"})
             dummy_raw_output = RawOutput(raw_result="dummy_raw_output", client=LLMClient.openai, start_time=10, end_time=20, chat_thread_id=first_chat.id)
-            dummy_processed_output = ProcessedOutput(usage=dummy_usage, json_object=dummy_json_object, raw_output=dummy_raw_output, time_taken=10, llm_client=LLMClient.openai, chat_thread=first_chat)
+            dummy_processed_output = ProcessedOutput(usage=dummy_usage, json_object=dummy_json_object, raw_output=dummy_raw_output, time_taken=10, llm_client=LLMClient.openai, chat_thread=first_chat, 
+                                                     chat_thread_id=first_chat.id    )
             session.add(dummy_processed_output)
             session.commit()
         return dummy_processed_output
