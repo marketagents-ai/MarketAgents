@@ -71,7 +71,7 @@ class ParallelAIUtilities:
         for output in llm_outputs:
                 output.update_db_from_session(session)
 
-    async def run_parallel_ai_completion(self, chat_threads: List[ChatThread], update_history:bool=True, update_db:bool=True) -> List[ProcessedOutput]:
+    async def run_parallel_ai_completion(self, chat_threads: List[ChatThread], update_history:bool=True) -> List[ProcessedOutput]:
 
             
 
@@ -102,6 +102,11 @@ class ParallelAIUtilities:
             with Session(self.engine) as session:
                 for result in flattened_results:
                     session.add(result)
+                session.commit()
+                for chat in chat_threads:
+                    session.refresh(chat)
+                    snapshot = chat.create_snapshot()
+                    session.add(snapshot)
                 session.commit()
 
         
