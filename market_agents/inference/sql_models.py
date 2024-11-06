@@ -114,7 +114,7 @@ class LLMConfig(SQLModel, table=True):
 class ChatSnapshot(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     chat_thread_id: int = Field(foreign_key="chatthread.id")
-    messages: Optional[List[Dict[str, str]]] = Field(default=None, sa_column=Column(JSON))
+    messages: Optional[List[Dict[str, Any]]] = Field(default=None,sa_column=Column(JSON))
     structured_output_schema: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
     structured_output_name: Optional[str] = None
     structured_output_id: Optional[int] = Field(default=None, foreign_key="tool.id")
@@ -125,12 +125,67 @@ class ChatThreadProcessedOutputLinkage(SQLModel, table=True):
     chat_thread_id: int = Field(foreign_key="chatthread.id",primary_key=True)
     processed_output_id: int = Field(foreign_key="processedoutput.id",primary_key=True)
 
+class ThreadMessageLinkage(SQLModel, table=True):
+    chat_thread_id: int = Field(foreign_key="chatthread.id",primary_key=True)
+    chat_message_id: int = Field(foreign_key="chatmessage.id",primary_key=True)
+
+class MessageRole(str, Enum):
+    user = "user"
+    assistant = "assistant"
+    tool = "tool"
+    system = "system"
+
+class MessageFormat(str, Enum):
+    chatml = "chatml"
+    json = "json"
+    python_dict = "python_dict"
+
+class ChatMessage(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
+    role: MessageRole
+    content: str
+    author_name: Optional[str] = None
+    parent_message_uuid: Optional[UUID] = None
+    chat_thread: 'ChatThread' = Relationship(back_populates="history",link_model=ThreadMessageLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    format: MessageFormat = Field(default=MessageFormat.python_dict)
+
+    def to_chatml_dict(self) -> Dict[str, Any]:
+        return {"role":self.role.value,"content":self.content}
+    
+    def to_string(self) -> str:
+        if self.format == MessageFormat.python_dict:
+            return json.dumps(self.to_chatml_dict())
+        else:
+            raise ValueError(f"Message format {self.format} is not supported")
+    def to_share_gpt_dict(self) -> Dict[str, Any]:
+        return {"from":self.role.value,"value":self.content}
+    
+    @classmethod
+    def from_chatml_dict(cls,message_dict:Dict[str, Any]) -> Self:
+        return cls(role=MessageRole(message_dict["role"]),content=message_dict["content"])
+    
+    @classmethod
+    def from_share_gpt_dict(cls,message_dict:Dict[str, Any]) -> Self:
+        return cls(role=MessageRole(message_dict["from"]),content=message_dict["value"])
+    
+    @classmethod
+    def from_dict(cls,message_dict:Dict[str, Any]) -> Self:
+        if "from" in message_dict and "value" in message_dict:
+            return cls.from_share_gpt_dict(message_dict)
+        elif "role" in message_dict and "content" in message_dict:
+            return cls.from_chatml_dict(message_dict)
+        else:
+            raise ValueError(f"Message dictionary {message_dict} is not valid, only chatml (role,content) or share_gpt (from,value) are supported")
+    
+
+    
 class ChatThread (SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
     system_string: Optional[str] = None
-    history: Optional[List[Dict[str, str]]] = Field(default=None, sa_column=Column(JSON))
-    new_message: str
+    history: List[ChatMessage] = Relationship(back_populates="chat_thread",link_model=ThreadMessageLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    new_message: Optional[str] = Field(default=None)
     prefill: str = Field(default="Here's the valid JSON object response:```json", description="prefill assistant response with an instruction")
     postfill: str = Field(default="\n\nPlease provide your response in JSON format.", description="postfill user response with an instruction")
     
@@ -138,10 +193,10 @@ class ChatThread (SQLModel, table=True):
     use_history: bool = Field(default=True, description="Whether to use the history")
     structured_output: Optional[Tool] = Relationship(back_populates="chats",sa_relationship_kwargs={"lazy": "joined"})
     structured_output_id: Optional[int] = Field(default=None, foreign_key="tool.id")
-    warm: bool = Field(default=True, description="Warm Threads will be used for inference")
     llm_config: LLMConfig = Relationship(back_populates="chats",sa_relationship_kwargs={"lazy": "joined"})
     llm_config_id: Optional[int] = Field(default=None, foreign_key="llmconfig.id")
     processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    
     @computed_field
     @property
     def oai_response_format(self) -> Optional[Union[ResponseFormatText, ResponseFormatJSONObject, ResponseFormatJSONSchema]]:
@@ -183,17 +238,34 @@ class ChatThread (SQLModel, table=True):
     
     @computed_field
     @property
-    def messages(self)-> List[Dict[str, Any]]:
-        messages = [self.system_message] if self.system_message is not None else []
-        if  self.use_history and self.history:
-            messages+=self.history
-        messages.append({"role":"user","content":self.new_message})
+    def messages_objects(self) -> List[ChatMessage]:
+        system_message = ChatMessage(role=MessageRole.system,content=self.system_message["content"]) if self.system_message else None
+        messages = [system_message] if system_message else []
+        if self.use_history and self.history:
+            messages+= [message for message in self.history]
+        if self.new_message:
+            messages.append(ChatMessage(role=MessageRole.user,content=self.new_message))
         if self.use_prefill:
-            prefill_message = {"role":"assistant","content":self.prefill}
+            prefill_message = ChatMessage(role=MessageRole.assistant,content=self.prefill)
             messages.append(prefill_message)
         elif self.use_postfill:
-            messages[-1]["content"] = messages[-1]["content"] + self.postfill
+            messages[-1].content = messages[-1].content + self.postfill
+        
         return messages
+    
+    @computed_field
+    @property
+    def messages(self)-> List[Dict[str, Any]]:
+        return [message.to_chatml_dict() for message in self.messages_objects]
+    
+    @computed_field
+    @property
+    def share_gpt_messages(self) -> List[Dict[str, str]]:
+        return [message.to_share_gpt_dict() for message in self.messages_objects]
+
+    
+        
+        
     
     @computed_field
     @property
@@ -214,14 +286,29 @@ class ChatThread (SQLModel, table=True):
         """ add a chat turn to the history without safely model copy just normal append """
         if llm_output.chat_thread_id != self.id:
             raise ValueError(f"ProcessedOutput chat_thread_id {llm_output.chat_thread_id} does not match the chat_thread id {self.id}")
-        if self.history is None:
-            self.history = []
-        self.history.append({"role": "user", "content": self.new_message})
-        response = json.dumps(llm_output.json_object.object) if llm_output.json_object else llm_output.content
-        if response is None:
-            raise ValueError("ProcessedOutput content or json_object is None, can not add to history")
-        self.history.append({"role": "assistant", "content": response})
+        
+        if self.new_message is None:
+            raise ValueError("new_message is None, can not add to history")
+
+        print(f"history before append: {len(self.history)} for chat_thread_id: {self.id}")
+        user_message = ChatMessage(role=MessageRole.user, content=self.new_message)
+        self.history.append(user_message)
+        print(f"history after append user message: {len(self.history)} for chat_thread_id: {self.id}")
+        json_object = llm_output.json_object
+        str_content = llm_output.content
+        if not json_object:
+            if str_content:
+                response = str_content
+            else:
+                raise ValueError("ProcessedOutput json_object is None and content is None, can not add to history")
+        else:
+            response =str(json_object.object)
+        assistant_message = ChatMessage(role=MessageRole.assistant, content=response)
+
+        self.history.append(assistant_message)
+        print(f"history after append assistant message: {len(self.history)} for chat_thread_id: {self.id}")
         self.processed_outputs.append(llm_output)
+        self.new_message = None
     
     def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
@@ -508,7 +595,7 @@ if __name__ == "__main__":
         """ we get all the chats and create snapshots for each one """
         with Session(engine) as session:
             statement = select(ChatThread)
-            result = session.exec(statement)
+            result = session.exec(statement).unique()
             for chat in result:
                 snapshot = chat.create_snapshot()
                 session.add(snapshot)
@@ -518,9 +605,9 @@ if __name__ == "__main__":
         test_history = [{"role":"user","content":"Hello, how are you?"},{"role":"assistant","content":"I'm fine, thank you!"}]
         with Session(engine) as session:
             statement = select(ChatThread)
-            result = session.exec(statement)
+            result = session.exec(statement).unique()
             for chat in result:
-                chat.history = test_history
+                chat.history = [ChatMessage.from_dict(message) for message in test_history]
                 chat.update_db_from_session(session)
 
     def select_openai_config(engine: Engine):

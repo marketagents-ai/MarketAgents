@@ -63,6 +63,7 @@ class ParallelAIUtilities:
         chat_thread_hashmap = self._create_chat_thread_hashmap(chat_threads)
         for output in llm_outputs:
             if output.chat_thread_id:
+                print(f"updating chat thread history for chat_thread_id: {output.chat_thread_id} with output: {output}")
                 chat_thread_hashmap[output.chat_thread_id].add_chat_turn_history(output)
         return list(chat_thread_hashmap.values())
     
@@ -71,9 +72,10 @@ class ParallelAIUtilities:
         for output in llm_outputs:
                 output.update_db_from_session(session)
 
-    async def run_parallel_ai_completion(self, chat_threads: List[ChatThread], update_history:bool=True) -> List[ProcessedOutput]:
+    async def run_parallel_ai_completion(self, chat_threads: List[ChatThread], update_history:bool=True, session: Optional[Session] = None) -> List[ProcessedOutput]:
 
-            
+        for chat in chat_threads:
+            print(f"chat message inside run_parallel_ai_completion: {chat.new_message}")
 
         openai_chat_threads = [p for p in chat_threads if p.llm_config.client == "openai"]
         anthropic_chat_threads = [p for p in chat_threads if p.llm_config.client == "anthropic"]
@@ -95,19 +97,55 @@ class ParallelAIUtilities:
         # Track  requests
         self.all_requests.extend(flattened_results)
         
-        if update_history:
-            chat_threads = self._update_chat_thread_history(chat_threads, flattened_results)
+ 
         if self.engine:
             print("Updating DB")
-            with Session(self.engine) as session:
-                for result in flattened_results:
-                    session.add(result)
-                session.commit()
-                for chat in chat_threads:
-                    session.refresh(chat)
-                    snapshot = chat.create_snapshot()
-                    session.add(snapshot)
-                session.commit()
+            
+            # Open a new session if none is provided
+            if session is None:
+                with Session(self.engine) as session:
+                    # Step 1: Add and commit each ProcessedOutput result to avoid re-adding them
+                    for result in flattened_results:
+                        session.add(result)
+                    session.commit()  # Commit ProcessedOutputs first
+                    
+                    # Step 2: If history updates are enabled
+                    if update_history:
+                        print(f"Updating chat thread history for {len(chat_threads)} chat threads")
+                        
+                        # Update the history for each chat thread directly
+                        for output in flattened_results:
+                            # Retrieve the corresponding ChatThread instance by ID in this session
+                            chat_thread = session.get(ChatThread, output.chat_thread_id)
+                            
+                            if chat_thread:
+                                # Initialize history if it doesn't exist
+                                chat_thread.add_chat_turn_history(output)
+                                
+                                
+                                # Use session.merge to ensure the object is attached to the session
+                                session.merge(chat_thread)
+                                session.commit()  # Commit each history update immediately
+                                
+                                # Print updated length of the history
+                                print(f"The length of the history for chat_thread_id: {chat_thread.id} is {len(chat_thread.history)}")
+                    
+                    # Step 3: Create snapshots for each updated chat thread
+                    for chat in chat_threads:
+                        # Retrieve the latest state from the database
+                        chat = session.get(ChatThread, chat.id)  # Re-get to avoid detached instance
+                        if chat:
+                            snapshot = chat.create_snapshot()
+                            print(f"snapshot: {snapshot}")
+                            session.add(snapshot)
+                            print("snapshot added to session:")
+                    session.commit()  # Final commit to save all snapshots
+
+            else:
+                raise ValueError("can not use external session, call the method independently of any other session")
+
+
+
 
         
         return flattened_results

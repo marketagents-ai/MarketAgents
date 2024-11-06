@@ -60,9 +60,9 @@ async def main():
                 session.refresh(prompt)
         return chats
     
-    def get_warm_chats_within_session(session:Session) -> List[ChatThread]:
-        chats = session.exec(select(ChatThread).where(ChatThread.warm == True)).unique().all()
-        return list(chats)
+    def get_chats_from_session(session:Session) -> List[ChatThread]:
+        return list(session.exec(select(ChatThread)).unique().all())
+
 
     # OpenAI chats
     # openai_chats = create_chats("openai", "gpt-4o-mini",[ResponseFormat.text,ResponseFormat.json_beg,ResponseFormat.json_object,ResponseFormat.structured_output,ResponseFormat.tool],1)
@@ -78,7 +78,18 @@ async def main():
     start_time = time.time()
     # with Session(engine) as session:
     completion_results = await parallel_ai.run_parallel_ai_completion(openai_chats)
-
+    with Session(engine) as session:
+        chats = get_chats_from_session(session)
+        for chat in chats:
+            print("latest_message:",chat.new_message)
+            print("history:",chat.history)
+            chat.new_message = "And why is it funny?"
+            session.add(chat)
+        session.commit()
+        for chat in chats:
+            session.refresh(chat)
+            print("latest_message:",chat.new_message)
+    second_step_completion_results = await parallel_ai.run_parallel_ai_completion(chats)
     end_time = time.time()
     total_time = end_time - start_time
 
