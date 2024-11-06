@@ -302,7 +302,7 @@ class ChatThread (SQLModel, table=True):
             else:
                 raise ValueError("ProcessedOutput json_object is None and content is None, can not add to history")
         else:
-            response =str(json_object.object)
+            response = json.dumps(json_object.object)
         assistant_message = ChatMessage(role=MessageRole.assistant, content=response)
 
         self.history.append(assistant_message)
