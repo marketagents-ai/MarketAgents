@@ -60,55 +60,7 @@ async def test_chat_api():
                     print(f"Error processing message: {str(e)}")
                     continue
 
-            # # Create second chat
-            # print("\n=== Creating second chat thread ===")
-            # response = await client.post(f"{base_url}/chats/")
-            # if response.status_code != 201:
-            #     raise ChatAPIError(f"Failed to create second chat: {response.text}")
-            
-            # second_chat_data = response.json()
-            # second_chat_id = second_chat_data["id"]
-            # print(f"Created second chat with ID: {second_chat_id}")
-
-            # # Send message to second chat
-            # print("\n=== Sending message to second thread ===")
-            # try:
-            #     response = await send_message_with_retry(
-            #         second_chat_id,
-            #         "Tell me a programmer joke about Python"
-            #     )
-            #     result = response.json()
-            #     print(f"Response received for second chat")
-            #     if result.get('new_message'):
-            #         print(f"Response content: {result['new_message']}")
-            # except Exception as e:
-            #     print(f"Error sending message to second chat: {str(e)}")
-
-            # # List all chats
-            # print("\n=== Listing all chats ===")
-            # try:
-            #     response = await client.get(f"{base_url}/chats/")
-            #     if response.status_code != 200:
-            #         raise ChatAPIError(f"Failed to list chats: {response.text}")
-                
-            #     chats = response.json()
-            #     print(f"Found {len(chats)} chats")
-            #     for chat in chats:
-            #         print(f"Chat ID: {chat['id']}, Messages: {len(chat.get('history', []))}")
-            # except Exception as e:
-            #     print(f"Error listing chats: {str(e)}")
-
-            # # Cleanup
-            # print("\n=== Cleaning up ===")
-            # for id_to_delete in [chat_id, second_chat_id]:
-            #     try:
-            #         response = await client.delete(f"{base_url}/chats/{id_to_delete}")
-            #         if response.status_code == 204:
-            #             print(f"Successfully deleted chat {id_to_delete}")
-            #         else:
-            #             print(f"Warning: Failed to delete chat {id_to_delete}: {response.text}")
-            #     except Exception as e:
-            #         print(f"Error deleting chat {id_to_delete}: {str(e)}")
+          
 
         except Exception as e:
             print(f"\nError during test: {str(e)}")
