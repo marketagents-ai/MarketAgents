@@ -13,8 +13,8 @@ from typing import Any, Dict, List
 
 import yaml
 from colorama import Fore, Style
-from market_agents.agents.db.setup_database import create_database, create_tables
-from market_agents.agents.market_agent import MarketAgent
+from agents.market_agent import MarketAgent
+from agents.db.setup_database import create_database, create_tables
 from market_agents.agents.personas.persona import Persona, generate_persona, save_persona_to_file
 from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.economics.econ_agent import EconomicAgent

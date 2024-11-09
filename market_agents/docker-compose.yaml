@@ -1,0 +1,70 @@
+version: '3'
+
+services:
+  db:
+    image: ankane/pgvector:v0.5.1
+    environment:
+      POSTGRES_DB: market_simulation
+      POSTGRES_USER: db_user
+      POSTGRES_PASSWORD: db_pwd@123
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U db_user -d market_simulation"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_NAME: market_simulation
+      DB_USER: db_user
+      DB_PASSWORD: db_pwd@123
+      DB_HOST: db
+      DB_PORT: 5432
+      PYTHONPATH: /usr/src/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python orchestrator_parallel_with_db.py
+    networks:
+      - app-network
+    volumes:
+      - .:/usr/src/app/market_agents
+
+  dashboard:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_NAME: market_simulation
+      DB_USER: db_user
+      DB_PASSWORD: db_pwd@123
+      DB_HOST: db
+      DB_PORT: 5432
+      PYTHONPATH: /usr/src/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m agents.db.dashboard.dashboard
+    networks:
+      - app-network
+    volumes:
+      - .:/usr/src/app/market_agents
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
