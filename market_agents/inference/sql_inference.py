@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import time
 from openai.types.chat import ChatCompletionToolParam
 from anthropic.types.beta.prompt_caching import PromptCachingBetaToolParam
-from anthropic.types.message_create_params import ToolChoiceToolChoiceTool
+from anthropic.types.message_create_params import ToolChoiceToolChoiceTool,ToolChoiceToolChoiceAuto
 from sqlalchemy import Engine
 from sqlmodel import Session
 
@@ -159,10 +159,6 @@ class ParallelAIUtilities:
                         session.add(snapshot)
                         print("snapshot added to session:")
                 session.commit()  # Final commit to save all snapshots
-
-
-
-
         
         return flattened_results
         
@@ -287,10 +283,15 @@ class ParallelAIUtilities:
         if chat_thread.oai_response_format:
             request["response_format"] = chat_thread.oai_response_format
         if chat_thread.llm_config.response_format == "tool" and chat_thread.structured_output:
-            tool = chat_thread.get_tool()
+            tool = chat_thread.get_structured_output_as_tool()
             if tool:
                 request["tools"] = [tool]
                 request["tool_choice"] = {"type": "function", "function": {"name": chat_thread.structured_output.schema_name}}
+        elif chat_thread.llm_config.response_format == "auto_tools":
+            tools = chat_thread.get_tools()
+            if tools:
+                request["tools"] = tools
+                request["tool_choice"] = {"type": "auto"}
         if self._validate_openai_request(request):
             return request
         else:
@@ -306,10 +307,15 @@ class ParallelAIUtilities:
             "system": system_content if system_content else None
         }
         if chat_thread.llm_config.response_format == "tool" and chat_thread.structured_output:
-            tool = chat_thread.get_tool()
+            tool = chat_thread.get_structured_output_as_tool()
             if tool:
                 request["tools"] = [tool]
                 request["tool_choice"] = ToolChoiceToolChoiceTool(name=chat_thread.structured_output.schema_name, type="tool")
+        elif chat_thread.llm_config.response_format == "auto_tools":
+            tools = chat_thread.get_tools()
+            if tools:
+                request["tools"] = tools
+                request["tool_choice"] = ToolChoiceToolChoiceAuto(type="auto")
 
         if self._validate_anthropic_request(request):
             return request
@@ -325,7 +331,7 @@ class ParallelAIUtilities:
             "temperature": chat_thread.llm_config.temperature,
         }
         if chat_thread.llm_config.response_format == "tool" and chat_thread.structured_output:
-            tool = chat_thread.get_tool()
+            tool = chat_thread.get_structured_output_as_tool()
             if tool:
                 request["tools"] = [tool]
                 request["tool_choice"] = {"type": "function", "function": {"name": chat_thread.structured_output.schema_name}}

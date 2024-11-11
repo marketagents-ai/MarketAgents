@@ -1,11 +1,14 @@
 #market_agents\inference\sql_models.py
 
 from sqlmodel import Field, SQLModel, create_engine, Column, JSON, Session, Relationship, select
-from typing import Dict, Any, List, Optional, Literal, Self, Union, Tuple
-from pydantic import computed_field, ValidationError, model_validator
+from typing import Dict, Any, List, Optional, Literal, Self, Union, Tuple, Callable, get_type_hints
+from pydantic import computed_field, ValidationError, model_validator, create_model, BaseModel
 from sqlalchemy import Engine
 from enum import Enum
+from inspect import signature
 import json
+from ast import literal_eval
+import sys
 from datetime import datetime
 from openai.types.chat import (
     ChatCompletionMessageParam,
@@ -48,6 +51,95 @@ class Tool(SQLModel, table=True):
     strict_schema: bool = True
     json_schema: Dict = Field(default = {},sa_column=Column(JSON))
     chats: List["ChatThread"] = Relationship(back_populates="structured_output")
+    callable: bool = False
+    callable_function: Optional[str] = None
+    callable_output_schema: Optional[Dict[str, Any]] = Field(default = None,sa_column=Column(JSON))
+    allow_literal_eval: bool = False
+
+    def parse_execute_callable_function(self) -> Callable:
+        """
+        Safely parse the callable function string using ast.literal_eval.
+        Only allows access to functions in the current module's globals.
+        
+        Returns:
+            Callable: The parsed callable function
+            
+        Raises:
+            ValueError: If callable_function is not set or function not found
+            TypeError: If parsed value is not callable
+        """
+        if self.callable_function is None:
+            raise ValueError("callable_function is not set")
+            
+        # Get the calling module's globals
+        frame = sys._getframe(1)
+        while frame:
+            if frame.f_globals.get('__name__') != __name__:
+                global_dict = frame.f_globals
+                break
+            frame = frame.f_back
+        else:
+            raise ValueError("Could not find calling module")
+
+        # Try to get function directly from globals first
+        if self.callable_function in global_dict:
+            func = global_dict[self.callable_function]
+            if callable(func):
+                return func
+            raise TypeError(f"'{self.callable_function}' is not callable")
+        if self.allow_literal_eval:
+            # Otherwise try to evaluate as a literal
+            try:
+                parsed = literal_eval(self.callable_function)
+                if not callable(parsed):
+                    raise TypeError(f"Parsed value '{self.callable_function}' is not callable")
+                return parsed
+            except (ValueError, SyntaxError) as e:
+                raise ValueError(f"Could not parse callable_function: {e}")
+        raise ValueError(f"callable_function '{self.callable_function}' is not present in the global scope and allow_literal_eval is False")
+
+    def execute(self, input: Dict[str, Any]) -> 'ChatMessage':
+        """
+        Execute the callable function with the given input.
+        
+        Args:
+            input: Dictionary of input parameters. If the function expects a BaseModel,
+                this should be the dict representation of that model.
+            
+        Returns:
+            ChatMessage: The response message with JSON-serialized content
+        """
+        if not self.callable:
+            raise ValueError("Tool is not callable")
+        
+        callable_func = self.parse_execute_callable_function()
+        
+        # Get the first parameter's type hint
+        sig = signature(callable_func)
+        type_hints = get_type_hints(callable_func)
+        first_param = next(iter(sig.parameters.values()))
+        param_type = type_hints.get(first_param.name)
+        
+        # If the first parameter is a BaseModel, construct it from input
+        if (isinstance(param_type, type) and 
+            issubclass(param_type, BaseModel)):
+            model_input = param_type.model_validate(input)
+            response = callable_func(model_input)
+        else:
+            response = callable_func(**input)
+        
+        # Convert response to JSON string
+        if isinstance(response, BaseModel):
+            content = response.model_dump_json()
+        else:
+            content = json.dumps({"result": response})
+            
+        return ChatMessage(
+            role=MessageRole.tool, 
+            content=content, 
+            tool_name=f"{self.schema_name}_response"
+        )
+            
 
     @computed_field
     @property
@@ -82,6 +174,77 @@ class Tool(SQLModel, table=True):
             return ResponseFormatJSONSchema(type="json_schema", json_schema=schema)
         return None
     
+    @classmethod
+    def from_callable(
+        cls,
+        func: Callable,
+        schema_name: Optional[str] = None,
+        schema_description: Optional[str] = None,
+        instruction_string: Optional[str] = None,
+        strict_schema: bool = True,
+        json_schema: Optional[Dict[str, Any]] = None
+    ) -> Self:
+        """Initialize a Tool from a Python callable with type hints."""
+        type_hints = get_type_hints(func)
+        sig = signature(func)
+        
+        if 'return' not in type_hints:
+            raise ValueError(f"Function {func.__name__} must have a return type hint")
+        
+        # Handle input schema
+        first_param = next(iter(sig.parameters.values()))
+        first_param_type = type_hints.get(first_param.name)
+        
+        # If first parameter is BaseModel, use its schema
+        if (isinstance(first_param_type, type) and 
+            issubclass(first_param_type, BaseModel)):
+            derived_input_schema = first_param_type.model_json_schema()
+        else:
+            # Create input model from parameters
+            input_fields = {}
+            for param_name, param in sig.parameters.items():
+                if param_name not in type_hints:
+                    raise ValueError(f"Parameter {param_name} must have a type hint")
+                
+                if param.default is param.empty:
+                    input_fields[param_name] = (type_hints[param_name], ...)
+                else:
+                    input_fields[param_name] = (type_hints[param_name], param.default)
+
+            InputModel = create_model(
+                f"{func.__name__}Input",
+                **input_fields
+            )
+            derived_input_schema = InputModel.model_json_schema()
+        
+        # Validate provided schema if any
+        if json_schema is not None:
+            # (validation code remains the same)
+            pass
+        else:
+            json_schema = derived_input_schema
+        
+        # Handle output type
+        output_type = type_hints['return']
+        if isinstance(output_type, type) and issubclass(output_type, BaseModel):
+            OutputModel = output_type
+        else:
+            OutputModel = create_model(
+                f"{func.__name__}Output",
+                result=(output_type, ...)
+            )
+        
+        return cls(
+            schema_name=schema_name if schema_name is not None else func.__name__,
+            schema_description=schema_description if schema_description is not None else (func.__doc__ or f"Execute {func.__name__} function"),
+            instruction_string=instruction_string or "Please follow this JSON schema for your response:",
+            strict_schema=strict_schema,
+            json_schema=json_schema,
+            callable=True,
+            callable_function=func.__name__,
+            callable_output_schema=OutputModel.model_json_schema()
+        )
+    
 class LLMClient(str, Enum):
     openai = "openai"
     azure_openai = "azure_openai"
@@ -95,6 +258,7 @@ class ResponseFormat(str, Enum):
     json_object = "json_object"
     structured_output = "structured_output"
     tool = "tool"
+    auto_tools = "auto_tools"
 
 class LLMConfig(SQLModel, table=True):
     id: Optional[int]  = Field(default=None, primary_key=True)
@@ -182,7 +346,10 @@ class ChatMessage(SQLModel, table=True):
             return cls.from_chatml_dict(message_dict)
         else:
             raise ValueError(f"Message dictionary {message_dict} is not valid, only chatml (role,content) or share_gpt (from,value) are supported")
-    
+
+class ThreadToolLinkage(SQLModel, table=True):
+    chat_thread_id: int = Field(foreign_key="chatthread.id",primary_key=True)
+    tool_id: int = Field(foreign_key="tool.id",primary_key=True)
 
     
 class ChatThread (SQLModel, table=True):
@@ -200,6 +367,7 @@ class ChatThread (SQLModel, table=True):
     structured_output_id: Optional[int] = Field(default=None, foreign_key="tool.id")
     llm_config: LLMConfig = Relationship(back_populates="chats",sa_relationship_kwargs={"lazy": "joined"})
     llm_config_id: Optional[int] = Field(default=None, foreign_key="llmconfig.id")
+    tools: List[Tool] = Relationship(link_model=ThreadToolLinkage,sa_relationship_kwargs={"lazy": "joined"})
     processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
     
     def get_last_message_uuid(self) -> Optional[UUID]:
@@ -343,7 +511,7 @@ class ChatThread (SQLModel, table=True):
         user_message = self.add_user_message()
         self.add_assistant_response(llm_output, user_message.uuid)
 
-    def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
+    def get_structured_output_as_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
             return None
         if self.llm_config.client in [LLMClient.openai,LLMClient.vllm,LLMClient.litellm]:
@@ -352,6 +520,18 @@ class ChatThread (SQLModel, table=True):
             return self.structured_output.get_anthropic_tool()
         else:
             return None
+    
+    def get_tools(self) -> Optional[List[Union[ChatCompletionToolParam, PromptCachingBetaToolParam]]]:
+        if len(self.tools) == 0:
+            return None
+        else:
+            tools = []
+            for tool in self.tools:
+                if self.llm_config.client in [LLMClient.openai,LLMClient.vllm,LLMClient.litellm]:
+                    tools.append(tool.get_openai_tool())
+                elif self.llm_config.client == LLMClient.anthropic:
+                    tools.append(tool.get_anthropic_tool())
+            return tools
         
     def create_snapshot(self) -> 'ChatSnapshot':
         if not self.llm_config.id or not self.id:
