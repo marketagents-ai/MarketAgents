@@ -1,6 +1,7 @@
+#app\api\v1\endpoints\chat.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, asc, col
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from market_agents.inference.sql_models import (
     ChatThread, 
     LLMConfig, 
@@ -25,7 +26,9 @@ class ChatMessageResponse(BaseModel):
     role: MessageRole
     content: str
     author_name: Optional[str] = None
-
+    uuid: UUID
+    parent_message_uuid: Optional[UUID] = None
+    tool_name: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -35,6 +38,7 @@ class ChatResponse(BaseModel):
     new_message: Optional[str]
     history: List[ChatMessageResponse]
     system_string: Optional[str]
+    active_tool_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -49,7 +53,10 @@ class ChatResponse(BaseModel):
             ChatMessageResponse(
                 role=msg.role,
                 content=msg.content,
-                author_name=msg.author_name
+                author_name=msg.author_name,
+                uuid=msg.uuid,
+                parent_message_uuid=msg.parent_message_uuid,
+                tool_name=msg.tool_name
             ) for msg in chat.history
         ] if chat.history else []
 
@@ -58,13 +65,38 @@ class ChatResponse(BaseModel):
             uuid=chat.uuid,
             new_message=chat.new_message,
             history=history,
-            system_string=chat.system_string
+            system_string=chat.system_string,
+            active_tool_id=chat.structured_output_id
         )
+class ToolCreate(BaseModel):
+    schema_name: str
+    schema_description: str
+    instruction_string: str = "Please follow this JSON schema for your response:"
+    json_schema: Dict[str, Any]
+    strict_schema: bool = True
+
+class ToolResponse(BaseModel):
+    id: int
+    schema_name: str
+    schema_description: str
+    instruction_string: str
+    json_schema: Dict[str, Any]
+    strict_schema: bool
+
+    class Config:
+        from_attributes = True
+
+class ToolUpdate(BaseModel):
+    schema_description: Optional[str] = None
+    instruction_string: Optional[str] = None
+    json_schema: Optional[Dict[str, Any]] = None
+    strict_schema: Optional[bool] = None
+
 
 # --- Default configurations ---
 DEFAULT_LLM_CONFIG = LLMConfig(
     client=LLMClient.openai,
-    model="gpt-4o-mini",
+    model="gpt-4o",
     response_format=ResponseFormat.tool,
     temperature=0,
     max_tokens=2500
@@ -89,6 +121,139 @@ CHAIN_OF_THOUGHT_SCHEMA = {
     },
     "required": ["thought_process", "final_answer"]
 }
+
+
+# --- Tool management endpoints ---
+@router.get("/tools/", response_model=List[ToolResponse])
+async def list_tools(
+    db: DatabaseDep,
+    skip: int = 0,
+    limit: int = 10
+) -> List[ToolResponse]:
+    """List available tools"""
+    statement = select(Tool).offset(skip).limit(limit)
+    tools = db.exec(statement).unique().all()
+    return [ToolResponse.from_orm(tool) for tool in tools]
+
+@router.post("/tools/", response_model=ToolResponse, status_code=status.HTTP_201_CREATED)
+async def create_tool(
+    tool_data: ToolCreate,
+    db: DatabaseDep
+) -> ToolResponse:
+    """Create a new tool"""
+    # Check if tool with same name exists
+    existing = db.exec(
+        select(Tool).where(Tool.schema_name == tool_data.schema_name)
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Tool with name '{tool_data.schema_name}' already exists"
+        )
+    
+    # Create new tool
+    tool = Tool(**tool_data.dict())
+    db.add(tool)
+    db.commit()
+    db.refresh(tool)
+    return ToolResponse.from_orm(tool)
+
+@router.get("/tools/{tool_id}", response_model=ToolResponse)
+async def get_tool(
+    tool_id: int,
+    db: DatabaseDep
+) -> ToolResponse:
+    """Get a specific tool"""
+    tool = db.get(Tool, tool_id)
+    if not tool:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tool {tool_id} not found"
+        )
+    return ToolResponse.from_orm(tool)
+
+@router.delete("/tools/{tool_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_tool(
+    tool_id: int,
+    db: DatabaseDep
+) -> None:
+    """Delete a specific tool"""
+    tool = db.get(Tool, tool_id)
+    if not tool:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tool {tool_id} not found"
+        )
+    
+    # Check if tool is in use by any chat threads
+    chats_using_tool = db.exec(
+        select(ChatThread).where(ChatThread.structured_output_id == tool_id)
+    ).first()
+    
+    if chats_using_tool:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Tool {tool_id} is in use by chat threads and cannot be deleted"
+        )
+    
+    db.delete(tool)
+    db.commit()
+
+@router.patch("/tools/{tool_id}", response_model=ToolResponse)
+async def update_tool(
+    tool_id: int,
+    tool_update: ToolUpdate,
+    db: DatabaseDep
+) -> ToolResponse:
+    """Update a specific tool"""
+    tool = db.get(Tool, tool_id)
+    if not tool:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tool {tool_id} not found"
+        )
+    
+    # Update only provided fields
+    update_data = tool_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(tool, key, value)
+    
+    db.add(tool)
+    db.commit()
+    db.refresh(tool)
+    return ToolResponse.from_orm(tool)
+
+# --- Chat thread tool assignment endpoint ---
+@router.put("/{chat_id}/tool/{tool_id}", response_model=ChatResponse)
+async def assign_tool_to_chat(
+    chat_id: int,
+    tool_id: int,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Assign a different tool to a chat thread"""
+    # Get chat
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Get tool
+    tool = db.get(Tool, tool_id)
+    if not tool:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tool {tool_id} not found"
+        )
+    
+    # Update chat's tool
+    chat.structured_output = tool
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
 
 @router.get("/", response_model=List[ChatResponse])
 async def list_chats(

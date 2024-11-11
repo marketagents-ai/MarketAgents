@@ -69,7 +69,8 @@ async def main():
     openai_chats = create_chats(engine,LLMClient.openai, "gpt-4o-mini",[ResponseFormat.tool],5)
     # with Session(engine) as session:
     #     chats = get_warm_chats_within_session(session)
-
+    
+    chats_id = [chat.id for chat in openai_chats]
         
 
     # print(chats[0].llm_config)
@@ -80,16 +81,17 @@ async def main():
     completion_results = await parallel_ai.run_parallel_ai_completion(openai_chats)
     with Session(engine) as session:
         chats = get_chats_from_session(session)
-        for chat in chats:
+        chats_filtered = [chat for chat in chats if chat.id in chats_id]
+        for chat in chats_filtered:
             print("latest_message:",chat.new_message)
             print("history:",chat.history)
             chat.new_message = "And why is it funny?"
             session.add(chat)
         session.commit()
-        for chat in chats:
+        for chat in chats_filtered:
             session.refresh(chat)
             print("latest_message:",chat.new_message)
-    second_step_completion_results = await parallel_ai.run_parallel_ai_completion(chats)
+    second_step_completion_results = await parallel_ai.run_parallel_ai_completion(chats_filtered)
     end_time = time.time()
     total_time = end_time - start_time
 

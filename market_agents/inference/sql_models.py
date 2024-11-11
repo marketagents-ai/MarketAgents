@@ -1,9 +1,12 @@
+#market_agents\inference\sql_models.py
+
 from sqlmodel import Field, SQLModel, create_engine, Column, JSON, Session, Relationship, select
 from typing import Dict, Any, List, Optional, Literal, Self, Union, Tuple
 from pydantic import computed_field, ValidationError, model_validator
 from sqlalchemy import Engine
 from enum import Enum
 import json
+from datetime import datetime
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionToolParam,
@@ -142,6 +145,7 @@ class MessageFormat(str, Enum):
 
 class ChatMessage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
     uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
     role: MessageRole
     content: str
@@ -149,6 +153,7 @@ class ChatMessage(SQLModel, table=True):
     parent_message_uuid: Optional[UUID] = None
     chat_thread: 'ChatThread' = Relationship(back_populates="history",link_model=ThreadMessageLinkage,sa_relationship_kwargs={"lazy": "joined"})
     format: MessageFormat = Field(default=MessageFormat.python_dict)
+    tool_name: Optional[str] = None
 
     def to_chatml_dict(self) -> Dict[str, Any]:
         return {"role":self.role.value,"content":self.content}
@@ -184,7 +189,7 @@ class ChatThread (SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
     system_string: Optional[str] = None
-    history: List[ChatMessage] = Relationship(back_populates="chat_thread",link_model=ThreadMessageLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    history: List[ChatMessage] = Relationship(back_populates="chat_thread",link_model=ThreadMessageLinkage,sa_relationship_kwargs={"lazy": "joined","order_by":"ChatMessage.timestamp"})
     new_message: Optional[str] = Field(default=None)
     prefill: str = Field(default="Here's the valid JSON object response:```json", description="prefill assistant response with an instruction")
     postfill: str = Field(default="\n\nPlease provide your response in JSON format.", description="postfill user response with an instruction")
@@ -197,6 +202,11 @@ class ChatThread (SQLModel, table=True):
     llm_config_id: Optional[int] = Field(default=None, foreign_key="llmconfig.id")
     processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
     
+    def get_last_message_uuid(self) -> Optional[UUID]:
+        if len(self.history) == 0:
+            return None
+        return self.history[-1].uuid
+
     @computed_field
     @property
     def oai_response_format(self) -> Optional[Union[ResponseFormatText, ResponseFormatJSONObject, ResponseFormatJSONSchema]]:
@@ -243,6 +253,8 @@ class ChatThread (SQLModel, table=True):
         messages = [system_message] if system_message else []
         if self.use_history and self.history:
             messages+= [message for message in self.history]
+        elif not self.use_history and not self.new_message:
+            raise ValueError("ChatThread has no history and no new message, cannot generate messages")
         if self.new_message:
             messages.append(ChatMessage(role=MessageRole.user,content=self.new_message))
         if self.use_prefill:
@@ -282,34 +294,55 @@ class ChatThread (SQLModel, table=True):
     def vllm_messages(self) -> List[ChatCompletionMessageParam]:
         return msg_dict_to_oai(self.messages)
         
-    def add_chat_turn_history(self, llm_output:'ProcessedOutput'):
-        """ add a chat turn to the history without safely model copy just normal append """
+    def add_user_message(self) -> ChatMessage:
+        """Add the current new_message as a user message to the history"""
+        if self.new_message is None:
+            raise ValueError("new_message is None, cannot add to history")
+
+        last_message_uuid = self.get_last_message_uuid()
+        user_message = ChatMessage(
+            role=MessageRole.user, 
+            content=self.new_message, 
+            parent_message_uuid=last_message_uuid
+        )
+        self.history.append(user_message)
+        self.new_message = None
+        return user_message
+
+    def add_assistant_response(self, llm_output: 'ProcessedOutput', user_message_uuid: UUID):
+        """Add the assistant's response from the ProcessedOutput to the history"""
         if llm_output.chat_thread_id != self.id:
             raise ValueError(f"ProcessedOutput chat_thread_id {llm_output.chat_thread_id} does not match the chat_thread id {self.id}")
-        
-        if self.new_message is None:
-            raise ValueError("new_message is None, can not add to history")
 
-        print(f"history before append: {len(self.history)} for chat_thread_id: {self.id}")
-        user_message = ChatMessage(role=MessageRole.user, content=self.new_message)
-        self.history.append(user_message)
-        print(f"history after append user message: {len(self.history)} for chat_thread_id: {self.id}")
         json_object = llm_output.json_object
         str_content = llm_output.content
+        
         if not json_object:
             if str_content:
                 response = str_content
+                tool_name = None
             else:
-                raise ValueError("ProcessedOutput json_object is None and content is None, can not add to history")
+                raise ValueError("ProcessedOutput json_object is None and content is None, cannot add to history")
         else:
             response = json.dumps(json_object.object)
-        assistant_message = ChatMessage(role=MessageRole.assistant, content=response)
+            tool_name = json_object.name
 
+        assistant_message = ChatMessage(
+            role=MessageRole.assistant, 
+            content=response, 
+            parent_message_uuid=user_message_uuid,
+            tool_name=tool_name
+        )
+        
         self.history.append(assistant_message)
-        print(f"history after append assistant message: {len(self.history)} for chat_thread_id: {self.id}")
         self.processed_outputs.append(llm_output)
         self.new_message = None
-    
+
+    def add_chat_turn_history(self, llm_output: 'ProcessedOutput'):
+        """Add a complete chat turn (user message + assistant response) to the history"""
+        user_message = self.add_user_message()
+        self.add_assistant_response(llm_output, user_message.uuid)
+
     def get_tool(self) -> Union[ChatCompletionToolParam, PromptCachingBetaToolParam, None]:
         if not self.structured_output:
             return None
