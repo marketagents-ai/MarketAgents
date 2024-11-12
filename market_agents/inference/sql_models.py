@@ -98,7 +98,7 @@ class Tool(SQLModel, table=True):
                 raise ValueError(f"Could not parse callable_function: {e}")
         raise ValueError(f"callable_function '{self.callable_function}' is not present in the global scope and allow_literal_eval is False")
 
-    def execute(self, input: Dict[str, Any]) -> 'ChatMessage':
+    def execute(self, input: Dict[str, Any], tool_call_id: Optional[str] = None) -> 'ChatMessage':
         """
         Execute the callable function with the given input.
         
@@ -137,7 +137,8 @@ class Tool(SQLModel, table=True):
         return ChatMessage(
             role=MessageRole.tool, 
             content=content, 
-            tool_name=f"{self.schema_name}_response"
+            tool_name=f"{self.schema_name}_response",
+            tool_call_id=tool_call_id
         )
             
 
@@ -318,6 +319,7 @@ class ChatMessage(SQLModel, table=True):
     chat_thread: 'ChatThread' = Relationship(back_populates="history",link_model=ThreadMessageLinkage,sa_relationship_kwargs={"lazy": "joined"})
     format: MessageFormat = Field(default=MessageFormat.python_dict)
     tool_name: Optional[str] = None
+    tool_call_id: Optional[str] = None
 
     def to_chatml_dict(self) -> Dict[str, Any]:
         return {"role":self.role.value,"content":self.content}
@@ -506,6 +508,19 @@ class ChatThread (SQLModel, table=True):
         self.processed_outputs.append(llm_output)
         self.new_message = None
 
+    def add_assistant_and_tool_execution_response(self, llm_output: 'ProcessedOutput'):
+        """Add the assistant's response from the ProcessedOutput to the history"""
+        user_message_uuid = self.get_last_message_uuid()
+        assert user_message_uuid is not None, "User message uuid is None, cannot add assistant response"
+        self.add_assistant_response(llm_output, user_message_uuid)
+        #execute the tool
+
+        tool = self.get_tool_by_name(llm_output.json_object.name)
+        if tool is None:
+            raise ValueError(f"Tool {llm_output.json_object.name} not found, cannot execute tool")
+        tool_response = tool.execute(input=llm_output.json_object.object, tool_call_id=llm_output.json_object.tool_call_id)
+        self.history.append(tool_response)
+
     def add_chat_turn_history(self, llm_output: 'ProcessedOutput'):
         """Add a complete chat turn (user message + assistant response) to the history"""
         user_message = self.add_user_message()
@@ -532,6 +547,12 @@ class ChatThread (SQLModel, table=True):
                 elif self.llm_config.client == LLMClient.anthropic:
                     tools.append(tool.get_anthropic_tool())
             return tools
+        
+    def get_tool_by_name(self, tool_name: str) -> Optional[Tool]:
+        for tool in self.tools:
+            if tool.schema_name == tool_name:
+                return tool
+        return None
         
     def create_snapshot(self) -> 'ChatSnapshot':
         if not self.llm_config.id or not self.id:
@@ -583,6 +604,7 @@ class GeneratedJsonObject(SQLModel, table=True):
     name: str
     object: Dict[str, Any] = Field(sa_column=Column(JSON))
     processed_output: 'ProcessedOutput' = Relationship(back_populates="json_object", link_model=OutputJsonObjectLinkage)
+    tool_call_id : Optional[str] = None
 
 class RawOutput(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -664,11 +686,12 @@ class RawOutput(SQLModel, table=True):
         if message.tool_calls:
             tool_call = message.tool_calls[0]
             name = tool_call.function.name
+            tool_call_id = tool_call.id
             try:
                 object_dict = json.loads(tool_call.function.arguments)
-                json_object = GeneratedJsonObject(name=name, object=object_dict,)
+                json_object = GeneratedJsonObject(name=name, object=object_dict, tool_call_id=tool_call_id)
             except json.JSONDecodeError:
-                json_object = GeneratedJsonObject(name=name, object={"raw": tool_call.function.arguments})
+                json_object = GeneratedJsonObject(name=name, object={"raw": tool_call.function.arguments}, tool_call_id=tool_call_id)
         elif content is not None:
             if self.completion_kwargs:
                 name = self.completion_kwargs.get("response_format",{}).get("json_schema",{}).get("name",None)
