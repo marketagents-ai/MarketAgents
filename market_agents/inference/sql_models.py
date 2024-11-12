@@ -224,7 +224,8 @@ class Tool(SQLModel, table=True):
             content=content,
             tool_name=f"{self.schema_name}_response",
             tool_call_id=tool_call_id,
-            parent_message_uuid=tool_call_message_uuid
+            parent_message_uuid=tool_call_message_uuid,
+            tool_json_schema=self.callable_output_schema
         )
 
     @computed_field
@@ -440,13 +441,14 @@ class ChatMessage(SQLModel, table=True):
     tool_name: Optional[str] = None
     tool_call_id: Optional[str] = None
     tool_json_schema: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    tool_call: Dict[str, Any] = Field(default=None, sa_column=Column(JSON))
 
     def to_chatml_dict(self) -> Dict[str, Any]:
         if self.role == MessageRole.tool:
             return {"role":self.role.value,"content":self.content,"tool_call_id":self.tool_call_id}
         elif self.role == MessageRole.assistant:
             if self.tool_call_id is not None:
-                return {"role":self.role.value,"content":self.content,"tool_calls":[{"id":self.tool_call_id,"function":{"arguments":json.dumps(self.content),"name":self.tool_name},"type":"function"}]}
+                return {"role":self.role.value,"content":self.content,"tool_calls":[{"id":self.tool_call_id,"function":{"arguments":json.dumps(self.tool_call),"name":self.tool_name},"type":"function"}]}
             else:
                 return {"role":self.role.value,"content":self.content}
         else:
@@ -614,28 +616,46 @@ class ChatThread (SQLModel, table=True):
 
         json_object = llm_output.json_object
         str_content = llm_output.content
-        tool_json_schema = None
+        
         if not json_object:
             if str_content:
                 response = str_content
                 tool_name = None
+                assistant_message = ChatMessage(
+                    role=MessageRole.assistant, 
+                    content=response, 
+                    parent_message_uuid=user_message_uuid
+                )
             else:
                 raise ValueError("ProcessedOutput json_object is None and content is None, cannot add to history")
         else:
-            response = json.dumps(json_object.object)
             tool_name = json_object.name
+            
+            tool_json_schema = None
             tool = self.get_tool_by_name(tool_name)
-            if tool is not None:
+
+            if self.llm_config.response_format != ResponseFormat.auto_tools and tool is not None:
+                assert json_object is not None, "json_object is None, cannot add to history"
+                structured_response = json.dumps(json_object.object)
                 tool_json_schema = tool.json_schema
-        assistant_message = ChatMessage(
-            role=MessageRole.assistant, 
-            content=response, 
-            parent_message_uuid=user_message_uuid,
-            tool_name=tool_name,
-            tool_call_id=llm_output.json_object.tool_call_id,
-            tool_json_schema=tool_json_schema
-        )
-        
+                assistant_message = ChatMessage(
+                    role=MessageRole.assistant, 
+                    content=structured_response, 
+                    parent_message_uuid=user_message_uuid,
+                    tool_name=tool_name,
+                    tool_json_schema=tool_json_schema
+                )
+            elif self.llm_config.response_format == ResponseFormat.auto_tools and tool is not None:
+                assert json_object is not None, "json_object is None, cannot add to history"
+                assistant_message = ChatMessage(
+                    role=MessageRole.assistant, 
+                    content=str_content if str_content else "", 
+                    parent_message_uuid=user_message_uuid,
+                    tool_name=tool_name,
+                    tool_call_id=json_object.tool_call_id,
+                    tool_json_schema=tool.json_schema,
+                    tool_call=json_object.object
+                )
         self.history.append(assistant_message)
         self.processed_outputs.append(llm_output)
         self.new_message = None
@@ -644,6 +664,7 @@ class ChatThread (SQLModel, table=True):
         """Add the assistant's response from the ProcessedOutput to the history"""
         user_message_uuid = self.get_last_message_uuid()
         assert user_message_uuid is not None, "User message uuid is None, cannot add assistant response"
+        assert llm_output.json_object is not None, "json_object is None, cannot add to history"
         self.add_assistant_response(llm_output, user_message_uuid)
         #execute the tool
 
@@ -895,9 +916,10 @@ class RawOutput(SQLModel, table=True):
     
     def create_processed_output(self) -> 'ProcessedOutput':
         content, json_object, usage, error = self._parse_result()
-        if json_object is None or usage is None or self.chat_thread_id is None:
+        if (json_object is None and content is None) or usage is None or self.chat_thread_id is None:
             print(f"content: {content}, json_object: {json_object}, usage: {usage}, error: {error}, chat_thread_id: {self.chat_thread_id}")
             raise ValueError("No JSON object or usage found or chat_thread_id in the raw output, can not create processed output")
+   
         processed_output = ProcessedOutput(content=content, json_object=json_object, usage=usage, error=error, time_taken=self.time_taken, llm_client=self.client, raw_output=self, chat_thread_id=self.chat_thread_id)
         return processed_output
 
@@ -908,7 +930,7 @@ class RawOutput(SQLModel, table=True):
 class ProcessedOutput(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     content: Optional[str] = None
-    json_object: GeneratedJsonObject = Relationship(back_populates="processed_output", link_model=OutputJsonObjectLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    json_object: Optional[GeneratedJsonObject] = Relationship(back_populates="processed_output", link_model=OutputJsonObjectLinkage,sa_relationship_kwargs={"lazy": "joined"})
     usage: Usage = Relationship(back_populates="processed_output", link_model=OutputUsageLinkage,sa_relationship_kwargs={"lazy": "joined"})
     raw_output: 'RawOutput' = Relationship(link_model=RawProcessedLinkage,sa_relationship_kwargs={"lazy": "joined"})
     error: Optional[str] = None

@@ -65,7 +65,7 @@ async def main():
                     chats.append(
                         ChatThread(
                         
-                        system_string="You are a helpful assistant with access to multiple tools, use tools whenever possible.",
+                        system_string="You are a helpful assistant with access to multiple tools, use tools whenever possible. Include a text explanation of your reasoning in using the tools.",
                         new_message=f"Calculate the mean and standard deviation of the following numbers: {[x*(i+1) for x in example_series]}",
                         llm_config=llm_config,
                         tools=[analyze_number,analyze_minimum],
@@ -114,7 +114,23 @@ async def main():
         for chat in chats_filtered:
             session.refresh(chat)
             print("latest_message:",chat.new_message)
+    
     second_step_completion_results = await parallel_ai.run_parallel_ai_completion(chats_filtered)
+    with Session(engine) as session:
+        chats = get_chats_from_session(session)
+        chats_filtered = [chat for chat in chats if chat.id in chats_id]
+        for chat in chats_filtered:
+            print("latest_message:",chat.history[-1])
+        for chat in chats_filtered:
+            print("latest_message:",chat.new_message)
+            print("history:",chat.history)
+            chat.new_message = "and which one is the biggest?"
+            session.add(chat)
+        session.commit()
+        for chat in chats_filtered:
+            session.refresh(chat)
+            print("latest_message:",chat.new_message)
+    third_step_completion_results = await parallel_ai.run_parallel_ai_completion(chats_filtered)
     end_time = time.time()
     total_time = end_time - start_time
 
