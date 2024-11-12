@@ -13,3 +13,4 @@ aiohttp
 scipy
 fastapi
 uvicorn
+libcst

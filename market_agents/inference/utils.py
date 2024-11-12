@@ -10,6 +10,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
     ChatCompletionAssistantMessageParam,
     ChatCompletionToolMessageParam,
+    ChatCompletionMessageToolCallParam,
     ChatCompletionFunctionMessageParam,
     ChatCompletionMessageParam,
 )
@@ -70,7 +71,8 @@ def msg_dict_to_oai(messages: List[Dict[str, Any]]) -> List[ChatCompletionMessag
                 if "function_call" in msg:
                     assistant_msg["function_call"] = msg["function_call"]
                 if "tool_calls" in msg:
-                    assistant_msg["tool_calls"] = msg["tool_calls"]
+                    print(f"validating tool_calls during conversion: {[ChatCompletionMessageToolCallParam(**tool_call) for tool_call in msg["tool_calls"]]}")
+                    assistant_msg["tool_calls"] = [ChatCompletionMessageToolCallParam(**tool_call) for tool_call in msg["tool_calls"]]
                 return assistant_msg
             elif role == "tool":
                 return ChatCompletionToolMessageParam(role=role, content=msg["content"], tool_call_id=msg["tool_call_id"])

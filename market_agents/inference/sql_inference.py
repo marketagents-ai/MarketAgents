@@ -3,7 +3,7 @@ import asyncio
 import json
 from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field, ValidationError
-from market_agents.inference.sql_models import RawOutput, ProcessedOutput, ChatThread , LLMClient 
+from market_agents.inference.sql_models import RawOutput, ProcessedOutput, ChatThread , LLMClient ,ChatMessage, MessageRole
 from market_agents.inference.clients_models import AnthropicRequest, OpenAIRequest, VLLMRequest
 from market_agents.inference.oai_parallel import process_api_requests_from_file, OAIApiFromFileConfig
 import os
@@ -14,7 +14,6 @@ from anthropic.types.beta.prompt_caching import PromptCachingBetaToolParam
 from anthropic.types.message_create_params import ToolChoiceToolChoiceTool,ToolChoiceToolChoiceAuto
 from sqlalchemy import Engine
 from sqlmodel import Session
-
 
 class RequestLimits(BaseModel):
     max_requests_per_minute: int = Field(default=50,description="The maximum number of requests per minute for the API")
@@ -73,25 +72,26 @@ class ParallelAIUtilities:
         for output in llm_outputs:
                 output.update_db_from_session(session)
 
-    async def run_parallel_ai_completion(self, chat_threads: List[ChatThread], update_history:bool=True, session: Optional[Session] = None) -> List[ProcessedOutput]:
-        if self.engine:
-            print("Updating DB")
-            
-            # Open a new session if none is provided
-            if session is None:
-                with Session(self.engine) as session:
-                    for chat in chat_threads:
-                        
-                        try:
-                            chat.add_user_message()
-                            session.add(chat)
-                        except Exception as e:
-                            chat_threads.remove(chat)
-                            print(f"Error adding user message to chat thread {chat.id}: {e}, removed from thread list")
-                    session.commit()
-                    #refresh the chat threads
-                    for chat in chat_threads:
-                        session.refresh(chat)
+    async def run_parallel_ai_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
+        if not self.engine:
+            raise ValueError("Engine is not set, cannot update DB")
+        print("Updating DB with user messages")
+        
+        # Open a new session if none is provided
+        
+        with Session(self.engine) as session:
+            for chat in chat_threads:
+                
+                try:
+                    chat.add_user_message()
+                    session.add(chat)
+                except Exception as e:
+                    chat_threads.remove(chat)
+                    print(f"Error adding user message to chat thread {chat.id}: {e}, removed from thread list")
+            session.commit()
+            #refresh the chat threads
+            for chat in chat_threads:
+                session.refresh(chat)
 
         openai_chat_threads = [p for p in chat_threads if p.llm_config.client == "openai"]
         anthropic_chat_threads = [p for p in chat_threads if p.llm_config.client == "anthropic"]
@@ -114,52 +114,68 @@ class ParallelAIUtilities:
         self.all_requests.extend(flattened_results)
         
  
-        if self.engine:
-            print("Updating DB")
-            
-            # Open a new session if none is provided
-            with Session(self.engine) as session:
-                # Step 1: Add and commit each ProcessedOutput result to avoid re-adding them
-                for result in flattened_results:
-                    session.add(result)
-                session.commit()  # Commit ProcessedOutputs first
-                
-                # Step 2: If history updates are enabled
-                if update_history:
-                    print(f"Updating chat thread history for {len(chat_threads)} chat threads")
-                    
-                    # Update the history for each chat thread directly
-                    for output in flattened_results:
-                        # Retrieve the corresponding ChatThread instance by ID in this session
-                        chat_thread = session.get(ChatThread, output.chat_thread_id)
-                        
-                        if chat_thread:
-                            # Initialize history if it doesn't exist
-                            user_mesage_uuid= chat_thread.get_last_message_uuid() 
-                            if user_mesage_uuid:
-                                chat_thread.add_assistant_response(output, user_mesage_uuid)
-                            else:
-                                raise ValueError(f"Chat thread {chat_thread.id} has no user message uuid")
-                            
-                            
-                            # Use session.merge to ensure the object is attached to the session
-                            session.merge(chat_thread)
-                            session.commit()  # Commit each history update immediately
-                            
-                            # Print updated length of the history
-                            print(f"The length of the history for chat_thread_id: {chat_thread.id} is {len(chat_thread.history)}")
-                
-                # Step 3: Create snapshots for each updated chat thread
-                for chat in chat_threads:
-                    # Retrieve the latest state from the database
-                    chat = session.get(ChatThread, chat.id)  # Re-get to avoid detached instance
-                    if chat:
-                        snapshot = chat.create_snapshot()
-                        print(f"snapshot: {snapshot}")
-                        session.add(snapshot)
-                        print("snapshot added to session:")
-                session.commit()  # Final commit to save all snapshots
+        print("Updating DB with LLM outputs")
         
+        # Open a new session if none is provided
+        with Session(self.engine) as session:
+            # Step 1: Add and commit each ProcessedOutput result to avoid re-adding them
+            for output in flattened_results:
+                session.add(output)
+            session.commit()  # Commit ProcessedOutputs first
+            
+            # Step 2: If history updates are enabled
+            print(f"Updating chat thread history for {len(chat_threads)} chat threads")
+            
+            # Update the history for each chat thread directly
+            for output in flattened_results:
+                # Retrieve the corresponding ChatThread instance by ID in this session
+                chat_thread = session.get(ChatThread, output.chat_thread_id)
+                
+                if chat_thread:
+                    # Initialize history if it doesn't exist
+                    user_mesage_uuid= chat_thread.get_last_message_uuid() 
+                    if user_mesage_uuid:
+                        chat_thread.add_assistant_response(output, user_mesage_uuid)
+                    else:
+                        raise ValueError(f"Chat thread {chat_thread.id} has no user message uuid")
+                    #refresh again chat thread so we can access the history
+                    session.refresh(chat_thread)
+                    assistant_message_uuid = chat_thread.get_last_message_uuid()
+                    if output.json_object:
+                        tool = chat_thread.get_tool_by_name(output.json_object.name)
+                        if tool and tool.callable:
+                            print(f"Executing tool: {tool.schema_name} with request_id: {output.json_object.tool_call_id}")
+                            # try:
+                            tool_response = tool.execute(input=output.json_object.object, tool_call_id=output.json_object.tool_call_id, tool_call_message_uuid=assistant_message_uuid)
+                            chat_thread.history.append(tool_response)
+                            print(f"Tool response: {tool_response}")
+                            # except Exception as e:
+                            #     error_dict = {"results": {"error": str(e)}}
+                            #     error_tool_response = ChatMessage(role=MessageRole.tool, content=json.dumps(error_dict))
+                            #     chat_thread.history.append(error_tool_response)
+                            #     print(f"Tool response: {error_tool_response}")
+                    
+                    
+                    # Use session.merge to ensure the object is attached to the session
+                    session.merge(chat_thread)
+                    session.commit()  # Commit each history update immediately
+                    
+                    # Print updated length of the history
+                    print(f"The length of the history for chat_thread_id: {chat_thread.id} is {len(chat_thread.history)}")
+        
+            # Step 3: Create snapshots for each updated chat thread
+            for chat in chat_threads:
+                # Retrieve the latest state from the database
+                chat = session.get(ChatThread, chat.id)  # Re-get to avoid detached instance
+                if chat:
+                    snapshot = chat.create_snapshot()
+                    print(f"snapshot: {snapshot}")
+                    session.add(snapshot)
+                    print("snapshot added to session:")
+            session.commit()  # Final commit to save all snapshots
+            #step 4 refresh all the results
+            for output in flattened_results:
+                session.refresh(output)
         return flattened_results
         
     def get_all_requests(self):
@@ -260,6 +276,7 @@ class ParallelAIUtilities:
             openai_request = OpenAIRequest(**request)
             return True
         except Exception as e:
+            print(f"Error validating OpenAI request: {e} with request: {request}")
             raise ValidationError(f"Error validating OpenAI request: {e} with request: {request}")
         
     def _validate_vllm_request(self, request: Dict[str, Any]) -> bool:
@@ -291,7 +308,7 @@ class ParallelAIUtilities:
             tools = chat_thread.get_tools()
             if tools:
                 request["tools"] = tools
-                request["tool_choice"] = {"type": "auto"}
+                request["tool_choice"] = "auto"
         if self._validate_openai_request(request):
             return request
         else:

@@ -10,6 +10,7 @@ import json
 from ast import literal_eval
 import sys
 from datetime import datetime
+import libcst as cst
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionToolParam,
@@ -43,84 +44,168 @@ from market_agents.inference.utils import msg_dict_to_oai, msg_dict_to_anthropic
 import uuid
 from uuid import UUID
 
+class CallableRegistry:
+    """Global registry for tool callables"""
+    _instance = None
+    _registry: Dict[str, Callable] = {}
+
+    def __new__(cls) -> 'CallableRegistry':
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    @classmethod
+    def register(cls, name: str, func: Callable) -> None:
+        """Register a new callable. Raises error if name exists."""
+        if name in cls._registry:
+            raise ValueError(f"Function '{name}' already registered. Use update() to replace existing function.")
+        
+        # Check for type hints
+        type_hints = get_type_hints(func)
+        if not type_hints:
+            raise ValueError(f"Function '{name}' must have type hints")
+        if 'return' not in type_hints:
+            raise ValueError(f"Function '{name}' must have a return type hint")
+            
+        cls._registry[name] = func
+    
+    @classmethod
+    def register_from_text(cls, name: str, func_text: str) -> None:
+        """Register a function from its text representation."""
+        if name in cls._registry:
+            raise ValueError(f"Function '{name}' already registered. Use update() to replace existing function.")
+        
+        # For lambdas, wrap them in a typed function
+        if func_text.strip().startswith('lambda'):
+            # Create a wrapper function with type hints
+            wrapper_text = f"""
+def {name}(x: float) -> float:
+    \"\"\"Wrapped lambda function with type hints\"\"\"
+    func = {func_text}
+    return func(x)
+"""
+            func_text = wrapper_text
+        
+        try:
+            # Parse with libcst
+            module = cst.parse_module(func_text)
+            
+            # Create a clean namespace with all needed imports
+            namespace = {
+                # Basic types
+                'float': float, 'int': int, 'str': str, 'bool': bool,
+                'list': list, 'dict': dict, 'tuple': tuple,
+                # Type hints
+                'List': List, 'Dict': Dict, 'Tuple': Tuple, 
+                'Optional': Optional, 'Union': Union,
+                'Any': Any,
+                # Models if needed
+                'BaseModel': BaseModel
+            }
+            
+            # Execute the code
+            exec(module.code, namespace)
+            
+            # Get the function
+            if func_text.strip().startswith('lambda'):
+                func = namespace[name]  # Get wrapped function
+            else:
+                func_name = func_text.split('def ')[1].split('(')[0].strip()
+                func = namespace[func_name]
+            
+            # Verify it has type hints
+            type_hints = get_type_hints(func)
+            if not type_hints:
+                raise ValueError(f"Function must have type hints")
+            if 'return' not in type_hints:
+                raise ValueError(f"Function must have a return type hint")
+            
+            cls._registry[name] = func
+            
+        except Exception as e:
+            raise ValueError(f"Failed to parse function: {str(e)}")
+    
+    @classmethod
+    def update(cls, name: str, func: Callable) -> None:
+        """Update an existing callable."""
+        # Check for type hints
+        type_hints = get_type_hints(func)
+        if not type_hints:
+            raise ValueError(f"Function must have type hints")
+        if 'return' not in type_hints:
+            raise ValueError(f"Function must have a return type hint")
+            
+        cls._registry[name] = func
+    
+    @classmethod
+    def delete(cls, name: str) -> None:
+        """Delete a callable from registry."""
+        if name not in cls._registry:
+            raise ValueError(f"Function '{name}' not found in registry.")
+        del cls._registry[name]
+    
+    @classmethod
+    def get(cls, name: str) -> Optional[Callable]:
+        return cls._registry.get(name)
+
 class Tool(SQLModel, table=True):
-    id: Optional[int]  = Field(default=None, primary_key=True)
-    schema_name: str = Field(default = "generate_structured_output")
-    schema_description: str = Field(default ="Generate a structured output based on the provided JSON schema.")
-    instruction_string: str = Field(default = "Please follow this JSON schema for your response:")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    schema_name: str = Field(default="generate_structured_output")
+    schema_description: str = Field(default="Generate a structured output based on the provided JSON schema.")
+    instruction_string: str = Field(default="Please follow this JSON schema for your response:")
     strict_schema: bool = True
-    json_schema: Dict = Field(default = {},sa_column=Column(JSON))
+    json_schema: Dict = Field(default={}, sa_column=Column(JSON))
     chats: List["ChatThread"] = Relationship(back_populates="structured_output")
     callable: bool = False
     callable_function: Optional[str] = None
-    callable_output_schema: Optional[Dict[str, Any]] = Field(default = None,sa_column=Column(JSON))
+    callable_output_schema: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
     allow_literal_eval: bool = False
 
-    def parse_execute_callable_function(self) -> Callable:
-        """
-        Safely parse the callable function string using ast.literal_eval.
-        Only allows access to functions in the current module's globals.
-        
-        Returns:
-            Callable: The parsed callable function
-            
-        Raises:
-            ValueError: If callable_function is not set or function not found
-            TypeError: If parsed value is not callable
-        """
-        if self.callable_function is None:
-            raise ValueError("callable_function is not set")
-            
-        # Get the calling module's globals
-        frame = sys._getframe(1)
-        while frame:
-            if frame.f_globals.get('__name__') != __name__:
-                global_dict = frame.f_globals
-                break
-            frame = frame.f_back
-        else:
-            raise ValueError("Could not find calling module")
+    def _register_callable(self) -> None:
+        """Helper method to register callable in registry"""
+        if self.callable and self.callable_function:
+            # Check if function is already registered
+            if not CallableRegistry().get(self.schema_name):
+                if not self.allow_literal_eval:
+                    raise ValueError(
+                        f"Function '{self.callable_function}' not found in registry "
+                        f"and allow_literal_eval is False"
+                    )
+                try:
+                    # For lambda and simple functions, pass the actual function text
+                    CallableRegistry().register_from_text(
+                        name=self.schema_name, 
+                        func_text=self.callable_function
+                    )
+                except Exception as e:
+                    raise ValueError(f"Could not register callable_function: {str(e)}")
 
-        # Try to get function directly from globals first
-        if self.callable_function in global_dict:
-            func = global_dict[self.callable_function]
-            if callable(func):
-                return func
-            raise TypeError(f"'{self.callable_function}' is not callable")
-        if self.allow_literal_eval:
-            # Otherwise try to evaluate as a literal
-            try:
-                parsed = literal_eval(self.callable_function)
-                if not callable(parsed):
-                    raise TypeError(f"Parsed value '{self.callable_function}' is not callable")
-                return parsed
-            except (ValueError, SyntaxError) as e:
-                raise ValueError(f"Could not parse callable_function: {e}")
-        raise ValueError(f"callable_function '{self.callable_function}' is not present in the global scope and allow_literal_eval is False")
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._register_callable()
 
-    def execute(self, input: Dict[str, Any], tool_call_id: Optional[str] = None) -> 'ChatMessage':
-        """
-        Execute the callable function with the given input.
-        
-        Args:
-            input: Dictionary of input parameters. If the function expects a BaseModel,
-                this should be the dict representation of that model.
-            
-        Returns:
-            ChatMessage: The response message with JSON-serialized content
-        """
-        if not self.callable:
+    @model_validator(mode='after')
+    def validate_callable(self) -> Self:
+        """Validate and register callable"""
+        self._register_callable()
+        return self
+
+    def execute(self, input: Dict[str, Any], tool_call_id: Optional[str] = None, tool_call_message_uuid: Optional[UUID] = None) -> 'ChatMessage':
+        """Execute the callable function with the given input."""
+        if not self.callable or not self.callable_function:
             raise ValueError("Tool is not callable")
+
+        callable_func = CallableRegistry().get(self.schema_name)
+        if not callable_func:
+            raise ValueError(f"Function '{self.schema_name}' not found in registry")
         
-        callable_func = self.parse_execute_callable_function()
-        
-        # Get the first parameter's type hint
+        # Get function signature info
         sig = signature(callable_func)
         type_hints = get_type_hints(callable_func)
         first_param = next(iter(sig.parameters.values()))
         param_type = type_hints.get(first_param.name)
         
-        # If the first parameter is a BaseModel, construct it from input
+        # Handle input based on parameter type
         if (isinstance(param_type, type) and 
             issubclass(param_type, BaseModel)):
             model_input = param_type.model_validate(input)
@@ -128,19 +213,19 @@ class Tool(SQLModel, table=True):
         else:
             response = callable_func(**input)
         
-        # Convert response to JSON string
+        # Process response
         if isinstance(response, BaseModel):
             content = response.model_dump_json()
         else:
             content = json.dumps({"result": response})
             
         return ChatMessage(
-            role=MessageRole.tool, 
-            content=content, 
+            role=MessageRole.tool,
+            content=content,
             tool_name=f"{self.schema_name}_response",
-            tool_call_id=tool_call_id
+            tool_call_id=tool_call_id,
+            parent_message_uuid=tool_call_message_uuid
         )
-            
 
     @computed_field
     @property
@@ -168,13 +253,18 @@ class Tool(SQLModel, table=True):
                 cache_control=PromptCachingBetaCacheControlEphemeralParam(type='ephemeral')
             )
         return None
-    def get_openai_json_schema_response(self) -> Optional[ResponseFormatJSONSchema]:
 
+    def get_openai_json_schema_response(self) -> Optional[ResponseFormatJSONSchema]:
         if self.json_schema:
-            schema = JSONSchema(name=self.schema_name,description=self.schema_description,schema=self.json_schema,strict=self.strict_schema)
+            schema = JSONSchema(
+                name=self.schema_name,
+                description=self.schema_description,
+                schema=self.json_schema,
+                strict=self.strict_schema
+            )
             return ResponseFormatJSONSchema(type="json_schema", json_schema=schema)
         return None
-    
+
     @classmethod
     def from_callable(
         cls,
@@ -192,16 +282,20 @@ class Tool(SQLModel, table=True):
         if 'return' not in type_hints:
             raise ValueError(f"Function {func.__name__} must have a return type hint")
         
+        # Use provided name or function name
+        final_name = schema_name if schema_name is not None else func.__name__
+        
+        # Register with the final name
+        CallableRegistry().register(final_name, func)
+        
         # Handle input schema
         first_param = next(iter(sig.parameters.values()))
         first_param_type = type_hints.get(first_param.name)
         
-        # If first parameter is BaseModel, use its schema
         if (isinstance(first_param_type, type) and 
             issubclass(first_param_type, BaseModel)):
             derived_input_schema = first_param_type.model_json_schema()
         else:
-            # Create input model from parameters
             input_fields = {}
             for param_name, param in sig.parameters.items():
                 if param_name not in type_hints:
@@ -212,40 +306,65 @@ class Tool(SQLModel, table=True):
                 else:
                     input_fields[param_name] = (type_hints[param_name], param.default)
 
-            InputModel = create_model(
-                f"{func.__name__}Input",
-                **input_fields
-            )
+            InputModel = create_model(f"{final_name}Input", **input_fields)
             derived_input_schema = InputModel.model_json_schema()
         
-        # Validate provided schema if any
+        # Validate provided schema against derived
         if json_schema is not None:
-            # (validation code remains the same)
-            pass
+            derived_required = set(derived_input_schema.get("required", []))
+            provided_required = set(json_schema.get("required", []))
+            if derived_required != provided_required:
+                raise ValueError(
+                    f"Schema mismatch: Required properties don't match.\n"
+                    f"Derived: {derived_required}\n"
+                    f"Provided: {provided_required}"
+                )
+
+            derived_props = derived_input_schema.get("properties", {})
+            provided_props = json_schema.get("properties", {})
+            
+            for prop_name, prop_schema in derived_props.items():
+                if prop_name not in provided_props:
+                    raise ValueError(
+                        f"Schema mismatch: Missing property '{prop_name}' in provided schema"
+                    )
+                provided_type = provided_props[prop_name].get("type")
+                derived_type = prop_schema.get("type")
+                if provided_type != derived_type:
+                    raise ValueError(
+                        f"Schema mismatch: Property '{prop_name}' type mismatch.\n"
+                        f"Derived type: {derived_type}\n"
+                        f"Provided type: {provided_type}"
+                    )
+
+            extra_props = set(provided_props.keys()) - set(derived_props.keys())
+            if extra_props:
+                raise ValueError(
+                    f"Schema mismatch: Extra properties in provided schema: {extra_props}"
+                )
+
+            final_schema = json_schema
         else:
-            json_schema = derived_input_schema
+            final_schema = derived_input_schema
         
         # Handle output type
         output_type = type_hints['return']
         if isinstance(output_type, type) and issubclass(output_type, BaseModel):
             OutputModel = output_type
         else:
-            OutputModel = create_model(
-                f"{func.__name__}Output",
-                result=(output_type, ...)
-            )
+            OutputModel = create_model(f"{final_name}Output", result=(output_type, ...))
         
         return cls(
-            schema_name=schema_name if schema_name is not None else func.__name__,
-            schema_description=schema_description if schema_description is not None else (func.__doc__ or f"Execute {func.__name__} function"),
+            schema_name=final_name,
+            schema_description=schema_description if schema_description is not None else (func.__doc__ or f"Execute {final_name} function"),
             instruction_string=instruction_string or "Please follow this JSON schema for your response:",
             strict_schema=strict_schema,
-            json_schema=json_schema,
+            json_schema=final_schema,
             callable=True,
             callable_function=func.__name__,
             callable_output_schema=OutputModel.model_json_schema()
         )
-    
+     
 class LLMClient(str, Enum):
     openai = "openai"
     azure_openai = "azure_openai"
@@ -320,9 +439,18 @@ class ChatMessage(SQLModel, table=True):
     format: MessageFormat = Field(default=MessageFormat.python_dict)
     tool_name: Optional[str] = None
     tool_call_id: Optional[str] = None
+    tool_json_schema: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
 
     def to_chatml_dict(self) -> Dict[str, Any]:
-        return {"role":self.role.value,"content":self.content}
+        if self.role == MessageRole.tool:
+            return {"role":self.role.value,"content":self.content,"tool_call_id":self.tool_call_id}
+        elif self.role == MessageRole.assistant:
+            if self.tool_call_id is not None:
+                return {"role":self.role.value,"content":self.content,"tool_calls":[{"id":self.tool_call_id,"function":{"arguments":json.dumps(self.content),"name":self.tool_name},"type":"function"}]}
+            else:
+                return {"role":self.role.value,"content":self.content}
+        else:
+            return {"role":self.role.value,"content":self.content}
     
     def to_string(self) -> str:
         if self.format == MessageFormat.python_dict:
@@ -486,7 +614,7 @@ class ChatThread (SQLModel, table=True):
 
         json_object = llm_output.json_object
         str_content = llm_output.content
-        
+        tool_json_schema = None
         if not json_object:
             if str_content:
                 response = str_content
@@ -496,12 +624,16 @@ class ChatThread (SQLModel, table=True):
         else:
             response = json.dumps(json_object.object)
             tool_name = json_object.name
-
+            tool = self.get_tool_by_name(tool_name)
+            if tool is not None:
+                tool_json_schema = tool.json_schema
         assistant_message = ChatMessage(
             role=MessageRole.assistant, 
             content=response, 
             parent_message_uuid=user_message_uuid,
-            tool_name=tool_name
+            tool_name=tool_name,
+            tool_call_id=llm_output.json_object.tool_call_id,
+            tool_json_schema=tool_json_schema
         )
         
         self.history.append(assistant_message)
