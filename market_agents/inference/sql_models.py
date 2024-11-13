@@ -616,7 +616,7 @@ class ChatThread (SQLModel, table=True):
 
         json_object = llm_output.json_object
         str_content = llm_output.content
-        
+        print(f"adding assistant response with content: {str_content} and json_object: {json_object}")
         if not json_object:
             if str_content:
                 response = str_content
@@ -635,6 +635,7 @@ class ChatThread (SQLModel, table=True):
             tool = self.get_tool_by_name(tool_name)
 
             if self.llm_config.response_format != ResponseFormat.auto_tools and tool is not None:
+                print(f"current response format: {self.llm_config.response_format}")
                 assert json_object is not None, "json_object is None, cannot add to history"
                 structured_response = json.dumps(json_object.object)
                 tool_json_schema = tool.json_schema
@@ -705,6 +706,8 @@ class ChatThread (SQLModel, table=True):
         for tool in self.tools:
             if tool.schema_name == tool_name:
                 return tool
+        if self.structured_output and self.structured_output.schema_name == tool_name:
+            return self.structured_output
         return None
         
     def create_snapshot(self) -> 'ChatSnapshot':

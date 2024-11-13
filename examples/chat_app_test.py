@@ -43,7 +43,7 @@ async def test_chat_api():
                     json={"content": content}
                 )
                 if response.status_code != 200:
-                    raise ChatAPIError(f"Failed to send message: {response.text}")
+                    raise ChatAPIError(f"Failed to send message with content: {content} error: {response.text}")
                 return response
             
             print("\n=== Sending multiple messages to same thread ===")

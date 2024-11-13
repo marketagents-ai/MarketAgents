@@ -15,6 +15,7 @@ from market_agents.inference.sql_inference import ParallelAIUtilities
 from app.api.deps import DatabaseDep, get_ai_utils
 from pydantic import BaseModel
 from uuid import UUID
+from datetime import datetime
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
@@ -29,6 +30,10 @@ class ChatMessageResponse(BaseModel):
     uuid: UUID
     parent_message_uuid: Optional[UUID] = None
     tool_name: Optional[str] = None
+    tool_call_id: Optional[str] = None
+    tool_json_schema: Optional[Dict[str, Any]] = None
+    timestamp: datetime
+
     class Config:
         from_attributes = True
 
@@ -56,7 +61,10 @@ class ChatResponse(BaseModel):
                 author_name=msg.author_name,
                 uuid=msg.uuid,
                 parent_message_uuid=msg.parent_message_uuid,
-                tool_name=msg.tool_name
+                tool_name=msg.tool_name,
+                tool_call_id=msg.tool_call_id,
+                tool_json_schema=msg.tool_json_schema,
+                timestamp=msg.timestamp
             ) for msg in chat.history
         ] if chat.history else []
 
@@ -99,7 +107,8 @@ DEFAULT_LLM_CONFIG = LLMConfig(
     model="gpt-4o",
     response_format=ResponseFormat.tool,
     temperature=0,
-    max_tokens=2500
+    max_tokens=2500,
+    use_cache=True
 )
 
 CHAIN_OF_THOUGHT_SCHEMA = {
@@ -353,6 +362,8 @@ async def create_chat(
     
     return ChatResponse.from_chat_thread(chat)
 
+#app/api/v1/endpoints/chat.py
+
 @router.post("/{chat_id}/messages/", response_model=ChatResponse)
 async def send_message(
     message: MessageCreate,
@@ -360,10 +371,9 @@ async def send_message(
     ai_utils: ParallelAIUtilities = Depends(get_ai_utils)
 ) -> ChatResponse:
     """Send a new message in a chat"""
-    # Get chat using a dedicated session
+    # Get chat and setup message
     with Session(ai_utils.engine) as db:
-        statement = select(ChatThread).where(ChatThread.id == chat_id)
-        chat = db.exec(statement).first()
+        chat = db.get(ChatThread, chat_id)
         if not chat:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -375,31 +385,37 @@ async def send_message(
         db.add(chat)
         db.commit()
         db.refresh(chat)
-    
+
     try:
-        # Process with AI outside any session context
+        # Process with AI and WAIT for the results
         results = await ai_utils.run_parallel_ai_completion([chat])
         if not results:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to get AI response"
             )
-        
-        # Get fresh chat after AI processing
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing message during parallel completion: {str(e)}"
+        )
+    try:
+        # Now that we have results, get final state
         with Session(ai_utils.engine) as db:
-            chat = db.get(ChatThread, chat_id)
-            if not chat:
+            final_chat = db.get(ChatThread, chat_id)
+            if not final_chat:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Chat {chat_id} not found after processing"
                 )
-            return ChatResponse.from_chat_thread(chat)
-    
+            return ChatResponse.from_chat_thread(final_chat)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing message: {str(e)}"
+            detail=f"Error getting final chat state after parallel completion: {str(e)}"
         )
+
+   
 
 @router.post("/{chat_id}/clear", response_model=ChatResponse)
 async def clear_chat_history(
