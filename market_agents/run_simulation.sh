@@ -3,8 +3,7 @@
 # Script to run market simulation with parallel orchestration, dashboard, and time tracking
 
 # File names for the Python scripts
-#ORCHESTRATOR_SCRIPT="market_agents/orchestrator_parallel_with_db.py"
-ORCHESTRATOR_SCRIPT="market_agents/orchestrator_parallel_with_db.py"
+ORCHESTRATOR_SCRIPT="market_agents/orchestrators/meta_orchestrator.py"
 DASHBOARD_SCRIPT="market_agents/agents/db/dashboard/dashboard.py"
 
 # Check if the Python scripts exist
@@ -32,9 +31,12 @@ echo "Dashboard is running. Access it at http://localhost:8000"
 # Get the start time
 start_time=$(date +%s)
 
-# Run the orchestrator script and print its output in real-time
+# Run the orchestrator script and print its output in rea
+l-time
 echo "Starting market simulation with parallel orchestration..."
-python3 "$ORCHESTRATOR_SCRIPT" 2>&1 | tee simulation_output.log
+python3 $ORCHESTRATOR_SCRIPT | tee simulation_output.log
+# python3 "$ORCHESTRATOR_SCRIPT" --environments group_chat auction 2>&1 | tee simulation_output.log
+# python3 "$ORCHESTRATOR_SCRIPT" --environments auction 2>&1 | tee simulation_output.log
 orchestrator_exit_code=${PIPESTATUS[0]}
 
 # Get the end time for the orchestrator
