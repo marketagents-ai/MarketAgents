@@ -110,9 +110,10 @@ class TestAgent(unittest.TestCase):
         self.assertIn("calculate", react_output.action.name.lower())
         self.assertTrue(any(char.isdigit() for char in react_output.final_answer))
 
+
     def test_agent_interactions_logging(self):
         agent = Agent(role="test_role", llm_config=LLMConfig(client="openai", model="gpt-4o-mini"))
-        self.loop.run_until_complete(agent.execute("Test task"))
+        self.loop.run_until_complete(agent.execute("Test task", output_format=Action))
 
         logger.debug(f"Number of agent interactions: {len(agent.interactions)}")
         if agent.interactions:
@@ -122,9 +123,9 @@ class TestAgent(unittest.TestCase):
         interaction = agent.interactions[0]
         self.assertIn("id", interaction)
         self.assertIn("name", interaction)
-        self.assertIn("prompt_context", interaction)
+        self.assertIn("system", interaction)  # Changed from prompt_context
+        self.assertIn("task", interaction)    # Added
         self.assertIn("response", interaction)
         self.assertIn("timestamp", interaction)
-
 if __name__ == '__main__':
     unittest.main()

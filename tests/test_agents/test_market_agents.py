@@ -19,14 +19,21 @@ logger = logging.getLogger(__name__)
 
 class TestMarketAgentBase(IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        # Initialize the auction environment
-        self.auction_env = MultiAgentEnvironment(
-            name="TestAuction",
-            address="test_auction_1",
-            max_steps=5,
-            mechanism=DoubleAuction(sequential=False, max_rounds=5, good_name="apple")
-        )
+        # Initialize ParallelAIUtilities first
+        self.ai_utils = ParallelAIUtilities()
 
+        # Initialize the auction environment
+        self.auction_env = DoubleAuction()
+        # self.auction_env.step = 0  # Initialize step counter
+
+        
+        # Create a MultiAgentEnvironment instance and wrap the auction
+        auction_environment = MultiAgentEnvironment(
+            name="auction",  # Add this line
+            mechanism=self.auction_env,
+            agents=[],  # Will be populated later
+            sequential=True
+        )
         # Initialize the LLMConfig
         llm_config = LLMConfig(
             client="openai",
@@ -63,25 +70,23 @@ class TestMarketAgentBase(IsolatedAsyncioTestCase):
             cost_schedules=cost_schedules,
             max_relative_spread=0.2,
             role="buyer",
-            environments={"auction": self.auction_env},
+            environments={"auction": auction_environment},
             llm_config=llm_config,
-            protocol=ACLMessage,  # Provide the ACLMessage protocol
+            protocol=ACLMessage,
             address="agent_0_address"
         )
 
-        # Initialize ParallelAIUtilities (you may need to adjust this based on your actual implementation)
-        self.ai_utils = ParallelAIUtilities()
-
-        # Initialize the orchestrator
+        # Initialize the orchestrator (now that self.agent exists)
         self.orchestrator = MarketOrchestrator(
-            agents=[self.agent],
-            markets=[self.auction_env],
-            ai_utils=self.ai_utils
+            llm_agents=[self.agent],
+            goods=["apple"],
+            ai_utils=self.ai_utils,
+            max_rounds=5
         )
 
     async def test_generate_action(self):
         await self.asyncSetUp()  # Ensure setup is called before the test
-        self.auction_env.current_step = 2
+        # self.auction_env.step = 2  # Use step instead of current_step
         action = await self.agent.generate_action("auction")
         print(f"{Fore.GREEN}Generated action: {action}{Style.RESET_ALL}")
         self.assertIsNotNone(action)
@@ -89,7 +94,7 @@ class TestMarketAgentBase(IsolatedAsyncioTestCase):
 
     async def test_perceive(self):
         await self.asyncSetUp()  # Ensure setup is called before the test
-        self.auction_env.current_step = 3
+        # self.auction_env.step = 3  # Use step instead of current_step
         perception = await self.agent.perceive("auction")
         print(f"{Fore.BLUE}Perception: {perception}{Style.RESET_ALL}")
         self.assertIsNotNone(perception)
