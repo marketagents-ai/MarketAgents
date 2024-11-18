@@ -398,8 +398,9 @@ async def create_chat(
     # Explicitly load relationships for response
     db.refresh(chat)
     statement = select(ChatThread).where(ChatThread.id == chat.id)
-    chat = db.exec(statement).unique().first()
-    
+    chat  = db.exec(statement).unique().first()
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
     return ChatResponse.from_chat_thread(chat)
 
 @router.post("/with-config", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
@@ -503,19 +504,13 @@ async def _create_chat_with_config(
     # Create chat thread with explicit relationships
     chat = ChatThread(
         llm_config_id=db_config.id,  # Use ID instead of relationship
-        structured_output_id=tools[0].id if tools else None  # Use ID instead of relationship
+        structured_output_id=tools[0].id if tools else None , # Use ID instead of relationship
+        system_prompt=system_prompt
     )
     db.add(chat)
     db.flush()  # Flush to get chat ID
     
-    # Add system prompt through the linkage table
-    if system_prompt:
-        from abstractions.inference.sql_models import ThreadSystemLinkage
-        linkage = ThreadSystemLinkage(
-            chat_thread_id=chat.id,
-            system_str_id=system_prompt.id
-        )
-        db.add(linkage)
+   
     
     # Commit all changes
     db.commit()
