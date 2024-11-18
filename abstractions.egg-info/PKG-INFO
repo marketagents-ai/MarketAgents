@@ -1,5 +1,0 @@
-Metadata-Version: 2.1
-Name: abstractions
-Version: 0.1.0
-Requires-Dist: pydantic
-Requires-Dist: asyncio
