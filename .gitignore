@@ -18,6 +18,8 @@ llm_agents/logs*
 venv
 venv/*
 venv/**
+/abstractions.egg-info
+abstractions.egg-info/**
 /market_agents.egg-info
 /reports
 /outputs
