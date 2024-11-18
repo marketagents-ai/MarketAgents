@@ -1,7 +1,7 @@
 import asyncio
 from dotenv import load_dotenv
-from market_agents.inference.sql_inference import ParallelAIUtilities, RequestLimits
-from market_agents.inference.sql_models import ChatThread, LLMConfig, Tool, LLMClient,ResponseFormat
+from abstractions.inference.sql_inference import ParallelAIUtilities, RequestLimits
+from abstractions.inference.sql_models import ChatThread, LLMConfig, Tool, LLMClient,ResponseFormat
 from typing import Literal, List
 import time
 import os

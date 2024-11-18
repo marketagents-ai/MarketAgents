@@ -1,5 +1,5 @@
-from market_agents.environments.environment import MultiAgentEnvironment
-from market_agents.environments.mechanisms.beauty import (
+from abstractions.environments.environment import MultiAgentEnvironment
+from abstractions.environments.mechanisms.beauty import (
     BeautyContestMechanism, BeautyContestAction, BeautyContestActionSpace,
     BeautyContestObservationSpace, BeautyContestGlobalObservation
 )

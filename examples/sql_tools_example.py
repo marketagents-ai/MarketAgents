@@ -1,7 +1,7 @@
 from typing import List, Dict, Tuple, Optional, Any, get_type_hints
 from pydantic import BaseModel, create_model
 import json
-from market_agents.inference.sql_models import Tool, MessageRole, ChatMessage, CallableRegistry
+from abstractions.inference.sql_models import Tool, MessageRole, ChatMessage, CallableRegistry
 import statistics
 
 # Example Models

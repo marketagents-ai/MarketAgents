@@ -1,6 +1,6 @@
 import asyncio
-from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
-from market_agents.inference.message_models import LLMPromptContext, LLMConfig, StructuredTool
+from abstractions.inference.parallel_inference import ParallelAIUtilities, RequestLimits
+from abstractions.inference.message_models import LLMPromptContext, LLMConfig, StructuredTool
 import time
 from typing import Literal, List
 from pydantic import BaseModel, Field
