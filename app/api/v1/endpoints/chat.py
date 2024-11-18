@@ -53,6 +53,7 @@ class ChatResponse(BaseModel):
     new_message: Optional[str]
     history: List[ChatMessageResponse]
     system_prompt: Optional[str] = None
+    system_prompt_id: Optional[int] = None
     active_tool_id: Optional[int] = None
 
     class Config:
@@ -84,6 +85,7 @@ class ChatResponse(BaseModel):
             new_message=chat.new_message,
             history=history,
             system_prompt=chat.system_prompt.content if chat.system_prompt else None,
+            system_prompt_id=chat.system_prompt.id if chat.system_prompt else None,
             active_tool_id=chat.structured_output_id if chat.structured_output_id else None
         )
 
@@ -784,3 +786,126 @@ async def get_system_prompt_by_name(
     if not prompt:
         raise HTTPException(status_code=404, detail="System prompt not found")
     return prompt
+
+@router.put("/{chat_id}/system-prompt/by-uuid/{prompt_uuid}", response_model=ChatResponse)
+async def update_chat_system_prompt_by_uuid(
+    chat_id: int,
+    prompt_uuid: UUID,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Update the system prompt for a specific chat using a system prompt UUID"""
+    # Get chat
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Get system prompt
+    query = select(SystemStr).where(SystemStr.uuid == prompt_uuid)
+    system_prompt = db.exec(query).first()
+    if not system_prompt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"System prompt with UUID {prompt_uuid} not found"
+        )
+    
+    # Update chat's system prompt
+    chat.system_prompt = system_prompt
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+@router.put("/{chat_id}/system-prompt/by-name/{prompt_name}", response_model=ChatResponse)
+async def update_chat_system_prompt_by_name(
+    chat_id: int,
+    prompt_name: str,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Update the system prompt for a specific chat using a system prompt name"""
+    # Get chat
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Get system prompt
+    query = select(SystemStr).where(SystemStr.name == prompt_name)
+    system_prompt = db.exec(query).first()
+    if not system_prompt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"System prompt with name '{prompt_name}' not found"
+        )
+    
+    # Update chat's system prompt
+    chat.system_prompt = system_prompt
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+@router.put("/{chat_id}/system-prompt/by-id/{prompt_id}", response_model=ChatResponse)
+async def update_chat_system_prompt_by_id(
+    chat_id: int,
+    prompt_id: int,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Update the system prompt for a specific chat using a system prompt ID"""
+    # Get chat
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Get system prompt
+    system_prompt = db.get(SystemStr, prompt_id)
+    if not system_prompt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"System prompt with ID {prompt_id} not found"
+        )
+    
+    # Update chat's system prompt
+    chat.system_prompt = system_prompt
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+@router.delete("/system-prompts/{prompt_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_system_prompt(
+    prompt_id: int,
+    db: DatabaseDep
+) -> None:
+    """Delete a specific system prompt"""
+    # Get the system prompt
+    prompt = db.get(SystemStr, prompt_id)
+    if not prompt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"System prompt {prompt_id} not found"
+        )
+    
+    # Check if prompt is in use by any chat threads
+    chats_using_prompt = db.exec(
+        select(ChatThread).where(ChatThread.system_prompt == prompt)
+    ).first()
+    
+    if chats_using_prompt:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"System prompt {prompt_id} is in use by chat threads and cannot be deleted"
+        )
+    
+    db.delete(prompt)
+    db.commit()
