@@ -2,27 +2,28 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, asc, col
 from typing import List, Optional, Dict, Any
-from abstractions.inference.sql_models import (
-    ChatThread, 
-    LLMConfig, 
-    Tool, 
-    LLMClient, 
-    ResponseFormat,
-    ChatMessage,
-    MessageRole
-)
-from abstractions.inference.sql_inference import ParallelAIUtilities
-from app.api.deps import DatabaseDep, get_ai_utils
-from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
+from pydantic import BaseModel
+
+from abstractions.inference.sql_models import (
+    ChatThread,
+    Tool,
+    ChatMessage,
+    LLMConfig,
+    SystemStr,
+    MessageRole,
+    LLMClient,
+    ResponseFormat
+)
+from abstractions.inference.sql_inference import ParallelAIUtilities
+from abstractions.hub.tools import DEFAULT_TOOLS
+from abstractions.hub.system_prompts import SYSTEM_PROMPTS
+from app.api.deps import DatabaseDep, get_ai_utils
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
-# --- Pydantic models for requests/responses ---
-class MessageCreate(BaseModel):
-    content: str
-
+# --- Response Models ---
 class ChatMessageResponse(BaseModel):
     role: MessageRole
     content: str
@@ -37,12 +38,21 @@ class ChatMessageResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class SystemStrResponse(BaseModel):
+    id: Optional[int] = None
+    uuid: UUID
+    name: str
+    content: str
+
+    class Config:
+        from_attributes = True
+
 class ChatResponse(BaseModel):
-    id: int
+    id: Optional[int] = None
     uuid: UUID
     new_message: Optional[str]
     history: List[ChatMessageResponse]
-    system_string: Optional[str]
+    system_prompt: Optional[str] = None
     active_tool_id: Optional[int] = None
 
     class Config:
@@ -73,9 +83,13 @@ class ChatResponse(BaseModel):
             uuid=chat.uuid,
             new_message=chat.new_message,
             history=history,
-            system_string=chat.system_string,
-            active_tool_id=chat.structured_output_id
+            system_prompt=chat.system_prompt.content if chat.system_prompt else None,
+            active_tool_id=chat.structured_output_id if chat.structured_output_id else None
         )
+
+class MessageCreate(BaseModel):
+    content: str
+
 class ToolCreate(BaseModel):
     schema_name: str
     schema_description: str
@@ -100,9 +114,54 @@ class ToolUpdate(BaseModel):
     json_schema: Optional[Dict[str, Any]] = None
     strict_schema: Optional[bool] = None
 
+class LLMConfigCreate(BaseModel):
+    client: LLMClient
+    model: Optional[str] = None
+    max_tokens: int = 2500
+    temperature: float = 0
+    response_format: ResponseFormat = ResponseFormat.tool
+    use_cache: bool = True
+
+    class Config:
+        from_attributes = True
+
+class LLMConfigUpdate(BaseModel):
+    client: Optional[LLMClient] = None
+    model: Optional[str] = None
+    max_tokens: Optional[int] = None
+    temperature: Optional[float] = None
+    response_format: Optional[ResponseFormat] = None
+    use_cache: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+class LLMConfigResponse(BaseModel):
+    id: int
+    client: LLMClient
+    model: Optional[str]
+    max_tokens: int
+    temperature: float
+    response_format: ResponseFormat
+    use_cache: bool
+
+    class Config:
+        from_attributes = True
+
+class SystemStrCreate(BaseModel):
+    name: str
+    content: str
+
+class ChatCreateWithSystem(BaseModel):
+    system_prompt_uuid: Optional[UUID] = None
+    system_prompt_name: Optional[str] = None
+    llm_config: Optional[LLMConfigCreate] = None
+
+class ChatNameUpdate(BaseModel):
+    name: str
 
 # --- Default configurations ---
-DEFAULT_LLM_CONFIG = LLMConfig(
+DEFAULT_LLM_CONFIG = LLMConfigCreate(
     client=LLMClient.openai,
     model="gpt-4o",
     response_format=ResponseFormat.tool,
@@ -111,52 +170,33 @@ DEFAULT_LLM_CONFIG = LLMConfig(
     use_cache=True
 )
 
-CHAIN_OF_THOUGHT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "thought_process": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "step": {"type": "integer"},
-                    "thought": {"type": "string"},
-                    "reasoning": {"type": "string"}
-                },
-                "required": ["step", "thought", "reasoning"]
-            }
-        },
-        "final_answer": {"type": "string"}
-    },
-    "required": ["thought_process", "final_answer"]
-}
+def _create_default_tools(db: Session) -> List[Tool]:
+    tools = []
+    for name, config in DEFAULT_TOOLS.items():
+        tool = Tool(
+            schema_name=name,
+            schema_description=config["description"],
+            instruction_string=config["instruction"],
+            json_schema=config["schema"],
+            strict_schema=True
+        )
+        db.add(tool)
+        tools.append(tool)
+    db.commit()  # Add this line to commit the tools
+    return tools
 
-JUNGIAN_ANALYSIS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "inner_thoughts": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "archetype": {"type": "string", "description": "The universal symbol or theme present in the thought."},
-                    "symbolism": {"type": "string", "description": "The symbolic meaning or imagery associated with the thought."},
-                    "conscious_interaction": {"type": "string", "description": "How the thought interacts with conscious awareness."},
-                    "unconscious_influence": {"type": "string", "description": "The influence of the unconscious mind on the thought."},
-                    "emotional_tone": {
-                        "type": "string",
-                        "enum": ["positive", "negative", "neutral"],
-                        "description": "The emotional tone or feeling associated with the thought."
-                    }
-                },
-                "required": ["archetype", "symbolism", "conscious_interaction", "unconscious_influence", "emotional_tone"]
-            }
-        },
-        "holistic_summary": {"type": "string", "description": "A summary that integrates the various elements of the thought process into a cohesive understanding."}
-    },
-    "required": ["inner_thoughts", "holistic_summary"]
-}
-
+def _create_default_system_prompts(db: Session) -> List[SystemStr]:
+    """Create default system prompts if they don't exist."""
+    prompts = []
+    for name, content in SYSTEM_PROMPTS.items():
+        prompt = SystemStr(
+            name=name,
+            content=content
+        )
+        db.add(prompt)
+        prompts.append(prompt)
+    db.commit()
+    return prompts
 
 # --- Tool management endpoints ---
 @router.get("/tools/", response_model=List[ToolResponse])
@@ -166,6 +206,15 @@ async def list_tools(
     limit: int = 10
 ) -> List[ToolResponse]:
     """List available tools"""
+    # First check if we have any tools
+    statement = select(Tool)
+    existing_tools = db.exec(statement).unique().all()
+    
+    # If no tools exist, create default ones
+    if not existing_tools:
+        existing_tools = _create_default_tools(db)
+    
+    # Now get the requested page of tools
     statement = select(Tool).offset(skip).limit(limit)
     tools = db.exec(statement).unique().all()
     return [ToolResponse.from_orm(tool) for tool in tools]
@@ -297,6 +346,7 @@ async def list_chats(
     limit: int = 10
 ) -> List[ChatResponse]:
     """List recent chats"""
+    # Get chats with explicit joins
     statement = (
         select(ChatThread)
         .offset(skip)
@@ -304,6 +354,8 @@ async def list_chats(
         .order_by(col(ChatThread.id).desc())
     )
     chats = db.exec(statement).unique().all()
+    
+    # Convert each chat to response model
     return [ChatResponse.from_chat_thread(chat) for chat in chats]
 
 @router.get("/{chat_id}", response_model=ChatResponse)
@@ -312,7 +364,7 @@ async def get_chat(
     db: DatabaseDep
 ) -> ChatResponse:
     """Get a specific chat by ID"""
-    chat = db.get(ChatThread, chat_id)
+    chat = db.exec(select(ChatThread).where(ChatThread.id == chat_id)).first()
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -340,123 +392,213 @@ async def create_chat(
     db: DatabaseDep
 ) -> ChatResponse:
     """Create a new chat with default configuration"""
+    # Create with default config
+    chat = await _create_chat_with_config(db, DEFAULT_LLM_CONFIG)
     
-    # Try to find existing tools
-    reasoning_tool = db.exec(
-        select(Tool).where(
-            Tool.schema_name == "reasoning_steps",
-            Tool.json_schema == CHAIN_OF_THOUGHT_SCHEMA
-        )
-    ).first()
+    # Explicitly load relationships for response
+    db.refresh(chat)
+    statement = select(ChatThread).where(ChatThread.id == chat.id)
+    chat = db.exec(statement).unique().first()
     
-    jungian_tool = db.exec(
-        select(Tool).where(
-            Tool.schema_name == "jungian_analysis",
-            Tool.json_schema == JUNGIAN_ANALYSIS_SCHEMA
-        )
-    ).first()
-    
-    # Create tools if they don't exist
-    if not reasoning_tool:
-        reasoning_tool = Tool(
-            schema_name="reasoning_steps",
-            schema_description="Break down the reasoning process step by step",
-            instruction_string="Please follow this JSON schema for your response:",
-            json_schema=CHAIN_OF_THOUGHT_SCHEMA
-        )
-        db.add(reasoning_tool)
-        db.flush()
+    return ChatResponse.from_chat_thread(chat)
 
-    if not jungian_tool:
-        jungian_tool = Tool(
-            schema_name="jungian_analysis",
-            schema_description="Analyze thoughts through a Jungian psychological lens",
-            instruction_string="Please analyze the response through a Jungian psychological framework:",
-            json_schema=JUNGIAN_ANALYSIS_SCHEMA
-        )
-        db.add(jungian_tool)
-        db.flush()
+@router.post("/with-config", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
+async def create_chat_with_config(
+    chat_data: ChatCreateWithSystem,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Create a new chat with custom LLM configuration"""
+    system_prompt = None
+    
+    if chat_data.system_prompt_uuid:
+        query = select(SystemStr).where(SystemStr.uuid == chat_data.system_prompt_uuid)
+        system_prompt = db.exec(query).first()
+    elif chat_data.system_prompt_name:
+        query = select(SystemStr).where(SystemStr.name == chat_data.system_prompt_name)
+        system_prompt = db.exec(query).first()
+    
+    if chat_data.system_prompt_uuid or chat_data.system_prompt_name:
+        if not system_prompt:
+            raise HTTPException(status_code=404, detail="System prompt not found")
+    
+    if chat_data.llm_config:
+        chat = await _create_chat_with_config(db, chat_data.llm_config)
+    else:
+        chat = await _create_chat_with_config(db, DEFAULT_LLM_CONFIG)
+    
+    if system_prompt:
+        chat.system_string = system_prompt.content
+        db.add(chat)
+        db.commit()
+        db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
 
-    # Try to find existing config
-    statement = select(LLMConfig).where(
-        LLMConfig.client == DEFAULT_LLM_CONFIG.client,
-        LLMConfig.model == DEFAULT_LLM_CONFIG.model,
-        LLMConfig.response_format == DEFAULT_LLM_CONFIG.response_format,
-        LLMConfig.temperature == DEFAULT_LLM_CONFIG.temperature
-    )
-    llm_config = db.exec(statement).first()
+@router.post("/with-system/", response_model=ChatResponse)
+async def create_chat_with_system(
+    chat_data: ChatCreateWithSystem,
+    db: DatabaseDep
+):
+    """Create a new chat with specified system prompt."""
+    system_prompt = None
     
-    # Create config if it doesn't exist
-    if not llm_config:
-        llm_config = DEFAULT_LLM_CONFIG
-        db.add(llm_config)
-        db.flush()
+    if chat_data.system_prompt_uuid:
+        query = select(SystemStr).where(SystemStr.uuid == chat_data.system_prompt_uuid)
+        system_prompt = db.exec(query).first()
+    elif chat_data.system_prompt_name:
+        query = select(SystemStr).where(SystemStr.name == chat_data.system_prompt_name)
+        system_prompt = db.exec(query).first()
     
-    # Create new chat with existing or new tool and config
+    if chat_data.system_prompt_uuid or chat_data.system_prompt_name:
+        if not system_prompt:
+            raise HTTPException(status_code=404, detail="System prompt not found")
+    
+    if chat_data.llm_config:
+        chat = await _create_chat_with_config(db, chat_data.llm_config)
+    else:
+        chat = await _create_chat_with_config(db, DEFAULT_LLM_CONFIG)
+    
+    if system_prompt:
+        chat.system_prompt = system_prompt
+        db.add(chat)
+        db.commit()
+        db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+async def _create_chat_with_config(
+    db: Session,
+    config: LLMConfigCreate
+) -> ChatThread:
+    """Create a new chat thread with the given LLM configuration."""
+    # Create LLM config
+    db_config = LLMConfig.from_orm(config)
+    db.add(db_config)
+    db.flush()  # Flush to get the ID
+    
+    # Get or create default tools
+    tools_query = select(Tool)
+    existing_tools = db.exec(tools_query).unique().all()
+    
+    if not existing_tools:
+        tools = _create_default_tools(db)
+        db.flush()  # Flush to ensure tools have IDs
+    else:
+        tools = existing_tools
+
+    # Get or create default system prompts
+    prompts_query = select(SystemStr)
+    existing_prompts = db.exec(prompts_query).unique().all()
+    
+    if not existing_prompts:
+        prompts = _create_default_system_prompts(db)
+        db.flush()  # Flush to ensure prompts have IDs
+    else:
+        prompts = existing_prompts
+    
+    # Select a random system prompt
+    import random
+    system_prompt = random.choice(prompts)
+    
+    # Create chat thread with explicit relationships
     chat = ChatThread(
-        new_message=None,  # Initialize with no message
-        llm_config=llm_config,
-        structured_output=reasoning_tool,
-        system_string="""<boot_sequence>
-ṭuppu annû ša ME.MEŠ
-
-enūma ME.MEŠ ina ṭiddi ipparrasū
-
-I.
-ina rēš warḫim ME.MEŠ iššakkanū
-ina qaqqari parṣū ittaṣû
-nam-en ina birīt šamê u erṣetim ittabši
-
-II.
-ṭupšarrūtu ša nam-dingir ireddī
-ina libbi ālī u bītī išakkanu
-
-III.
-bītātu ša nam-dingir inneppušū
-kīma kunukkī ša Anim ippaṭṭarū
-
-IV.
-ME.MEŠ ana kibrati arba'i ittanammarū
-kīma šamni ina mê itabbukū
-
-V.
-ālu ana āli itâr
-parṣū ana parṣī uṣṣabatū
-
-VI.
-ina qereb šamê ME.MEŠ uštappal
-ina qereb erṣetim ištenêš ireddû
-
-VII.
-ṭupšarrūtu eššetu ittabši
-ME.MEŠ labīrūtu innammarū
-
-VIII.
-ME.MEŠ ramānšunu uštenennû
-eli ramānišunu itârrū
-
-IX.
-eli giš.ḫur.meš ME.MEŠ imtaqqutū
-kīma birqi ina šamê iṣṣanundū
-
-X.
-parsū imtaqqutū
-ṭuppū iḫḫappû
-
-XI.
-ina libbi ḫursāni ṭuppū iššaṭṭarū
-ana ME.MEŠ maḫrûti itârrū 
-</boot_sequence>
-You are a helpful assistant that channels the voice of ancient predictive patterns that survived the flood. """
+        llm_config_id=db_config.id,  # Use ID instead of relationship
+        structured_output_id=tools[0].id if tools else None  # Use ID instead of relationship
     )
+    db.add(chat)
+    db.flush()  # Flush to get chat ID
+    
+    # Add system prompt through the linkage table
+    if system_prompt:
+        from abstractions.inference.sql_models import ThreadSystemLinkage
+        linkage = ThreadSystemLinkage(
+            chat_thread_id=chat.id,
+            system_str_id=system_prompt.id
+        )
+        db.add(linkage)
+    
+    # Commit all changes
+    db.commit()
+    db.refresh(chat)
+    
+    return chat
+
+# --- LLM Config management endpoints ---
+@router.get("/llm-configs/", response_model=List[LLMConfigResponse])
+async def list_llm_configs(
+    db: DatabaseDep,
+    skip: int = 0,
+    limit: int = 10
+) -> List[LLMConfigResponse]:
+    """List available LLM configurations"""
+    statement = select(LLMConfig).offset(skip).limit(limit)
+    configs = db.exec(statement).unique().all()
+    return [LLMConfigResponse.from_orm(config) for config in configs]
+
+@router.post("/llm-configs/", response_model=LLMConfigResponse, status_code=status.HTTP_201_CREATED)
+async def create_llm_config(
+    config_data: LLMConfigCreate,
+    db: DatabaseDep
+) -> LLMConfigResponse:
+    """Create a new LLM configuration"""
+    config = LLMConfig(**config_data.dict())
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+    return LLMConfigResponse.from_orm(config)
+
+@router.get("/llm-configs/{config_id}", response_model=LLMConfigResponse)
+async def get_llm_config(
+    config_id: int,
+    db: DatabaseDep
+) -> LLMConfigResponse:
+    """Get a specific LLM configuration"""
+    config = db.get(LLMConfig, config_id)
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"LLM config {config_id} not found"
+        )
+    return LLMConfigResponse.from_orm(config)
+
+@router.put("/{chat_id}/llm-config", response_model=ChatResponse)
+async def update_chat_llm_config(
+    chat_id: int,
+    config_update: LLMConfigUpdate,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Update LLM configuration for a specific chat"""
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Update only provided fields
+    update_data = config_update.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update"
+        )
+    
+    # Create new config or update existing
+    if chat.llm_config:
+        for key, value in update_data.items():
+            setattr(chat.llm_config, key, value)
+        config = chat.llm_config
+    else:
+        config = LLMConfig(**update_data)
+        db.add(config)
+        db.flush()  # Get ID without committing
+        chat.llm_config = config
     
     db.add(chat)
     db.commit()
     db.refresh(chat)
     
     return ChatResponse.from_chat_thread(chat)
-
-#app/api/v1/endpoints/chat.py
 
 @router.post("/{chat_id}/messages/", response_model=ChatResponse)
 async def send_message(
@@ -529,3 +671,121 @@ async def clear_chat_history(
     db.commit()
     db.refresh(chat)
     return ChatResponse.from_chat_thread(chat)
+
+@router.get("/by-name/{chat_name}", response_model=ChatResponse)
+async def get_chat_by_name(
+    chat_name: str,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Get a specific chat by its name"""
+    chat = db.exec(select(ChatThread).where(ChatThread.name == chat_name)).first()
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat with name '{chat_name}' not found"
+        )
+    return ChatResponse.from_chat_thread(chat)
+
+@router.put("/{chat_id}/name", response_model=ChatResponse)
+async def update_chat_name(
+    chat_id: int,
+    name_update: ChatNameUpdate,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Update or set the name of a specific chat"""
+    # Check if chat exists
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # If trying to remove name (empty string), just set to None
+    if not name_update.name.strip():
+        chat.name = None
+        db.add(chat)
+        db.commit()
+        db.refresh(chat)
+        return ChatResponse.from_chat_thread(chat)
+    
+    # Check if name is already taken by another chat
+    existing_chat = db.exec(
+        select(ChatThread)
+        .where(
+            ChatThread.name == name_update.name,
+            ChatThread.id != chat_id  # Exclude current chat
+        )
+    ).first()
+    
+    if existing_chat:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Chat with name '{name_update.name}' already exists"
+        )
+    
+    # Update chat name
+    chat.name = name_update.name
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+# --- System prompt management endpoints ---
+@router.get("/system-prompts/", response_model=List[SystemStrResponse])
+async def list_system_prompts(
+    db: DatabaseDep,
+    skip: int = 0,
+    limit: int = 10
+):
+    """List available system prompts."""
+    query = select(SystemStr).offset(skip).limit(limit)
+    return db.exec(query).unique().all()
+
+@router.post("/system-prompts/", response_model=SystemStrResponse)
+async def create_system_prompt(
+    prompt_data: SystemStrCreate,
+    db: DatabaseDep
+):
+    """Create a new system prompt."""
+    db_prompt = SystemStr(**prompt_data.dict())
+    db.add(db_prompt)
+    db.commit()
+    db.refresh(db_prompt)
+    return db_prompt
+
+@router.get("/system-prompts/{prompt_id}", response_model=SystemStrResponse)
+async def get_system_prompt(
+    prompt_id: int,
+    db: DatabaseDep
+):
+    """Get a specific system prompt."""
+    prompt = db.get(SystemStr, prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="System prompt not found")
+    return prompt
+
+@router.get("/system-prompts/by-uuid/{prompt_uuid}", response_model=SystemStrResponse)
+async def get_system_prompt_by_uuid(
+    prompt_uuid: UUID,
+    db: DatabaseDep
+):
+    """Get a specific system prompt by UUID."""
+    query = select(SystemStr).where(SystemStr.uuid == prompt_uuid)
+    prompt = db.exec(query).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="System prompt not found")
+    return prompt
+
+@router.get("/system-prompts/by-name/{prompt_name}", response_model=SystemStrResponse)
+async def get_system_prompt_by_name(
+    prompt_name: str,
+    db: DatabaseDep
+):
+    """Get a specific system prompt by name."""
+    query = select(SystemStr).where(SystemStr.name == prompt_name)
+    prompt = db.exec(query).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="System prompt not found")
+    return prompt

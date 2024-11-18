@@ -459,7 +459,7 @@ class ChatMessage(SQLModel, table=True):
             return json.dumps(self.to_chatml_dict())
         else:
             raise ValueError(f"Message format {self.format} is not supported")
-    def to_share_gpt_dict(self) -> Dict[str, Any]:
+    def to_share_gpt_dict(self) -> Dict[str, str]:
         return {"from":self.role.value,"value":self.content}
     
     @classmethod
@@ -484,10 +484,22 @@ class ThreadToolLinkage(SQLModel, table=True):
     tool_id: int = Field(foreign_key="tool.id",primary_key=True)
 
     
+class ThreadSystemLinkage(SQLModel, table=True):
+    chat_thread_id: int = Field(foreign_key="chatthread.id",primary_key=True)
+    system_str_id: int = Field(foreign_key="systemstr.id",primary_key=True)
+
+class SystemStr(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
+    name: str = Field(index=True)
+    content: str
+    chats: List["ChatThread"] = Relationship(back_populates="system_prompt", link_model=ThreadSystemLinkage, sa_relationship_kwargs={"lazy": "joined"})
+
 class ChatThread (SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
-    system_string: Optional[str] = None
+    name: Optional[str] = Field(default=None)
+    system_prompt: Optional[SystemStr] = Relationship(back_populates="chats", link_model=ThreadSystemLinkage, sa_relationship_kwargs={"lazy": "joined"})
     history: List[ChatMessage] = Relationship(back_populates="chat_thread",link_model=ThreadMessageLinkage,sa_relationship_kwargs={"lazy": "joined","order_by":"ChatMessage.timestamp"})
     new_message: Optional[str] = Field(default=None)
     prefill: str = Field(default="Here's the valid JSON object response:```json", description="prefill assistant response with an instruction")
@@ -541,7 +553,7 @@ class ChatThread (SQLModel, table=True):
     @computed_field
     @property
     def system_message(self) -> Optional[Dict[str, str]]:
-        content= self.system_string if self.system_string  else ""
+        content= self.system_prompt.content if self.system_prompt else ""
         if self.use_schema_instruction and self.structured_output:
             content = "\n".join([content,self.structured_output.schema_instruction])
         return {"role":"system","content":content} if len(content)>0 else None
@@ -745,7 +757,6 @@ class RawProcessedLinkage(SQLModel, table=True):
     raw_output_id: int = Field(foreign_key="rawoutput.id",primary_key=True)
     processed_output_id: int = Field(foreign_key="processedoutput.id",primary_key=True)
 
-
 class Usage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     prompt_tokens: int
@@ -941,5 +952,3 @@ class ProcessedOutput(SQLModel, table=True):
     llm_client: LLMClient
     chat_thread_id: int = Field(foreign_key="chatthread.id")
     chat_thread: 'ChatThread' = Relationship(back_populates="processed_outputs", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
-
-

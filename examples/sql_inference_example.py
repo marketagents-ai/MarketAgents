@@ -1,7 +1,7 @@
 import asyncio
 from dotenv import load_dotenv
 from abstractions.inference.sql_inference import ParallelAIUtilities, RequestLimits
-from abstractions.inference.sql_models import ChatThread, LLMConfig, Tool, LLMClient,ResponseFormat
+from abstractions.inference.sql_models import ChatThread, LLMConfig, Tool, LLMClient,ResponseFormat,    SystemStr
 from typing import Literal, List
 import time
 import os
@@ -36,7 +36,7 @@ async def main():
         schema_name="tell_joke",
         schema_description="Generate a programmer joke with explanation"
     )
-    
+    system_string = SystemStr(content="You are a helpful assistant that tells programmer jokes.", name= "joke_teller")
     # Create chats for different JSON modes and tool usage
     def create_chats(engine:Engine,client:LLMClient, model, response_formats : List[ResponseFormat]= [ResponseFormat.text], count=1) -> List[ChatThread]:
         with Session(engine) as session:
@@ -47,7 +47,7 @@ async def main():
                     chats.append(
                         ChatThread(
                         
-                        system_string="You are a helpful assistant that tells programmer jokes.",
+                        system_prompt=system_string,
                         new_message=f"Tell me a programmer joke about the number {i}.",
                         llm_config=llm_config,
                         structured_output=structured_tool,

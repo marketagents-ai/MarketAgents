@@ -25,7 +25,7 @@ def create_application() -> FastAPI:
         title="Chat API",
         description="API for managing AI chat interactions",
         # Add version info
-        version="1.0.0",
+        version="0.0.1",
         # Add response model by default
         default_response_class=JSONResponse
     )
