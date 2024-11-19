@@ -1,7 +1,7 @@
 import asyncio
 from dotenv import load_dotenv
 from abstractions.inference.sql_inference import ParallelAIUtilities, RequestLimits
-from abstractions.inference.sql_models import ChatThread, LLMConfig, Tool, LLMClient,ResponseFormat
+from abstractions.inference.sql_models import ChatThread, LLMConfig, Tool, LLMClient,ResponseFormat, SystemStr
 from typing import Literal, List
 import time
 import os
@@ -13,7 +13,7 @@ async def main():
     load_dotenv()
     oai_request_limits = RequestLimits(max_requests_per_minute=500, max_tokens_per_minute=200000)
 
-    sqlite_file_name = "inference_example.db"
+    sqlite_file_name = "chat.db"
     sqlite_url = f"sqlite:///{sqlite_file_name}"
 
     engine = create_engine(sqlite_url, echo=False)
@@ -54,6 +54,10 @@ async def main():
     analyze_minimum = Tool.from_callable(analyze_minimum_basemodel)
     analyze_minimum.allow_literal_eval = True
     example_series = [3,7,2,1,4,5,6,8]
+    system_string = SystemStr(
+        content="You are a helpful assistant with access to multiple tools, use tools whenever possible. Include a text explanation of your reasoning in using the tools.",
+        name="example_system_string"
+    )
     
     # Create chats for different JSON modes and tool usage
     def create_chats(engine:Engine,client:LLMClient, model, response_formats : List[ResponseFormat]= [ResponseFormat.text], count=1) -> List[ChatThread]:
@@ -65,7 +69,7 @@ async def main():
                     chats.append(
                         ChatThread(
                         
-                        system_string="You are a helpful assistant with access to multiple tools, use tools whenever possible. Include a text explanation of your reasoning in using the tools.",
+                        system_prompt=system_string,
                         new_message=f"Calculate the mean and standard deviation of the following numbers: {[x*(i+1) for x in example_series]}",
                         llm_config=llm_config,
                         tools=[analyze_number,analyze_minimum],

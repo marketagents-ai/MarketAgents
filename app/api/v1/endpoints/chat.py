@@ -1,10 +1,10 @@
 #app\api\v1\endpoints\chat.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, asc, col
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from abstractions.inference.sql_models import (
     ChatThread,
@@ -14,11 +14,13 @@ from abstractions.inference.sql_models import (
     SystemStr,
     MessageRole,
     LLMClient,
-    ResponseFormat
+    ResponseFormat,
+    CallableRegistry
 )
 from abstractions.inference.sql_inference import ParallelAIUtilities
 from abstractions.hub.tools import DEFAULT_TOOLS
 from abstractions.hub.system_prompts import SYSTEM_PROMPTS
+from abstractions.hub.callable_tools import DEFAULT_CALLABLE_TOOLS
 from app.api.deps import DatabaseDep, get_ai_utils
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -33,6 +35,7 @@ class ChatMessageResponse(BaseModel):
     tool_name: Optional[str] = None
     tool_call_id: Optional[str] = None
     tool_json_schema: Optional[Dict[str, Any]] = None
+    tool_call: Optional[Dict[str, Any]] = None
     timestamp: datetime
 
     class Config:
@@ -75,6 +78,7 @@ class ChatResponse(BaseModel):
                 tool_name=msg.tool_name,
                 tool_call_id=msg.tool_call_id,
                 tool_json_schema=msg.tool_json_schema,
+                tool_call=msg.tool_call,
                 timestamp=msg.timestamp
             ) for msg in chat.history
         ] if chat.history else []
@@ -106,6 +110,7 @@ class ToolResponse(BaseModel):
     instruction_string: str
     json_schema: Dict[str, Any]
     strict_schema: bool
+    is_callable: bool = False
 
     class Config:
         from_attributes = True
@@ -173,19 +178,50 @@ DEFAULT_LLM_CONFIG = LLMConfigCreate(
 )
 
 def _create_default_tools(db: Session) -> List[Tool]:
+    """Create default tools if they don't exist."""
     tools = []
+    
+    # Check existing tools to avoid duplicates
+    existing_tools = {
+        tool.schema_name: tool 
+        for tool in db.exec(select(Tool)).unique().all()
+    }
+    
+    # Create regular tools
     for name, config in DEFAULT_TOOLS.items():
-        tool = Tool(
-            schema_name=name,
-            schema_description=config["description"],
-            instruction_string=config["instruction"],
-            json_schema=config["schema"],
-            strict_schema=True
-        )
-        db.add(tool)
-        tools.append(tool)
-    db.commit()  # Add this line to commit the tools
-    return tools
+        if name not in existing_tools:
+            tool = Tool(
+                schema_name=name,
+                schema_description=config["description"],
+                instruction_string=config["instruction"],
+                json_schema=config["schema"],
+                strict_schema=True
+            )
+            db.add(tool)
+            tools.append(tool)
+    
+    # Create callable tools
+    for name, config in DEFAULT_CALLABLE_TOOLS.items():
+        if name not in existing_tools:
+            try:
+                tool = Tool.from_callable(
+                    func=config["function"],
+                    schema_name=name,
+                    schema_description=config["description"]
+                )
+                tool.allow_literal_eval = config.get("allow_literal_eval", False)
+                db.add(tool)
+                tools.append(tool)
+            except Exception as e:
+                print(f"Failed to create callable tool {name}: {str(e)}")
+    
+    if tools:  # Only commit if we created new tools
+        db.commit()
+        for tool in tools:
+            db.refresh(tool)
+    
+    # Return all tools, both existing and newly created
+    return list(existing_tools.values()) + tools
 
 def _create_default_system_prompts(db: Session) -> List[SystemStr]:
     """Create default system prompts if they don't exist."""
@@ -207,19 +243,56 @@ async def list_tools(
     skip: int = 0,
     limit: int = 10
 ) -> List[ToolResponse]:
-    """List available tools"""
+    """List available regular (non-callable) tools, creating defaults if missing"""
     # First check if we have any tools
-    statement = select(Tool)
-    existing_tools = db.exec(statement).unique().all()
+    statement = select(Tool).where(Tool.callable == False)  # Only get regular tools
+    existing_tools: List[Tool] = list(db.exec(statement).unique().all())
     
-    # If no tools exist, create default ones
-    if not existing_tools:
-        existing_tools = _create_default_tools(db)
+    # Get existing tool names
+    existing_tool_names = {tool.schema_name for tool in existing_tools}
     
-    # Now get the requested page of tools
-    statement = select(Tool).offset(skip).limit(limit)
+    # Check for missing default tools (only regular tools)
+    missing_regular_tools = set(DEFAULT_TOOLS.keys()) - existing_tool_names
+    
+    if missing_regular_tools:
+        new_tools: List[Tool] = []
+        
+        # Create missing regular tools
+        for name in missing_regular_tools:
+            config = DEFAULT_TOOLS[name]
+            tool = Tool(
+                schema_name=name,
+                schema_description=config["description"],
+                instruction_string=config["instruction"],
+                json_schema=config["schema"],
+                strict_schema=True,
+                callable=False
+            )
+            db.add(tool)
+            new_tools.append(tool)
+        
+        db.commit()
+        for tool in new_tools:
+            db.refresh(tool)
+        existing_tools.extend(new_tools)
+    
+    # Now get the requested page of regular tools
+    statement = select(Tool).where(Tool.callable == False).offset(skip).limit(limit)
     tools = db.exec(statement).unique().all()
-    return [ToolResponse.from_orm(tool) for tool in tools]
+    
+    responses: List[ToolResponse] = []
+    for tool in tools:
+        if tool.id is not None:  # Only include tools with valid IDs
+            responses.append(ToolResponse(
+                id=tool.id,  # Now guaranteed to be non-None
+                schema_name=tool.schema_name,
+                schema_description=tool.schema_description,
+                instruction_string=tool.instruction_string,
+                json_schema=tool.json_schema,
+                strict_schema=tool.strict_schema,
+                is_callable=tool.callable
+            ))
+    return responses
 
 @router.post("/tools/", response_model=ToolResponse, status_code=status.HTTP_201_CREATED)
 async def create_tool(
@@ -632,6 +705,7 @@ async def send_message(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing message during parallel completion: {str(e)}"
         )
+
     try:
         # Now that we have results, get final state
         with Session(ai_utils.engine) as db:
@@ -909,3 +983,220 @@ async def delete_system_prompt(
     
     db.delete(prompt)
     db.commit()
+
+# Add new response/create models for callable tools
+class CallableToolCreate(BaseModel):
+    name: str
+    description: str
+    function_text: str
+    input_schema: Optional[Dict[str, Any]] = None
+    output_schema: Optional[Dict[str, Any]] = None
+    allow_literal_eval: bool = False
+
+class CallableToolResponse(BaseModel):
+    id: int
+    name: str
+    description: str
+    input_schema: Dict[str, Any]
+    output_schema: Dict[str, Any]
+    is_registered: bool
+
+    class Config:
+        from_attributes = True
+
+# Add new endpoints for callable tools
+@router.post("/callable-tools/", response_model=CallableToolResponse, status_code=status.HTTP_201_CREATED)
+async def create_callable_tool(
+    tool_data: CallableToolCreate,
+    db: DatabaseDep
+) -> CallableToolResponse:
+    """Create a new callable tool"""
+    # Check if tool with same name exists
+    existing = db.exec(
+        select(Tool).where(Tool.schema_name == tool_data.name)
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Tool with name '{tool_data.name}' already exists"
+        )
+    
+    # Create tool from callable
+    try:
+        # First register the function from text
+        CallableRegistry().register_from_text(
+            name=tool_data.name,
+            func_text=tool_data.function_text
+        )
+        
+        # Get the registered callable
+        func = CallableRegistry().get(tool_data.name)
+        if func is None:
+            raise ValueError("Failed to register callable function")
+        
+        # Now create the tool using the callable
+        tool = Tool.from_callable(
+            func=func,
+            schema_name=tool_data.name,
+            schema_description=tool_data.description,
+            json_schema=tool_data.input_schema
+        )
+        
+        db.add(tool)
+        db.commit()
+        db.refresh(tool)
+        
+        if tool.id is None:
+            raise ValueError("Tool ID was not generated")
+            
+        return CallableToolResponse(
+            id=tool.id,
+            name=tool.schema_name,
+            description=tool.schema_description,
+            input_schema=tool.json_schema,
+            output_schema=tool.callable_output_schema or {},
+            is_registered=tool.callable
+        )
+    except Exception as e:
+        # Clean up registry if tool creation fails
+        try:
+            CallableRegistry().delete(tool_data.name)
+        except:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create callable tool: {str(e)}"
+        )
+
+@router.get("/callable-tools/", response_model=List[CallableToolResponse])
+async def list_callable_tools(
+    db: DatabaseDep,
+    skip: int = 0,
+    limit: int = 10
+) -> List[CallableToolResponse]:
+    """List available callable tools, creating defaults if missing"""
+    # First check if we have any callable tools
+    statement = select(Tool).where(Tool.callable == True)
+    existing_tools: List[Tool] = list(db.exec(statement).unique().all())
+    
+    # Get existing callable tool names
+    existing_tool_names = {tool.schema_name for tool in existing_tools}
+    
+    # Check for missing default callable tools
+    missing_callable_tools = set(DEFAULT_CALLABLE_TOOLS.keys()) - existing_tool_names
+    
+    if missing_callable_tools:
+        new_tools: List[Tool] = []
+        
+        # Create missing callable tools
+        for name in missing_callable_tools:
+            config = DEFAULT_CALLABLE_TOOLS[name]
+            try:
+                tool = Tool.from_callable(
+                    func=config["function"],
+                    schema_name=name,
+                    schema_description=config["description"]
+                )
+                tool.allow_literal_eval = config.get("allow_literal_eval", False)
+                db.add(tool)
+                new_tools.append(tool)
+            except Exception as e:
+                print(f"Failed to create callable tool {name}: {str(e)}")
+        
+        db.commit()
+        for tool in new_tools:
+            db.refresh(tool)
+        existing_tools.extend(new_tools)
+    
+    # Now get the requested page of callable tools
+    statement = select(Tool).where(Tool.callable == True).offset(skip).limit(limit)
+    tools = db.exec(statement).unique().all()
+    
+    responses: List[CallableToolResponse] = []
+    for tool in tools:
+        if tool.id is not None:  # Only include tools with valid IDs
+            responses.append(CallableToolResponse(
+                id=tool.id,  # Now guaranteed to be non-None
+                name=tool.schema_name,
+                description=tool.schema_description,
+                input_schema=tool.json_schema,
+                output_schema=tool.callable_output_schema or {},
+                is_registered=tool.callable
+            ))
+    return responses
+
+@router.get("/callable-tools/{tool_id}", response_model=CallableToolResponse)
+async def get_callable_tool(
+    tool_id: int,
+    db: DatabaseDep
+) -> CallableToolResponse:
+    """Get a specific callable tool"""
+    tool = db.get(Tool, tool_id)
+    if not tool or not tool.callable or tool.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Callable tool {tool_id} not found"
+        )
+    
+    return CallableToolResponse(
+        id=tool.id,
+        name=tool.schema_name,
+        description=tool.schema_description,
+        input_schema=tool.json_schema,
+        output_schema=tool.callable_output_schema or {},
+        is_registered=tool.callable
+    )
+
+@router.delete("/callable-tools/{tool_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_callable_tool(
+    tool_id: int,
+    db: DatabaseDep
+) -> None:
+    """Delete a specific callable tool"""
+    tool = db.get(Tool, tool_id)
+    if not tool or not tool.callable or tool.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Callable tool {tool_id} not found"
+        )
+    
+    # Check if tool is in use
+    chats_using_tool = db.exec(
+        select(ChatThread).where(ChatThread.structured_output_id == tool_id)
+    ).first()
+    
+    if chats_using_tool:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Tool {tool_id} is in use by chat threads and cannot be deleted"
+        )
+    
+    # Remove from registry first
+    CallableRegistry().delete(tool.schema_name)
+    
+    db.delete(tool)
+    db.commit()
+
+# Add new endpoint to test callable tools
+@router.post("/callable-tools/{tool_id}/test", response_model=Dict[str, Any])
+async def test_callable_tool(
+    tool_id: int,
+    input_data: Dict[str, Any],
+    db: DatabaseDep
+) -> Dict[str, Any]:
+    """Test a callable tool with sample input"""
+    tool = db.get(Tool, tool_id)
+    if not tool or not tool.callable or tool.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Callable tool {tool_id} not found"
+        )
+    
+    try:
+        result = tool.execute(input=input_data)
+        return {"result": result.content}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to execute tool: {str(e)}"
+        )

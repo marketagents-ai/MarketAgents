@@ -448,6 +448,7 @@ class ChatMessage(SQLModel, table=True):
             return {"role":self.role.value,"content":self.content,"tool_call_id":self.tool_call_id}
         elif self.role == MessageRole.assistant:
             if self.tool_call_id is not None:
+                print(f"tool_call adding proper dictioanry with tool_call_id: {self.tool_call_id} and content: {self.content}")
                 return {"role":self.role.value,"content":self.content,"tool_calls":[{"id":self.tool_call_id,"function":{"arguments":json.dumps(self.tool_call),"name":self.tool_name},"type":"function"}]}
             else:
                 return {"role":self.role.value,"content":self.content}
@@ -646,7 +647,19 @@ class ChatThread (SQLModel, table=True):
             tool_json_schema = None
             tool = self.get_tool_by_name(tool_name)
 
-            if self.llm_config.response_format != ResponseFormat.auto_tools and tool is not None:
+            
+            if self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and tool.callable:
+                assert json_object is not None, "json_object is None, cannot add to history"
+                assistant_message = ChatMessage(
+                    role=MessageRole.assistant, 
+                    content=str_content if str_content else "", 
+                    parent_message_uuid=user_message_uuid,
+                    tool_name=tool_name,
+                    tool_call_id=json_object.tool_call_id,
+                    tool_json_schema=tool.json_schema,
+                    tool_call=json_object.object
+                )
+            elif self.llm_config.response_format != ResponseFormat.auto_tools and tool is not None:
                 print(f"current response format: {self.llm_config.response_format}")
                 assert json_object is not None, "json_object is None, cannot add to history"
                 structured_response = json.dumps(json_object.object)
@@ -657,17 +670,6 @@ class ChatThread (SQLModel, table=True):
                     parent_message_uuid=user_message_uuid,
                     tool_name=tool_name,
                     tool_json_schema=tool_json_schema
-                )
-            elif self.llm_config.response_format == ResponseFormat.auto_tools and tool is not None:
-                assert json_object is not None, "json_object is None, cannot add to history"
-                assistant_message = ChatMessage(
-                    role=MessageRole.assistant, 
-                    content=str_content if str_content else "", 
-                    parent_message_uuid=user_message_uuid,
-                    tool_name=tool_name,
-                    tool_call_id=json_object.tool_call_id,
-                    tool_json_schema=tool.json_schema,
-                    tool_call=json_object.object
                 )
         self.history.append(assistant_message)
         self.processed_outputs.append(llm_output)
