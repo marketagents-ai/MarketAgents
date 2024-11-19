@@ -1,0 +1,1128 @@
+2024-11-19 14:30:31,685 - __main__ - INFO - ======================================
+2024-11-19 14:30:31,685 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:30:31,685 - __main__ - INFO - ======================================
+2024-11-19 14:30:31,687 - __main__ - ERROR - Error in main execution: 5 validation errors for WebSearchConfig
+max_concurrent_requests
+  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='${WEB_SEARCH_MAX_REQUESTS}', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/int_parsing
+rate_limit
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='${WEB_SEARCH_RATE_LIMIT}', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/float_parsing
+content_max_length
+  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='${WEB_SEARCH_CONTENT_LENGTH}', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/int_parsing
+request_timeout
+  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='${WEB_SEARCH_TIMEOUT}', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/int_parsing
+use_ai_summary
+  Input should be a valid boolean, unable to interpret input [type=bool_parsing, input_value='${WEB_SEARCH_USE_AI_SUMMARY}', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/bool_parsing
+2024-11-19 14:31:57,860 - __main__ - INFO - ======================================
+2024-11-19 14:31:57,860 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:31:57,860 - __main__ - INFO - ======================================
+2024-11-19 14:31:57,861 - __main__ - ERROR - Error in main execution: 'bool' object has no attribute 'lower'
+2024-11-19 14:33:14,900 - __main__ - INFO - ======================================
+2024-11-19 14:33:14,900 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:33:14,900 - __main__ - INFO - ======================================
+2024-11-19 14:33:14,903 - __main__ - ERROR - Error in main execution: [Errno 2] No such file or directory: 'urls.json'
+2024-11-19 14:34:55,887 - __main__ - INFO - ======================================
+2024-11-19 14:34:55,887 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:34:55,887 - __main__ - INFO - ======================================
+2024-11-19 14:34:55,889 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 14:34:55,889 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 14:34:55,889 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 14:34:56,771 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2 validation errors for LLMPromptContext
+id
+  Field required [type=missing, input_value={'prompt': 'Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+new_message
+  Field required [type=missing, input_value={'prompt': 'Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 14:34:56,901 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2 validation errors for LLMPromptContext
+id
+  Field required [type=missing, input_value={'prompt': 'Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+new_message
+  Field required [type=missing, input_value={'prompt': 'Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 14:34:58,594 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 2 validation errors for LLMPromptContext
+id
+  Field required [type=missing, input_value={'prompt': 'Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+new_message
+  Field required [type=missing, input_value={'prompt': 'Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 14:34:58,597 - __main__ - INFO - ======================================
+2024-11-19 14:34:58,597 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 14:34:58,597 - __main__ - INFO - ======================================
+2024-11-19 14:34:58,597 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 2.71 seconds
+        - Results saved to: outputs/web_search/results_20241119_143458.json
+        
+2024-11-19 14:39:04,898 - __main__ - INFO - ======================================
+2024-11-19 14:39:04,898 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:39:04,898 - __main__ - INFO - ======================================
+2024-11-19 14:39:04,901 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 14:39:04,901 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 14:39:04,901 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 14:39:05,055 - __main__ - INFO - Fetching URL: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 14:39:05,419 - __main__ - INFO - Fetching URL: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 14:39:05,460 - __main__ - INFO - Fetching URL: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 14:39:05,547 - __main__ - INFO - Status code for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 200
+2024-11-19 14:39:05,563 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 0, message='', url='https://crypto.news/floki-whipsaws-14-on-coinbase-listing/'
+2024-11-19 14:39:05,839 - __main__ - INFO - Status code for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 200
+2024-11-19 14:39:05,891 - __main__ - INFO - Content length for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 4088 characters
+2024-11-19 14:39:05,894 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 2 validation errors for LLMPromptContext
+id
+  Field required [type=missing, input_value={'prompt': "Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+new_message
+  Field required [type=missing, input_value={'prompt': "Summarize the...xt', 'use_cache': True}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 14:39:06,052 - __main__ - INFO - Content length for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 0 characters
+2024-11-19 14:39:06,052 - __main__ - WARNING - No content extracted from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 14:39:06,053 - __main__ - INFO - ======================================
+2024-11-19 14:39:06,053 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 14:39:06,053 - __main__ - INFO - ======================================
+2024-11-19 14:39:06,053 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 1.15 seconds
+        - Results saved to: outputs/web_search/results_20241119_143906.json
+        
+2024-11-19 14:45:47,237 - __main__ - INFO - ======================================
+2024-11-19 14:45:47,237 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:45:47,237 - __main__ - INFO - ======================================
+2024-11-19 14:45:47,240 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 14:45:47,240 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 14:45:47,240 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 14:45:47,387 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 14:45:47,388 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'WebSearchAgent' object has no attribute 'fetch_url_with_playwright'
+2024-11-19 14:45:47,495 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 14:45:47,495 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'WebSearchAgent' object has no attribute 'fetch_url_with_playwright'
+2024-11-19 14:45:47,642 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 14:45:47,642 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 'WebSearchAgent' object has no attribute 'fetch_url_with_playwright'
+2024-11-19 14:45:47,646 - __main__ - INFO - ======================================
+2024-11-19 14:45:47,646 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 14:45:47,646 - __main__ - INFO - ======================================
+2024-11-19 14:45:47,646 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 0.41 seconds
+        - Results saved to: outputs/web_search/results_20241119_144547.json
+        
+2024-11-19 14:48:33,667 - __main__ - INFO - ======================================
+2024-11-19 14:48:33,668 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:48:33,668 - __main__ - INFO - ======================================
+2024-11-19 14:48:33,670 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 14:48:33,671 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 14:48:33,671 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 14:48:33,890 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 14:48:34,042 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 14:48:34,225 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 14:48:35,218 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:48:35,218 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:48:35,218 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:48:35,218 - __main__ - INFO - ======================================
+2024-11-19 14:48:35,219 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 14:48:35,219 - __main__ - INFO - ======================================
+2024-11-19 14:48:35,219 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 1.55 seconds
+        - Results saved to: outputs/web_search/results_20241119_144835.json
+        
+2024-11-19 14:51:30,512 - __main__ - INFO - ======================================
+2024-11-19 14:51:30,512 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:51:30,512 - __main__ - INFO - ======================================
+2024-11-19 14:51:30,515 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 14:51:30,516 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 14:51:30,516 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 14:51:30,660 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 14:51:30,710 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 14:51:31,037 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:51:31,038 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:51:31,086 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 14:51:31,213 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:51:31,215 - __main__ - INFO - ======================================
+2024-11-19 14:51:31,215 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 14:51:31,215 - __main__ - INFO - ======================================
+2024-11-19 14:51:31,215 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 0.70 seconds
+        - Results saved to: outputs/web_search/results_20241119_145131.json
+        
+2024-11-19 14:51:49,088 - __main__ - INFO - ======================================
+2024-11-19 14:51:49,088 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 14:51:49,089 - __main__ - INFO - ======================================
+2024-11-19 14:51:49,091 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 14:51:49,092 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 14:51:49,092 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 14:51:49,357 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 14:51:49,427 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 14:51:49,527 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 14:51:49,733 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:51:49,733 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:51:49,733 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: BrowserType.launch: Executable doesn't exist at /Users/karolbhandari/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+2024-11-19 14:51:49,734 - __main__ - INFO - ======================================
+2024-11-19 14:51:49,734 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 14:51:49,734 - __main__ - INFO - ======================================
+2024-11-19 14:51:49,734 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 0.64 seconds
+        - Results saved to: outputs/web_search/results_20241119_145149.json
+        
+2024-11-19 16:06:41,722 - __main__ - INFO - ======================================
+2024-11-19 16:06:41,722 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:06:41,722 - __main__ - INFO - ======================================
+2024-11-19 16:06:41,725 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:06:41,726 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:06:41,726 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:06:42,020 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:06:42,191 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:06:42,250 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:06:46,581 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:06:46,586 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:06:46,587 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:06:59,093 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:06:59,140 - __main__ - WARNING - No content extracted with Playwright from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:07:16,587 - __main__ - ERROR - Playwright error for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://crypto.news/floki-whipsaws-14-on-coinbase-listing/", waiting until "networkidle"
+
+2024-11-19 16:07:16,598 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 16:07:17,070 - __main__ - INFO - ======================================
+2024-11-19 16:07:17,070 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:07:17,070 - __main__ - INFO - ======================================
+2024-11-19 16:07:17,070 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 3
+        - Failed: 0
+        - Duration: 35.34 seconds
+        - Results saved to: outputs/web_search/results_20241119_160717.json
+        
+2024-11-19 16:16:06,298 - __main__ - INFO - ======================================
+2024-11-19 16:16:06,299 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:16:06,299 - __main__ - INFO - ======================================
+2024-11-19 16:16:06,301 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:16:06,302 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:16:06,302 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:16:06,692 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:16:06,864 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:16:06,897 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:16:07,907 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:16:07,911 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:16:07,911 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:16:20,469 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:16:20,500 - __main__ - ERROR - Error generating AI summary: 1 validation error for LLMPromptContext
+new_message
+  Input should be a valid string [type=string_type, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.8/v/string_type
+2024-11-19 16:16:20,500 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_tolerance'
+2024-11-19 16:16:37,913 - __main__ - ERROR - Playwright error for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://crypto.news/floki-whipsaws-14-on-coinbase-listing/", waiting until "networkidle"
+
+2024-11-19 16:16:37,916 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 16:16:38,327 - __main__ - INFO - ======================================
+2024-11-19 16:16:38,327 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:16:38,327 - __main__ - INFO - ======================================
+2024-11-19 16:16:38,327 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 2
+        - Failed: 1
+        - Duration: 32.02 seconds
+        - Results saved to: outputs/web_search/results_20241119_161638.json
+        
+2024-11-19 16:19:20,948 - __main__ - INFO - ======================================
+2024-11-19 16:19:20,948 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:19:20,949 - __main__ - INFO - ======================================
+2024-11-19 16:19:20,951 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:19:20,951 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:19:20,951 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:19:21,293 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:19:21,362 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:19:21,400 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:19:22,421 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:19:22,425 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:19:22,425 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:19:23,503 - __main__ - INFO - Successfully extracted content from https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 5307 characters
+2024-11-19 16:19:23,534 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:19:27,184 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2484 characters
+2024-11-19 16:19:29,003 - __main__ - ERROR - Error generating AI summary: 6 validation errors for Message
+id
+  Field required [type=missing, input_value={'error': "{'type': 'erro... 'invalid x-api-key'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+content
+  Field required [type=missing, input_value={'error': "{'type': 'erro... 'invalid x-api-key'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+model
+  Field required [type=missing, input_value={'error': "{'type': 'erro... 'invalid x-api-key'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+role
+  Field required [type=missing, input_value={'error': "{'type': 'erro... 'invalid x-api-key'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+type
+  Field required [type=missing, input_value={'error': "{'type': 'erro... 'invalid x-api-key'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+usage
+  Field required [type=missing, input_value={'error': "{'type': 'erro... 'invalid x-api-key'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 16:19:29,003 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:19:29,271 - __main__ - ERROR - Error generating AI summary: 5 validation errors for ChatCompletion
+id
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+choices
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+created
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+model
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+object
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 16:19:29,271 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:19:29,272 - __main__ - ERROR - Error generating AI summary: 5 validation errors for ChatCompletion
+id
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+choices
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+created
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+model
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+object
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 16:19:29,272 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:19:29,273 - __main__ - INFO - ======================================
+2024-11-19 16:19:29,273 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:19:29,274 - __main__ - INFO - ======================================
+2024-11-19 16:19:29,274 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 8.32 seconds
+        - Results saved to: outputs/web_search/results_20241119_161929.json
+        
+2024-11-19 16:22:17,981 - __main__ - INFO - ======================================
+2024-11-19 16:22:17,981 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:22:17,981 - __main__ - INFO - ======================================
+2024-11-19 16:22:17,983 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:22:17,984 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:22:17,984 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:22:18,268 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:22:18,531 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:22:18,569 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:22:19,378 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:22:19,382 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:22:19,383 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:22:20,610 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2146 characters
+2024-11-19 16:22:20,946 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:22:22,425 - __main__ - ERROR - Error in AI summary generation: 5 validation errors for ChatCompletion
+id
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+choices
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+created
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+model
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+object
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 16:22:22,425 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:22:23,006 - __main__ - ERROR - Error in AI summary generation: 'f43cd9fa-b429-498d-a8da-1600a3e055cd'
+2024-11-19 16:22:23,006 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:22:23,447 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.wait_for_selector: Timeout 3000ms exceeded.
+Call log:
+waiting for locator("article, main, .post-content, .article-content, .entry-content, p") to be visible
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+
+2024-11-19 16:22:24,162 - __main__ - INFO - ======================================
+2024-11-19 16:22:24,162 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:22:24,163 - __main__ - INFO - ======================================
+2024-11-19 16:22:24,163 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 6.18 seconds
+        - Results saved to: outputs/web_search/results_20241119_162224.json
+        
+2024-11-19 16:37:09,161 - __main__ - INFO - ======================================
+2024-11-19 16:37:09,161 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:37:09,161 - __main__ - INFO - ======================================
+2024-11-19 16:37:09,164 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:37:09,164 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:37:09,164 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:37:09,305 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:37:09,385 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:37:09,388 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:37:10,504 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:37:10,508 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:37:10,509 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:37:11,527 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:37:11,743 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2146 characters
+2024-11-19 16:37:12,867 - __main__ - INFO - Successfully extracted content from https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 5307 characters
+2024-11-19 16:37:14,053 - __main__ - ERROR - Error in AI summary generation: 5 validation errors for ChatCompletion
+id
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+choices
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+created
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+model
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+object
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 16:37:14,053 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:37:14,131 - __main__ - ERROR - Error in AI summary generation: '17713ef3-e03d-49fe-ad4e-874744ce96be'
+2024-11-19 16:37:14,131 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:37:14,432 - __main__ - ERROR - Error in AI summary generation: 5 validation errors for ChatCompletion
+id
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+choices
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+created
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+model
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+object
+  Field required [type=missing, input_value={'error': "{'error': {'me...': 'model_not_found'}}"}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-19 16:37:14,432 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:37:14,433 - __main__ - INFO - ======================================
+2024-11-19 16:37:14,433 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:37:14,434 - __main__ - INFO - ======================================
+2024-11-19 16:37:14,434 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 5.27 seconds
+        - Results saved to: outputs/web_search/results_20241119_163714.json
+        
+2024-11-19 16:39:20,369 - __main__ - INFO - ======================================
+2024-11-19 16:39:20,369 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:39:20,369 - __main__ - INFO - ======================================
+2024-11-19 16:39:20,371 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:39:20,372 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:39:20,372 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:39:20,561 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:39:20,778 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:39:20,832 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:39:21,749 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:39:21,753 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:39:21,753 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:39:22,360 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2146 characters
+2024-11-19 16:39:22,663 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:39:24,024 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:39:24,203 - __main__ - ERROR - Error in AI summary generation: 'f8bc984b-97bf-4201-b916-c4ab13f4e5e1'
+2024-11-19 16:39:24,203 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:39:26,426 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.wait_for_selector: Timeout 3000ms exceeded.
+Call log:
+waiting for locator("article, main, .post-content, .article-content, .entry-content, p") to be visible
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+
+2024-11-19 16:39:27,369 - __main__ - INFO - ======================================
+2024-11-19 16:39:27,369 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:39:27,369 - __main__ - INFO - ======================================
+2024-11-19 16:39:27,369 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 7.00 seconds
+        - Results saved to: outputs/web_search/results_20241119_163927.json
+        
+2024-11-19 16:41:38,028 - __main__ - INFO - ======================================
+2024-11-19 16:41:38,028 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:41:38,028 - __main__ - INFO - ======================================
+2024-11-19 16:41:38,031 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:41:38,031 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:41:38,031 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:41:38,137 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:41:38,272 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:41:38,272 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:41:39,474 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:41:39,477 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:41:39,478 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:41:40,784 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2146 characters
+2024-11-19 16:41:41,091 - __main__ - INFO - Successfully extracted content from https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 5347 characters
+2024-11-19 16:41:41,101 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:41:42,235 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:41:42,743 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:41:42,987 - __main__ - ERROR - Error in AI summary generation: '19f7e7ea-4c96-4fd4-9d68-e5867f2ccc45'
+2024-11-19 16:41:42,987 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:41:42,989 - __main__ - INFO - ======================================
+2024-11-19 16:41:42,989 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:41:42,989 - __main__ - INFO - ======================================
+2024-11-19 16:41:42,989 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 4.96 seconds
+        - Results saved to: outputs/web_search/results_20241119_164142.json
+        
+2024-11-19 16:46:07,936 - __main__ - INFO - ======================================
+2024-11-19 16:46:07,937 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:46:07,937 - __main__ - INFO - ======================================
+2024-11-19 16:46:07,939 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:46:07,939 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:46:07,939 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:46:08,077 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:46:08,145 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:46:08,359 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:46:09,316 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:46:09,319 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:46:09,320 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:46:10,268 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:46:10,570 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2146 characters
+2024-11-19 16:46:10,721 - __main__ - INFO - Successfully extracted content from https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 5318 characters
+2024-11-19 16:46:11,222 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:46:11,317 - __main__ - ERROR - Error in AI summary generation: 'b21e8ce5-014d-442f-8f84-a6fe09582acf'
+2024-11-19 16:46:11,317 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:46:11,431 - __main__ - ERROR - Error in AI summary generation: 'b21e8ce5-014d-442f-8f84-a6fe09582acf'
+2024-11-19 16:46:11,431 - __main__ - ERROR - Error fetching https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:46:11,433 - __main__ - INFO - ======================================
+2024-11-19 16:46:11,433 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:46:11,433 - __main__ - INFO - ======================================
+2024-11-19 16:46:11,433 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 0
+        - Failed: 3
+        - Duration: 3.49 seconds
+        - Results saved to: outputs/web_search/results_20241119_164611.json
+        
+2024-11-19 16:47:31,077 - __main__ - INFO - ======================================
+2024-11-19 16:47:31,077 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:47:31,077 - __main__ - INFO - ======================================
+2024-11-19 16:47:31,079 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:47:31,080 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:47:31,080 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:47:31,187 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:47:31,397 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:47:31,441 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:47:32,357 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:47:32,361 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:47:32,362 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:47:33,057 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2146 characters
+2024-11-19 16:47:33,508 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:47:34,644 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:47:34,676 - __main__ - ERROR - Error in AI summary generation: '2c897ff8-da93-4a03-8db7-e09db142077d'
+2024-11-19 16:47:34,676 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:47:36,633 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.wait_for_selector: Timeout 3000ms exceeded.
+Call log:
+waiting for locator("article, main, .post-content, .article-content, .entry-content, p") to be visible
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+
+2024-11-19 16:47:37,416 - __main__ - INFO - ======================================
+2024-11-19 16:47:37,416 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:47:37,417 - __main__ - INFO - ======================================
+2024-11-19 16:47:37,417 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 6.34 seconds
+        - Results saved to: outputs/web_search/results_20241119_164737.json
+        
+2024-11-19 16:49:31,982 - __main__ - INFO - ======================================
+2024-11-19 16:49:31,983 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:49:31,983 - __main__ - INFO - ======================================
+2024-11-19 16:49:31,985 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:49:31,985 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:49:31,985 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:49:32,135 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:49:32,540 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:49:32,555 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:49:33,325 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:49:33,329 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:49:33,329 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:49:33,983 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2146 characters
+2024-11-19 16:49:34,457 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:49:35,132 - __main__ - INFO - Successfully generated summary for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:49:35,133 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:49:35,932 - __main__ - ERROR - Error in AI summary generation for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: '1b995392-1051-434e-88b3-dd065f0c93c5'
+2024-11-19 16:49:35,933 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:49:37,545 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.wait_for_selector: Timeout 3000ms exceeded.
+Call log:
+waiting for locator("article, main, .post-content, .article-content, .entry-content, p") to be visible
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 117 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+  -   locator resolved to 119 elements. Proceeding with the first one: <p class="CybotCookiebotDialogDetailBodyContentCookieProviderDescription">Some of the data collected by this provider is fo…</p>
+
+2024-11-19 16:49:37,809 - __main__ - INFO - ======================================
+2024-11-19 16:49:37,809 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:49:37,809 - __main__ - INFO - ======================================
+2024-11-19 16:49:37,809 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 5.82 seconds
+        - Results saved to: outputs/web_search/results_20241119_164937.json
+        
+2024-11-19 16:52:02,154 - __main__ - INFO - ======================================
+2024-11-19 16:52:02,154 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:52:02,154 - __main__ - INFO - ======================================
+2024-11-19 16:52:02,156 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:52:02,156 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:52:02,157 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:52:02,305 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:52:02,408 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:52:02,676 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:52:03,534 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:52:03,543 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:52:03,544 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:52:07,235 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:52:08,760 - __main__ - INFO - Successfully generated summary for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:52:08,761 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:52:10,452 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2480 characters
+2024-11-19 16:52:11,634 - __main__ - INFO - Successfully generated summary for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:52:11,634 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:52:33,550 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 16:52:34,507 - __main__ - INFO - ======================================
+2024-11-19 16:52:34,508 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:52:34,508 - __main__ - INFO - ======================================
+2024-11-19 16:52:34,508 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 32.35 seconds
+        - Results saved to: outputs/web_search/results_20241119_165234.json
+        
+2024-11-19 16:54:56,797 - __main__ - INFO - ======================================
+2024-11-19 16:54:56,798 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
+2024-11-19 16:54:56,798 - __main__ - INFO - ======================================
+2024-11-19 16:54:56,800 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:54:56,800 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:54:56,800 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:54:57,016 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:54:57,147 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:54:57,226 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:54:58,219 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:54:58,224 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:54:58,224 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:55:01,118 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:55:02,478 - __main__ - ERROR - Error in AI summary generation for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'LLMOutput' object has no attribute 'content'
+2024-11-19 16:55:02,479 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:55:04,963 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2478 characters
+2024-11-19 16:55:06,131 - __main__ - ERROR - Error in AI summary generation for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'LLMOutput' object has no attribute 'content'
+2024-11-19 16:55:06,131 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:55:28,226 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 16:55:29,159 - __main__ - ERROR - Error in main execution: 'WebSearchAgent' object has no attribute 'save_results'
+2024-11-19 16:57:50,467 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 16:57:50,468 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 16:57:50,468 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 16:57:50,706 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 16:57:50,869 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 16:57:50,989 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 16:57:51,969 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 16:57:51,973 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 16:57:51,974 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 16:57:54,789 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 16:57:56,376 - __main__ - INFO - 
+                Successfully generated summary for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/:
+                ----------------------------------------
+                raw_result={'id': 'chatcmpl-AVGS8SmrcmGVE32mFrsVAuDLVeJf1', 'object': 'chat.completion', 'created': 1732014776, 'model': 'gpt-4o-mini-2024-07-18', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': 'Hello! How can I assist you today?', 'refusal': None}, 'logprobs': None, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 7, 'completion_tokens': 9, 'total_tokens': 16, 'prompt_tokens_details': {'cached_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 0, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_0705bf87c0'} completion_kwargs={'model': 'gpt-4o-mini', 'messages': [{'role': 'user', 'content': ''}], 'max_tokens': 500, 'temperature': 0.7, 'response_format': {'type': 'text'}} start_time=1732014774.834611 end_time=1732014776.3693068 source_id='299770f7-6c88-4c1f-888c-5c5565ef6a72' client='openai' str_content='Hello! How can I assist you today?' json_object=None error=None contains_object=False usage=Usage(prompt_tokens=7, completion_tokens=9, total_tokens=16, cache_creation_input_tokens=None, cache_read_input_tokens=None) result_provider='openai'
+                ----------------------------------------
+                
+2024-11-19 16:57:56,376 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:57:56,687 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2476 characters
+2024-11-19 16:57:58,013 - __main__ - INFO - 
+                Successfully generated summary for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/:
+                ----------------------------------------
+                raw_result={'id': 'chatcmpl-AVGS98HA6l8XCZDWhtX55PzkR7XeY', 'object': 'chat.completion', 'created': 1732014777, 'model': 'gpt-4o-mini-2024-07-18', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': 'Hello! How can I assist you today?', 'refusal': None}, 'logprobs': None, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 7, 'completion_tokens': 9, 'total_tokens': 16, 'prompt_tokens_details': {'cached_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 0, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_0ba0d124f1'} completion_kwargs={'model': 'gpt-4o-mini', 'messages': [{'role': 'user', 'content': ''}], 'max_tokens': 500, 'temperature': 0.7, 'response_format': {'type': 'text'}} start_time=1732014776.7203069 end_time=1732014778.0112371 source_id='9ec523b9-d9c8-4ac7-8803-a51776633e1d' client='openai' str_content='Hello! How can I assist you today?' json_object=None error=None contains_object=False usage=Usage(prompt_tokens=7, completion_tokens=9, total_tokens=16, cache_creation_input_tokens=None, cache_read_input_tokens=None) result_provider='openai'
+                ----------------------------------------
+                
+2024-11-19 16:57:58,013 - __main__ - ERROR - Error fetching https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 'Persona' object has no attribute 'risk_appetite'
+2024-11-19 16:58:21,976 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 16:58:22,861 - __main__ - INFO - 
+Article Summaries:
+2024-11-19 16:58:22,861 - __main__ - INFO - ======================================
+2024-11-19 16:58:22,861 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 16:58:22,861 - __main__ - INFO - ======================================
+2024-11-19 16:58:22,861 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 32.39 seconds
+        - Results saved to: outputs/web_search/results_20241119_165822.json
+        
+2024-11-19 17:01:45,957 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:01:45,958 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:01:45,958 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:01:46,111 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 17:01:46,273 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 17:01:46,346 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 17:01:47,316 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:01:47,320 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:01:47,320 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:01:49,664 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:01:51,325 - __main__ - WARNING - No summary generated for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 17:02:17,323 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 17:02:17,325 - __main__ - ERROR - Playwright error for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://crypto.news/floki-whipsaws-14-on-coinbase-listing/", waiting until "networkidle"
+
+2024-11-19 17:02:18,023 - __main__ - INFO - 
+Article Summaries:
+2024-11-19 17:02:18,023 - __main__ - INFO - ======================================
+2024-11-19 17:02:18,023 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 17:02:18,023 - __main__ - INFO - ======================================
+2024-11-19 17:02:18,023 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 3
+        - Failed: 0
+        - Duration: 32.06 seconds
+        - Results saved to: outputs/web_search/results_20241119_170218.json
+        
+2024-11-19 17:06:12,430 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:06:12,430 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:06:12,430 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:06:12,813 - __main__ - INFO - Fetching URL with Playwright: https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/
+2024-11-19 17:06:12,887 - __main__ - INFO - Fetching URL with Playwright: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 17:06:13,035 - __main__ - INFO - Fetching URL with Playwright: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 17:06:14,089 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:06:14,093 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:06:14,094 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:06:17,027 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:06:19,004 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2476 characters
+2024-11-19 17:06:23,663 - __main__ - INFO - 
+    === Summary for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ ===
+    raw_result={'id': 'chatcmpl-AVGaFCxA4HIuZa3azefS0fR3w7XF8', 'object': 'chat.completion', 'created': 1732015279, 'model': 'gpt-4o-mini-2024-07-18', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': "### 1. Summary\nThe cryptocurrency Floki experienced a 21% surge following its listing on Coinbase, highlighting the exchange's recent trend of adding popular meme coins, including PEPE just days prior. Increased market activity, alongside speculation about a favorable regulatory environment under Donald Trump's administration, suggests a growing interest in meme coins in the current crypto landscape.\n\n### 2. Key Points\n- Floki's price jumped over 21% after Coinbase announced its upcoming trading support.\n- This event followed the recent listing of PEPE on Coinbase, which also saw a significant price increase.\n- Speculation about regulatory changes under the Trump administration may be influencing crypto market dynamics.\n- Other exchanges like Robinhood and Binance are also actively listing meme coins, contributing to market volatility.\n\n### 3. Market Impact\nThe listing of Floki and other meme coins has contributed to a market-wide recovery, particularly benefiting altcoins and meme tokens. Bitcoin's recent performance, with a market cap surpassing $1.8 trillion, has further fueled interest in the meme coin sector, with liquidity flowing into ecosystems like Ethereum and Solana.\n\n### 4. Trading Implications\nTraders may consider the recent surge in meme coins as a signal for potential short-term gains, especially in a favorable regulatory climate. The rapid price movements of tokens like Floki and PEPE suggest heightened volatility, prompting traders to exercise caution and possibly employ strategies like stop-loss orders to manage risk. Investors might also look to capitalize on the momentum of new listings on major exchanges.", 'refusal': None}, 'logprobs': None, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 743, 'completion_tokens': 306, 'total_tokens': 1049, 'prompt_tokens_details': {'cached_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 0, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_0705bf87c0'} completion_kwargs={'model': 'gpt-4o-mini', 'messages': [{'role': 'user', 'content': 'Please provide a concise analysis of this cryptocurrency article:\n\n    Content:\n    Floki whipsaws 14% on Coinbase listing\nBy Naga Avan-Nomayo\nNovember 15, 2024 at 9:36 pm\nEdited by Jayson Derrick\nMARKETS\n\nshare\n\nCoinbase meme coin Floki to its listing roadmap two days after announcing PEPE trading on the largest U.S. centralized crypto exchange.\n\nFloki \nFLOKI\n-4.36%\nFLOKI\n surged over 21% in one hour as Coinbase posted about upcoming trading support for the\xa0 $2.7 billion meme coin. The timing of the news coincided with a market-wide recovery, bolstering FLOKI’s price hike.\n\nhttps://twitter.com/CoinbaseAssets/status/1857513967444230566\n\nIt’s the second time Coinbase has added crypto’s older meme tokens. On Nov. 13, the exchange listed Pepe-The-Frog-inspired \nPEPE\n-4.41%\nPepe\n. Data showed that PEPE reached a new all-time high shortly after.\n\nSocial media users speculated that a relaxed regulatory environment under President Donald Trump’s administration steered crypto businesses toward more expansive decisions.\n\nRobinhood U.S. also listed PEPE alongside Coinbase. Binance has listed several meme coins, although some of its choices were deemed contentious.\n\n24-hour FLOKI price chart – Nov. 15 | Source: crypto.news\nYou might also like:\nNews PEPE surges 42% on Coinbase and Robinhood listing\n\nBinance recently announced spot listings for newer low-cap memes like (PNUT) and \nNEIRO\n0.07%\nNeiro\n. Reactions to the platform’s additions ranged from outrage at supposed insider trading to bullish rallying cries calling for more meme coin exposure.\n\nCryptocurrency excitement conjured by Bitcoin’s \nBTC\n0.58%\nBitcoin\n blast to a $1.8 trillion market cap has been akin to rocket fuel for memes and altcoins. Memes on Ethereum \nETH\n1.13%\nEthereum\n and Solana \nSOL\n0.17%\nSolana\n reached new highs as Bitcoin reclaimed above $90,000.\n\nThe largest meme coins may run atop Ethereum, like Dogecoin \nDOGE\n4.62%\nDogecoin\n and PEPE. Nonetheless, staggering liquidity has flowed into Solana’s ecosystem.\n\nSuccess stories such as Dogwifhat \nWIF\n-5.28%\ndogwifhat\n and Bonk \nBONK\n1.97%\nBonk\n spurred service providers like Pump.fun, an on-chain launchpad for memecoins. Users used the platform to issue thousands of tokens, Pump.fun generated $100 million in revenue within its first few months.\n\nRead more:\nFederal prosecutors to downsize crypto lawsuits\nFLOKI\n-4.36%\nFLOKI\nPEPE\n-4.41%\nPepe\nNEIRO\n0.07%\nNeiro\nBTC\n0.58%\nBitcoin\nETH\n1.13%\nEthereum\nSOL\n0.17%\nSolana\nDOGE\n4.62%\nDogecoin\nWIF\n-5.28%\ndogwifhat\nBONK\n1.97%\nBonk\n\nREAD MORE ABOUT\n\ncoinbase\nfloki\nmeme coin\n\n    Please provide your analysis in the following format:\n    1. Summary (2-3 sentences)\n    2. Key Points\n    3. Market Impact\n    4. Trading Implications\n\n    Keep the analysis clear and focused on the most important information.'}], 'max_tokens': 500, 'temperature': 0.7, 'response_format': {'type': 'text'}} start_time=1732015279.040823 end_time=1732015283.6528199 source_id='83cc1779-9a75-4742-9f42-273a32760ef0' client='openai' str_content="### 1. Summary\nThe cryptocurrency Floki experienced a 21% surge following its listing on Coinbase, highlighting the exchange's recent trend of adding popular meme coins, including PEPE just days prior. Increased market activity, alongside speculation about a favorable regulatory environment under Donald Trump's administration, suggests a growing interest in meme coins in the current crypto landscape.\n\n### 2. Key Points\n- Floki's price jumped over 21% after Coinbase announced its upcoming trading support.\n- This event followed the recent listing of PEPE on Coinbase, which also saw a significant price increase.\n- Speculation about regulatory changes under the Trump administration may be influencing crypto market dynamics.\n- Other exchanges like Robinhood and Binance are also actively listing meme coins, contributing to market volatility.\n\n### 3. Market Impact\nThe listing of Floki and other meme coins has contributed to a market-wide recovery, particularly benefiting altcoins and meme tokens. Bitcoin's recent performance, with a market cap surpassing $1.8 trillion, has further fueled interest in the meme coin sector, with liquidity flowing into ecosystems like Ethereum and Solana.\n\n### 4. Trading Implications\nTraders may consider the recent surge in meme coins as a signal for potential short-term gains, especially in a favorable regulatory climate. The rapid price movements of tokens like Floki and PEPE suggest heightened volatility, prompting traders to exercise caution and possibly employ strategies like stop-loss orders to manage risk. Investors might also look to capitalize on the momentum of new listings on major exchanges." json_object=None error=None contains_object=False usage=Usage(prompt_tokens=743, completion_tokens=306, total_tokens=1049, cache_creation_input_tokens=None, cache_read_input_tokens=None) result_provider='openai'
+    =====================================
+                
+2024-11-19 17:06:25,614 - __main__ - INFO - 
+    === Summary for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ ===
+    raw_result={'id': 'chatcmpl-AVGaEfMl4d9cPrSaQvY51BJ6K5lkk', 'object': 'chat.completion', 'created': 1732015278, 'model': 'gpt-4o-mini-2024-07-18', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '### Analysis of GoPlus SafeToken Protocol Launch\n\n1. **Summary**: GoPlus has launched the SafeToken Protocol, aimed at facilitating the issuance of compliant memecoins through a standardized and permissionless smart contract framework. This new protocol enhances user security and liquidity management within the Web3 ecosystem, catering to developers and project creators in the cryptocurrency space.\n\n2. **Key Points**:\n   - **Open-Source Framework**: SafeToken Protocol provides a library of secure smart contract templates for easy token issuance.\n   - **Liquidity Management Tool**: SafeToken Locker offers reduced fees and flexible lock durations for liquidity management, allowing projects to earn rewards while securing their liquidity.\n   - **Risk Mitigation**: The protocol is designed to minimize risks associated with token issuance, such as contract vulnerabilities.\n   - **EVM-Compatible**: This design allows for efficient and secure token launches across various blockchain networks.\n\n3. **Market Impact**: The introduction of SafeToken Protocol could enhance the overall security of memecoins and tokens in the cryptocurrency market, potentially increasing investor confidence. The focus on low-cost liquidity management may attract more projects to utilize this protocol, leading to a surge in compliant token launches.\n\n4. **Trading Implications**: As the SafeToken Protocol gains traction, it may influence the trading volume and market dynamics of memecoins. Investors may gravitate towards tokens issued under this protocol due to perceived lower risks and enhanced liquidity options, impacting price performance and trading strategies in the memecoin sector.', 'refusal': None}, 'logprobs': None, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 589, 'completion_tokens': 303, 'total_tokens': 892, 'prompt_tokens_details': {'cached_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 0, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_9b78b61c52'} completion_kwargs={'model': 'gpt-4o-mini', 'messages': [{'role': 'user', 'content': 'Please provide a concise analysis of this cryptocurrency article:\n\n    Content:\n    Singapore, Singapore, October 29th, 2024, Chainwire\n\n\n\n\nWeb3 user security platform GoPlus has announced the launch of SafeToken Protocol, a token issuance protocol for memecoins. SafeToken enables any third party to issue a compliant memecoin using a standardized, permissionless smart contract.\n\nAs an open-source and permissionless framework, SafeToken Protocol offers a comprehensive library of secure smart contract templates, accessible to developers seeking a streamlined token issuance solution. Already supported by various platforms, including DEX aggregators and Web3 wallets, the protocol enables seamless integration for a safer and more standardized ecosystem for token launches across multiple blockchain networks.\n\nDesigned to mitigate risks such as contract backdoors, SafeToken Protocol also includes SafeToken Locker, an advanced liquidity management tool offering reduced fees and flexible lock durations. This empowers projects to lock liquidity while earning rewards, catering to diverse business needs for token issuers.\n\nWith SafeToken Locker, GoPlus addresses a critical need for low-cost liquidity management, providing compatibility with major decentralized exchanges and a flexible, user-friendly approach to liquidity locking and rewards.\n\nGoPlus Co-Founder Eskil Tsu said: “SafeToken Protocol was created to set a new benchmark in token security while addressing practical business needs, such as liquidity management. We’re proud to bring this protocol to market and to support the development of a safer Web3 for all users.”\n\nWith its EVM-compatible design, SafeToken Protocol provides a robust solution for secure token issuance, allowing projects to maximize both efficiency and user safety. It establishes a new security standard in token issuance by enabling projects to launch assets swiftly and securely. For more information on GoPlus SafeToken Protocol, visit https://gopluslabs.io/safe-token-protocol.\n\n\n\n\nAbout GoPlus Security\n\nGoPlus is a Web3 user security company committed to ensuring the safety of the Web3 ecosystem. We have developed a comprehensive suite of security infrastructure tailored to major wallets, DEXes, DeFi protocols, public blockchains, and launchpads. Guided by our motto, "Protect your every transaction," we launched an easy-to-use consumer product this year that has already attracted over 12 million wallets, empowering users to secure their daily transactions.\n\nOfficial Website | GoPlus Twitter\xa0\n\n\n\n\n\n\n\n\nContactMarketAcross\npr@marketacross.com\n\n\n\nDisclaimer. This is a paid press release. CoinMarketCap does not recommend that any cryptocurrency (bitcoin, ethereum, custom asset) should be bought, sold or held. Do conduct your own due diligence and consult your financial advisor before making any investment decisions.\n\n    Please provide your analysis in the following format:\n    1. Summary (2-3 sentences)\n    2. Key Points\n    3. Market Impact\n    4. Trading Implications\n\n    Keep the analysis clear and focused on the most important information.'}], 'max_tokens': 500, 'temperature': 0.7, 'response_format': {'type': 'text'}} start_time=1732015277.084 end_time=1732015285.612023 source_id='c443a431-ec00-4971-a18a-4868b2fcdff5' client='openai' str_content='### Analysis of GoPlus SafeToken Protocol Launch\n\n1. **Summary**: GoPlus has launched the SafeToken Protocol, aimed at facilitating the issuance of compliant memecoins through a standardized and permissionless smart contract framework. This new protocol enhances user security and liquidity management within the Web3 ecosystem, catering to developers and project creators in the cryptocurrency space.\n\n2. **Key Points**:\n   - **Open-Source Framework**: SafeToken Protocol provides a library of secure smart contract templates for easy token issuance.\n   - **Liquidity Management Tool**: SafeToken Locker offers reduced fees and flexible lock durations for liquidity management, allowing projects to earn rewards while securing their liquidity.\n   - **Risk Mitigation**: The protocol is designed to minimize risks associated with token issuance, such as contract vulnerabilities.\n   - **EVM-Compatible**: This design allows for efficient and secure token launches across various blockchain networks.\n\n3. **Market Impact**: The introduction of SafeToken Protocol could enhance the overall security of memecoins and tokens in the cryptocurrency market, potentially increasing investor confidence. The focus on low-cost liquidity management may attract more projects to utilize this protocol, leading to a surge in compliant token launches.\n\n4. **Trading Implications**: As the SafeToken Protocol gains traction, it may influence the trading volume and market dynamics of memecoins. Investors may gravitate towards tokens issued under this protocol due to perceived lower risks and enhanced liquidity options, impacting price performance and trading strategies in the memecoin sector.' json_object=None error=None contains_object=False usage=Usage(prompt_tokens=589, completion_tokens=303, total_tokens=892, cache_creation_input_tokens=None, cache_read_input_tokens=None) result_provider='openai'
+    =====================================
+                
+2024-11-19 17:06:44,096 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 17:06:44,978 - __main__ - INFO - 
+Article Summaries:
+2024-11-19 17:06:44,978 - __main__ - INFO - ======================================
+2024-11-19 17:06:44,978 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 17:06:44,978 - __main__ - INFO - ======================================
+2024-11-19 17:06:44,978 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 3
+        - Failed: 0
+        - Duration: 32.55 seconds
+        - Results saved to: outputs/web_search/results_20241119_170644.json
+        
+2024-11-19 17:09:45,647 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:09:45,647 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:09:45,647 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:09:45,656 - __main__ - ERROR - Error in main execution: WebSearchAgent.fetch_url() takes 3 positional arguments but 4 were given
+2024-11-19 17:10:48,045 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:10:48,045 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:10:48,045 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:10:49,272 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:10:49,276 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:10:49,277 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:10:52,837 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:10:54,097 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2474 characters
+2024-11-19 17:10:58,192 - __main__ - INFO - 
+    === Summary for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ ===
+    raw_result={'id': 'chatcmpl-AVGegWTk3I746uSInAyknph2u5uKj', 'object': 'chat.completion', 'created': 1732015554, 'model': 'gpt-4o-mini-2024-07-18', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '### 1. Summary\nGoPlus has launched the SafeToken Protocol, a new framework for issuing compliant memecoins using secure and standardized smart contracts. This open-source platform aims to enhance user security in the Web3 space by offering tools for liquidity management and reducing risks associated with token issuance.\n\n### 2. Key Points\n- **SafeToken Protocol**: A permissionless and open-source framework for memecoin issuance that includes secure smart contract templates.\n- **Liquidity Management**: Features SafeToken Locker, which allows for flexible liquidity locking and rewards with reduced fees.\n- **Integration**: The protocol is compatible with major decentralized exchanges and Web3 wallets, facilitating easy adoption.\n- **Security Focus**: Designed to mitigate risks such as contract vulnerabilities and backdoors.\n\n### 3. Market Impact\nThe introduction of SafeToken Protocol could standardize the memecoin issuance process, potentially leading to a safer and more regulated environment for new tokens. By addressing security concerns, it may attract more developers to launch projects on this framework, fostering growth in the memecoin sector while also enhancing overall market confidence.\n\n### 4. Trading Implications\nTraders may view the SafeToken Protocol as a positive development, potentially leading to increased interest in memecoins as they become more secure and compliant. The liquidity management features could also affect trading strategies, as projects utilizing SafeToken may have improved price stability and reduced volatility, making them more appealing to investors.', 'refusal': None}, 'logprobs': None, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 589, 'completion_tokens': 289, 'total_tokens': 878, 'prompt_tokens_details': {'cached_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 0, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_9b78b61c52'} completion_kwargs={'model': 'gpt-4o-mini', 'messages': [{'role': 'user', 'content': 'Please provide a concise analysis of this cryptocurrency article:\n\n    Content:\n    Singapore, Singapore, October 29th, 2024, Chainwire\n\n\n\n\nWeb3 user security platform GoPlus has announced the launch of SafeToken Protocol, a token issuance protocol for memecoins. SafeToken enables any third party to issue a compliant memecoin using a standardized, permissionless smart contract.\n\nAs an open-source and permissionless framework, SafeToken Protocol offers a comprehensive library of secure smart contract templates, accessible to developers seeking a streamlined token issuance solution. Already supported by various platforms, including DEX aggregators and Web3 wallets, the protocol enables seamless integration for a safer and more standardized ecosystem for token launches across multiple blockchain networks.\n\nDesigned to mitigate risks such as contract backdoors, SafeToken Protocol also includes SafeToken Locker, an advanced liquidity management tool offering reduced fees and flexible lock durations. This empowers projects to lock liquidity while earning rewards, catering to diverse business needs for token issuers.\n\nWith SafeToken Locker, GoPlus addresses a critical need for low-cost liquidity management, providing compatibility with major decentralized exchanges and a flexible, user-friendly approach to liquidity locking and rewards.\n\nGoPlus Co-Founder Eskil Tsu said: “SafeToken Protocol was created to set a new benchmark in token security while addressing practical business needs, such as liquidity management. We’re proud to bring this protocol to market and to support the development of a safer Web3 for all users.”\n\nWith its EVM-compatible design, SafeToken Protocol provides a robust solution for secure token issuance, allowing projects to maximize both efficiency and user safety. It establishes a new security standard in token issuance by enabling projects to launch assets swiftly and securely. For more information on GoPlus SafeToken Protocol, visit https://gopluslabs.io/safe-token-protocol.\n\n\n\n\nAbout GoPlus Security\n\nGoPlus is a Web3 user security company committed to ensuring the safety of the Web3 ecosystem. We have developed a comprehensive suite of security infrastructure tailored to major wallets, DEXes, DeFi protocols, public blockchains, and launchpads. Guided by our motto, "Protect your every transaction," we launched an easy-to-use consumer product this year that has already attracted over 12 million wallets, empowering users to secure their daily transactions.\n\nOfficial Website | GoPlus Twitter\xa0\n\n\n\n\n\n\n\n\nContactMarketAcross\npr@marketacross.com\n\n\n\nDisclaimer. This is a paid press release. CoinMarketCap does not recommend that any cryptocurrency (bitcoin, ethereum, custom asset) should be bought, sold or held. Do conduct your own due diligence and consult your financial advisor before making any investment decisions.\n\n    Please provide your analysis in the following format:\n    1. Summary (2-3 sentences)\n    2. Key Points\n    3. Market Impact\n    4. Trading Implications\n\n    Keep the analysis clear and focused on the most important information.'}], 'max_tokens': 500, 'temperature': 0.7, 'response_format': {'type': 'text'}} start_time=1732015552.8798668 end_time=1732015558.182753 source_id='a785a7be-92f7-409a-8aac-adb1aa25d4e0' client='openai' str_content='### 1. Summary\nGoPlus has launched the SafeToken Protocol, a new framework for issuing compliant memecoins using secure and standardized smart contracts. This open-source platform aims to enhance user security in the Web3 space by offering tools for liquidity management and reducing risks associated with token issuance.\n\n### 2. Key Points\n- **SafeToken Protocol**: A permissionless and open-source framework for memecoin issuance that includes secure smart contract templates.\n- **Liquidity Management**: Features SafeToken Locker, which allows for flexible liquidity locking and rewards with reduced fees.\n- **Integration**: The protocol is compatible with major decentralized exchanges and Web3 wallets, facilitating easy adoption.\n- **Security Focus**: Designed to mitigate risks such as contract vulnerabilities and backdoors.\n\n### 3. Market Impact\nThe introduction of SafeToken Protocol could standardize the memecoin issuance process, potentially leading to a safer and more regulated environment for new tokens. By addressing security concerns, it may attract more developers to launch projects on this framework, fostering growth in the memecoin sector while also enhancing overall market confidence.\n\n### 4. Trading Implications\nTraders may view the SafeToken Protocol as a positive development, potentially leading to increased interest in memecoins as they become more secure and compliant. The liquidity management features could also affect trading strategies, as projects utilizing SafeToken may have improved price stability and reduced volatility, making them more appealing to investors.' json_object=None error=None contains_object=False usage=Usage(prompt_tokens=589, completion_tokens=289, total_tokens=878, cache_creation_input_tokens=None, cache_read_input_tokens=None) result_provider='openai'
+    =====================================
+                
+2024-11-19 17:10:58,194 - __main__ - ERROR - Error fetching https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 1 validation error for WebSearchResult
+summary
+  Input should be a valid dictionary [type=dict_type, input_value='raw_result={\'id\': \'ch...ult_provider=\'openai\'', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/dict_type
+2024-11-19 17:10:58,194 - __main__ - ERROR - Error in main execution: 1 validation error for WebSearchResult
+summary
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.8/v/dict_type
+2024-11-19 17:13:35,394 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:13:35,394 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:13:35,394 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:13:36,599 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:13:36,603 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:13:36,604 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:13:39,467 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:13:41,440 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2474 characters
+2024-11-19 17:13:47,478 - __main__ - ERROR - Error in AI summary generation for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: list index out of range
+2024-11-19 17:13:48,553 - __main__ - ERROR - Error in AI summary generation for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: list index out of range
+2024-11-19 17:14:06,607 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 17:14:06,663 - __main__ - ERROR - Error in main execution: 'NoneType' object has no attribute 'model_dump'
+2024-11-19 17:16:31,595 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:16:31,595 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:16:31,595 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:16:32,835 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:16:32,838 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:16:32,838 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:16:36,255 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:16:37,562 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2478 characters
+2024-11-19 17:16:44,202 - __main__ - WARNING - No summary generated for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+2024-11-19 17:16:45,473 - __main__ - WARNING - No summary generated for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 17:17:02,842 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 17:17:02,904 - __main__ - INFO - 
+=== ARTICLE SUMMARIES ===
+2024-11-19 17:17:02,904 - __main__ - INFO - ======================================
+2024-11-19 17:17:02,904 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 17:17:02,904 - __main__ - INFO - ======================================
+2024-11-19 17:17:02,904 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 2
+        - Failed: 1
+        - Duration: 31.31 seconds
+        - Results saved to: outputs/web_search/results_20241119_171702.json
+        
+2024-11-19 17:19:09,453 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:19:09,453 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:19:09,453 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:19:10,692 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:19:10,696 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:19:10,697 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:19:13,761 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:19:15,623 - __main__ - INFO - Successfully extracted content from https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: 2476 characters
+2024-11-19 17:19:19,275 - __main__ - INFO - 
+    === Summary for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ ===
+    Summary: GoPlus has launched SafeToken Protocol, a new security-focused platform for memecoin deployment. The protocol offers standardized smart contracts and includes features like SafeToken Locker for liquidity management, aiming to make memecoin issuance more secure and efficient.
+    Key Points: [
+  "Open-source framework with secure smart contract templates",
+  "Includes SafeToken Locker for liquidity management",
+  "EVM-compatible design for broad compatibility",
+  "Already supported by major DEX aggregators and Web3 wallets"
+]
+    Market Impact: The protocol could standardize memecoin issuance and improve security in the Web3 ecosystem, potentially leading to increased institutional adoption of memecoin projects.
+    Trading Implications: Reduced risk of contract vulnerabilities and improved liquidity management could make memecoin investments more attractive to serious traders and investors.
+    =====================================
+            
+2024-11-19 17:19:24,501 - __main__ - INFO - 
+    === Summary for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ ===
+    Summary: GoPlus has launched SafeToken Protocol, a new security-focused platform for memecoin deployment. The protocol offers standardized smart contracts and includes features like SafeToken Locker for liquidity management, aiming to make memecoin issuance more secure and efficient.
+    Key Points: [
+  "Open-source framework with secure smart contract templates",
+  "Includes SafeToken Locker for liquidity management",
+  "EVM-compatible design for broad compatibility",
+  "Already supported by major DEX aggregators and Web3 wallets"
+]
+    Market Impact: The protocol could standardize memecoin issuance and improve security in the Web3 ecosystem, potentially leading to increased institutional adoption of memecoin projects.
+    Trading Implications: Reduced risk of contract vulnerabilities and improved liquidity management could make memecoin investments more attractive to serious traders and investors.
+    =====================================
+            
+2024-11-19 17:19:40,702 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 17:19:40,769 - __main__ - INFO - 
+=== ARTICLE SUMMARIES ===
+2024-11-19 17:19:40,769 - __main__ - INFO - 
+        URL: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+        TITLE: GoPlus Launches SafeToken Protocol For Secure Memecoin Deployment (29 Oct): Guest Post by Chainwire | CoinMarketCap
+        SUMMARY:
+        {
+  "summary": "GoPlus has launched SafeToken Protocol, a new security-focused platform for memecoin deployment. The protocol offers standardized smart contracts and includes features like SafeToken Locker for liquidity management, aiming to make memecoin issuance more secure and efficient.",
+  "key_points": [
+    "Open-source framework with secure smart contract templates",
+    "Includes SafeToken Locker for liquidity management",
+    "EVM-compatible design for broad compatibility",
+    "Already supported by major DEX aggregators and Web3 wallets"
+  ],
+  "market_impact": "The protocol could standardize memecoin issuance and improve security in the Web3 ecosystem, potentially leading to increased institutional adoption of memecoin projects.",
+  "trading_implications": "Reduced risk of contract vulnerabilities and improved liquidity management could make memecoin investments more attractive to serious traders and investors."
+}
+        -------------------
+                        
+2024-11-19 17:19:40,769 - __main__ - INFO - 
+        URL: https://crypto.news/floki-whipsaws-14-on-coinbase-listing/
+        TITLE: Floki whipsaws 14% on Coinbase listing
+        SUMMARY:
+        {
+  "summary": "GoPlus has launched SafeToken Protocol, a new security-focused platform for memecoin deployment. The protocol offers standardized smart contracts and includes features like SafeToken Locker for liquidity management, aiming to make memecoin issuance more secure and efficient.",
+  "key_points": [
+    "Open-source framework with secure smart contract templates",
+    "Includes SafeToken Locker for liquidity management",
+    "EVM-compatible design for broad compatibility",
+    "Already supported by major DEX aggregators and Web3 wallets"
+  ],
+  "market_impact": "The protocol could standardize memecoin issuance and improve security in the Web3 ecosystem, potentially leading to increased institutional adoption of memecoin projects.",
+  "trading_implications": "Reduced risk of contract vulnerabilities and improved liquidity management could make memecoin investments more attractive to serious traders and investors."
+}
+        -------------------
+                        
+2024-11-19 17:19:40,770 - __main__ - INFO - ======================================
+2024-11-19 17:19:40,770 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 17:19:40,770 - __main__ - INFO - ======================================
+2024-11-19 17:19:40,770 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 2
+        - Failed: 1
+        - Duration: 31.32 seconds
+        - Results saved to: outputs/web_search/results_20241119_171940.json
+        
+2024-11-19 17:24:26,409 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:24:26,410 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:24:26,410 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:24:27,598 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:24:27,601 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:24:27,601 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:24:30,819 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:24:34,945 - __main__ - WARNING - Failed to generate summary for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+2024-11-19 17:24:57,618 - __main__ - ERROR - Playwright error for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://crypto.news/floki-whipsaws-14-on-coinbase-listing/", waiting until "networkidle"
+
+2024-11-19 17:24:57,621 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 17:24:57,690 - __main__ - INFO - 
+=== ARTICLE SUMMARIES ===
+2024-11-19 17:24:57,691 - __main__ - INFO - 
+        URL: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+        TITLE: GoPlus Launches SafeToken Protocol For Secure Memecoin Deployment (29 Oct): Guest Post by Chainwire | CoinMarketCap
+        SUMMARY:
+        {
+  "summary": "Failed to generate summary for article about Singapore, Singapore, October 29th, 2024, Chainwire\n\n\n\n\nWeb3 user security platform GoPlus has annou...",
+  "key_points": [
+    "Error generating key points"
+  ],
+  "market_impact": "Unable to determine market impact",
+  "trading_implications": "Unable to determine trading implications"
+}
+        -------------------
+                        
+2024-11-19 17:24:57,691 - __main__ - INFO - ======================================
+2024-11-19 17:24:57,691 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 17:24:57,691 - __main__ - INFO - ======================================
+2024-11-19 17:24:57,691 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 31.28 seconds
+        - Results saved to: outputs/web_search/results_20241119_172457.json
+        
+2024-11-19 17:27:32,028 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-19 17:27:32,029 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-19 17:27:32,029 - __main__ - INFO - Loaded 3 URLs
+2024-11-19 17:27:33,331 - __main__ - INFO - Navigating to https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ with Playwright
+2024-11-19 17:27:33,335 - __main__ - INFO - Navigating to https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/ with Playwright
+2024-11-19 17:27:33,336 - __main__ - INFO - Navigating to https://crypto.news/floki-whipsaws-14-on-coinbase-listing/ with Playwright
+2024-11-19 17:27:35,808 - __main__ - INFO - Successfully extracted content from https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/: 2792 characters
+2024-11-19 17:27:44,119 - __main__ - INFO - 
+    === Summary Generated for https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/ ===
+    Summary: Article about Singapore, Singapore, October 29th, 2024, Chainwire
+
+
+
+
+Web3 user security platform GoPlus has annou...
+    Key Points: [
+  "Key point extraction failed"
+]
+    Market Impact: Impact analysis unavailable
+    Trading Implications: Trading analysis unavailable
+    =====================================
+            
+2024-11-19 17:28:03,337 - __main__ - ERROR - Playwright error for https://crypto.news/floki-whipsaws-14-on-coinbase-listing/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://crypto.news/floki-whipsaws-14-on-coinbase-listing/", waiting until "networkidle"
+
+2024-11-19 17:28:03,342 - __main__ - ERROR - Playwright error for https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/: Page.goto: Timeout 30000ms exceeded.
+Call log:
+navigating to "https://www.coindesk.com/markets/2024/11/18/missed-btc-rally-to-93k-bitcoin-memecoins-could-be-next-to-watch/", waiting until "networkidle"
+
+2024-11-19 17:28:03,411 - __main__ - INFO - 
+=== ARTICLE SUMMARIES ===
+2024-11-19 17:28:03,411 - __main__ - INFO - 
+        URL: https://coinmarketcap.com/community/articles/6720b6cacc468f2eee543ca7/
+        TITLE: GoPlus Launches SafeToken Protocol For Secure Memecoin Deployment (29 Oct): Guest Post by Chainwire | CoinMarketCap
+        SUMMARY:
+        {
+  "summary": "Article about Singapore, Singapore, October 29th, 2024, Chainwire\n\n\n\n\nWeb3 user security platform GoPlus has annou...",
+  "key_points": [
+    "Key point extraction failed"
+  ],
+  "market_impact": "Impact analysis unavailable",
+  "trading_implications": "Trading analysis unavailable"
+}
+        -------------------
+                        
+2024-11-19 17:28:03,412 - __main__ - INFO - ======================================
+2024-11-19 17:28:03,412 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-19 17:28:03,412 - __main__ - INFO - ======================================
+2024-11-19 17:28:03,412 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 1
+        - Failed: 2
+        - Duration: 31.38 seconds
+        - Results saved to: outputs/web_search/results_20241119_172803.json
+        

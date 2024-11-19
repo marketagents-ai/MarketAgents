@@ -47,7 +47,7 @@ class SimulationDataInserter:
             user=db_params.get('user', 'db_user'),
             password=db_params.get('password', 'db_pwd@123'),
             host=db_params.get('host', 'localhost'),
-            port=db_params.get('port', '5433')
+            port=db_params.get('port', '5434')
         )
         self.cursor = self.conn.cursor()
 
