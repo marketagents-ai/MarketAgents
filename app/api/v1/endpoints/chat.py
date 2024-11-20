@@ -53,11 +53,13 @@ class SystemStrResponse(BaseModel):
 class ChatResponse(BaseModel):
     id: Optional[int] = None
     uuid: UUID
+    name: Optional[str] = None
     new_message: Optional[str]
     history: List[ChatMessageResponse]
     system_prompt: Optional[str] = None
     system_prompt_id: Optional[int] = None
     active_tool_id: Optional[int] = None
+    auto_tools_ids: List[int] = []
 
     class Config:
         from_attributes = True
@@ -83,14 +85,19 @@ class ChatResponse(BaseModel):
             ) for msg in chat.history
         ] if chat.history else []
 
+        # Get IDs of active tools
+        auto_tools_ids = [tool.id for tool in chat.tools if tool.id is not None]
+
         return cls(
             id=chat.id,
             uuid=chat.uuid,
+            name=chat.name,
             new_message=chat.new_message,
             history=history,
             system_prompt=chat.system_prompt.content if chat.system_prompt else None,
             system_prompt_id=chat.system_prompt.id if chat.system_prompt else None,
-            active_tool_id=chat.structured_output_id if chat.structured_output_id else None
+            active_tool_id=chat.structured_output_id if chat.structured_output_id else None,
+            auto_tools_ids=auto_tools_ids
         )
 
 class MessageCreate(BaseModel):
@@ -1200,3 +1207,100 @@ async def test_callable_tool(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to execute tool: {str(e)}"
         )
+
+# --- Auto tools management endpoints ---
+@router.put("/{chat_id}/auto-tools", response_model=ChatResponse)
+async def update_chat_auto_tools(
+    chat_id: int,
+    tool_ids: List[int],
+    db: DatabaseDep
+) -> ChatResponse:
+    """Update the list of active tools for auto tools mode"""
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Verify all tools exist and get them
+    tools = []
+    for tool_id in tool_ids:
+        tool = db.get(Tool, tool_id)
+        if not tool:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tool {tool_id} not found"
+            )
+        tools.append(tool)
+    
+    # Update chat's tools without modifying response format
+    chat.tools = tools
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+@router.post("/{chat_id}/assistant-response", response_model=ChatResponse)
+async def trigger_assistant_response(
+    chat_id: int,
+    ai_utils: ParallelAIUtilities = Depends(get_ai_utils)
+) -> ChatResponse:
+    """Trigger an assistant response without a new user message"""
+    with Session(ai_utils.engine) as db:
+        chat = db.get(ChatThread, chat_id)
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat {chat_id} not found"
+            )
+        
+        if not chat.tools:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Chat must have active tools to trigger assistant response"
+            )
+    
+    try:
+        results = await ai_utils.run_parallel_ai_completion([chat])
+        if not results:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get AI response"
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing assistant response: {str(e)}"
+        )
+
+    with Session(ai_utils.engine) as db:
+        final_chat = db.get(ChatThread, chat_id)
+        if not final_chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat {chat_id} not found after processing"
+            )
+        return ChatResponse.from_chat_thread(final_chat)
+
+@router.get("/{chat_id}/llm-config", response_model=LLMConfigResponse)
+async def get_chat_llm_config(
+    chat_id: int,
+    db: DatabaseDep
+) -> LLMConfigResponse:
+    """Get the LLM configuration for a specific chat"""
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    if not chat.llm_config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No LLM configuration found for chat {chat_id}"
+        )
+    
+    return LLMConfigResponse.from_orm(chat.llm_config)
