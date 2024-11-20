@@ -3,7 +3,7 @@ import asyncio
 import json
 from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field, ValidationError
-from abstractions.inference.sql_models import RawOutput, ProcessedOutput, ChatThread , LLMClient ,ChatMessage, MessageRole
+from abstractions.inference.sql_models import RawOutput, ProcessedOutput, ChatThread , LLMClient , ResponseFormat, ChatMessage, MessageRole
 from abstractions.inference.clients_models import AnthropicRequest, OpenAIRequest, VLLMRequest
 from abstractions.inference.oai_parallel import process_api_requests_from_file, OAIApiFromFileConfig
 import os
@@ -86,8 +86,11 @@ class ParallelAIUtilities:
                     chat.add_user_message()
                     session.add(chat)
                 except Exception as e:
-                    chat_threads.remove(chat)
-                    print(f"Error adding user message to chat thread {chat.id}: {e}, removed from thread list")
+                    if chat.llm_config.response_format != ResponseFormat.auto_tools:
+                        chat_threads.remove(chat)
+                        print(f"Error adding user message to chat thread {chat.id}: {e}, removed from thread list")
+                    else:
+                        session.add(chat)
             session.commit()
             #refresh the chat threads
             for chat in chat_threads:
@@ -133,9 +136,9 @@ class ParallelAIUtilities:
                 
                 if chat_thread:
                     # Initialize history if it doesn't exist
-                    user_mesage_uuid= chat_thread.get_last_message_uuid() 
-                    if user_mesage_uuid:
-                        chat_thread.add_assistant_response(output, user_mesage_uuid)
+                    last_message_uuid= chat_thread.get_last_message_uuid() 
+                    if last_message_uuid:
+                        chat_thread.add_assistant_response(output, last_message_uuid)
                     else:
                         raise ValueError(f"Chat thread {chat_thread.id} has no user message uuid")
                     #refresh again chat thread so we can access the history

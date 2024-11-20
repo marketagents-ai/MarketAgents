@@ -545,7 +545,7 @@ class ChatThread (SQLModel, table=True):
     @computed_field
     @property
     def use_postfill(self) -> bool:
-        if self.llm_config.client == 'openai' and 'json' in self.llm_config.response_format and not self.use_schema_instruction:
+        if self.llm_config.client == LLMClient.openai and  self.llm_config.response_format in [ResponseFormat.json_object,ResponseFormat.json_beg] and not self.use_schema_instruction:
             return True
 
         else:
