@@ -98,7 +98,7 @@ async def run_sequential_steps(parallel_ai: ParallelAIUtilities, initial_chat: C
             print(f"Tool Name: {latest_message.tool_name}")
             print(f"Tool Call: {latest_message.tool_call}")
             
-            if latest_message.tool_name == "check_goal_achieved_results":
+            if latest_message.tool_name == "check_goal_achieved_response":
                 print("\nGoal achieved, stopping sequence.")
                 break
                 
@@ -113,7 +113,7 @@ async def main():
     load_dotenv()
     
     # Initialize database
-    sqlite_file_name = "sequential_chat.db"
+    sqlite_file_name = "chat.db"
     sqlite_url = f"sqlite:///{sqlite_file_name}"
     engine = create_engine(sqlite_url, echo=False)
     SQLModel.metadata.create_all(engine)
