@@ -920,7 +920,7 @@ async def delete_system_prompt(
     prompt_id: int,
     db: DatabaseDep
 ) -> None:
-    """Delete a specific system prompt"""
+    """Delete a specific system prompt and clear it from any chats using it"""
     # Get the system prompt
     prompt = db.get(SystemStr, prompt_id)
     if not prompt:
@@ -929,17 +929,18 @@ async def delete_system_prompt(
             detail=f"System prompt {prompt_id} not found"
         )
     
-    # Check if prompt is in use by any chat threads
-    chats_using_prompt = db.exec(
-        select(ChatThread).where(ChatThread.system_prompt == prompt)
-    ).first()
+    # Get all chats using this prompt and clear their system prompt
+    statement = (
+        select(ChatThread)
+        .where(ChatThread.system_prompt == prompt)
+    )
+    chats_using_prompt = db.exec(statement).unique().all()
     
-    if chats_using_prompt:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"System prompt {prompt_id} is in use by chat threads and cannot be deleted"
-        )
+    for chat in chats_using_prompt:
+        chat.system_prompt = None
+        db.add(chat)
     
+    # Delete the prompt
     db.delete(prompt)
     db.commit()
 
