@@ -17,3 +17,32 @@ pydantic_settings
 bs4
 pip install playwright
 playwright install chromium
+
+newspaper3k
+requests-html
+httpx
+MechanicalSoup
+parsel
+scrapy
+
+# Dependencies for newspaper3k
+nltk
+feedparser
+tldextract
+feedfinder2
+jieba3k
+
+# Dependencies for requests-html
+pyppeteer
+fake-useragent
+parse
+w3lib
+lxml[html_clean] 
+lxml_html_clean 
+
+# Additional packages for robust scraping
+cloudscraper
+selenium-stealth
+undetected-chromedriver
+aiohttp-proxy
+tenacity

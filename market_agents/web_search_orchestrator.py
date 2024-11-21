@@ -95,7 +95,6 @@ class WebSearchAgent:
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
         }
-        
     async def fetch_url_with_playwright(self, url: str) -> tuple[str, str]:
         """Fetch URL using Playwright for JavaScript-heavy sites"""
         async with async_playwright() as p:
@@ -107,61 +106,94 @@ class WebSearchAgent:
             
             try:
                 logger.info(f"Navigating to {url} with Playwright")
-                # Wait longer for initial load
-                await page.goto(url, wait_until='networkidle', timeout=30000)
+                # Increase timeout and add bypass options
+                await page.goto(url, wait_until='networkidle', timeout=60000)
                 
-                # Wait for cookie banner to appear and handle it if present
-                try:
-                    cookie_button = page.locator('button:has-text("Accept")', timeout=5000)
-                    await cookie_button.click()
-                except:
-                    pass  # No cookie banner or different format
+                # Wait for content to load
+                await page.wait_for_load_state('networkidle')
+                await page.wait_for_timeout(2000)  # Additional 2s wait
                 
-                # Get content with more reliable selectors
-                title = await page.title()
+                # Get the full page content
                 content = await page.evaluate('''() => {
-                    // Remove unwanted elements first
-                    document.querySelectorAll('.cookie-banner, #cookie-notice, .ad, .advertisement').forEach(el => el.remove());
-                    
-                    // Try multiple content selectors
-                    const selectors = [
-                        'article', 
-                        'main', 
-                        '.post-content', 
-                        '.article-content', 
-                        '.entry-content',
-                        '.content'
-                    ];
-                    
-                    for (const selector of selectors) {
-                        const element = document.querySelector(selector);
-                        if (element) {
-                            return element.innerText;
+                    // Function to convert element to markdown-like format
+                    function elementToMarkdown(element) {
+                        let text = '';
+                        
+                        // Handle different element types
+                        switch(element.tagName.toLowerCase()) {
+                            case 'h1':
+                            case 'h2':
+                            case 'h3':
+                            case 'h4':
+                            case 'h5':
+                            case 'h6':
+                                text += '#'.repeat(parseInt(element.tagName[1])) + ' ' + element.innerText + '\\n\\n';
+                                break;
+                            case 'p':
+                                text += element.innerText + '\\n\\n';
+                                break;
+                            case 'ul':
+                            case 'ol':
+                                Array.from(element.children).forEach(li => {
+                                    text += '- ' + li.innerText + '\\n';
+                                });
+                                text += '\\n';
+                                break;
+                            case 'blockquote':
+                                text += '> ' + element.innerText + '\\n\\n';
+                                break;
+                            default:
+                                if (element.innerText && element.innerText.trim()) {
+                                    text += element.innerText + '\\n\\n';
+                                }
                         }
+                        return text;
                     }
                     
-                    // Fallback to paragraphs
-                    return Array.from(document.querySelectorAll('p'))
-                        .filter(p => {
-                            const text = p.innerText.trim();
-                            return text.length > 50 && !p.closest('.cookie-banner, #cookie-notice');
-                        })
-                        .map(p => p.innerText)
-                        .join('\\n');
+                    // Get all content elements
+                    const contentElements = document.querySelectorAll('body *');
+                    let markdown = '';
+                    
+                    // Convert page to markdown
+                    contentElements.forEach(element => {
+                        // Skip hidden elements and common non-content elements
+                        if (element.offsetParent !== null && 
+                            !element.closest('nav, header, footer, .cookie-banner, #cookie-notice, .ad, .advertisement')) {
+                            markdown += elementToMarkdown(element);
+                        }
+                    });
+                    
+                    // Clean up the markdown
+                    return markdown
+                        .replace(/\\n{3,}/g, '\\n\\n')  // Remove extra newlines
+                        .replace(/\\s+/g, ' ')  // Normalize whitespace
+                        .trim();
                 }''')
+                
+                title = await page.title()
                 
                 if content:
                     logger.info(f"Successfully extracted content from {url}: {len(content)} characters")
                 else:
-                    logger.warning(f"No content extracted from {url}")
-                    
+                    # Fallback to basic HTML if markdown extraction fails
+                    content = await page.content()
+                    logger.warning(f"Falling back to HTML content for {url}")
+                
                 await browser.close()
                 return title, content
                 
             except Exception as e:
                 logger.error(f"Playwright error for {url}: {str(e)}")
-                await browser.close()
-                return "", ""
+                try:
+                    # Attempt to get whatever content is available
+                    content = await page.content()
+                    title = await page.title()
+                    await browser.close()
+                    return title, content
+                except:
+                    await browser.close()
+                    return "", ""
+
     async def generate_ai_summary(self, content: str, url: str) -> dict:
         """Generate AI summary using parallel inference"""
         try:
@@ -355,18 +387,29 @@ class WebSearchAgent:
         try:
             title, content = await self.fetch_url_with_playwright(url)
             
-            if not content:
+            # Handle edge case where content is an error URL
+            if content and "errors.edgesuite.net" in content:
+                # Try fetching again with different options
+                await asyncio.sleep(2)  # Wait briefly
+                title, content = await self.fetch_url_with_playwright(url)
+            
+            if not content or "errors.edgesuite.net" in content:
                 return WebSearchResult(
                     url=url,
-                    title="",
-                    content="",
+                    title="Access Denied",
+                    content="Failed to access content - Access Denied",
                     timestamp=datetime.now(),
-                    status="error: no content extracted",
-                    summary={},
+                    status="error: access denied",
+                    summary={
+                        "summary": "Unable to access article content due to access restrictions",
+                        "key_points": ["Access to content was denied"],
+                        "market_impact": "Impact analysis unavailable",
+                        "trading_implications": "Trading analysis unavailable"
+                    },
                     agent_id=str(uuid.uuid4())
                 )
             
-            # Generate AI summary
+            # Generate AI summary from whatever content we have
             summary_dict = await self.generate_ai_summary(content, url)
             
             return WebSearchResult(
@@ -383,11 +426,16 @@ class WebSearchAgent:
             logger.error(f"Error fetching {url}: {str(e)}")
             return WebSearchResult(
                 url=url,
-                title="",
-                content="",
+                title="Error",
+                content=f"Failed to fetch content: {str(e)}",
                 timestamp=datetime.now(),
                 status=f"error: {str(e)}",
-                summary={},
+                summary={
+                    "summary": f"Error fetching article: {str(e)}",
+                    "key_points": ["Content fetch failed"],
+                    "market_impact": "Impact analysis unavailable",
+                    "trading_implications": "Trading analysis unavailable"
+                },
                 agent_id=str(uuid.uuid4())
             )
 
