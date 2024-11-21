@@ -2,8 +2,9 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.wsgi import WSGIMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 import json
 import os
 from datetime import datetime, timedelta
@@ -12,6 +13,12 @@ import colorama
 from tqdm import tqdm
 import time
 import statistics
+import re
+import logging  # Added for logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize colorama for colored output
 colorama.init()
@@ -22,23 +29,20 @@ from dash import html, dcc, Input, Output, State, dash_table
 import pandas as pd
 import numpy as np
 from sklearn.decomposition import PCA
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
-import re
 
-#import nltk
-#nltk.download('punkt_tab')
-
+# Initialize FastAPI app
 app = FastAPI()
 
 # Initialize Dash app
-dash_app = dash.Dash(__name__)
+dash_app = dash.Dash(__name__, server=False)
 
 # Serve static files (for the GUI)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount the Dash app onto the FastAPI app
+app.mount("/dash", WSGIMiddleware(dash_app.server))
 
 # Set the path to the folder containing JSON files
 JSON_FOLDER = "test_jsonl"
@@ -48,28 +52,32 @@ memory_manager = MemoryManager()
 
 # Load data from JSON files
 def load_data():
-    print(colorama.Fore.CYAN + "Loading and embedding data:" + colorama.Fore.RESET)
+    logger.info("Loading and embedding data:")
     for filename in tqdm(os.listdir(JSON_FOLDER), desc="Processing files"):
         if filename.endswith(".jsonl"):
-            with open(os.path.join(JSON_FOLDER, filename), "r") as f:
-                for line in f:
-                    data = json.loads(line)
-                    agent_id = re.search(r'agent_(\d+)', filename)
-                    if agent_id:
-                        agent_id = f"agent_{agent_id.group(1)}"
-                        memory_id = f"{agent_id}_{data['id']}"
-                        memory_manager.add_memory(agent_id, json.dumps(data), {"type": "interaction", "id": memory_id})
-                    else:
-                        print(f"Warning: Could not determine agent ID from filename {filename}")
-    print(colorama.Fore.GREEN + "Data loading and embedding complete!" + colorama.Fore.RESET)
+            file_path = os.path.join(JSON_FOLDER, filename)
+            try:
+                with open(file_path, "r") as f:
+                    for line in f:
+                        try:
+                            data = json.loads(line)
+                            agent_id_match = re.search(r'agent_(\d+)', filename)
+                            if agent_id_match:
+                                agent_id = f"agent_{agent_id_match.group(1)}"
+                                memory_id = f"{agent_id}_{data['id']}"
+                                memory_manager.add_memory(agent_id, json.dumps(data), {"type": "interaction", "id": memory_id})
+                            else:
+                                logger.warning(f"Could not determine agent ID from filename {filename}")
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Failed to parse JSON line in {filename}: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to read file {file_path}: {e}")
+    logger.info("Data loading and embedding complete!")
 
 # Load data
 load_data()
 
-from pydantic import BaseModel
-from typing import List, Dict, Union, Optional
-import json
-
+# Define data models using Pydantic
 class SystemInfo(BaseModel):
     role: str
     content: str
@@ -122,6 +130,7 @@ class ObservationData(BaseModel):
 
 DataModel = Union[PerceptionData, ActionData, ReflectionData, EnvironmentStateData, ObservationData]
 
+# Function to parse JSON data into the appropriate data model
 def parse_json_to_model(json_data: Dict) -> DataModel:
     if "response" in json_data:
         if "monologue" in json_data["response"] and "strategy" in json_data["response"]:
@@ -137,6 +146,7 @@ def parse_json_to_model(json_data: Dict) -> DataModel:
     else:
         raise ValueError("Unknown data schema")
 
+# Function to convert data models to Markdown
 def json_to_markdown(data: Union[DataModel, Dict]) -> str:
     if isinstance(data, dict):
         data = parse_json_to_model(data)
@@ -244,11 +254,12 @@ def json_to_markdown(data: Union[DataModel, Dict]) -> str:
     else:
         return json.dumps(data.dict(), indent=2)  # Fallback to simple JSON formatting
 
-
+# FastAPI endpoint to get the list of agents
 @app.get("/agents")
 async def get_agents():
     return list(memory_manager.memories.keys())
 
+# FastAPI endpoint for searching memories
 @app.get("/search")
 async def search(query: str = Query(..., min_length=1), agent: str = Query("all"), top_k: int = Query(10, gt=0)):
     try:
@@ -275,6 +286,7 @@ async def search(query: str = Query(..., min_length=1), agent: str = Query("all"
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# FastAPI endpoint for generating embeddings graph data
 @app.post("/embeddings_graph")
 async def get_embeddings_graph(search_results: List[Dict[str, Any]]):
     embeddings = []
@@ -317,6 +329,7 @@ async def get_embeddings_graph(search_results: List[Dict[str, Any]]):
         "ids": ids
     }
 
+# FastAPI endpoint to serve the root HTML page
 @app.get("/")
 async def read_root():
     return FileResponse("static/index.html")
@@ -422,6 +435,6 @@ def update_agent_options(search_value):
     return options
 
 if __name__ == "__main__":
-    print(colorama.Fore.CYAN + "Starting server..." + colorama.Fore.RESET)
+    logger.info("Starting server...")
     import uvicorn
     uvicorn.run(app, host="localhost", port=8000)

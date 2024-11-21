@@ -31,11 +31,25 @@ To install the `market_agents` package in editable mode, follow these steps:
     pip install -r requirements.txt
     ```
 
+4. Follow the README.md (just navigate to market_agents/agents/db)
+    ```sh
+    cat ./market_agents/agents/db/README.md
+    ```
+
+5. Make a copy of .env.example
+    ```sh
+    cp .env.example .env
+    ```
+
+    *Note: Setup API keys and more...*
+
+7. Edit the ```market_agents/orchestrator_config.yaml``` accoding to your configuration
+
 ## Running Examples
 
-You can run the `orchestrator` as follows:
+You can run the `run_simulation.sh` as follows:
 
 ```sh
-python3 market_agents/orchestrator.py
+python3 market_agents/run_simulation.sh
 ```
 
