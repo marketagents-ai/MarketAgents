@@ -147,6 +147,18 @@ def {name}(x: float) -> float:
     @classmethod
     def get(cls, name: str) -> Optional[Callable]:
         return cls._registry.get(name)
+    
+    @classmethod
+    def get_registry_status(cls) -> Dict[str, Any]:
+        """Get current status of the registry"""
+        return {
+            "total_functions": len(cls._registry),
+            "registered_functions": list(cls._registry.keys()),
+            "function_signatures": {
+                name: str(signature(func))
+                for name, func in cls._registry.items()
+            }
+        }
 
 class Tool(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -164,21 +176,34 @@ class Tool(SQLModel, table=True):
     def _register_callable(self) -> None:
         """Helper method to register callable in registry"""
         if self.callable and self.callable_function:
-            # Check if function is already registered
-            if not CallableRegistry().get(self.schema_name):
-                if not self.allow_literal_eval:
-                    raise ValueError(
-                        f"Function '{self.callable_function}' not found in registry "
-                        f"and allow_literal_eval is False"
-                    )
-                try:
-                    # For lambda and simple functions, pass the actual function text
-                    CallableRegistry().register_from_text(
-                        name=self.schema_name, 
-                        func_text=self.callable_function
-                    )
-                except Exception as e:
-                    raise ValueError(f"Could not register callable_function: {str(e)}")
+            try:
+                # First try to get the function from DEFAULT_CALLABLE_TOOLS
+                from abstractions.hub.callable_tools import DEFAULT_CALLABLE_TOOLS
+                if self.schema_name in DEFAULT_CALLABLE_TOOLS:
+                    func = DEFAULT_CALLABLE_TOOLS[self.schema_name]["function"]
+                    try:
+                        CallableRegistry().register(self.schema_name, func)
+                    except ValueError:
+                        # Function already registered, skip
+                        pass
+                    return
+                
+                # If not in defaults and allow_literal_eval is True, try to register from text
+                if not CallableRegistry().get(self.schema_name):
+                    if not self.allow_literal_eval:
+                        raise ValueError(
+                            f"Function '{self.callable_function}' not found in registry "
+                            f"and allow_literal_eval is False"
+                        )
+                    try:
+                        CallableRegistry().register_from_text(
+                            name=self.schema_name, 
+                            func_text=self.callable_function
+                        )
+                    except Exception as e:
+                        raise ValueError(f"Could not register callable_function: {str(e)}")
+            except Exception as e:
+                print(f"Warning: Failed to register callable tool {self.schema_name}: {str(e)}")
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -192,41 +217,72 @@ class Tool(SQLModel, table=True):
 
     def execute(self, input: Dict[str, Any], tool_call_id: Optional[str] = None, tool_call_message_uuid: Optional[UUID] = None) -> 'ChatMessage':
         """Execute the callable function with the given input."""
+        print(f"\n=== Tool Execution Debug ===")
+        print(f"Tool: {self.schema_name}")
+        print(f"Input: {input}")
+        print(f"Tool call ID: {tool_call_id}")
+        print(f"Parent message UUID: {tool_call_message_uuid}")
+
         if not self.callable or not self.callable_function:
-            raise ValueError("Tool is not callable")
+            error_msg = "Tool is not callable"
+            print(f"Error: {error_msg}")
+            raise ValueError(error_msg)
 
         callable_func = CallableRegistry().get(self.schema_name)
         if not callable_func:
-            raise ValueError(f"Function '{self.schema_name}' not found in registry")
+            error_msg = f"Function '{self.schema_name}' not found in registry. Available functions: {list(CallableRegistry()._registry.keys())}"
+            print(f"Error: {error_msg}")
+            raise ValueError(error_msg)
         
-        # Get function signature info
-        sig = signature(callable_func)
-        type_hints = get_type_hints(callable_func)
-        first_param = next(iter(sig.parameters.values()))
-        param_type = type_hints.get(first_param.name)
-        
-        # Handle input based on parameter type
-        if (isinstance(param_type, type) and 
-            issubclass(param_type, BaseModel)):
-            model_input = param_type.model_validate(input)
-            response = callable_func(model_input)
-        else:
-            response = callable_func(**input)
-        
-        # Process response
-        if isinstance(response, BaseModel):
-            content = response.model_dump_json()
-        else:
-            content = json.dumps({"result": response})
+        try:
+            # Get function signature info
+            sig = signature(callable_func)
+            type_hints = get_type_hints(callable_func)
+            first_param = next(iter(sig.parameters.values()))
+            param_type = type_hints.get(first_param.name)
             
-        return ChatMessage(
-            role=MessageRole.tool,
-            content=content,
-            tool_name=f"{self.schema_name}_response",
-            tool_call_id=tool_call_id,
-            parent_message_uuid=tool_call_message_uuid,
-            tool_json_schema=self.callable_output_schema
-        )
+            print(f"Function signature: {sig}")
+            print(f"Type hints: {type_hints}")
+            print(f"Parameter type: {param_type}")
+            
+            # Handle input based on parameter type
+            if (isinstance(param_type, type) and 
+                issubclass(param_type, BaseModel)):
+                print(f"Using Pydantic model validation for input")
+                model_input = param_type.model_validate(input)
+                response = callable_func(model_input)
+            else:
+                print(f"Using direct kwargs for input")
+                response = callable_func(**input)
+            
+            print(f"Raw response: {response}")
+            
+            # Process response
+            if isinstance(response, BaseModel):
+                content = response.model_dump_json()
+                print(f"Serialized Pydantic response: {content}")
+            else:
+                content = json.dumps({"result": response})
+                print(f"Wrapped primitive response: {content}")
+                
+            message = ChatMessage(
+                role=MessageRole.tool,
+                content=content,
+                tool_name=f"{self.schema_name}_response",
+                tool_call_id=tool_call_id,
+                parent_message_uuid=tool_call_message_uuid,
+                tool_json_schema=self.callable_output_schema
+            )
+            print(f"Created ChatMessage: {message}")
+            return message
+            
+        except Exception as e:
+            error_msg = f"Error executing tool {self.schema_name}: {str(e)}"
+            print(f"Error: {error_msg}")
+            print(f"Exception type: {type(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            raise ValueError(error_msg) from e
 
     @computed_field
     @property

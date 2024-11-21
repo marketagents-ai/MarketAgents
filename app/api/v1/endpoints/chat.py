@@ -184,51 +184,7 @@ DEFAULT_LLM_CONFIG = LLMConfigCreate(
     use_cache=True
 )
 
-def _create_default_tools(db: Session) -> List[Tool]:
-    """Create default tools if they don't exist."""
-    tools = []
-    
-    # Check existing tools to avoid duplicates
-    existing_tools = {
-        tool.schema_name: tool 
-        for tool in db.exec(select(Tool)).unique().all()
-    }
-    
-    # Create regular tools
-    for name, config in DEFAULT_TOOLS.items():
-        if name not in existing_tools:
-            tool = Tool(
-                schema_name=name,
-                schema_description=config["description"],
-                instruction_string=config["instruction"],
-                json_schema=config["schema"],
-                strict_schema=True
-            )
-            db.add(tool)
-            tools.append(tool)
-    
-    # Create callable tools
-    for name, config in DEFAULT_CALLABLE_TOOLS.items():
-        if name not in existing_tools:
-            try:
-                tool = Tool.from_callable(
-                    func=config["function"],
-                    schema_name=name,
-                    schema_description=config["description"]
-                )
-                tool.allow_literal_eval = config.get("allow_literal_eval", False)
-                db.add(tool)
-                tools.append(tool)
-            except Exception as e:
-                print(f"Failed to create callable tool {name}: {str(e)}")
-    
-    if tools:  # Only commit if we created new tools
-        db.commit()
-        for tool in tools:
-            db.refresh(tool)
-    
-    # Return all tools, both existing and newly created
-    return list(existing_tools.values()) + tools
+
 
 def _create_default_system_prompts(db: Session) -> List[SystemStr]:
     """Create default system prompts if they don't exist."""
@@ -561,13 +517,9 @@ async def _create_chat_with_config(
     
     # Get or create default tools
     tools_query = select(Tool)
-    existing_tools = db.exec(tools_query).unique().all()
+    tools = db.exec(tools_query).unique().all()
     
-    if not existing_tools:
-        tools = _create_default_tools(db)
-        db.flush()  # Flush to ensure tools have IDs
-    else:
-        tools = existing_tools
+    
 
     # Get or create default system prompts
     prompts_query = select(SystemStr)
