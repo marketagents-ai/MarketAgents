@@ -139,11 +139,13 @@ class ParallelAIUtilities:
                     last_message_uuid= chat_thread.get_last_message_uuid() 
                     if last_message_uuid:
                         chat_thread.add_assistant_response(output, last_message_uuid)
+                        print(f"finished adding assistant response to chat thread {chat_thread.id}")
                     else:
                         raise ValueError(f"Chat thread {chat_thread.id} has no user message uuid")
                     #refresh again chat thread so we can access the history
                     session.refresh(chat_thread)
                     assistant_message_uuid = chat_thread.get_last_message_uuid()
+                    print(f"assistant_message_uuid: {assistant_message_uuid}")
                     if output.json_object:
                         tool = chat_thread.get_tool_by_name(output.json_object.name)
                         if tool and tool.callable:

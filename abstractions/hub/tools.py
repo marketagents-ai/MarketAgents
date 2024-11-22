@@ -181,3 +181,6 @@ DEFAULT_TOOLS: Dict[str, Dict[str, Any]] = {
         "instruction": "Please interpret using mythological archetypes:"
     }
 }
+
+
+

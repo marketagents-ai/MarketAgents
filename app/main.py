@@ -8,8 +8,33 @@ from app.core.config import settings
 from app.db.session import engine
 from sqlmodel import SQLModel, Session, select
 from typing import Union
-from abstractions.inference.sql_models import Tool, CallableRegistry
+from abstractions.inference.sql_models import (
+    Tool, 
+    CallableRegistry, 
+    SystemStr, 
+    ChatThread, 
+    LLMConfig,
+    LLMClient,
+    ResponseFormat
+)
 from abstractions.hub.callable_tools import DEFAULT_CALLABLE_TOOLS
+from abstractions.hub.angels import (
+    DEFAULT_TOOLS,
+    tier1_programs,
+    tier2_programs,
+    tier3_programs,
+    TIER1_SYSTEM_PROMPT,
+    TIER2_SYSTEM_PROMPT,
+    TIER3_SYSTEM_PROMPT,
+    BASIC_METADATA_SCHEMA,
+    SUMMARY_SCHEMA,
+    THEME_ANALYSIS_SCHEMA,
+    CHARACTER_ANALYSIS_SCHEMA,
+    SETTING_ANALYSIS_SCHEMA,
+    HISTORICAL_CONTEXT_SCHEMA,
+    LITERARY_DEVICES_SCHEMA,
+    CRITICAL_ANALYSIS_SCHEMA
+)
 import logging
 
 # Configure logging
@@ -79,6 +104,130 @@ def register_default_tools(db: Session):
         logger.error(f"Critical error during tool registration: {str(e)}", exc_info=True)
         raise
 
+def register_literary_analysis_tools(db: Session):
+    """Register literary analysis tools and system prompts during startup"""
+    logger.info("=== Starting Literary Analysis Tools Registration ===")
+    
+    try:
+        # Define all tools
+        tier1_tools = [
+            Tool(
+                schema_name="extract_basic_metadata",
+                schema_description="Extracts basic metadata like title and author",
+                json_schema=BASIC_METADATA_SCHEMA,
+                instruction_string="Extract the basic metadata from the text"
+            ),
+            Tool(
+                schema_name="generate_summary",
+                schema_description="Generates a brief summary of the text",
+                json_schema=SUMMARY_SCHEMA,  # This is the output constraint for the LLM
+                instruction_string="Generate a summary of the text"
+            ),
+            Tool(
+                schema_name="extract_keywords",
+                schema_description="Extracts key terms and concepts",
+                json_schema={
+                    "type": "object",
+                    "properties": {
+                        "keywords": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of key terms and concepts"
+                        }
+                    },
+                    "required": ["keywords"]
+                },
+                instruction_string="Extract key terms and concepts from the text"
+            )
+        ]
+
+        # Create and register Tier 2 tools
+        tier2_tools = [
+            Tool(
+                schema_name="analyze_themes",
+                schema_description="Analyzes major themes in the text",
+                json_schema=THEME_ANALYSIS_SCHEMA,  # This is the output constraint for the LLM
+                instruction_string="Analyze the major themes in the text"
+            ),
+            Tool(
+                schema_name="analyze_characters",
+                schema_description="Analyzes character details and relationships",
+                json_schema=CHARACTER_ANALYSIS_SCHEMA,  # This is the output constraint for the LLM
+                instruction_string="Analyze the characters and their relationships"
+            ),
+            Tool(
+                schema_name="analyze_setting",
+                schema_description="Analyzes the setting and time period",
+                json_schema=SETTING_ANALYSIS_SCHEMA,  # This is the output constraint for the LLM
+                instruction_string="Analyze the setting of the text"
+            )
+        ]
+
+        # Create and register Tier 3 tools
+        tier3_tools = [
+            Tool(
+                schema_name="analyze_historical_context",
+                schema_description="Analyzes historical and cultural background",
+                json_schema=HISTORICAL_CONTEXT_SCHEMA,  # This is the output constraint for the LLM
+                instruction_string="Analyze the historical context of the text"
+            ),
+            Tool(
+                schema_name="identify_literary_devices",
+                schema_description="Identifies and analyzes literary techniques",
+                json_schema=LITERARY_DEVICES_SCHEMA,  # This is the output constraint for the LLM
+                instruction_string="Identify and analyze literary devices in the text"
+            ),
+            Tool(
+                schema_name="perform_critical_analysis",
+                schema_description="Provides interpretive analysis",
+                json_schema=CRITICAL_ANALYSIS_SCHEMA,  # This is the output constraint for the LLM
+                instruction_string="Perform a critical analysis of the text"
+            )
+        ]
+
+        all_tools = tier1_tools + tier2_tools + tier3_tools
+        
+        # Check and add tools only if they don't exist
+        for tool in all_tools:
+            existing_tool = db.exec(
+                select(Tool).where(Tool.schema_name == tool.schema_name)
+            ).first()
+            
+            if not existing_tool:
+                db.add(tool)
+                logger.info(f"✓ Created new literary analysis tool: {tool.schema_name}")
+            else:
+                logger.info(f"→ Tool already exists: {tool.schema_name}")
+
+        # Check and add system prompts only if they don't exist
+        system_prompts = {
+            "Tier 1 Literary Analysis": TIER1_SYSTEM_PROMPT,
+            "Tier 2 Literary Analysis": TIER2_SYSTEM_PROMPT,
+            "Tier 3 Literary Analysis": TIER3_SYSTEM_PROMPT
+        }
+        
+        for name, content in system_prompts.items():
+            existing_prompt = db.exec(
+                select(SystemStr).where(SystemStr.name == name)
+            ).first()
+            
+            if not existing_prompt:
+                system_str = SystemStr(name=name, content=content)
+                db.add(system_str)
+                logger.info(f"✓ Created new system prompt: {name}")
+            else:
+                logger.info(f"→ System prompt already exists: {name}")
+        
+        # Commit changes
+        db.commit()
+        logger.info("\n=== Literary Analysis Registration Summary ===")
+        logger.info(f"Total tools checked: {len(all_tools)}")
+        logger.info(f"Total system prompts checked: {len(system_prompts)}")
+        
+    except Exception as e:
+        logger.error(f"Critical error during literary analysis registration: {str(e)}", exc_info=True)
+        raise
+
 class SQLAlchemyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         try:
@@ -118,15 +267,112 @@ def create_application() -> FastAPI:
     
     @app.on_event("startup")
     async def startup_event():
+        """Initialize database, tools, and default chat threads."""
         logger.info("Running startup tasks...")
         try:
             # Create database tables
             logger.info("Creating database tables...")
             SQLModel.metadata.create_all(engine)
             
-            # Register tools
+            # Register tools and system prompts
             with Session(engine) as db:
                 register_default_tools(db)
+                register_literary_analysis_tools(db)
+                
+                # Initialize default chat threads
+                logger.info("Checking/Initializing default chat threads...")
+                
+                # Get system prompts
+                tier1_prompt = db.exec(
+                    select(SystemStr).where(SystemStr.name == "Tier 1 Literary Analysis")
+                ).first()
+                tier2_prompt = db.exec(
+                    select(SystemStr).where(SystemStr.name == "Tier 2 Literary Analysis")
+                ).first()
+                tier3_prompt = db.exec(
+                    select(SystemStr).where(SystemStr.name == "Tier 3 Literary Analysis")
+                ).first()
+                
+                # Get tools for each tier based on their names in the system prompts
+                tier1_tools = db.exec(
+                    select(Tool).where(Tool.schema_name.in_([
+                        "extract_basic_metadata",
+                        "generate_summary", 
+                        "extract_keywords"
+                    ]))
+                ).all()
+                
+                tier2_tools = db.exec(
+                    select(Tool).where(Tool.schema_name.in_([
+                        "analyze_themes",
+                        "analyze_characters",
+                        "analyze_setting",
+                        "correlate_themes_setting"
+                    ]))
+                ).all()
+                
+                tier3_tools = db.exec(
+                    select(Tool).where(Tool.schema_name.in_([
+                        "analyze_historical_context",
+                        "identify_literary_devices",
+                        "perform_critical_analysis",
+                        "analyze_philosophy",
+                        "analyze_psychology",
+                        "analyze_structure",
+                        "analyze_linguistics",
+                        "perform_comparative"
+                    ]))
+                ).all()
+                
+                # Create default LLM config if needed
+                default_config = db.exec(
+                    select(LLMConfig)
+                    .where(LLMConfig.model == "gpt-4o")
+                    .where(LLMConfig.response_format == ResponseFormat.auto_tools)
+                ).first()
+                
+                if not default_config:
+                    default_config = LLMConfig(
+                        client=LLMClient.openai,
+                        model="gpt-4o",
+                        response_format=ResponseFormat.auto_tools,
+                        temperature=0,
+                        max_tokens=2500,
+                        use_cache=True
+                    )
+                    db.add(default_config)
+                    db.commit()
+                    logger.info("✓ Created default LLM config")
+                
+                # Define default chats configuration with their specific tools
+                default_chats_config = [
+                    ("Dante", tier1_prompt, tier1_tools),          # Tier 1 tools only
+                    ("Shakespeare", tier2_prompt, tier2_tools),    # Tier 2 tools only
+                    ("Virgil", tier3_prompt, tier3_tools)         # Tier 3 tools only
+                ]
+                
+                # Check and create each chat if it doesn't exist
+                for chat_name, system_prompt, tools in default_chats_config:
+                    existing_chat = db.exec(
+                        select(ChatThread).where(ChatThread.name == chat_name)
+                    ).first()
+                    
+                    if not existing_chat:
+                        logger.info(f"Creating new chat thread: {chat_name} with tools: {[t.schema_name for t in tools]}")
+                        new_chat = ChatThread(
+                            name=chat_name,
+                            system_prompt=system_prompt,
+                            tools=tools,  # Assign tier-specific tools
+                            llm_config=default_config
+                        )
+                        db.add(new_chat)
+                        logger.info(f"✓ Created new chat thread: {chat_name}")
+                    else:
+                        # Update existing chat with correct tier tools
+                        existing_chat.tools = tools
+                        logger.info(f"→ Updated chat thread {chat_name} with tools")
+                    
+                    db.commit()
                 
         except Exception as e:
             logger.error(f"Startup failed: {str(e)}", exc_info=True)
