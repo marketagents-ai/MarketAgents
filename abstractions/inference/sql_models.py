@@ -43,6 +43,7 @@ from anthropic.types.model_param import ModelParam
 from abstractions.inference.utils import msg_dict_to_oai, msg_dict_to_anthropic, parse_json_string
 import uuid
 from uuid import UUID
+import asyncio
 
 class CallableRegistry:
     """Global registry for tool callables"""
@@ -159,10 +160,41 @@ def {name}(x: float) -> float:
                 for name, func in cls._registry.items()
             }
         }
-
+def create_tool_error_message(
+    error: Union[str, Exception],
+    tool_name: str,
+    tool_call_id: Optional[str],
+    parent_uuid: Optional[UUID]
+) -> 'ChatMessage':
+    """
+    Create an error message for tool execution failures.
+    
+    Args:
+        error: The error message or exception
+        tool_name: Name of the tool that failed
+        tool_call_id: Optional ID of the tool call
+        parent_uuid: UUID of the parent message
+        
+    Returns:
+        ChatMessage: Formatted error message
+    """
+    error_content = json.dumps({
+        "error": str(error),
+        "tool_name": tool_name,
+        "tool_call_id": tool_call_id
+    })
+    
+    return ChatMessage(
+        role=MessageRole.tool,
+        content=error_content,
+        tool_name=f"{tool_name}_response",
+        tool_call_id=tool_call_id,
+        parent_message_uuid=parent_uuid,
+        tool_executable=True
+    )
 class Tool(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    schema_name: str = Field(default="generate_structured_output")
+    schema_name: str
     schema_description: str = Field(default="Generate a structured output based on the provided JSON schema.")
     instruction_string: str = Field(default="Please follow this JSON schema for your response:")
     strict_schema: bool = True
@@ -217,21 +249,13 @@ class Tool(SQLModel, table=True):
 
     async def execute(self, input: Dict[str, Any], tool_call_id: Optional[str] = None, tool_call_message_uuid: Optional[UUID] = None) -> 'ChatMessage':
         """Execute the callable function with the given input."""
-        print(f"\n=== Tool Execution Debug ===")
-        print(f"Tool: {self.schema_name}")
-        print(f"Input: {input}")
-        print(f"Tool call ID: {tool_call_id}")
-        print(f"Parent message UUID: {tool_call_message_uuid}")
-
         if not self.callable or not self.callable_function:
             error_msg = "Tool is not callable"
-            print(f"Error: {error_msg}")
             raise ValueError(error_msg)
 
         callable_func = CallableRegistry().get(self.schema_name)
         if not callable_func:
-            error_msg = f"Function '{self.schema_name}' not found in registry. Available functions: {list(CallableRegistry()._registry.keys())}"
-            print(f"Error: {error_msg}")
+            error_msg = f"Function '{self.schema_name}' not found in registry"
             raise ValueError(error_msg)
         
         try:
@@ -250,10 +274,18 @@ class Tool(SQLModel, table=True):
                 issubclass(param_type, BaseModel)):
                 print(f"Using Pydantic model validation for input")
                 model_input = param_type.model_validate(input)
-                response = callable_func(model_input)
+                # Add await here for async functions
+                if asyncio.iscoroutinefunction(callable_func):
+                    response = await callable_func(model_input)
+                else:
+                    response = callable_func(model_input)
             else:
                 print(f"Using direct kwargs for input")
-                response = callable_func(**input)
+                # Add await here for async functions
+                if asyncio.iscoroutinefunction(callable_func):
+                    response = await callable_func(**input)
+                else:
+                    response = callable_func(**input)
             
             print(f"Raw response: {response}")
             
@@ -283,7 +315,12 @@ class Tool(SQLModel, table=True):
             print(f"Exception type: {type(e)}")
             import traceback
             print(f"Traceback: {traceback.format_exc()}")
-            raise ValueError(error_msg) from e
+            return create_tool_error_message(
+                error=error_msg,
+                tool_name=self.schema_name,
+                tool_call_id=tool_call_id,
+                parent_uuid=tool_call_message_uuid
+            )
 
     @computed_field
     @property
@@ -840,39 +877,7 @@ class ChatThread (SQLModel, table=True):
             
         return True
 
-    def _create_tool_error_message(
-        self, 
-        error: Union[str, Exception],
-        tool_name: str,
-        tool_call_id: Optional[str],
-        parent_uuid: UUID
-    ) -> ChatMessage:
-        """
-        Create an error message for tool execution failures.
-        
-        Args:
-            error: The error message or exception
-            tool_name: Name of the tool that failed
-            tool_call_id: Optional ID of the tool call
-            parent_uuid: UUID of the parent message
-            
-        Returns:
-            ChatMessage: Formatted error message
-        """
-        error_content = json.dumps({
-            "error": str(error),
-            "tool_name": tool_name,
-            "tool_call_id": tool_call_id
-        })
-        
-        return ChatMessage(
-            role=MessageRole.tool,
-            content=error_content,
-            tool_name=f"{tool_name}_response",
-            tool_call_id=tool_call_id,
-            parent_message_uuid=parent_uuid,
-            tool_executable=True
-        )
+
 
     async def execute_tool(self) -> Optional[ChatMessage]:
         """
@@ -889,7 +894,7 @@ class ChatThread (SQLModel, table=True):
         tool = self.get_tool_by_name(last_message.tool_name)
         
         if not tool:
-            return self._create_tool_error_message(
+            return create_tool_error_message(
                 error=f"Tool '{last_message.tool_name}' not found",
                 tool_name=last_message.tool_name,
                 tool_call_id=last_message.tool_call_id,
@@ -906,7 +911,7 @@ class ChatThread (SQLModel, table=True):
             return tool_response
             
         except Exception as e:
-            return self._create_tool_error_message(
+            return create_tool_error_message(
                 error=e,
                 tool_name=last_message.tool_name,
                 tool_call_id=last_message.tool_call_id,

@@ -28,3 +28,4 @@ abstractions.egg-info/**
 *.db
 *.db
 database.db
+/forge_responses

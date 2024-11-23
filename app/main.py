@@ -35,6 +35,7 @@ from abstractions.hub.angels import (
     LITERARY_DEVICES_SCHEMA,
     CRITICAL_ANALYSIS_SCHEMA
 )
+from abstractions.hub.forge import forge_tool, call_forge_api
 import logging
 
 # Configure logging
@@ -184,6 +185,7 @@ def register_literary_analysis_tools(db: Session):
                 instruction_string="Perform a critical analysis of the text"
             )
         ]
+        
 
         all_tools = tier1_tools + tier2_tools + tier3_tools
         
@@ -292,7 +294,6 @@ def create_application() -> FastAPI:
                 tier3_prompt = db.exec(
                     select(SystemStr).where(SystemStr.name == "Tier 3 Literary Analysis")
                 ).first()
-                
                 # Get tools for each tier based on their names in the system prompts
                 tier1_tools = db.exec(
                     select(Tool).where(Tool.schema_name.in_([
@@ -301,7 +302,6 @@ def create_application() -> FastAPI:
                         "extract_keywords"
                     ]))
                 ).all()
-                
                 tier2_tools = db.exec(
                     select(Tool).where(Tool.schema_name.in_([
                         "analyze_themes",
@@ -310,7 +310,6 @@ def create_application() -> FastAPI:
                         "correlate_themes_setting"
                     ]))
                 ).all()
-                
                 tier3_tools = db.exec(
                     select(Tool).where(Tool.schema_name.in_([
                         "analyze_historical_context",
@@ -323,8 +322,33 @@ def create_application() -> FastAPI:
                         "perform_comparative"
                     ]))
                 ).all()
+                # Check for forge tool in database and registry
+                forge_tool_db = db.exec(
+                    select(Tool).where(Tool.schema_name == forge_tool.schema_name)
+                ).first()
                 
-                # Create default LLM config if needed
+                if forge_tool_db:
+                    logger.info("Found forge tool in database, re-registering to registry...")
+                    try:
+                        CallableRegistry().register(forge_tool.schema_name, call_forge_api)
+                        logger.info("✓ Re-registered forge tool to registry")
+                    except ValueError:
+                        logger.info("→ Forge tool already in registry")
+                
+                # Create forge system prompt if needed
+                forge_prompt = db.exec(
+                    select(SystemStr).where(SystemStr.name == "Forge Agent")
+                ).first()
+                
+                if not forge_prompt:
+                    forge_prompt = SystemStr(
+                        name="Forge Agent",
+                        content="You are a forge agent capable of creating and modifying tools. Use the call_forge tool to handle tool-related operations."
+                    )
+                    db.add(forge_prompt)
+                    logger.info("✓ Created forge system prompt")
+                
+                # Get default LLM config
                 default_config = db.exec(
                     select(LLMConfig)
                     .where(LLMConfig.model == "gpt-4o")
@@ -346,9 +370,10 @@ def create_application() -> FastAPI:
                 
                 # Define default chats configuration with their specific tools
                 default_chats_config = [
-                    ("Dante", tier1_prompt, tier1_tools),          # Tier 1 tools only
-                    ("Shakespeare", tier2_prompt, tier2_tools),    # Tier 2 tools only
-                    ("Virgil", tier3_prompt, tier3_tools)         # Tier 3 tools only
+                    ("Dante", tier1_prompt, tier1_tools),
+                    ("Shakespeare", tier2_prompt, tier2_tools),
+                    ("Virgil", tier3_prompt, tier3_tools),
+                    ("Forge", forge_prompt, [forge_tool_db] if forge_tool_db else [forge_tool])  # Add Forge agent
                 ]
                 
                 # Check and create each chat if it doesn't exist
