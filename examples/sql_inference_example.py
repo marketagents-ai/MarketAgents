@@ -56,8 +56,10 @@ async def main():
                 )
             session.add_all(chats)
             session.commit()
+            print("chats added to session:")
             for prompt in chats:
                 session.refresh(prompt)
+            print("chats refreshed:")
         return chats
     
     def get_chats_from_session(session:Session) -> List[ChatThread]:

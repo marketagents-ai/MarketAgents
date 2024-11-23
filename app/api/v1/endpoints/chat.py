@@ -1153,7 +1153,7 @@ async def test_callable_tool(
         )
     
     try:
-        result = tool.execute(input=input_data)
+        result = await tool.execute(input=input_data)
         return {"result": result.content}
     except Exception as e:
         raise HTTPException(

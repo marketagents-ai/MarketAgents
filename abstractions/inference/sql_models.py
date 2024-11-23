@@ -215,7 +215,7 @@ class Tool(SQLModel, table=True):
         self._register_callable()
         return self
 
-    def execute(self, input: Dict[str, Any], tool_call_id: Optional[str] = None, tool_call_message_uuid: Optional[UUID] = None) -> 'ChatMessage':
+    async def execute(self, input: Dict[str, Any], tool_call_id: Optional[str] = None, tool_call_message_uuid: Optional[UUID] = None) -> 'ChatMessage':
         """Execute the callable function with the given input."""
         print(f"\n=== Tool Execution Debug ===")
         print(f"Tool: {self.schema_name}")
@@ -760,19 +760,6 @@ class ChatThread (SQLModel, table=True):
         self.processed_outputs.append(llm_output)
         self.new_message = None
 
-    def add_assistant_and_tool_execution_response(self, llm_output: 'ProcessedOutput'):
-        """Add the assistant's response from the ProcessedOutput to the history"""
-        user_message_uuid = self.get_last_message_uuid()
-        assert user_message_uuid is not None, "User message uuid is None, cannot add assistant response"
-        assert llm_output.json_object is not None, "json_object is None, cannot add to history"
-        self.add_assistant_response(llm_output, user_message_uuid)
-        #execute the tool
-
-        tool = self.get_tool_by_name(llm_output.json_object.name)
-        if tool is None:
-            raise ValueError(f"Tool {llm_output.json_object.name} not found, cannot execute tool")
-        tool_response = tool.execute(input=llm_output.json_object.object, tool_call_id=llm_output.json_object.tool_call_id)
-        self.history.append(tool_response)
 
     def add_chat_turn_history(self, llm_output: 'ProcessedOutput'):
         """Add a complete chat turn (user message + assistant response) to the history"""
@@ -831,6 +818,100 @@ class ChatThread (SQLModel, table=True):
         snapshot = self.create_snapshot()
         session.add(snapshot)
         session.commit()
+
+    def can_execute_tool(self) -> bool:
+        """
+        Check if the chat thread's last message is an assistant message with a valid tool request.
+        
+        Returns:
+            bool: True if the thread can execute a tool, False otherwise
+        """
+        if not self.history:
+            return False
+            
+        last_message = self.history[-1]
+        if last_message.role != MessageRole.assistant:
+            return False
+            
+        if not (last_message.tool_name and last_message.tool_call and last_message.tool_executable):
+            return False
+            
+
+            
+        return True
+
+    def _create_tool_error_message(
+        self, 
+        error: Union[str, Exception],
+        tool_name: str,
+        tool_call_id: Optional[str],
+        parent_uuid: UUID
+    ) -> ChatMessage:
+        """
+        Create an error message for tool execution failures.
+        
+        Args:
+            error: The error message or exception
+            tool_name: Name of the tool that failed
+            tool_call_id: Optional ID of the tool call
+            parent_uuid: UUID of the parent message
+            
+        Returns:
+            ChatMessage: Formatted error message
+        """
+        error_content = json.dumps({
+            "error": str(error),
+            "tool_name": tool_name,
+            "tool_call_id": tool_call_id
+        })
+        
+        return ChatMessage(
+            role=MessageRole.tool,
+            content=error_content,
+            tool_name=f"{tool_name}_response",
+            tool_call_id=tool_call_id,
+            parent_message_uuid=parent_uuid,
+            tool_executable=True
+        )
+
+    async def execute_tool(self) -> Optional[ChatMessage]:
+        """
+        Execute the tool requested in the last assistant message.
+        
+        Returns:
+            Optional[ChatMessage]: The tool response message or None if execution not possible
+        """
+        if not self.can_execute_tool():
+            return None
+            
+        last_message = self.history[-1]
+        assert last_message.tool_name is not None, "tool_name is None, cannot execute tool"
+        tool = self.get_tool_by_name(last_message.tool_name)
+        
+        if not tool:
+            return self._create_tool_error_message(
+                error=f"Tool '{last_message.tool_name}' not found",
+                tool_name=last_message.tool_name,
+                tool_call_id=last_message.tool_call_id,
+                parent_uuid=last_message.uuid
+            )
+        
+        try:
+            tool_response = await tool.execute(
+                input=last_message.tool_call,
+                tool_call_id=last_message.tool_call_id,
+                tool_call_message_uuid=last_message.uuid
+            )
+            tool_response.chat_thread = self
+            return tool_response
+            
+        except Exception as e:
+            return self._create_tool_error_message(
+                error=e,
+                tool_name=last_message.tool_name,
+                tool_call_id=last_message.tool_call_id,
+                parent_uuid=last_message.uuid
+            )
 
 class OutputUsageLinkage(SQLModel, table=True):
     usage_id: int = Field(foreign_key="usage.id",primary_key=True)
