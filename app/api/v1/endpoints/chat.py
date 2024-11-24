@@ -1208,12 +1208,6 @@ async def trigger_assistant_response(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat {chat_id} not found"
             )
-        
-        if not chat.tools:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Chat must have active tools to trigger assistant response"
-            )
     
     try:
         results = await ai_utils.run_parallel_ai_completion([chat])

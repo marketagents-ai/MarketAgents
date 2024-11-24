@@ -88,7 +88,7 @@ class ParallelAIUtilities:
                     session.add(chat)
                     updated_threads.append(chat)
                 except Exception as e:
-                    if chat.llm_config.response_format != ResponseFormat.auto_tools:
+                    if chat.llm_config.response_format not in [ResponseFormat.auto_tools, ResponseFormat.tool, ResponseFormat.text]:
                         print(f"Error adding user message to chat thread {chat.id}: {e}, removed from thread list")
                     else:
                         session.add(chat)
