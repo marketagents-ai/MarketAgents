@@ -254,6 +254,49 @@ def create_tables(db_params):
         FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS article_summaries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        url TEXT UNIQUE NOT NULL,
+        title TEXT,
+        content TEXT,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        status TEXT,
+        basic_summary TEXT,
+        key_points JSONB,
+        market_impact TEXT,
+        trading_implications TEXT,
+        agent_id TEXT,
+        extraction_method TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+        # Create indexes for article_summaries
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_article_summaries_url ON article_summaries(url)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_article_summaries_timestamp ON article_summaries(timestamp)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_article_summaries_status ON article_summaries(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_article_summaries_agent_id ON article_summaries(agent_id)")
+
+    # Create updated_at trigger function
+    cursor.execute("""
+    CREATE OR REPLACE FUNCTION update_article_summaries_updated_at()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+    END;
+    $$ language 'plpgsql'
+    """)
+
+    # Create trigger
+    cursor.execute("""
+    DROP TRIGGER IF EXISTS update_article_summaries_updated_at ON article_summaries;
+    CREATE TRIGGER update_article_summaries_updated_at
+        BEFORE UPDATE ON article_summaries
+        FOR EACH ROW
+        EXECUTE FUNCTION update_article_summaries_updated_at()
+    """)
 
     # Create indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_requests_prompt_context_id ON requests(prompt_context_id)")

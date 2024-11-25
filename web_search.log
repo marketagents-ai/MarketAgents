@@ -5113,3 +5113,82 @@ Brent crude oil futures pared losses during London trade and were last down 2
         - Duration: 12.89 seconds
         - Results saved to: outputs/web_search/results_20241122_163659.json
         
+2024-11-23 22:10:13,010 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/urls.json
+2024-11-23 22:10:13,010 - __main__ - INFO - Successfully loaded 3 URLs
+2024-11-23 22:10:13,010 - __main__ - INFO - Loaded 3 URLs
+2024-11-23 22:10:13,011 - __main__ - INFO - Using method newspaper3k for https://www.moneycontrol.com/news/business/markets/wall-street-sinks-on-powell-rate-cut-caution-trump-cabinet-picks-12868570.html
+2024-11-23 22:10:13,566 - __main__ - INFO - Successfully extracted content using newspaper3k
+2024-11-23 22:10:13,566 - __main__ - INFO - Using method newspaper3k for https://www.moneycontrol.com/news/business/markets/s-walmart-hits-record-after-forecast-12870909.html
+2024-11-23 22:10:14,126 - __main__ - INFO - Successfully extracted content using newspaper3k
+2024-11-23 22:10:14,126 - __main__ - INFO - Using method newspaper3k for https://www.moneycontrol.com/news/business/markets/sp-500-blows-past-6000-points-on-trump-presidency-12861920.html
+2024-11-23 22:10:14,678 - __main__ - INFO - Successfully extracted content using newspaper3k
+2024-11-23 22:10:23,310 - __main__ - ERROR - Error in AI summary generation for https://www.moneycontrol.com/news/business/markets/wall-street-sinks-on-powell-rate-cut-caution-trump-cabinet-picks-12868570.html: '4df02514-a8a6-4231-9ffd-a4f58640b93a'
+2024-11-23 22:10:24,349 - __main__ - ERROR - Error in AI summary generation for https://www.moneycontrol.com/news/business/markets/s-walmart-hits-record-after-forecast-12870909.html: '26a7c931-b3a1-4783-bdea-3274ba2963e2'
+2024-11-23 22:10:26,777 - __main__ - ERROR - Error in AI summary generation for https://www.moneycontrol.com/news/business/markets/sp-500-blows-past-6000-points-on-trump-presidency-12861920.html: '4df02514-a8a6-4231-9ffd-a4f58640b93a'
+2024-11-23 22:10:26,778 - __main__ - INFO - 
+=== ARTICLE SUMMARIES ===
+2024-11-23 22:10:26,778 - __main__ - INFO - 
+    URL: https://www.moneycontrol.com/news/business/markets/wall-street-sinks-on-powell-rate-cut-caution-trump-cabinet-picks-12868570.html
+    TITLE: Wall Street sinks on Powell rate-cut caution, Trump cabinet picks
+    EXTRACTION METHOD: newspaper3k
+    SUMMARY:
+    {
+  "summary": "Wall Street",
+  "key_points": [
+    "Wall Street's main indexes closed lower on Friday, with the S&P 500 and Nasdaq notching their biggest one-day losses in two weeks, on concerns about slower interest-rate cuts and as investors reacted to cabinet picks by U.S. President-elect Donald Trump.",
+    "Federal Reserve Chair Jerome Powell on Thursday cited ongoing economic growth, a solid job market, and inflation above the U.S. central bank's 2% target as reasons it can afford to be careful with the pace and scope of future rate cuts.",
+    "Story continues below Advertisement Remove Ad",
+    "Traders increased bets the Fed will not change rates at its December meeting, pricing in a roughly 42% chance, versus roughly 14% a month ago, according to the CME FedWatch tool. They also dialed back expectations for easing in 2025."
+  ],
+  "market_impact": "Wall Street\n\nWall Street's main indexes closed lower on Friday, with the S&P 500 and Nasdaq notching their biggest one-day losses in two weeks, on concerns about slower interest-rate cuts and as investors reacted to cabinet picks by U\n\n\nFederal Reserve Chair Jerome Powell on Thursday cited ongoing economic growth, a solid job market, and inflation above the U\n central bank's 2% target as reasons it can afford to be careful with the pace and scope of future rate cuts\n\n\nStory continues below Advertisement Remove Ad\n\nTraders increased bets the Fed will not change rates at its December meeting, pricing in a roughly 42% chance, versus roughly 14% a month ago, according to the CME FedWatch tool\n Import prices also rebounded and data released on Wednesday and Thursday showed sticky inflation\n\n\n\"In the last 48 hours we've had some pretty big changes, not just from the election but from economic data that was better than expected and Powell speaking about not having to be as aggressive on interest rate cuts,\" said Adam Rich, deputy chief investment officer for Vaughan Nelson in Houston\n\n\n\"Market expectations for interest rate cuts have come down materially and also the market is readjusting after a pretty bullish reaction to the U\n\"\n\nFriday's sell-off ended a week in which market focus shifted from the U\n election win by Trump, seen as a pro-business choice, to worries about the rate cut path and potential inflation risks under the next administration\n stocks have been doing well this month\n\"\n\nStocks of vaccine makers and packaged food companies also dipped after Trump said he would nominate Robert F Kennedy Jr, who has spread misinformation on vaccines and criticized ultra-processed foods, to head the Department of Health and Human Services\n\n\nThe small-cap Russell 2000 index ended down 1\n\n\nAlso, the Philadelphia SE Semiconductor index fell 3\n\n\nThe Consumer staples index, which finished off 0\n\n\nAdding to Friday's volatility was the regular expiration of stock and index options, according to Vaughan Nelson's Rich\n\n\nBrent Kochuba, founder of financial insights company SpotGamma, said Friday's stock market weakness was partly due to investors being ill-prepared for a pullback\n\n\nCBOE's volatility index, also known as Wall Street's fear gauge, hit 17\n However the index pared gains to close at 16\n\n\nOn the Nasdaq, 1,241 stocks rose and 3,115 fell as declining issues outnumbered advancers by a 2",
+  "trading_implications": "\n\nStory continues below Advertisement Remove Ad\n\nTraders increased bets the Fed will not change rates at its December meeting, pricing in a roughly 42% chance, versus roughly 14% a month ago, according to the CME FedWatch tool\n\"\n\nFriday's sell-off ended a week in which market focus shifted from the U\n election win by Trump, seen as a pro-business choice, to worries about the rate cut path and potential inflation risks under the next administration\n\n\nThe small-cap Russell 2000 index ended down 1"
+}
+    -------------------
+                    
+2024-11-23 22:10:26,778 - __main__ - INFO - 
+    URL: https://www.moneycontrol.com/news/business/markets/s-walmart-hits-record-after-forecast-12870909.html
+    TITLE: S&P 500, Nasdaq end up with Nvidia; Walmart hits record after forecast
+    EXTRACTION METHOD: newspaper3k
+    SUMMARY:
+    {
+  "summary": "Wall Street",
+  "key_points": [
+    "The Nasdaq rose more than 1% and S&P 500 also ended higher on Tuesday, led by a jump in technology shares as investors eagerly awaited results this week from Nvidia, while Walmart shares climbed after the retailer raised its annual forecasts. The Dow finished lower.",
+    "All three major indexes started the day lower, with the benchmark index dropping as much as about 0.6% after Russian President Vladimir Putin lowered the threshold for a nuclear strike in response to a broader range of conventional attacks earlier in the day, and Moscow said Ukraine had struck deep inside Russia with U.S.-made long-range missiles.",
+    "Story continues below Advertisement Remove Ad",
+    "Stocks pared losses as Russian Foreign Minister Sergei Lavrov said Moscow will do everything possible to prevent a nuclear war."
+  ],
+  "market_impact": "Wall Street\n\nThe Nasdaq rose more than 1% and S&P 500 also ended higher on Tuesday, led by a jump in technology shares as investors eagerly awaited results this week from Nvidia, while Walmart shares climbed after the retailer raised its annual forecasts\n\n\nAll three major indexes started the day lower, with the benchmark index dropping as much as about 0\n\n\nStory continues below Advertisement Remove Ad\n\nStocks pared losses as Russian Foreign Minister Sergei Lavrov said Moscow will do everything possible to prevent a nuclear war\n01 and was the biggest boost for all three major indexes\n\n\nStrategists said expectations are high for Nvidia, which has driven the artificial intelligence-related rally in stocks\n\n\nOther megacap stocks also rose, including Amazon\n Largely investors are hiding out in some of the megacap names, which is a little bit surprising ahead of Nvidia earnings, but they are highly liquid,\" said Timothy Chubb, chief investment officer at Girard, a Univest Wealth Division\n\n\n\"Walmart came in and delivered optimistic guidance,\" said Quincy Krosby, chief global strategist at LPL Financial in Charlotte, North Carolina\n\n\n\"One of the components that was important for the market was that it said more of their customers are going in and purchasing items in the higher margin categories, which is something that has been watched\n\n\nAdding to optimism, Goldman Sachs strategists forecast the S&P 500 would reach 6,500 by the end of 2025\n\n\nInvestors are digesting picks for President-elect Donald Trump's administration\n\n\nOn the Nasdaq, 2,459 stocks rose and 1,841 fell as advancing issues outnumbered decliners by a 1\n24 billion average for the full session over the last 20 trading days",
+  "trading_implications": "Trading analysis unavailable due to processing error"
+}
+    -------------------
+                    
+2024-11-23 22:10:26,778 - __main__ - INFO - 
+    URL: https://www.moneycontrol.com/news/business/markets/sp-500-blows-past-6000-points-on-trump-presidency-12861920.html
+    TITLE: S&P 500 blows past 6,000 points on Trump presidency
+    EXTRACTION METHOD: newspaper3k
+    SUMMARY:
+    {
+  "summary": "Wall Street",
+  "key_points": [
+    "The US S&P 500 zoomed past 6,000 points on Friday to a new record while Treasury yields retreated, as investors again cheered Donald Trump's decisive victory, although disappointment about China's latest fiscal support dampened the mood elsewhere.",
+    "A day after the Federal Reserve delivered a quarter-point rate cut, as anticipated, the focus returned to the fallout of Tuesday's U.S. presidential election and headlines out of Beijing.",
+    "Story continues below Advertisement Remove Ad",
+    "The offshore yuan weakened, while U.S.-listed shares of Chinese firms and China exposed-sectors in Europe sank as investors took in news that China's stimulus did not directly inject money into the struggling economy."
+  ],
+  "market_impact": "Wall Street\n\nThe US S&P 500 zoomed past 6,000 points on Friday to a new record while Treasury yields retreated, as investors again cheered Donald Trump's decisive victory, although disappointment about China's latest fiscal support dampened the mood elsewhere\n\n\nA day after the Federal Reserve delivered a quarter-point rate cut, as anticipated, the focus returned to the fallout of Tuesday's U\n-listed shares of Chinese firms and China exposed-sectors in Europe sank as investors took in news that China's stimulus did not directly inject money into the struggling economy\n\n\nBut investors on Wall Street shrugged off frustration about the lack of a Chinese fiscal bazooka and bought U\n stocks\n\n\nThe S&P 500 index climbed to an intra-day high of 6,012\n2%, catapulting its market capitalization to $1 trillion for the first time since 2022\n stocks: \"The Fed is cutting rates, and the U\n Investors are betting that a Trump administration will bring lighter regulation and tax cuts that could boost the U\n7%, while a MSCI index for world stocks was flat after hitting a record high on Friday\n Still, the index for world stocks had its best week in three months\n So, taxes will come down, bureaucracy will ease and regulation will become lighter,\" said Guy Miller, chief markets strategist at Zurich Insurance Group\n stocks\n market has potential,\" he said\n\n\nGermany's DAX stock index fell 0\n China-exposed European luxury and mining stocks each fell over 3%\n\n\nThe dot plot shows the policy rates of the G10 central banks on March 1, 2024 and Nov\n 7 for countries which have started cutting rates is in orange, which are steady is in yellow and for those which are hiking are in purple\n\n\nFED CUTS\n\nU\n Treasury yields fell after Fed Chair Jerome Powell on Thursday signaled continued, patient policy easing\n\n\nThe Fed's rate cut followed a quarter-point cut from the Bank of England and a large half-point cut by Sweden, also on Thursday\n\n\n\"The Fed pointed to a more uncertain economic outlook and inflation remaining elevated,\" said Mahmood Pradhan, head of global macroeconomics at the Amundi Investment Institute\n\"\n\nThe dollar index , which measures the currency against six major peers, rose to 104\n53%, the most in over two years, a sign of increased volatility as investors assess the new Trump administration's policies",
+  "trading_implications": "\n\nNicholas Colas, a co-founder of DataTrek Research LLC, said there are several reasons for buying U\n\n\nBrent crude oil futures pared losses during London trade and were last down 2"
+}
+    -------------------
+                    
+2024-11-23 22:10:26,779 - __main__ - INFO - ======================================
+2024-11-23 22:10:26,779 - __main__ - INFO - 🔥 SEARCH SUMMARY 🔥
+2024-11-23 22:10:26,779 - __main__ - INFO - ======================================
+2024-11-23 22:10:26,780 - __main__ - INFO - 
+        Search completed:
+        - Total URLs: 3
+        - Successful: 3
+        - Failed: 0
+        - Duration: 13.77 seconds
+        - Results saved to: outputs/web_search/results_20241123_221026.json
+        
