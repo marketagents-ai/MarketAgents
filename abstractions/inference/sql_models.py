@@ -591,6 +591,10 @@ class SystemStr(SQLModel, table=True):
     content: str
     chats: List["ChatThread"] = Relationship(back_populates="system_prompt", link_model=ThreadSystemLinkage, sa_relationship_kwargs={"lazy": "joined"})
 
+class ThreadStopToolLinkage(SQLModel, table=True):
+    chat_thread_id: int = Field(foreign_key="chatthread.id",primary_key=True)
+    stop_tool_id: int = Field(foreign_key="tool.id",primary_key=True)
+
 class ChatThread (SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     uuid: UUID = Field(default_factory=lambda: uuid.uuid4())
@@ -608,8 +612,11 @@ class ChatThread (SQLModel, table=True):
     llm_config: LLMConfig = Relationship(back_populates="chats",sa_relationship_kwargs={"lazy": "joined"})
     llm_config_id: Optional[int] = Field(default=None, foreign_key="llmconfig.id")
     tools: List[Tool] = Relationship(link_model=ThreadToolLinkage,sa_relationship_kwargs={"lazy": "joined"})
+    stop_tool: Optional[Tool] = Relationship(link_model=ThreadStopToolLinkage,sa_relationship_kwargs={"lazy": "joined"})
     processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
-    
+    auto_run: bool = Field(default=False, description="Whether to automatically run the assistant without user messages until stop tool is called")
+    is_running: bool = Field(default=False, description="Whether the chat thread is currently running")
+
     def get_last_message_uuid(self) -> Optional[UUID]:
         if len(self.history) == 0:
             return None

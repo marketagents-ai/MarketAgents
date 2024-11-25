@@ -242,6 +242,17 @@ class SQLAlchemyMiddleware(BaseHTTPMiddleware):
                 content={"detail": f"Database error: {str(e)}"}
             )
 
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logger.info(f"=== Starting {request.method} {request.url.path} ===")
+        try:
+            response = await call_next(request)
+            logger.info(f"✓ Completed {request.method} {request.url.path}")
+            return response
+        except Exception as e:
+            logger.error(f"✕ Error processing {request.method} {request.url.path}: {str(e)}")
+            raise
+
 def create_application() -> FastAPI:
     logger.info("Creating FastAPI application...")
     
@@ -266,6 +277,7 @@ def create_application() -> FastAPI:
     )
     
     app.add_middleware(SQLAlchemyMiddleware)
+    app.add_middleware(LoggingMiddleware)
     
     @app.on_event("startup")
     async def startup_event():
@@ -388,14 +400,17 @@ def create_application() -> FastAPI:
                             name=chat_name,
                             system_prompt=system_prompt,
                             tools=tools,  # Assign tier-specific tools
-                            llm_config=default_config
+                            llm_config=default_config,
+                            stop_tool=tools[-1] if tools and chat_name != "Forge" else None  # Set last tool as stop tool for literary agents
                         )
                         db.add(new_chat)
                         logger.info(f"✓ Created new chat thread: {chat_name}")
                     else:
-                        # Update existing chat with correct tier tools
+                        # Update existing chat with correct tier tools and stop tool
                         existing_chat.tools = tools
-                        logger.info(f"→ Updated chat thread {chat_name} with tools")
+                        if chat_name != "Forge" and tools:  # Only set stop tool for literary agents
+                            existing_chat.stop_tool = tools[-1]
+                        logger.info(f"→ Updated chat thread {chat_name} with tools and stop tool")
                     
                     db.commit()
                 

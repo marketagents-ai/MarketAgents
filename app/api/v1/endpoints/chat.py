@@ -5,6 +5,9 @@ from typing import List, Optional, Dict, Any, Callable
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, Field
+import logging
+from functools import partial
+import asyncio
 
 from abstractions.inference.sql_models import (
     ChatThread,
@@ -15,7 +18,8 @@ from abstractions.inference.sql_models import (
     MessageRole,
     LLMClient,
     ResponseFormat,
-    CallableRegistry
+    CallableRegistry,
+    ProcessedOutput,
 )
 from abstractions.inference.sql_inference import ParallelAIUtilities
 from abstractions.hub.tools import DEFAULT_TOOLS
@@ -24,6 +28,9 @@ from abstractions.hub.callable_tools import DEFAULT_CALLABLE_TOOLS
 from app.api.deps import DatabaseDep, get_ai_utils
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # --- Response Models ---
 class ChatMessageResponse(BaseModel):
@@ -60,6 +67,9 @@ class ChatResponse(BaseModel):
     system_prompt_id: Optional[int] = None
     active_tool_id: Optional[int] = None
     auto_tools_ids: List[int] = []
+    stop_tool_id: Optional[int] = None
+    auto_run: bool = False
+    is_running: bool = False
 
     class Config:
         from_attributes = True
@@ -97,7 +107,10 @@ class ChatResponse(BaseModel):
             system_prompt=chat.system_prompt.content if chat.system_prompt else None,
             system_prompt_id=chat.system_prompt.id if chat.system_prompt else None,
             active_tool_id=chat.structured_output_id if chat.structured_output_id else None,
-            auto_tools_ids=auto_tools_ids
+            auto_tools_ids=auto_tools_ids,
+            stop_tool_id=chat.stop_tool.id if chat.stop_tool else None,
+            auto_run=chat.auto_run,
+            is_running=chat.is_running
         )
 
 class MessageCreate(BaseModel):
@@ -173,6 +186,9 @@ class ChatCreateWithSystem(BaseModel):
 
 class ChatNameUpdate(BaseModel):
     name: str
+
+class ChatAutoRunUpdate(BaseModel):
+    auto_run: bool
 
 # --- Default configurations ---
 DEFAULT_LLM_CONFIG = LLMConfigCreate(
@@ -635,53 +651,191 @@ async def send_message(
     chat_id: int,
     ai_utils: ParallelAIUtilities = Depends(get_ai_utils)
 ) -> ChatResponse:
-    """Send a new message in a chat"""
-    # Get chat and setup message
-    with Session(ai_utils.engine) as db:
-        chat = db.get(ChatThread, chat_id)
-        if not chat:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Chat {chat_id} not found"
-            )
-        
-        # Update chat with new message
-        chat.new_message = message.content
-        db.add(chat)
-        db.commit()
-        db.refresh(chat)
-
+    """Send a new message in a chat and handle auto-running tools if enabled"""
     try:
-        # Process with AI and WAIT for the results
-        results = await ai_utils.run_parallel_ai_completion([chat])
-        if not results:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to get AI response"
-            )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing message during parallel completion: {str(e)}"
-        )
-
-    try:
-        # Now that we have results, get final state
+        # Set initial state
         with Session(ai_utils.engine) as db:
-            final_chat = db.get(ChatThread, chat_id)
-            if not final_chat:
+            chat = db.get(ChatThread, chat_id)
+            if not chat:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Chat {chat_id} not found"
+                )
+            
+            chat.is_running = True
+            chat.new_message = message.content
+            db.add(chat)
+            db.commit()
+
+        # Process with AI (passing chat_id instead of chat object)
+        try:
+            results = await process_chat_with_auto_run(chat_id, ai_utils)
+            if not results:
+                raise ValueError("Failed to get AI response")
+
+        except Exception as e:
+            # Handle errors in a new session
+            with Session(ai_utils.engine) as db:
+                chat = db.get(ChatThread, chat_id)
+                if not chat:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Chat {chat_id} not found during error handling"
+                    )
+
+                if "Tool" in str(e) and "not found" in str(e):
+                    available_tools = [
+                        f"- {tool.schema_name}: {tool.schema_description}"
+                        for tool in chat.tools
+                    ]
+                    tool_list = "\n".join(available_tools)
+                    
+                    error_response = ChatMessage(
+                        role=MessageRole.user,
+                        content=f"Error: {str(e)}\n\nAvailable tools are:\n{tool_list}",
+                        chat_thread=chat
+                    )
+                    chat.history.append(error_response)
+                
+                chat.is_running = False
+                db.add(chat)
+                db.commit()
+                db.refresh(chat)
+                
+                if "Tool" in str(e) and "not found" in str(e):
+                    return ChatResponse.from_chat_thread(chat)
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Error processing message: {str(e)}"
+                    )
+
+        # Success path
+        with Session(ai_utils.engine) as db:
+            chat = db.get(ChatThread, chat_id)
+            if not chat:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Chat {chat_id} not found after processing"
                 )
-            return ChatResponse.from_chat_thread(final_chat)
+            
+            chat.is_running = False
+            db.add(chat)
+            db.commit()
+            db.refresh(chat)
+            return ChatResponse.from_chat_thread(chat)
+
     except Exception as e:
+        # Final error handling
+        with Session(ai_utils.engine) as db:
+            chat = db.get(ChatThread, chat_id)
+            if chat:
+                chat.is_running = False
+                db.add(chat)
+                db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting final chat state after parallel completion: {str(e)}"
+            detail=str(e)
         )
 
-   
+async def alog(logger, level: str, message: str):
+    """Async wrapper for logging"""
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, partial(getattr(logger, level), message))
+
+async def process_chat_with_auto_run(chat_id: int, ai_utils: ParallelAIUtilities) -> List[ProcessedOutput]:
+    """Process chat messages with auto-running support"""
+    all_results = []
+    MAX_ITERATIONS = 5
+    
+    await alog(logger, "info", f"=== Starting Chat Auto-Run Process (Chat ID: {chat_id}) ===")
+    
+    # Initial processing
+    await alog(logger, "info", f"✓ Performing initial AI completion for chat {chat_id}")
+    with Session(ai_utils.engine) as db:
+        chat = db.get(ChatThread, chat_id)
+        if not chat:
+            await alog(logger, "error", f"✕ Failed to get chat {chat_id} from database")
+            return []
+    results = await ai_utils.run_parallel_ai_completion([chat])
+    
+    if not results:
+        await alog(logger, "warning", f"→ No results from initial AI completion for chat {chat_id}")
+        return []
+    all_results.extend(results)
+    
+    # Auto-run loop
+    with Session(ai_utils.engine) as db:
+        db_chat = db.get(ChatThread, chat_id)
+        if not db_chat:
+            await alog(logger, "error", f"✕ Failed to get chat {chat_id} from database")
+            return all_results
+            
+        should_auto_run = (
+            db_chat.auto_run and 
+            db_chat.llm_config.response_format == ResponseFormat.auto_tools and
+            db_chat.stop_tool is not None and
+            db_chat.stop_tool.id is not None
+        )
+    
+    if should_auto_run:
+        iteration = 0
+        while iteration < MAX_ITERATIONS:
+            iteration += 1
+            await alog(logger, "info", f"\n=== Starting Iteration {iteration} (Chat ID: {chat_id}) ===")
+            
+            # Check stop conditions
+            with Session(ai_utils.engine) as db:
+                current_chat = db.get(ChatThread, chat_id)
+                if not current_chat:
+                    await alog(logger, "error", f"✕ Failed to get chat {chat_id} from database")
+                    break
+                
+                last_message = current_chat.history[-1] if current_chat.history else None
+                if not last_message:
+                    await alog(logger, "info", "✓ No messages in history, ending auto-run")
+                    break
+
+                # Get stop tool and check if it's executable
+                stop_tool = current_chat.stop_tool
+                if not stop_tool:
+                    await alog(logger, "error", "✕ Stop tool not found, ending auto-run")
+                    break
+
+                stop_tool_is_executable = stop_tool.callable
+
+                # Check stop condition based on tool type
+                if stop_tool_is_executable:
+                    # For executable tools, check the tool response
+                    if (last_message.role == MessageRole.tool and 
+                        last_message.tool_name and 
+                        last_message.tool_name.startswith(f"{stop_tool.schema_name}_response")):
+                        await alog(logger, "info", f"✓ Stop tool {stop_tool.schema_name} response received, ending auto-run")
+                        break
+                else:
+                    # For non-executable tools, check the tool call
+                    if (last_message.role == MessageRole.assistant and 
+                        last_message.tool_name == stop_tool.schema_name):
+                        await alog(logger, "info", f"✓ Stop tool {stop_tool.schema_name} called, ending auto-run")
+                        break
+            
+            # Process next iteration
+            with Session(ai_utils.engine) as db:
+                current_chat = db.get(ChatThread, chat_id)
+                if not current_chat:
+                    await alog(logger, "error", f"✕ Failed to get chat {chat_id} from database")
+                    break
+            results = await ai_utils.run_parallel_ai_completion([current_chat])
+            
+            if not results:
+                await alog(logger, "warning", f"→ No results from AI completion in iteration {iteration}")
+                break
+            all_results.extend(results)
+        
+        if iteration >= MAX_ITERATIONS:
+            await alog(logger, "warning", f"✓ Reached maximum iterations ({MAX_ITERATIONS}), ending auto-run")
+    
+    return all_results
 
 @router.post("/{chat_id}/clear", response_model=ChatResponse)
 async def clear_chat_history(
@@ -1251,3 +1405,92 @@ async def get_chat_llm_config(
         )
     
     return LLMConfigResponse.from_orm(chat.llm_config)
+
+@router.put("/{chat_id}/stop-tool/{tool_id}", response_model=ChatResponse)
+async def assign_stop_tool_to_chat(
+    chat_id: int,
+    tool_id: int,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Assign a tool as the stop tool for a chat thread"""
+    # Get chat
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Get tool
+    tool = db.get(Tool, tool_id)
+    if not tool:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tool {tool_id} not found"
+        )
+    
+    # Update chat's stop tool
+    chat.stop_tool = tool
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+@router.delete("/{chat_id}/stop-tool", response_model=ChatResponse)
+async def remove_stop_tool_from_chat(
+    chat_id: int,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Remove the stop tool from a chat thread"""
+    # Get chat
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    # Remove stop tool
+    chat.stop_tool = None
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+@router.put("/{chat_id}/auto-run", response_model=ChatResponse)
+async def update_chat_auto_run(
+    chat_id: int,
+    auto_run_update: ChatAutoRunUpdate,
+    db: DatabaseDep
+) -> ChatResponse:
+    """Update the auto_run setting for a chat thread"""
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    chat.auto_run = auto_run_update.auto_run
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    
+    return ChatResponse.from_chat_thread(chat)
+
+@router.get("/{chat_id}/auto-run", response_model=bool)
+async def get_chat_auto_run(
+    chat_id: int,
+    db: DatabaseDep
+) -> bool:
+    """Get the auto_run setting for a chat thread"""
+    chat = db.get(ChatThread, chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat {chat_id} not found"
+        )
+    
+    return chat.auto_run
