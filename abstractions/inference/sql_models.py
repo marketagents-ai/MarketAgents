@@ -537,12 +537,13 @@ class ChatMessage(SQLModel, table=True):
     tool_json_schema: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
     tool_call: Dict[str, Any] = Field(default=None, sa_column=Column(JSON))
     tool_executable: bool = Field(default=False)
+    tool_structured_with_id: bool = Field(default=False)
 
     def to_chatml_dict(self) -> Dict[str, Any]:
         if self.role == MessageRole.tool:
             return {"role":self.role.value,"content":self.content,"tool_call_id":self.tool_call_id}
         elif self.role == MessageRole.assistant:
-            if self.tool_call_id is not None and self.tool_executable:
+            if self.tool_call_id is not None and (self.tool_executable or self.tool_structured_with_id):
                 print(f"tool_call adding proper dictioanry with tool_call_id: {self.tool_call_id} and content: {self.content}")
                 return {"role":self.role.value,"content":self.content,"tool_calls":[{"id":self.tool_call_id,"function":{"arguments":json.dumps(self.tool_call),"name":self.tool_name},"type":"function"}]}
             else:
@@ -616,6 +617,7 @@ class ChatThread (SQLModel, table=True):
     processed_outputs: List['ProcessedOutput'] = Relationship(back_populates="chat_thread", link_model=ChatThreadProcessedOutputLinkage,sa_relationship_kwargs={"lazy": "joined"})
     auto_run: bool = Field(default=False, description="Whether to automatically run the assistant without user messages until stop tool is called")
     is_running: bool = Field(default=False, description="Whether the chat thread is currently running")
+    use_tool_id_for_structured_tools: bool = Field(default=True, description="Whether to use the tool id for structured tools")
 
     def get_last_message_uuid(self) -> Optional[UUID]:
         if len(self.history) == 0:
@@ -754,7 +756,7 @@ class ChatThread (SQLModel, table=True):
                 raise ValueError(f"Tool {tool_name} not found, cannot add to history")
 
             
-            if self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and tool.callable:
+            if self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and (tool.callable or self.use_tool_id_for_structured_tools):
                 assert json_object is not None, "json_object is None, cannot add to history"
                 assistant_message = ChatMessage(
                     role=MessageRole.assistant, 
@@ -764,9 +766,10 @@ class ChatThread (SQLModel, table=True):
                     tool_call_id=json_object.tool_call_id,
                     tool_json_schema=tool.json_schema,
                     tool_call=json_object.object,
-                    tool_executable=tool.callable
+                    tool_executable=tool.callable,
+                    tool_structured_with_id=self.use_tool_id_for_structured_tools if not tool.callable else False
                 )
-            elif self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and not tool.callable:
+            elif self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and not tool.callable and not self.use_tool_id_for_structured_tools:
                 assert json_object is not None, "json_object is None, cannot add to history"
                 structured_response = json.dumps(json_object.object)
                 assistant_message = ChatMessage(
@@ -803,6 +806,20 @@ class ChatThread (SQLModel, table=True):
         self.history.append(assistant_message)
         self.processed_outputs.append(llm_output)
         self.new_message = None
+        if self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and self.use_tool_id_for_structured_tools:
+            structured_tool_response = ChatMessage(
+                role=MessageRole.tool,
+                content=json.dumps({
+                    "status": "success",
+                    "message": f"Successfully generated {tool_name}",
+                    "tool_call_id": assistant_message.tool_call_id
+                }),
+                parent_message_uuid=user_message_uuid,
+                tool_name=f"{tool_name}_response",
+                tool_call_id=assistant_message.tool_call_id
+            )
+            self.history.append(structured_tool_response)
+        
 
 
     def add_chat_turn_history(self, llm_output: 'ProcessedOutput'):

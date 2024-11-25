@@ -803,9 +803,10 @@ async def process_chat_with_auto_run(chat_id: int, ai_utils: ParallelAIUtilities
                     break
 
                 stop_tool_is_executable = stop_tool.callable
+                stop_tool_structured_with_id = current_chat.use_tool_id_for_structured_tools if not stop_tool.callable else False
 
                 # Check stop condition based on tool type
-                if stop_tool_is_executable:
+                if stop_tool_is_executable or stop_tool_structured_with_id:
                     # For executable tools, check the tool response
                     if (last_message.role == MessageRole.tool and 
                         last_message.tool_name and 
