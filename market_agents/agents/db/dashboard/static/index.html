@@ -11,8 +11,7 @@
         <div class="header-container">
             <div class="header-left">
                 <div class="logo">
-                    <div class="market">MARKET</div>
-                    <div class="agents">AGENTS</div>
+                    <img src="/static/images/header_image.png" alt="Market Agents Logo">
                 </div>
             </div>
             <div class="header-right">
@@ -225,6 +224,7 @@
             });
         }
 
+        // Replace your sortTable function with this corrected version
         function sortTable(n) {
             const table = document.getElementById('dataTable');
             let rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
@@ -272,8 +272,87 @@
                     }
                 }
             }
+
+            // After sorting, update the chart if we're in chart view
+            const viewSelect = document.getElementById('viewSelect');
+            if (viewSelect.value === 'chart') {
+                const tbody = table.getElementsByTagName('tbody')[0];
+                const rows = Array.from(tbody.getElementsByTagName('tr'));
+                
+                // Get the x and y values from the sorted table
+                const xValues = [];
+                const yValues = [];
+                
+                rows.forEach(row => {
+                    const cells = row.getElementsByTagName('td');
+                    // In chart view, we're looking for x_value and y_value columns
+                    const xValueCell = cells[0]; // First column is x_value
+                    const yValueCell = cells[1]; // Second column is y_value
+                    
+                    if (xValueCell && yValueCell) {
+                        const xValue = xValueCell.textContent.trim();
+                        const yValue = yValueCell.textContent.trim();
+                        
+                        xValues.push(xValue);
+                        // Try to convert y to number if possible
+                        yValues.push(!isNaN(parseFloat(yValue)) ? parseFloat(yValue) : yValue);
+                    }
+                });
+
+                // Update the Plotly chart with the new sorted data
+                if (xValues.length > 0 && yValues.length > 0) {
+                    Plotly.restyle('dataChart', {
+                        x: [xValues],
+                        y: [yValues]
+                    });
+                }
+            }
         }
 
+        // Add these helper functions for data type detection
+        function detectDataType(values) {
+            const sampleSize = Math.min(values.length, 10); // Check first 10 values
+            let dateCount = 0;
+            let numberCount = 0;
+            let categoricalCount = 0;
+
+            for (let i = 0; i < sampleSize; i++) {
+                const value = values[i];
+                if (!value && value !== 0) continue;
+
+                // Check if it's a date
+                const date = new Date(value);
+                if (!isNaN(date.getTime()) && value.length > 4) { // Length > 4 to avoid treating years as dates
+                    dateCount++;
+                    continue;
+                }
+
+                // Check if it's a number
+                if (!isNaN(parseFloat(value)) && isFinite(value)) {
+                    numberCount++;
+                    continue;
+                }
+
+                // If not date or number, consider it categorical
+                categoricalCount++;
+            }
+
+            // Determine predominant type
+            const max = Math.max(dateCount, numberCount, categoricalCount);
+            if (max === dateCount) return 'date';
+            if (max === numberCount) return 'number';
+            return 'categorical';
+        }
+
+        function analyzeDistribution(values) {
+            const uniqueValues = new Set(values).size;
+            const dataLength = values.length;
+            
+            // If more than 50% of values are unique, consider it continuous
+            return uniqueValues / dataLength > 0.5 ? 'continuous' : 'discrete';
+        }
+
+        // Replace your initChart function with this smarter version
         function initChart(data, xColumn, yColumn) {
             const chartContainer = document.querySelector('.chart-container');
             
@@ -289,15 +368,38 @@
             const xData = data.map(row => row.x_value);
             const yData = data.map(row => row.y_value);
 
-            // Determine if data is temporal
-            const isDateX = xData.some(x => x instanceof Date);
-            const isDateY = yData.some(y => y instanceof Date);
+            // Detect data types
+            const xType = detectDataType(xData);
+            const yType = detectDataType(yData);
+            const xDistribution = analyzeDistribution(xData);
+            const yDistribution = analyzeDistribution(yData);
+
+            // Configure chart based on data types
+            let chartType = 'scatter';
+            let mode = 'lines+markers';
+            let markerSize = 6;
+
+            // Determine the best chart type based on data characteristics
+            if (xType === 'categorical' || yType === 'categorical') {
+                if (xDistribution === 'discrete' && yType === 'number') {
+                    chartType = 'bar';
+                    mode = 'none';
+                }
+            } else if (xType === 'date' && yType === 'number') {
+                mode = 'lines+markers';
+                markerSize = 4; // Smaller markers for time series
+            } else if (xType === 'number' && yType === 'number') {
+                if (xDistribution === 'discrete' && yDistribution === 'discrete') {
+                    mode = 'markers';
+                    markerSize = 8; // Larger markers for discrete data
+                }
+            }
 
             const trace = {
                 x: xData,
                 y: yData,
-                mode: 'lines+markers',
-                type: 'scatter',
+                type: chartType,
+                mode: mode,
                 name: yColumn,
                 line: {
                     color: '#463e8d',
@@ -305,28 +407,28 @@
                 },
                 marker: {
                     color: '#564caf',
-                    size: 6
+                    size: markerSize
                 }
             };
 
             const layout = {
                 title: {
                     text: `${yColumn} vs ${xColumn}`,
-                    font: {
-                        size: 16
-                    }
+                    font: { size: 16 }
                 },
                 xaxis: {
                     title: xColumn,
-                    type: isDateX ? 'date' : 'auto',
+                    type: xType === 'date' ? 'date' : 'auto',
                     gridcolor: '#e1e1e1',
-                    zeroline: false
+                    zeroline: false,
+                    automargin: true
                 },
                 yaxis: {
                     title: yColumn,
-                    type: isDateY ? 'date' : 'auto',
+                    type: yType === 'date' ? 'date' : 'auto',
                     gridcolor: '#e1e1e1',
-                    zeroline: false
+                    zeroline: false,
+                    automargin: true
                 },
                 plot_bgcolor: '#ffffff',
                 paper_bgcolor: '#ffffff',
@@ -339,6 +441,12 @@
                 showlegend: false,
                 hovermode: 'closest'
             };
+
+            // Add histogram if appropriate
+            if (chartType === 'scatter' && yType === 'number') {
+                layout.yaxis.showspikes = true;
+                layout.xaxis.showspikes = true;
+            }
 
             const config = {
                 responsive: true,
