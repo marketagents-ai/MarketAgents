@@ -387,42 +387,37 @@ async def search_database(
         if not column_types:
             raise HTTPException(status_code=404, detail="Table not found or has no columns.")
 
-        # If no specific columns are provided, search all columns
+        # If no columns specified, only use base columns
         if not columns:
-            columns = list(column_types.keys())
+            columns = [col for col in column_types.keys() if '.' not in col]
 
         # Construct the WHERE clause
         where_clauses = []
         for col in columns:
-            if column_types[col]['type'] in ('json', 'jsonb'):
-                # For JSON columns, use the ->> operator to search as text
-                where_clauses.append(
-                    sql.SQL("{} ->> {} ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(''),  # Empty string means the entire JSON object
-                        sql.Literal(f'%{search_term}%')
+            if col in column_types:
+                if column_types[col]['type'] in ('json', 'jsonb'):
+                    # Simple JSON text search
+                    where_clauses.append(
+                        sql.SQL("CAST({} AS TEXT) ILIKE {}").format(
+                            sql.Identifier(col),
+                            sql.Literal(f'%{search_term}%')
+                        )
                     )
-                )
-            elif column_types[col]['type'] in ('text', 'varchar', 'char'):
-                where_clauses.append(
-                    sql.SQL("{} ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(f'%{search_term}%')
+                else:
+                    where_clauses.append(
+                        sql.SQL("CAST({} AS TEXT) ILIKE {}").format(
+                            sql.Identifier(col),
+                            sql.Literal(f'%{search_term}%')
+                        )
                     )
-                )
-            else:
-                # For other types, cast to text before searching
-                where_clauses.append(
-                    sql.SQL("CAST({} AS TEXT) ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(f'%{search_term}%')
-                    )
-                )
+
+        if not where_clauses:
+            return {"data": [], "total_count": 0, "page": page, "page_size": page_size, "total_pages": 0}
 
         # Calculate offset
         offset = (page - 1) * page_size
 
-        # Construct the full query with pagination
+        # Construct the query
         query = sql.SQL("SELECT * FROM {} WHERE {} OFFSET {} LIMIT {}").format(
             sql.Identifier(table_name),
             sql.SQL(" OR ").join(where_clauses),
@@ -484,4 +479,4 @@ async def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="localhost", port=8001)
