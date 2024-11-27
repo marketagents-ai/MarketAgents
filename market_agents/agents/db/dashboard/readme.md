@@ -1,101 +1,170 @@
-# SQL Dashboard
+# Advanced SQL Dashboard for LLM Agent Frameworks
 
-A VERY BASIC web-based SQL dashboard for visualizing and exploring PostgreSQL database data, specifically for use with llm agent frameworks.
+A web-based SQL dashboard specifically designed for visualizing and exploring PostgreSQL database data, with enhanced features for LLM agent frameworks and JSON handling capabilities.
 
-## Features
+## Key Features
 
-- `TABLE` and `CHART` generation from SQL query results
-- Simple data visualization using Chart.js
-- Search functionality across tables
-- Pagination
-- JSON Column Extraction (`--flatten-json` as argparse)
-- Pretty JSON formatting
+### Data Visualization
+- Dual view modes: TABLE and CHART visualization
+- Dynamic chart type selection based on data characteristics
+- Interactive Plotly.js charts with advanced features:
+  - Automatic chart type detection (scatter, bar, time series)
+  - Smart data distribution analysis
+  - Responsive design with hover tooltips
+  - Export capabilities
+- Pagination with configurable page sizes
+- Column sorting capabilities
+- Markdown export functionality
+
+### JSON Handling
+- Smart JSON column detection and processing
+- Nested JSON path querying
+- Pretty JSON formatting in table view
+- Dynamic JSON schema detection
+
+### Search & Filter
+- Full-text search across all columns
+- Type-aware searching (handles dates, numbers, text)
+- JSON content searching
+- Real-time search with debouncing
+
+### Database Integration
+- Advanced PostgreSQL integration with JSON/JSONB support
+- Dynamic table and column detection
+- Efficient pagination with large datasets
+- Automatic data type detection
+- Connection pooling
+- Error handling and recovery
 
 ## Tech Stack
 
-- Backend: FastAPI (Python)
-- Frontend: HTML, CSS, JavaScript
-- Database: PostgreSQL
-- Visualization: Chart.js
+### Backend
+- FastAPI (Python)
+- Psycopg2 for PostgreSQL connectivity
+- SQLAlchemy ORM (optional)
+- Python-dotenv for configuration
+- Pydantic for data validation
 
-## Setup
+### Frontend
+- Modern HTML5/CSS3
+- Vanilla JavaScript (no framework dependencies)
+- Plotly.js for advanced visualizations
+- Support for custom styling
 
-1. Clone the repository
-2. Install dependencies:
+### Database
+- PostgreSQL with JSON/JSONB support
+- Efficient query optimization
+- Connection pooling
+
+## Installation & Setup
+
+1. Clone the repository:
+   ```bash
+   git clone [repository-url]
+   cd sql-dashboard
    ```
-   pip install fastapi uvicorn psycopg2-binary python-dotenv
+
+2. Install Python dependencies:
+   ```bash
+   pip install fastapi uvicorn psycopg2-binary python-dotenv plotly
    ```
-3. Set up your PostgreSQL database
-4. Create a `.env` file with your database credentials:
-   ```
-   DB_NAME=your_database_name
+
+3. Configure your PostgreSQL database connection in `.env`:
+   ```env
+   DB_NAME=your_database
    DB_USER=your_username
    DB_PASSWORD=your_password
    DB_HOST=your_host
-   DB_PORT=your_port
+   DB_PORT=5432
    ```
-5. Run the FastAPI server:
-   ```
-   uvicorn main:app --reload
-   ```
-6. Open `http://localhost:8000` in your browser
 
----
+4. Launch the application:
+   ```bash
+   python sqlDASHBOARD.py [--flatten-json]
+   ```
+
+5. Access the dashboard at `http://localhost:8001`
+
+## API Endpoints
+
+### Core Endpoints
+- `GET /api/get-tables`: List all available database tables
+- `GET /api/column-names`: Get column information for a specific table
+- `GET /api/metrics-data`: Fetch paginated data with support for JSON columns
+- `GET /api/search`: Perform full-text search across tables
+
+### Request Parameters
+- `table_name`: Target table name
+- `x_column`, `y_column`: Chart axis specifications
+- `page`, `page_size`: Pagination controls
+- `search_term`: Search query string
+- `full_table`: Boolean for complete table data
+
+## Advanced Features
+
+### JSON Path Querying
+The dashboard supports complex JSON path queries:
+```python
+data.nested.field[0].value
+```
+
+### Dynamic Chart Selection
+The system automatically selects the most appropriate chart type based on:
+- Data type analysis (categorical, numerical, temporal)
+- Distribution patterns
+- Data density
+- Column relationships
+
+### Data Export Options
+- Markdown table format
+- JSON data export
+- Chart image export (PNG)
+
+## Security Considerations
+
+- SQL injection prevention through parameterized queries
+- Environmental variable protection
+- Sanitized JSON handling
+- Error message sanitization
+- Rate limiting capabilities
 
 ## Extending the Dashboard
 
-### Adding New Chart Types
+### Adding Custom Chart Types
+```javascript
+function initChart(data, xColumn, yColumn) {
+    // Configure new chart type
+    const customTrace = {
+        x: xData,
+        y: yData,
+        type: 'custom-chart',
+        mode: 'custom-mode',
+        // Additional configuration
+    };
+}
+```
 
-1. Modify the `initChart` function in `index.html`
-2. Use Chart.js configurations to add new chart types:
+### Custom JSON Processing
+```python
+def process_json_data(value, flatten=False):
+    # Add custom JSON processing logic
+    if flatten:
+        return flatten_json(json_data)
+    return json.dumps(json_data, indent=2)
+```
 
-   ```javascript
-   chartInstance = new Chart(ctx, {
-       type: 'new_chart_type',
-       data: {
-           // Configure data for the new chart type
-       },
-       options: {
-           // Configure options for the new chart type
-       }
-   });
-   ```
+## Performance Optimization
 
-### Implementing Additional SQL Commands
+- Connection pooling for database connections
+- Debounced search functionality
+- Efficient JSON parsing and flattening
+- Pagination for large datasets
+- Smart data type detection caching
 
-1. Add new API endpoints in `main.py`:
-
-   ```python
-   @app.get("/api/new-endpoint")
-   async def new_endpoint(param: str = Query(...)):
-       conn = None
-       cursor = None
-       try:
-           conn = get_db_connection()
-           cursor = conn.cursor(cursor_factory=RealDictCursor)
-           
-           # Your SQL query here
-           query = sql.SQL("YOUR SQL COMMAND").format(sql.Identifier(param))
-           
-           cursor.execute(query)
-           results = cursor.fetchall()
-           
-           return results
-       except Exception as e:
-           raise HTTPException(status_code=500, detail=str(e))
-       finally:
-           if cursor:
-               cursor.close()
-           if conn:
-               conn.close()
-   ```
-
-2. Add corresponding JavaScript functions in `index.html` to call the new endpoint and process the data
-
-## Project Structure
-
-- `sqlDASHBOARD.py`: FastAPI backend
-- `static/index.html`: Frontend HTML and JavaScript
-- `static/styles.css`: CSS styles
-
-This SQL Dashboard provides a foundation for exploring and visualizing PostgreSQL data. Extend it by adding new chart types or implementing additional SQL commands as needed for your specific use case.
+# Directory Structure
+- db_dash/
+  - static/
+    - index.html
+    - styles.css
+  - sqlDASHBOARD.py
+  - readme.md
