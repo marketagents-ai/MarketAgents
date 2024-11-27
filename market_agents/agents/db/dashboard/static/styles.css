@@ -8,43 +8,32 @@ body {
     background-color: #707070;
 }
 
+h1 {
+    color: #333;
+    text-align: center;
+}
 
-.header-container {
-    margin-bottom: 20px;
-    line-height: 1;
-    columns: 2;
-    column-gap: 20px;
+.dashboard-header {
     display: flex;
     justify-content: space-between;
-    padding: 24px 24px;
-    background-color: #564caf;
-    color: whitesmoke;
-    border: 0px solid whitesmoke;
-    border-radius: 8px;
-    cursor: default;
-    text-align: center;
-    font-family: 'VT323', monospace;
-    font-size: 24px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    image-rendering: pixelated;
-}
-
-.header-left {
-    display: flex;
     align-items: center;
+    padding: 10px 20px;
+    background-color: #564caf;
+    color: white;
+    margin-bottom: 20px;
 }
 
-.header-right {
+.dashboard-header h1 {
+    margin: 0;
     font-size: 24px;
-    font-weight: bold;
-    font-family: 'VT323', monospace;
-    color: rgb(211, 211, 211);
-    font-style: italic;
+    font-family: 'Orbitron', sans-serif;
+    color: white;
 }
+
+.logo {
+    height: 50px;
+    width: auto;
+} 
 
 .market {
     font-size: 32px;
