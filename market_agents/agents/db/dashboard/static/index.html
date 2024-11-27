@@ -7,17 +7,9 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <header>
-        <div class="header-container">
-            <div class="header-left">
-                <div class="logo">
-                    <img src="/static/header_image.png" alt="Market Agents Logo">
-                </div>
-            </div>
-            <div class="header-right">
-                <div class="title">AGENT DASHBOARD</div>
-            </div>
-        </div>
+    <header class="dashboard-header">
+        <h1>MarketAgents LLM Dashboard</h1>
+        <img src="static/marketagents_logo.png" alt="MarketAgents Logo" class="logo">
     </header>
     <div class="dashboard">
         <div class="controls-container">
@@ -157,8 +149,8 @@
 
         function isJSON(str) {
             try {
-                JSON.parse(str);
-                return true;
+                const parsed = JSON.parse(str);
+                return typeof parsed === 'object' && parsed !== null;
             } catch (e) {
                 return false;
             }
@@ -186,9 +178,14 @@
             tableHead.innerHTML = '';
             tableBody.innerHTML = '';
 
-            const headerRow = document.createElement('tr');
+            // Get all keys and check which columns are all NULL
             const keys = Object.keys(data[0]);
-            keys.forEach((key, index) => {
+            const validColumns = keys.filter(key => {
+                return data.some(row => row[key] !== null);
+            });
+
+            const headerRow = document.createElement('tr');
+            validColumns.forEach((key, index) => {
                 const th = document.createElement('th');
                 if (key === 'x_value' && xColumn) {
                     th.textContent = xColumn;
@@ -204,7 +201,7 @@
 
             data.forEach(row => {
                 const tr = document.createElement('tr');
-                keys.forEach(key => {
+                validColumns.forEach(key => {
                     const td = document.createElement('td');
                     const value = row[key];
                     if (value === null) {
@@ -412,20 +409,12 @@
             };
 
             const layout = {
-                title: {
-                    text: `${yColumn} vs ${xColumn}`,
-                    font: { size: 16 }
-                },
                 xaxis: {
-                    title: xColumn,
-                    type: xType === 'date' ? 'date' : 'auto',
                     gridcolor: '#e1e1e1',
                     zeroline: false,
                     automargin: true
                 },
                 yaxis: {
-                    title: yColumn,
-                    type: yType === 'date' ? 'date' : 'auto',
                     gridcolor: '#e1e1e1',
                     zeroline: false,
                     automargin: true
@@ -435,7 +424,7 @@
                 margin: {
                     l: 60,
                     r: 30,
-                    t: 50,
+                    t: 30,
                     b: 50
                 },
                 showlegend: false,
@@ -516,6 +505,27 @@
             currentPage = result.page;
             totalPages = result.total_pages;
             updatePaginationInfo(currentPage, totalPages);
+
+            // Sort the data before displaying
+            if (result.data.length > 0) {
+                const firstKey = Object.keys(result.data[0])[0]; // Get the first column name
+                result.data.sort((a, b) => {
+                    const aVal = a[firstKey];
+                    const bVal = b[firstKey];
+                    
+                    // Handle different data types
+                    if (!isNaN(Date.parse(aVal)) && !isNaN(Date.parse(bVal))) {
+                        // Date comparison
+                        return new Date(aVal) - new Date(bVal);
+                    } else if (!isNaN(aVal) && !isNaN(bVal)) {
+                        // Numeric comparison
+                        return parseFloat(aVal) - parseFloat(bVal);
+                    } else {
+                        // String comparison
+                        return String(aVal).localeCompare(String(bVal));
+                    }
+                });
+            }
 
             populateTable(result.data, isChartView ? xColumn : null, isChartView ? yColumn : null);
             
