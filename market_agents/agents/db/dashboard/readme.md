@@ -1,4 +1,4 @@
-# Advanced SQL Dashboard for LLM Agent Frameworks
+# SQL Dashboard for LLM Agent Frameworks
 
 A web-based SQL dashboard specifically designed for visualizing and exploring PostgreSQL database data, with enhanced features for LLM agent frameworks and JSON handling capabilities.
 
@@ -29,7 +29,7 @@ A web-based SQL dashboard specifically designed for visualizing and exploring Po
 - Real-time search with debouncing
 
 ### Database Integration
-- Advanced PostgreSQL integration with JSON/JSONB support
+- PostgreSQL integration with JSON/JSONB support
 - Dynamic table and column detection
 - Efficient pagination with large datasets
 - Automatic data type detection
