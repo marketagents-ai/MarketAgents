@@ -1,0 +1,12 @@
+[
+  {
+    "url": "Impact of AI on financial markets",
+    "title": "",
+    "content": "",
+    "timestamp": "2024-11-28 19:37:57.933038",
+    "status": "error: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets",
+    "summary": {},
+    "agent_id": "120cbd21-68c9-4d0f-8f71-972e6bf15754",
+    "extraction_method": "error"
+  }
+]

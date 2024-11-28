@@ -1,0 +1,12 @@
+[
+  {
+    "url": "Impact of AI on financial markets",
+    "title": "Error",
+    "content": "Failed to extract with newspaper3k: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets",
+    "timestamp": "2024-11-28 19:40:28.184205",
+    "status": "error: extraction failed",
+    "summary": {},
+    "agent_id": "28f11e1e-93b3-42d2-9066-a0e1a9d071ff",
+    "extraction_method": "newspaper3k_failed"
+  }
+]

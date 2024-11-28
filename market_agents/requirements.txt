@@ -16,3 +16,4 @@ uvicorn
 fastapi
 uvicorn
 psycopg2-binary
+google

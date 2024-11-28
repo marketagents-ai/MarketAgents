@@ -2,3 +2,197 @@
 2024-11-19 16:36:53,187 - __main__ - INFO - 🔥 WEB SEARCH INITIALIZATION 🔥
 2024-11-19 16:36:53,187 - __main__ - INFO - ======================================
 2024-11-19 16:36:53,187 - __main__ - ERROR - Error in main execution: [Errno 2] No such file or directory: 'market_agents/web_search_config.yaml'
+2024-11-28 19:17:39,814 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: 'market_agents/web_search_config.yaml'
+2024-11-28 19:17:39,815 - __main__ - ERROR - Error in main execution: 1 validation error for WebSearchPromptManager
+prompts
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-28 19:18:33,812 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: 'market_agents/web_search_config.yaml'
+2024-11-28 19:18:33,814 - __main__ - ERROR - Error in main execution: 1 validation error for WebSearchPromptManager
+prompts
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-28 19:19:53,526 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: 'market_agents/web_search_config.yaml'
+2024-11-28 19:19:53,527 - __main__ - ERROR - Error in main execution: 1 validation error for WebSearchPromptManager
+prompts
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-28 19:21:03,785 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:21:03,786 - __main__ - ERROR - Error in main execution: 'WebSearchPromptManager' object has no attribute 'prompt_file'
+2024-11-28 19:21:30,183 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:21:30,185 - __main__ - ERROR - Error in main execution: 1 validation error for WebSearchPromptManager
+prompts
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-28 19:22:16,737 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:22:16,740 - __main__ - ERROR - Error in main execution: 'WebSearchPromptManager' object has no attribute 'format_prompt'
+2024-11-28 19:22:59,037 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:22:59,040 - __main__ - ERROR - Error in main execution: 'WebSearchPromptManager' object has no attribute 'format_prompt'
+2024-11-28 19:24:39,415 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:24:39,419 - __main__ - ERROR - Error in main execution: 1 validation error for LLMPromptContext
+llm_config.client
+  Field required [type=missing, input_value={'model': 'gpt-3.5-turbo', 'temperature': 0.7}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2024-11-28 19:30:13,102 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:30:13,105 - __main__ - ERROR - Error in main execution: 'ParallelAIUtilities' object has no attribute 'run_single_ai_completion'
+2024-11-28 19:30:41,772 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:30:48,743 - __main__ - ERROR - Error in main execution: 'LLMOutput' object has no attribute 'choices'
+2024-11-28 19:33:10,380 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:33:14,746 - __main__ - ERROR - Unexpected LLMOutput structure
+2024-11-28 19:33:14,746 - __main__ - ERROR - Error in main execution: search() got an unexpected keyword argument 'num_results'
+2024-11-28 19:34:11,215 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/web_search_config.yaml'
+2024-11-28 19:34:13,897 - __main__ - ERROR - Unexpected LLMOutput structure
+2024-11-28 19:34:19,216 - __main__ - ERROR - Error in main execution: HTTP Error 429: Too Many Requests
+2024-11-28 19:35:39,633 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-28 19:35:41,955 - __main__ - ERROR - Unexpected LLMOutput structure
+2024-11-28 19:37:57,928 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-28 19:37:57,932 - __main__ - INFO - Starting search with query: Impact of AI on financial markets
+2024-11-28 19:37:57,932 - __main__ - ERROR - Error fetching Impact of AI on financial markets: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets
+2024-11-28 19:37:57,937 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-11-28 19:37:57,937 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241128_193757.json
+2024-11-28 19:37:57,937 - __main__ - INFO - 
+Search completed:
+- Total items processed: 1
+- Successful: 0
+- Failed: 1
+- Results saved to: outputs/web_search/results_20241128_193757.json
+        
+2024-11-28 19:40:28,180 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-28 19:40:28,183 - __main__ - INFO - Starting search with query: Impact of AI on financial markets
+2024-11-28 19:40:28,183 - __main__ - INFO - Using method newspaper3k for Impact of AI on financial markets
+2024-11-28 19:40:28,184 - __main__ - ERROR - newspaper3k failed for Impact of AI on financial markets: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets
+2024-11-28 19:40:28,187 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-11-28 19:40:28,187 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241128_194028.json
+2024-11-28 19:40:28,187 - __main__ - INFO - 
+Search completed:
+- Total items processed: 1
+- Successful: 0
+- Failed: 1
+- Results saved to: outputs/web_search/results_20241128_194028.json
+        
+2024-11-28 19:42:17,561 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-28 19:42:17,562 - __main__ - ERROR - Error in main execution: 'WebSearchAgent' object has no attribute 'ai_utils'
+2024-11-28 19:43:43,724 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-28 19:43:43,727 - __main__ - INFO - Starting search with query: Impact of AI on financial markets
+2024-11-28 19:43:43,727 - __main__ - INFO - Trying method selenium for Impact of AI on financial markets
+2024-11-28 19:43:54,530 - __main__ - ERROR - Selenium extraction failed: Message: invalid argument
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000104f4fac4 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000104f48314 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001049b0324 cxxbridge1$string$len + 88824
+3   chromedriver                        0x000000010499b028 cxxbridge1$string$len + 2044
+4   chromedriver                        0x000000010499953c core::str::slice_error_fail::ha0e52dbcb60e6bae + 60012
+5   chromedriver                        0x0000000104999e14 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62276
+6   chromedriver                        0x00000001049b29b8 cxxbridge1$string$len + 98700
+7   chromedriver                        0x0000000104a2e6a0 cxxbridge1$string$len + 605812
+8   chromedriver                        0x0000000104a2e0fc cxxbridge1$string$len + 604368
+9   chromedriver                        0x00000001049e90b0 cxxbridge1$string$len + 321668
+10  chromedriver                        0x00000001049e9d00 cxxbridge1$string$len + 324820
+11  chromedriver                        0x0000000104f1ae08 cxxbridge1$str$ptr + 3435328
+12  chromedriver                        0x0000000104f1e120 cxxbridge1$str$ptr + 3448408
+13  chromedriver                        0x0000000104f0217c cxxbridge1$str$ptr + 3333812
+14  chromedriver                        0x0000000104f1e9e0 cxxbridge1$str$ptr + 3450648
+15  chromedriver                        0x0000000104ef3988 cxxbridge1$str$ptr + 3274432
+16  chromedriver                        0x0000000104f390f4 cxxbridge1$str$ptr + 3558956
+17  chromedriver                        0x0000000104f39270 cxxbridge1$str$ptr + 3559336
+18  chromedriver                        0x0000000104f47f88 cxxbridge1$str$ptr + 3620032
+19  libsystem_pthread.dylib             0x00000001a314606c _pthread_start + 148
+20  libsystem_pthread.dylib             0x00000001a3140e2c thread_start + 8
+
+2024-11-28 19:43:54,603 - __main__ - INFO - Trying method playwright for Impact of AI on financial markets
+2024-11-28 19:43:56,106 - __main__ - ERROR - Playwright extraction failed: Page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+Call log:
+navigating to "Impact of AI on financial markets", waiting until "networkidle"
+
+2024-11-28 19:43:56,134 - __main__ - INFO - Trying method beautifulsoup for Impact of AI on financial markets
+2024-11-28 19:43:56,134 - __main__ - ERROR - beautifulsoup failed for Impact of AI on financial markets: 'WebSearchAgent' object has no attribute 'headers'
+2024-11-28 19:43:56,134 - __main__ - INFO - Trying method newspaper3k for Impact of AI on financial markets
+2024-11-28 19:43:56,135 - __main__ - ERROR - newspaper3k failed for Impact of AI on financial markets: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets
+2024-11-28 19:43:56,135 - __main__ - INFO - Trying method scrapy for Impact of AI on financial markets
+2024-11-28 19:43:56,135 - __main__ - INFO - Trying method requests_html for Impact of AI on financial markets
+2024-11-28 19:43:56,135 - __main__ - ERROR - requests_html failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-28 19:43:56,135 - __main__ - INFO - Trying method mechanicalsoup for Impact of AI on financial markets
+2024-11-28 19:43:56,135 - __main__ - ERROR - mechanicalsoup failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-28 19:43:56,135 - __main__ - INFO - Trying method httpx for Impact of AI on financial markets
+2024-11-28 19:43:56,157 - __main__ - ERROR - httpx failed for Impact of AI on financial markets: Request URL is missing an 'http://' or 'https://' protocol.
+2024-11-28 19:43:56,158 - __main__ - ERROR - All extraction methods failed for Impact of AI on financial markets
+2024-11-28 19:43:56,161 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-11-28 19:43:56,161 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241128_194356.json
+2024-11-28 19:43:56,161 - __main__ - INFO - 
+Search completed:
+- Total items processed: 1
+- Successful: 0
+- Failed: 1
+- Results saved to: outputs/web_search/results_20241128_194356.json
+        
+2024-11-28 19:44:48,667 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-28 19:44:48,670 - __main__ - INFO - Starting search with query: Impact of AI on financial markets
+2024-11-28 19:44:48,670 - __main__ - INFO - Trying method selenium for Impact of AI on financial markets
+2024-11-28 19:44:49,430 - __main__ - ERROR - Selenium extraction failed: Message: invalid argument
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x00000001048c3ac4 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x00000001048bc314 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x0000000104324324 cxxbridge1$string$len + 88824
+3   chromedriver                        0x000000010430f028 cxxbridge1$string$len + 2044
+4   chromedriver                        0x000000010430d53c core::str::slice_error_fail::ha0e52dbcb60e6bae + 60012
+5   chromedriver                        0x000000010430de14 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62276
+6   chromedriver                        0x00000001043269b8 cxxbridge1$string$len + 98700
+7   chromedriver                        0x00000001043a26a0 cxxbridge1$string$len + 605812
+8   chromedriver                        0x00000001043a20fc cxxbridge1$string$len + 604368
+9   chromedriver                        0x000000010435d0b0 cxxbridge1$string$len + 321668
+10  chromedriver                        0x000000010435dd00 cxxbridge1$string$len + 324820
+11  chromedriver                        0x000000010488ee08 cxxbridge1$str$ptr + 3435328
+12  chromedriver                        0x0000000104892120 cxxbridge1$str$ptr + 3448408
+13  chromedriver                        0x000000010487617c cxxbridge1$str$ptr + 3333812
+14  chromedriver                        0x00000001048929e0 cxxbridge1$str$ptr + 3450648
+15  chromedriver                        0x0000000104867988 cxxbridge1$str$ptr + 3274432
+16  chromedriver                        0x00000001048ad0f4 cxxbridge1$str$ptr + 3558956
+17  chromedriver                        0x00000001048ad270 cxxbridge1$str$ptr + 3559336
+18  chromedriver                        0x00000001048bbf88 cxxbridge1$str$ptr + 3620032
+19  libsystem_pthread.dylib             0x00000001a314606c _pthread_start + 148
+20  libsystem_pthread.dylib             0x00000001a3140e2c thread_start + 8
+
+2024-11-28 19:44:49,499 - __main__ - INFO - Trying method playwright for Impact of AI on financial markets
+2024-11-28 19:44:50,621 - __main__ - ERROR - Playwright extraction failed: Page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+Call log:
+navigating to "Impact of AI on financial markets", waiting until "networkidle"
+
+2024-11-28 19:44:50,797 - __main__ - INFO - Trying method beautifulsoup for Impact of AI on financial markets
+2024-11-28 19:44:50,798 - __main__ - ERROR - beautifulsoup failed for Impact of AI on financial markets: 'WebSearchAgent' object has no attribute 'headers'
+2024-11-28 19:44:50,798 - __main__ - INFO - Trying method newspaper3k for Impact of AI on financial markets
+2024-11-28 19:44:50,799 - __main__ - ERROR - newspaper3k failed for Impact of AI on financial markets: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets
+2024-11-28 19:44:50,800 - __main__ - INFO - Trying method scrapy for Impact of AI on financial markets
+2024-11-28 19:44:50,800 - __main__ - INFO - Trying method requests_html for Impact of AI on financial markets
+2024-11-28 19:44:50,802 - __main__ - ERROR - requests_html failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-28 19:44:50,802 - __main__ - INFO - Trying method mechanicalsoup for Impact of AI on financial markets
+2024-11-28 19:44:50,803 - __main__ - ERROR - mechanicalsoup failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-28 19:44:50,803 - __main__ - INFO - Trying method httpx for Impact of AI on financial markets
+2024-11-28 19:44:50,961 - __main__ - ERROR - httpx failed for Impact of AI on financial markets: Request URL is missing an 'http://' or 'https://' protocol.
+2024-11-28 19:44:50,967 - __main__ - ERROR - All extraction methods failed for Impact of AI on financial markets
+2024-11-28 19:44:50,980 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-11-28 19:44:50,980 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241128_194450.json
+2024-11-28 19:44:50,980 - __main__ - INFO - 
+Search completed:
+- Total items processed: 1
+- Successful: 0
+- Failed: 1
+- Results saved to: outputs/web_search/results_20241128_194450.json
+        

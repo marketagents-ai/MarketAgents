@@ -85,3 +85,13 @@ trading_implications: |
   - Provide clear rationale for each
   - Include relevant price levels
   - Suggest risk management approaches
+
+search_query_generation: |
+  Generate specific search queries based on this general query:
+
+  Query: {query}
+
+  Please generate 5 specific, targeted search queries that will help find relevant market information. 
+  Each query should focus on different aspects of the topic.
+  Format each query on a new line.
+  Make queries specific and include relevant market terminology.

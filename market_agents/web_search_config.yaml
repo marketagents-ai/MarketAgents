@@ -1,18 +1,17 @@
 max_concurrent_requests: 50
 rate_limit: 0.1
-content_max_length: 5000
+content_max_length: 1000000
 request_timeout: 30
+search_mode: "url"
+urls_per_query: 5
 use_ai_summary: true
-llm_configs:
-  - name: "gpt-4"
-    client: "openai"
-    model: "gpt-4o-mini"
-    temperature: 0.7
-    max_tokens: 500
-    use_cache: true
-  - name: "claude"
-    client: "anthropic"
-    model: "claude-3-5-sonnet-20240620"
-    temperature: 0.7
-    max_tokens: 500
-    use_cache: true
+methods: 
+  - "selenium"
+  - "playwright"
+  - "beautifulsoup"
+  - "newspaper3k"
+  - "scrapy"
+  - "requests_html"
+  - "mechanicalsoup"
+  - "httpx"
+default_method: "newspaper3k"
