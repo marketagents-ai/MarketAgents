@@ -18,3 +18,13 @@ connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection re
 connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
 	Is the server running on that host and accepting TCP/IP connections?
 
+2024-11-28 21:25:48,811 - market_agents.insert_simulation_data - ERROR - Database connection failed: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-11-29 22:57:18,477 - market_agents.insert_simulation_data - ERROR - Database connection failed: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+

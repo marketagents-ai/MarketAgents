@@ -196,3 +196,123 @@ Search completed:
 - Failed: 1
 - Results saved to: outputs/web_search/results_20241128_194450.json
         
+2024-11-28 21:25:46,582 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-28 21:25:46,585 - __main__ - INFO - Starting search with query: Impact of AI on financial markets
+2024-11-28 21:25:46,585 - __main__ - INFO - Trying method selenium for Impact of AI on financial markets
+2024-11-28 21:25:47,925 - __main__ - ERROR - Selenium extraction failed: Message: invalid argument
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000104abfac4 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000104ab8314 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x0000000104520324 cxxbridge1$string$len + 88824
+3   chromedriver                        0x000000010450b028 cxxbridge1$string$len + 2044
+4   chromedriver                        0x000000010450953c core::str::slice_error_fail::ha0e52dbcb60e6bae + 60012
+5   chromedriver                        0x0000000104509e14 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62276
+6   chromedriver                        0x00000001045229b8 cxxbridge1$string$len + 98700
+7   chromedriver                        0x000000010459e6a0 cxxbridge1$string$len + 605812
+8   chromedriver                        0x000000010459e0fc cxxbridge1$string$len + 604368
+9   chromedriver                        0x00000001045590b0 cxxbridge1$string$len + 321668
+10  chromedriver                        0x0000000104559d00 cxxbridge1$string$len + 324820
+11  chromedriver                        0x0000000104a8ae08 cxxbridge1$str$ptr + 3435328
+12  chromedriver                        0x0000000104a8e120 cxxbridge1$str$ptr + 3448408
+13  chromedriver                        0x0000000104a7217c cxxbridge1$str$ptr + 3333812
+14  chromedriver                        0x0000000104a8e9e0 cxxbridge1$str$ptr + 3450648
+15  chromedriver                        0x0000000104a63988 cxxbridge1$str$ptr + 3274432
+16  chromedriver                        0x0000000104aa90f4 cxxbridge1$str$ptr + 3558956
+17  chromedriver                        0x0000000104aa9270 cxxbridge1$str$ptr + 3559336
+18  chromedriver                        0x0000000104ab7f88 cxxbridge1$str$ptr + 3620032
+19  libsystem_pthread.dylib             0x00000001a151206c _pthread_start + 148
+20  libsystem_pthread.dylib             0x00000001a150ce2c thread_start + 8
+
+2024-11-28 21:25:47,993 - __main__ - INFO - Trying method playwright for Impact of AI on financial markets
+2024-11-28 21:25:48,773 - __main__ - ERROR - Playwright extraction failed: Page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+Call log:
+navigating to "Impact of AI on financial markets", waiting until "networkidle"
+
+2024-11-28 21:25:48,788 - __main__ - INFO - Trying method beautifulsoup for Impact of AI on financial markets
+2024-11-28 21:25:48,788 - __main__ - ERROR - beautifulsoup failed for Impact of AI on financial markets: 'WebSearchAgent' object has no attribute 'headers'
+2024-11-28 21:25:48,788 - __main__ - INFO - Trying method newspaper3k for Impact of AI on financial markets
+2024-11-28 21:25:48,789 - __main__ - ERROR - newspaper3k failed for Impact of AI on financial markets: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets
+2024-11-28 21:25:48,789 - __main__ - INFO - Trying method scrapy for Impact of AI on financial markets
+2024-11-28 21:25:48,789 - __main__ - INFO - Trying method requests_html for Impact of AI on financial markets
+2024-11-28 21:25:48,789 - __main__ - ERROR - requests_html failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-28 21:25:48,789 - __main__ - INFO - Trying method mechanicalsoup for Impact of AI on financial markets
+2024-11-28 21:25:48,789 - __main__ - ERROR - mechanicalsoup failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-28 21:25:48,789 - __main__ - INFO - Trying method httpx for Impact of AI on financial markets
+2024-11-28 21:25:48,808 - __main__ - ERROR - httpx failed for Impact of AI on financial markets: Request URL is missing an 'http://' or 'https://' protocol.
+2024-11-28 21:25:48,809 - __main__ - ERROR - All extraction methods failed for Impact of AI on financial markets
+2024-11-28 21:25:48,811 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-11-28 21:25:48,811 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241128_212548.json
+2024-11-28 21:25:48,811 - __main__ - INFO - 
+Search completed:
+- Total items processed: 1
+- Successful: 0
+- Failed: 1
+- Results saved to: outputs/web_search/results_20241128_212548.json
+        
+2024-11-29 22:57:15,231 - __main__ - INFO - Loading config from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/web_search_config.yaml
+2024-11-29 22:57:15,233 - __main__ - INFO - Starting search with query: Impact of AI on financial markets
+2024-11-29 22:57:15,233 - __main__ - INFO - Trying method selenium for Impact of AI on financial markets
+2024-11-29 22:57:17,662 - __main__ - ERROR - Selenium extraction failed: Message: invalid argument
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000100b53ac4 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000100b4c314 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001005b4324 cxxbridge1$string$len + 88824
+3   chromedriver                        0x000000010059f028 cxxbridge1$string$len + 2044
+4   chromedriver                        0x000000010059d53c core::str::slice_error_fail::ha0e52dbcb60e6bae + 60012
+5   chromedriver                        0x000000010059de14 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62276
+6   chromedriver                        0x00000001005b69b8 cxxbridge1$string$len + 98700
+7   chromedriver                        0x00000001006326a0 cxxbridge1$string$len + 605812
+8   chromedriver                        0x00000001006320fc cxxbridge1$string$len + 604368
+9   chromedriver                        0x00000001005ed0b0 cxxbridge1$string$len + 321668
+10  chromedriver                        0x00000001005edd00 cxxbridge1$string$len + 324820
+11  chromedriver                        0x0000000100b1ee08 cxxbridge1$str$ptr + 3435328
+12  chromedriver                        0x0000000100b22120 cxxbridge1$str$ptr + 3448408
+13  chromedriver                        0x0000000100b0617c cxxbridge1$str$ptr + 3333812
+14  chromedriver                        0x0000000100b229e0 cxxbridge1$str$ptr + 3450648
+15  chromedriver                        0x0000000100af7988 cxxbridge1$str$ptr + 3274432
+16  chromedriver                        0x0000000100b3d0f4 cxxbridge1$str$ptr + 3558956
+17  chromedriver                        0x0000000100b3d270 cxxbridge1$str$ptr + 3559336
+18  chromedriver                        0x0000000100b4bf88 cxxbridge1$str$ptr + 3620032
+19  libsystem_pthread.dylib             0x00000001a151206c _pthread_start + 148
+20  libsystem_pthread.dylib             0x00000001a150ce2c thread_start + 8
+
+2024-11-29 22:57:17,741 - __main__ - INFO - Trying method playwright for Impact of AI on financial markets
+2024-11-29 22:57:18,438 - __main__ - ERROR - Playwright extraction failed: Page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+Call log:
+navigating to "Impact of AI on financial markets", waiting until "networkidle"
+
+2024-11-29 22:57:18,453 - __main__ - INFO - Trying method beautifulsoup for Impact of AI on financial markets
+2024-11-29 22:57:18,453 - __main__ - ERROR - beautifulsoup failed for Impact of AI on financial markets: 'WebSearchAgent' object has no attribute 'headers'
+2024-11-29 22:57:18,453 - __main__ - INFO - Trying method newspaper3k for Impact of AI on financial markets
+2024-11-29 22:57:18,454 - __main__ - ERROR - newspaper3k failed for Impact of AI on financial markets: Article `download()` failed with No connection adapters were found for ':/Impact of AI on financial markets' on URL :/Impact of AI on financial markets
+2024-11-29 22:57:18,454 - __main__ - INFO - Trying method scrapy for Impact of AI on financial markets
+2024-11-29 22:57:18,454 - __main__ - INFO - Trying method requests_html for Impact of AI on financial markets
+2024-11-29 22:57:18,454 - __main__ - ERROR - requests_html failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-29 22:57:18,454 - __main__ - INFO - Trying method mechanicalsoup for Impact of AI on financial markets
+2024-11-29 22:57:18,454 - __main__ - ERROR - mechanicalsoup failed for Impact of AI on financial markets: Invalid URL 'Impact of AI on financial markets': No scheme supplied. Perhaps you meant https://Impact of AI on financial markets?
+2024-11-29 22:57:18,454 - __main__ - INFO - Trying method httpx for Impact of AI on financial markets
+2024-11-29 22:57:18,474 - __main__ - ERROR - httpx failed for Impact of AI on financial markets: Request URL is missing an 'http://' or 'https://' protocol.
+2024-11-29 22:57:18,475 - __main__ - ERROR - All extraction methods failed for Impact of AI on financial markets
+2024-11-29 22:57:18,477 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-11-29 22:57:18,477 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241129_225718.json
+2024-11-29 22:57:18,477 - __main__ - INFO - 
+Search completed:
+- Total items processed: 1
+- Successful: 0
+- Failed: 1
+- Results saved to: outputs/web_search/results_20241129_225718.json
+        
+2024-11-29 22:57:28,821 - __main__ - ERROR - Error loading config: [Errno 2] No such file or directory: 'market_agents/web_search_config.yaml'
+2024-11-29 22:57:28,821 - __main__ - INFO - Loading URLs from: /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/urls.json
+2024-11-29 22:57:28,822 - __main__ - ERROR - URLs file not found at /Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/urls.json
+2024-11-29 22:57:28,822 - __main__ - ERROR - Error in main execution: [Errno 2] No such file or directory: '/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/market_agents/urls.json'

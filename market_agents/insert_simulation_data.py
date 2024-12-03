@@ -31,7 +31,7 @@ if not logger.handlers:
     file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
-
+#
     
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -60,6 +60,9 @@ def serialize_memory_data(memory_data):
         return memory_data
     else:
         return str(memory_data)
+    
+
+#
 
 class SimulationDataInserter:
     def __init__(self, db_params=None):
