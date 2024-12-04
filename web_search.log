@@ -12141,3 +12141,2961 @@ Search completed:
 - Failed: 0
 - Results saved to: outputs/web_search/results_20241203_192609.json
         
+2024-12-04 15:45:25,575 - __main__ - INFO - Starting search with query: latest tech stock market trends
+2024-12-04 15:45:25,576 - __main__ - INFO - Using prompt template:
+Generate specific search queries based on this general query:
+
+Query: latest tech stock market trends
+
+Please generate 5 specific, targeted search queries that will help find relevant market information. 
+Each query should focus on different aspects of the topic.
+Format each query on a new line.
+Make queries specific and include relevant market terminology.
+2024-12-04 15:45:45,595 - __main__ - INFO - Starting search with query: latest tech stock market trends
+2024-12-04 15:45:45,596 - __main__ - INFO - Using prompt template:
+Generate specific search queries based on this general query:
+
+Query: latest tech stock market trends
+
+Please generate 5 specific, targeted search queries that will help find relevant market information. 
+Each query should focus on different aspects of the topic.
+Format each query on a new line.
+Make queries specific and include relevant market terminology.
+2024-12-04 15:45:54,528 - __main__ - INFO - AI Response:
+1. "Recent performance and trends in FAANG stocks"
+2. "Impacts of recent tech IPOs on the overall stock market"
+3. "Influence of semiconductor supply chain issues on tech stock prices"
+4. "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+5. "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:45:54,529 - __main__ - INFO - 
+=== Generated Search Queries ===
+2024-12-04 15:45:54,529 - __main__ - INFO - Original Query: latest tech stock market trends
+2024-12-04 15:45:54,530 - __main__ - INFO - Additional Queries Generated: 5
+2024-12-04 15:45:54,530 - __main__ - INFO - 
+All Queries:
+2024-12-04 15:45:54,530 - __main__ - INFO - 1. latest tech stock market trends
+2024-12-04 15:45:54,530 - __main__ - INFO - 2. "Recent performance and trends in FAANG stocks"
+2024-12-04 15:45:54,530 - __main__ - INFO - 3. "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:45:54,530 - __main__ - INFO - 4. "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:45:54,530 - __main__ - INFO - 5. "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:45:54,530 - __main__ - INFO - 6. "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:45:54,530 - __main__ - INFO - 
+=== Search Process Starting ===
+Original Query: latest tech stock market trends
+Total Queries Generated: 6
+
+2024-12-04 15:45:54,530 - __main__ - INFO - 
+=== Processing Query 1/6 ===
+Query: latest tech stock market trends
+
+2024-12-04 15:45:57,544 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:45:57,544 - __main__ - INFO - Query: latest tech stock market trends
+2024-12-04 15:45:57,545 - __main__ - INFO - URL 1: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+2024-12-04 15:45:57,545 - __main__ - INFO - URL 2: https://www.investors.com/technology/
+2024-12-04 15:45:57,545 - __main__ - INFO - URL 3: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+2024-12-04 15:45:57,545 - __main__ - INFO - URL 4: https://finance.yahoo.com/sectors/technology/
+2024-12-04 15:45:57,545 - __main__ - INFO - URL 5: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+2024-12-04 15:45:57,545 - __main__ - INFO - ================
+2024-12-04 15:45:57,545 - __main__ - INFO - 
+URLs found for query "latest tech stock market trends":
+- https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+- https://www.investors.com/technology/
+- https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+- https://finance.yahoo.com/sectors/technology/
+- https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+
+2024-12-04 15:45:57,545 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+Original Query: latest tech stock market trends
+2024-12-04 15:45:57,545 - __main__ - INFO - Trying method selenium for https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+2024-12-04 15:46:08,299 - __main__ - INFO - Successfully extracted content from https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html using selenium
+2024-12-04 15:46:08,300 - __main__ - INFO - Content type: Text only
+2024-12-04 15:46:08,300 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.investors.com/technology/
+Original Query: latest tech stock market trends
+2024-12-04 15:46:08,300 - __main__ - INFO - Trying method selenium for https://www.investors.com/technology/
+2024-12-04 15:46:22,793 - __main__ - INFO - Successfully extracted content from https://www.investors.com/technology/ using selenium
+2024-12-04 15:46:22,794 - __main__ - INFO - Content type: Text only
+2024-12-04 15:46:22,794 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+Original Query: latest tech stock market trends
+2024-12-04 15:46:22,795 - __main__ - INFO - Trying method selenium for https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+2024-12-04 15:46:30,675 - __main__ - INFO - Successfully extracted content from https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/ using selenium
+2024-12-04 15:46:30,676 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:46:30,677 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://finance.yahoo.com/sectors/technology/
+Original Query: latest tech stock market trends
+2024-12-04 15:46:30,677 - __main__ - INFO - Trying method selenium for https://finance.yahoo.com/sectors/technology/
+2024-12-04 15:47:31,088 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 58.831
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000104867b08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000104860358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001042c84b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x00000001042b37e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x00000001042b3550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x00000001042b12dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x00000001042b1f48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x00000001042bfb4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x00000001042d3674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x00000001042b2574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x00000001042d353c cxxbridge1$string$len + 134416
+11  chromedriver                        0x00000001043462c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x00000001043010b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x0000000104301d00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x0000000104832e4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x0000000104836164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x000000010481a1c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x0000000104836a24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x000000010480b9cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000104851138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x00000001048512b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x000000010485ffcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 15:47:31,259 - __main__ - INFO - Successfully extracted content from https://finance.yahoo.com/sectors/technology/ using selenium
+2024-12-04 15:47:31,259 - __main__ - INFO - Content type: Text only
+2024-12-04 15:47:31,260 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+Original Query: latest tech stock market trends
+2024-12-04 15:47:31,260 - __main__ - INFO - Trying method selenium for https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+2024-12-04 15:47:40,200 - __main__ - INFO - Successfully extracted content from https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/ using selenium
+2024-12-04 15:47:40,200 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:47:40,211 - __main__ - ERROR - Error processing AI response for https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html: Expecting value: line 1 column 3 (char 2)
+2024-12-04 15:47:40,211 - __main__ - ERROR - Error processing AI response for https://www.investors.com/technology/: Expecting value: line 1 column 13 (char 12)
+2024-12-04 15:47:40,211 - __main__ - ERROR - Error processing AI response for https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:47:40,211 - __main__ - ERROR - Error processing AI response for https://finance.yahoo.com/sectors/technology/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:47:58,883 - __main__ - INFO - 
+Query 1 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 15:47:58,883 - __main__ - INFO - 
+=== Processing Query 2/6 ===
+Query: "Recent performance and trends in FAANG stocks"
+
+2024-12-04 15:48:02,316 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:48:02,316 - __main__ - INFO - Query: "Recent performance and trends in FAANG stocks"
+2024-12-04 15:48:02,316 - __main__ - INFO - URL 1: https://www.tipranks.com/compare-stocks/faang
+2024-12-04 15:48:02,316 - __main__ - INFO - URL 2: https://groww.in/blog/faang-stocks-performance-over-the-last-decade
+2024-12-04 15:48:02,316 - __main__ - INFO - URL 3: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+2024-12-04 15:48:02,316 - __main__ - INFO - URL 4: https://corporatefinanceinstitute.com/resources/equities/faang-stocks/
+2024-12-04 15:48:02,316 - __main__ - INFO - URL 5: https://nuwealthapp.com/article/understanding-the-faang-stocks
+2024-12-04 15:48:02,316 - __main__ - INFO - ================
+2024-12-04 15:48:02,316 - __main__ - INFO - 
+URLs found for query ""Recent performance and trends in FAANG stocks"":
+- https://www.tipranks.com/compare-stocks/faang
+- https://groww.in/blog/faang-stocks-performance-over-the-last-decade
+- https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+- https://corporatefinanceinstitute.com/resources/equities/faang-stocks/
+- https://nuwealthapp.com/article/understanding-the-faang-stocks
+
+2024-12-04 15:48:02,317 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.tipranks.com/compare-stocks/faang
+Original Query: "Recent performance and trends in FAANG stocks"
+2024-12-04 15:48:02,317 - __main__ - INFO - Trying method selenium for https://www.tipranks.com/compare-stocks/faang
+2024-12-04 15:48:03,591 - __main__ - INFO - Successfully extracted content from https://www.tipranks.com/compare-stocks/faang using selenium
+2024-12-04 15:48:03,591 - __main__ - INFO - Content type: Text only
+2024-12-04 15:48:03,591 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://groww.in/blog/faang-stocks-performance-over-the-last-decade
+Original Query: "Recent performance and trends in FAANG stocks"
+2024-12-04 15:48:03,592 - __main__ - INFO - Trying method selenium for https://groww.in/blog/faang-stocks-performance-over-the-last-decade
+2024-12-04 15:48:06,138 - __main__ - INFO - Successfully extracted content from https://groww.in/blog/faang-stocks-performance-over-the-last-decade using selenium
+2024-12-04 15:48:06,138 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:48:06,139 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+Original Query: "Recent performance and trends in FAANG stocks"
+2024-12-04 15:48:06,139 - __main__ - INFO - Trying method selenium for https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+2024-12-04 15:48:07,688 - __main__ - INFO - Successfully extracted content from https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade using selenium
+2024-12-04 15:48:07,689 - __main__ - INFO - Content type: Text only
+2024-12-04 15:48:07,689 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://corporatefinanceinstitute.com/resources/equities/faang-stocks/
+Original Query: "Recent performance and trends in FAANG stocks"
+2024-12-04 15:48:07,689 - __main__ - INFO - Trying method selenium for https://corporatefinanceinstitute.com/resources/equities/faang-stocks/
+2024-12-04 15:48:10,007 - __main__ - INFO - Successfully extracted content from https://corporatefinanceinstitute.com/resources/equities/faang-stocks/ using selenium
+2024-12-04 15:48:10,007 - __main__ - INFO - Content type: Text only
+2024-12-04 15:48:10,007 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://nuwealthapp.com/article/understanding-the-faang-stocks
+Original Query: "Recent performance and trends in FAANG stocks"
+2024-12-04 15:48:10,007 - __main__ - INFO - Trying method selenium for https://nuwealthapp.com/article/understanding-the-faang-stocks
+2024-12-04 15:48:13,894 - __main__ - INFO - Successfully extracted content from https://nuwealthapp.com/article/understanding-the-faang-stocks using selenium
+2024-12-04 15:48:13,894 - __main__ - INFO - Content type: Text only
+2024-12-04 15:48:13,901 - __main__ - ERROR - Error processing AI response for https://www.tipranks.com/compare-stocks/faang: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:48:13,901 - __main__ - ERROR - Error processing AI response for https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:48:29,426 - __main__ - ERROR - Error processing AI response for https://nuwealthapp.com/article/understanding-the-faang-stocks: 'cc3c4576-5cbe-4dc6-a939-d41d2ab6a153'
+2024-12-04 15:48:32,536 - __main__ - ERROR - Error processing AI response for https://groww.in/blog/faang-stocks-performance-over-the-last-decade: 'cc3c4576-5cbe-4dc6-a939-d41d2ab6a153'
+2024-12-04 15:48:32,536 - __main__ - INFO - 
+Query 2 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 15:48:32,537 - __main__ - INFO - 
+=== Processing Query 3/6 ===
+Query: "Impacts of recent tech IPOs on the overall stock market"
+
+2024-12-04 15:48:35,651 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:48:35,651 - __main__ - INFO - Query: "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:48:35,651 - __main__ - INFO - URL 1: https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms
+2024-12-04 15:48:35,651 - __main__ - INFO - URL 2: https://almondztrade.com/blog/how-market-conditions-affect-ipos
+2024-12-04 15:48:35,651 - __main__ - INFO - URL 3: https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html
+2024-12-04 15:48:35,651 - __main__ - INFO - URL 4: https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms
+2024-12-04 15:48:35,651 - __main__ - INFO - URL 5: https://www.reuters.com/technology/tech-ipo-market-faces-worst-year-since-global-financial-crisis-2022-09-29/
+2024-12-04 15:48:35,651 - __main__ - INFO - ================
+2024-12-04 15:48:35,651 - __main__ - INFO - 
+URLs found for query ""Impacts of recent tech IPOs on the overall stock market"":
+- https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms
+- https://almondztrade.com/blog/how-market-conditions-affect-ipos
+- https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html
+- https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms
+- https://www.reuters.com/technology/tech-ipo-market-faces-worst-year-since-global-financial-crisis-2022-09-29/
+
+2024-12-04 15:48:35,651 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms
+Original Query: "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:48:35,651 - __main__ - INFO - Trying method selenium for https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms
+2024-12-04 15:48:40,457 - __main__ - INFO - Successfully extracted content from https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms using selenium
+2024-12-04 15:48:40,457 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:48:40,457 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://almondztrade.com/blog/how-market-conditions-affect-ipos
+Original Query: "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:48:40,457 - __main__ - INFO - Trying method selenium for https://almondztrade.com/blog/how-market-conditions-affect-ipos
+2024-12-04 15:48:42,807 - __main__ - INFO - Successfully extracted content from https://almondztrade.com/blog/how-market-conditions-affect-ipos using selenium
+2024-12-04 15:48:42,807 - __main__ - INFO - Content type: Text only
+2024-12-04 15:48:42,808 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html
+Original Query: "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:48:42,808 - __main__ - INFO - Trying method selenium for https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html
+2024-12-04 15:48:47,064 - __main__ - INFO - Successfully extracted content from https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html using selenium
+2024-12-04 15:48:47,064 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:48:47,065 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms
+Original Query: "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:48:47,065 - __main__ - INFO - Trying method selenium for https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms
+2024-12-04 15:49:47,602 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 59.440
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000100ad3b08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000100acc358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001005344b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x000000010051f7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x000000010051f550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x000000010051d2dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x000000010051df48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x000000010052bb4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x000000010053f674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x000000010051e574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x000000010053f53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x00000001005b22c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x000000010056d0b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x000000010056dd00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x0000000100a9ee4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x0000000100aa2164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x0000000100a861c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x0000000100aa2a24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x0000000100a779cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000100abd138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x0000000100abd2b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x0000000100acbfcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 15:49:47,716 - __main__ - INFO - Successfully extracted content from https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms using selenium
+2024-12-04 15:49:47,716 - __main__ - INFO - Content type: Text only
+2024-12-04 15:49:47,716 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.reuters.com/technology/tech-ipo-market-faces-worst-year-since-global-financial-crisis-2022-09-29/
+Original Query: "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:49:47,716 - __main__ - INFO - Trying method selenium for https://www.reuters.com/technology/tech-ipo-market-faces-worst-year-since-global-financial-crisis-2022-09-29/
+2024-12-04 15:49:49,173 - __main__ - INFO - Successfully extracted content from https://www.reuters.com/technology/tech-ipo-market-faces-worst-year-since-global-financial-crisis-2022-09-29/ using selenium
+2024-12-04 15:49:49,173 - __main__ - INFO - Content type: Text only
+2024-12-04 15:49:49,186 - __main__ - ERROR - Error processing AI response for https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms: Extra data: line 1 column 8 (char 7)
+2024-12-04 15:50:07,162 - __main__ - ERROR - Error processing AI response for https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms: '7a4c4a98-e7a9-4bdc-8ca3-24ad960471ec'
+2024-12-04 15:50:08,460 - __main__ - ERROR - Error processing AI response for https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html: '7a4c4a98-e7a9-4bdc-8ca3-24ad960471ec'
+2024-12-04 15:50:08,497 - __main__ - ERROR - Error processing AI response for https://almondztrade.com/blog/how-market-conditions-affect-ipos: '7a4c4a98-e7a9-4bdc-8ca3-24ad960471ec'
+2024-12-04 15:50:08,497 - __main__ - INFO - 
+Query 3 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 15:50:08,497 - __main__ - INFO - 
+=== Processing Query 4/6 ===
+Query: "Influence of semiconductor supply chain issues on tech stock prices"
+
+2024-12-04 15:50:11,676 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:50:11,676 - __main__ - INFO - Query: "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:50:11,676 - __main__ - INFO - URL 1: https://www.investopedia.com/semiconductor-impact-on-the-stock-market-7367723
+2024-12-04 15:50:11,676 - __main__ - INFO - URL 2: https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics
+2024-12-04 15:50:11,676 - __main__ - INFO - URL 3: https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks
+2024-12-04 15:50:11,676 - __main__ - INFO - URL 4: https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry
+2024-12-04 15:50:11,676 - __main__ - INFO - URL 5: https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074
+2024-12-04 15:50:11,676 - __main__ - INFO - ================
+2024-12-04 15:50:11,677 - __main__ - INFO - 
+URLs found for query ""Influence of semiconductor supply chain issues on tech stock prices"":
+- https://www.investopedia.com/semiconductor-impact-on-the-stock-market-7367723
+- https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics
+- https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks
+- https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry
+- https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074
+
+2024-12-04 15:50:11,677 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.investopedia.com/semiconductor-impact-on-the-stock-market-7367723
+Original Query: "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:50:11,677 - __main__ - INFO - Trying method selenium for https://www.investopedia.com/semiconductor-impact-on-the-stock-market-7367723
+2024-12-04 15:50:13,326 - __main__ - INFO - Successfully extracted content from https://www.investopedia.com/semiconductor-impact-on-the-stock-market-7367723 using selenium
+2024-12-04 15:50:13,326 - __main__ - INFO - Content type: Text only
+2024-12-04 15:50:13,326 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics
+Original Query: "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:50:13,326 - __main__ - INFO - Trying method selenium for https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics
+2024-12-04 15:51:13,700 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 58.494
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000102717b08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000102710358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001021784b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x00000001021637e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x0000000102163550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x00000001021612dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x0000000102161f48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x000000010216fb4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x0000000102183674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x0000000102162574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x000000010218353c cxxbridge1$string$len + 134416
+11  chromedriver                        0x00000001021f62c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x00000001021b10b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x00000001021b1d00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x00000001026e2e4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x00000001026e6164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x00000001026ca1c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x00000001026e6a24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x00000001026bb9cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000102701138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x00000001027012b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x000000010270ffcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 15:51:13,783 - __main__ - INFO - Successfully extracted content from https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics using selenium
+2024-12-04 15:51:13,783 - __main__ - INFO - Content type: Text only
+2024-12-04 15:51:13,783 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks
+Original Query: "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:51:13,783 - __main__ - INFO - Trying method selenium for https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks
+2024-12-04 15:51:16,969 - __main__ - INFO - Successfully extracted content from https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks using selenium
+2024-12-04 15:51:16,969 - __main__ - INFO - Content type: Text only
+2024-12-04 15:51:16,969 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry
+Original Query: "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:51:16,969 - __main__ - INFO - Trying method selenium for https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry
+2024-12-04 15:51:22,711 - __main__ - INFO - Successfully extracted content from https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry using selenium
+2024-12-04 15:51:22,712 - __main__ - INFO - Content type: Text only
+2024-12-04 15:51:22,712 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074
+Original Query: "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:51:22,712 - __main__ - INFO - Trying method selenium for https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074
+2024-12-04 15:51:23,541 - __main__ - INFO - Successfully extracted content from https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074 using selenium
+2024-12-04 15:51:23,541 - __main__ - INFO - Content type: Text only
+2024-12-04 15:51:23,547 - __main__ - ERROR - Error processing AI response for https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:51:31,377 - __main__ - ERROR - Error processing AI response for https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074: 'be38eda2-670d-47ff-bfce-ad87f8a04f7c'
+2024-12-04 15:51:39,259 - __main__ - ERROR - Error processing AI response for https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry: 'be38eda2-670d-47ff-bfce-ad87f8a04f7c'
+2024-12-04 15:51:41,844 - __main__ - ERROR - Error processing AI response for https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks: 'be38eda2-670d-47ff-bfce-ad87f8a04f7c'
+2024-12-04 15:51:41,845 - __main__ - INFO - 
+Query 4 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 15:51:41,845 - __main__ - INFO - 
+=== Processing Query 5/6 ===
+Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+
+2024-12-04 15:51:45,685 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:51:45,685 - __main__ - INFO - Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:51:45,685 - __main__ - INFO - URL 1: https://www.skyquestt.com/report/blockchain-ai-market
+2024-12-04 15:51:45,685 - __main__ - INFO - URL 2: http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/
+2024-12-04 15:51:45,685 - __main__ - INFO - URL 3: https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis
+2024-12-04 15:51:45,685 - __main__ - INFO - URL 4: https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full
+2024-12-04 15:51:45,685 - __main__ - INFO - URL 5: https://www.grandviewresearch.com/industry-analysis/blockchain-technology-market
+2024-12-04 15:51:45,685 - __main__ - INFO - ================
+2024-12-04 15:51:45,685 - __main__ - INFO - 
+URLs found for query ""Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"":
+- https://www.skyquestt.com/report/blockchain-ai-market
+- http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/
+- https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis
+- https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full
+- https://www.grandviewresearch.com/industry-analysis/blockchain-technology-market
+
+2024-12-04 15:51:45,686 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.skyquestt.com/report/blockchain-ai-market
+Original Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:51:45,686 - __main__ - INFO - Trying method selenium for https://www.skyquestt.com/report/blockchain-ai-market
+2024-12-04 15:51:52,080 - __main__ - INFO - Successfully extracted content from https://www.skyquestt.com/report/blockchain-ai-market using selenium
+2024-12-04 15:51:52,080 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:51:52,081 - __main__ - INFO - 
+=== Processing URL ===
+URL: http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/
+Original Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:51:52,081 - __main__ - INFO - Trying method selenium for http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/
+2024-12-04 15:51:57,257 - __main__ - INFO - Successfully extracted content from http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/ using selenium
+2024-12-04 15:51:57,257 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:51:57,257 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis
+Original Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:51:57,257 - __main__ - INFO - Trying method selenium for https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis
+2024-12-04 15:51:57,931 - __main__ - INFO - Successfully extracted content from https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis using selenium
+2024-12-04 15:51:57,931 - __main__ - INFO - Content type: Text only
+2024-12-04 15:51:57,931 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full
+Original Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:51:57,931 - __main__ - INFO - Trying method selenium for https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full
+2024-12-04 15:52:01,946 - __main__ - INFO - Successfully extracted content from https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full using selenium
+2024-12-04 15:52:01,947 - __main__ - INFO - Content type: Text only
+2024-12-04 15:52:01,947 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.grandviewresearch.com/industry-analysis/blockchain-technology-market
+Original Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:52:01,947 - __main__ - INFO - Trying method selenium for https://www.grandviewresearch.com/industry-analysis/blockchain-technology-market
+2024-12-04 15:52:04,512 - __main__ - INFO - Successfully extracted content from https://www.grandviewresearch.com/industry-analysis/blockchain-technology-market using selenium
+2024-12-04 15:52:04,512 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:52:04,523 - __main__ - ERROR - Error processing AI response for http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:52:04,523 - __main__ - ERROR - Error processing AI response for https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:52:04,523 - __main__ - ERROR - Error processing AI response for https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:52:31,068 - __main__ - ERROR - Error processing AI response for https://www.skyquestt.com/report/blockchain-ai-market: 'acbe8aca-24da-4d96-9adb-cbf7054d8aa2'
+2024-12-04 15:52:31,069 - __main__ - INFO - 
+Query 5 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 15:52:31,069 - __main__ - INFO - 
+=== Processing Query 6/6 ===
+Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+
+2024-12-04 15:52:34,618 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:52:34,618 - __main__ - INFO - Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:52:34,618 - __main__ - INFO - URL 1: https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development
+2024-12-04 15:52:34,618 - __main__ - INFO - URL 2: https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524
+2024-12-04 15:52:34,618 - __main__ - INFO - URL 3: https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676
+2024-12-04 15:52:34,618 - __main__ - INFO - URL 4: https://medium.com/@asarav/the-impact-of-return-to-office-policies-on-stock-prices-3b31141bc749
+2024-12-04 15:52:34,618 - __main__ - INFO - URL 5: https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html
+2024-12-04 15:52:34,618 - __main__ - INFO - ================
+2024-12-04 15:52:34,618 - __main__ - INFO - 
+URLs found for query ""Effects of COVID-19 pandemic on remote work software companies' stock prices"":
+- https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development
+- https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524
+- https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676
+- https://medium.com/@asarav/the-impact-of-return-to-office-policies-on-stock-prices-3b31141bc749
+- https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html
+
+2024-12-04 15:52:34,618 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development
+Original Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:52:34,619 - __main__ - INFO - Trying method selenium for https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development
+2024-12-04 15:52:35,520 - __main__ - INFO - Successfully extracted content from https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development using selenium
+2024-12-04 15:52:35,520 - __main__ - INFO - Content type: Text only
+2024-12-04 15:52:35,520 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524
+Original Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:52:35,520 - __main__ - INFO - Trying method selenium for https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524
+2024-12-04 15:52:36,509 - __main__ - INFO - Successfully extracted content from https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524 using selenium
+2024-12-04 15:52:36,509 - __main__ - INFO - Content type: Text only
+2024-12-04 15:52:36,509 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676
+Original Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:52:36,509 - __main__ - INFO - Trying method selenium for https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676
+2024-12-04 15:52:37,255 - __main__ - INFO - Successfully extracted content from https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676 using selenium
+2024-12-04 15:52:37,255 - __main__ - INFO - Content type: Text only
+2024-12-04 15:52:37,255 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://medium.com/@asarav/the-impact-of-return-to-office-policies-on-stock-prices-3b31141bc749
+Original Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:52:37,255 - __main__ - INFO - Trying method selenium for https://medium.com/@asarav/the-impact-of-return-to-office-policies-on-stock-prices-3b31141bc749
+2024-12-04 15:52:39,930 - __main__ - INFO - Successfully extracted content from https://medium.com/@asarav/the-impact-of-return-to-office-policies-on-stock-prices-3b31141bc749 using selenium
+2024-12-04 15:52:39,931 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 15:52:39,931 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html
+Original Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:52:39,931 - __main__ - INFO - Trying method selenium for https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html
+2024-12-04 15:52:44,505 - __main__ - INFO - Successfully extracted content from https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html using selenium
+2024-12-04 15:52:44,506 - __main__ - INFO - Content type: Text only
+2024-12-04 15:52:44,515 - __main__ - ERROR - Error processing AI response for https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:52:44,516 - __main__ - ERROR - Error processing AI response for https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524: Expecting value: line 1 column 1 (char 0)
+2024-12-04 15:52:44,516 - __main__ - ERROR - Error processing AI response for https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676: Expecting value: line 1 column 2 (char 1)
+2024-12-04 15:53:06,719 - __main__ - ERROR - Error processing AI response for https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html: 'a71dafa3-0118-4568-998c-38f4af3e6627'
+2024-12-04 15:53:06,720 - __main__ - INFO - 
+Query 6 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 15:53:09,610 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:53:09,610 - __main__ - INFO - Query: latest tech stock market trends
+2024-12-04 15:53:09,611 - __main__ - INFO - URL 1: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+2024-12-04 15:53:09,611 - __main__ - INFO - URL 2: https://www.investors.com/technology/
+2024-12-04 15:53:09,611 - __main__ - INFO - URL 3: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+2024-12-04 15:53:09,611 - __main__ - INFO - URL 4: https://finance.yahoo.com/sectors/technology/
+2024-12-04 15:53:09,611 - __main__ - INFO - URL 5: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+2024-12-04 15:53:09,611 - __main__ - INFO - ================
+2024-12-04 15:53:09,611 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 15:53:17,609 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:53:17,609 - __main__ - INFO - Query: "Recent performance and trends in FAANG stocks"
+2024-12-04 15:53:17,609 - __main__ - INFO - URL 1: https://www.tipranks.com/compare-stocks/faang
+2024-12-04 15:53:17,609 - __main__ - INFO - URL 2: https://groww.in/blog/faang-stocks-performance-over-the-last-decade
+2024-12-04 15:53:17,609 - __main__ - INFO - URL 3: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+2024-12-04 15:53:17,609 - __main__ - INFO - URL 4: https://corporatefinanceinstitute.com/resources/equities/faang-stocks/
+2024-12-04 15:53:17,609 - __main__ - INFO - URL 5: https://nuwealthapp.com/article/understanding-the-faang-stocks
+2024-12-04 15:53:17,610 - __main__ - INFO - ================
+2024-12-04 15:53:17,610 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 15:53:25,963 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:53:25,963 - __main__ - INFO - Query: "Impacts of recent tech IPOs on the overall stock market"
+2024-12-04 15:53:25,963 - __main__ - INFO - URL 1: https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms
+2024-12-04 15:53:25,963 - __main__ - INFO - URL 2: https://almondztrade.com/blog/how-market-conditions-affect-ipos
+2024-12-04 15:53:25,963 - __main__ - INFO - URL 3: https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html
+2024-12-04 15:53:25,963 - __main__ - INFO - URL 4: https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms
+2024-12-04 15:53:25,963 - __main__ - INFO - URL 5: https://www.reuters.com/technology/tech-ipo-market-faces-worst-year-since-global-financial-crisis-2022-09-29/
+2024-12-04 15:53:25,963 - __main__ - INFO - ================
+2024-12-04 15:53:25,963 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 15:53:34,267 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:53:34,267 - __main__ - INFO - Query: "Influence of semiconductor supply chain issues on tech stock prices"
+2024-12-04 15:53:34,267 - __main__ - INFO - URL 1: https://www.investopedia.com/semiconductor-impact-on-the-stock-market-7367723
+2024-12-04 15:53:34,267 - __main__ - INFO - URL 2: https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074
+2024-12-04 15:53:34,267 - __main__ - INFO - URL 3: https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics
+2024-12-04 15:53:34,267 - __main__ - INFO - URL 4: https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks
+2024-12-04 15:53:34,267 - __main__ - INFO - URL 5: https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry
+2024-12-04 15:53:34,267 - __main__ - INFO - ================
+2024-12-04 15:53:34,267 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 15:53:42,914 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:53:42,915 - __main__ - INFO - Query: "Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"
+2024-12-04 15:53:42,915 - __main__ - INFO - URL 1: https://www.skyquestt.com/report/blockchain-ai-market
+2024-12-04 15:53:42,915 - __main__ - INFO - URL 2: http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/
+2024-12-04 15:53:42,915 - __main__ - INFO - URL 3: https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis
+2024-12-04 15:53:42,915 - __main__ - INFO - URL 4: https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full
+2024-12-04 15:53:42,915 - __main__ - INFO - URL 5: https://www.grandviewresearch.com/industry-analysis/blockchain-technology-market
+2024-12-04 15:53:42,915 - __main__ - INFO - ================
+2024-12-04 15:53:42,915 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 15:53:51,258 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:53:51,259 - __main__ - INFO - Query: "Effects of COVID-19 pandemic on remote work software companies' stock prices"
+2024-12-04 15:53:51,259 - __main__ - INFO - URL 1: https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development
+2024-12-04 15:53:51,259 - __main__ - INFO - URL 2: https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524
+2024-12-04 15:53:51,259 - __main__ - INFO - URL 3: https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676
+2024-12-04 15:53:51,259 - __main__ - INFO - URL 4: https://medium.com/@asarav/the-impact-of-return-to-office-policies-on-stock-prices-3b31141bc749
+2024-12-04 15:53:51,259 - __main__ - INFO - URL 5: https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html
+2024-12-04 15:53:51,259 - __main__ - INFO - ================
+2024-12-04 15:53:51,259 - __main__ - INFO - 
+=== Final Search Summary ===
+Total Queries Processed: 6
+Total URLs Processed: 30
+Total Successful Extractions: 30
+
+Results by Query:
+- "latest tech stock market trends": 5 results
+- ""Recent performance and trends in FAANG stocks"": 5 results
+- ""Impacts of recent tech IPOs on the overall stock market"": 5 results
+- ""Influence of semiconductor supply chain issues on tech stock prices"": 5 results
+- ""Artificial Intelligence and Blockchain Technology stocks growth analysis 2022"": 5 results
+- ""Effects of COVID-19 pandemic on remote work software companies' stock prices"": 5 results
+
+2024-12-04 15:53:51,259 - __main__ - INFO - 
+=== ARTICLE SUMMARIES ===
+2024-12-04 15:53:51,261 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+TITLE: Trends in tech stocks
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,261 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.investors.com/technology/
+TITLE: Technology News - Stock Market News & Analysis - IBD
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,261 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+TITLE: Tech Stocks That Move The Market - Yahoo Finance
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,261 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://finance.yahoo.com/sectors/technology/
+TITLE: https://finance.yahoo.com/sectors/technology/
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,261 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+TITLE: Top Largest Companies In The Technology Sector List | Screener - Yahoo Finance
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Concise Summary:
+The content provides a list of the largest companies in the technology sector along with their current stock prices, changes in prices, percentage change, volume, average volume for the last 3 months, market cap, PE ratio, and the 52-week range. Notable companies include Apple Inc., NVIDIA Corporation, and Microsoft Corporation.
+
+KEY POINTS:
+- 2. Key Points:
+- Apple Inc., NVIDIA Corporation, and Microsoft Corporation are the top three companies with the highest market capitalization.
+- Palantir Technologies Inc. shows the highest percentage change at +6.88%.
+- The company with the highest volume of shares traded is NVIDIA Corporation with 160.129M shares.
+- The company with the highest PE ratio is Palantir Technologies Inc. with a PE ratio of 354.80.
+- Accenture plc and Uber Technologies, Inc. experienced a decrease in their stock prices.
+
+MARKET IMPACT:
+3. Market Impact Assessment:
+The data indicates a generally positive performance in the technology sector, with most companies experiencing an increase in their stock prices. This could signal investor confidence in the sector, potentially leading to increased investment and trading activity. However, the decrease in stock prices for some companies like Accenture plc and Uber Technologies, Inc. may indicate specific challenges or investor concerns.
+
+TRADING IMPLICATIONS:
+4. Trading Implications:
+Investors might consider buying stocks from companies showing positive performance and growth such as Apple Inc., NVIDIA Corporation, and Microsoft Corporation. However, high PE ratios, as seen with Palantir Technologies Inc., could indicate overvaluation, suggesting caution for potential investors. The stocks with decreased prices might present a buying opportunity if the price drop is temporary and the companies' fundamentals remain strong.
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.tipranks.com/compare-stocks/faang
+TITLE: Error Page
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://groww.in/blog/faang-stocks-performance-over-the-last-decade
+TITLE: FAANG Stocks - Performance Over the Last Decade
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+TITLE: Access Denied
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://corporatefinanceinstitute.com/resources/equities/faang-stocks/
+TITLE: FAANG Stocks - Overview, List of the Top Tech Companies
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Summary: The content provided is an overview of various finance-related courses and certifications offered by the Corporate Finance Institute. The courses cover a wide range of topics including financial modeling, commercial banking, capital markets, business intelligence, financial planning, FinTech, and more. Each course or certification is designed to equip professionals with the necessary skills and knowledge to excel in specific finance domains.
+
+KEY POINTS:
+- 2. Key Points:
+- The Corporate Finance Institute offers numerous certifications and courses in various finance domains.
+- Certifications include Financial Modeling & Valuation Analyst (FMVA®), Commercial Banking & Credit Analyst (CBCA®), Capital Markets & Securities Analyst (CMSA®), and more.
+- Specializations are available in areas such as Accounting for Financial Analysts, Business Intelligence Data Science, and Crypto and Digital Assets.
+- Role-based learning paths are provided for roles such as FP&A Analyst, Business Intelligence Analyst, Investment Banking Analyst, and others.
+- The courses are designed to equip professionals with the necessary skills and knowledge to excel in specific finance domains.
+
+MARKET IMPACT:
+3. Market Impact Assessment: The content does not provide any specific market-related information or updates, so a market impact assessment cannot be accurately made based on the provided information.
+
+TRADING IMPLICATIONS:
+4. Trading Implications: The content does not contain any specific details about trading or investment strategies, so no direct trading implications can be derived from the provided information. However, the courses and certifications mentioned could potentially enhance an individual's trading and investment skills.
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://nuwealthapp.com/article/understanding-the-faang-stocks
+TITLE: FAANG Growth Stocks: Definition And Companies | NuWealth
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://m.economictimes.com/markets/ipos/fpos/new-age-tech-companies-face-an-unforgiving-market-after-grand-ipos-what-lies-ahead-for-swiggy/articleshow/114965957.cms
+TITLE: New-age tech companies face an unforgiving market after grand IPOs. What lies ahead for Swiggy? - The Economic Times
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://almondztrade.com/blog/how-market-conditions-affect-ipos
+TITLE: How Market Conditions Affect IPOs
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,262 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.bscapitalmarkets.com/tech-ipos-boom-are-they-really-worth-the-hype.html
+TITLE: Tech IPOs Boom: are they really worth the hype?
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms
+TITLE: https://timesofindia.indiatimes.com/business/india-business/new-age-tech-ipos-rake-in-rs-15000-crore-best-year-since-2021/articleshow/113754089.cms
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.reuters.com/technology/tech-ipo-market-faces-worst-year-since-global-financial-crisis-2022-09-29/
+TITLE: reuters.com
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+I'm sorry, but I can't provide the analysis you're asking for because you didn't provide a specific article or content from Reuters.com. Please provide the content or the link to the article you want analyzed.
+
+KEY POINTS:
+
+
+MARKET IMPACT:
+Market impact analysis not available
+
+TRADING IMPLICATIONS:
+Trading implications not available
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.investopedia.com/semiconductor-impact-on-the-stock-market-7367723
+TITLE: Semiconductors and Advancements Investors Should Watch Out For
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Concise summary: The content appears to be a comprehensive guide on various aspects of investing, with a focus on the semiconductor industry. It seems to cover the overview of the industry, the impact of semiconductors on the stock market, and the future of semiconductors.
+
+KEY POINTS:
+- 2. Key points:
+- The content is a guide for investors with a focus on the semiconductor industry.
+- It includes an overview of the semiconductor industry.
+- It discusses the impact of semiconductors on the stock market.
+- It provides information on top semiconductor stocks and ETFs.
+- It gives insights into the future of semiconductors.
+
+MARKET IMPACT:
+3. Market impact assessment: The content suggests that there is a significant impact of the semiconductor industry on the stock market, which could influence investor decisions. The advancements and future prospects of the semiconductor industry could potentially drive market trends and investment strategies.
+
+TRADING IMPLICATIONS:
+4. Trading implications: For traders, this information could be crucial for making investment decisions in the semiconductor industry. Understanding the impact of semiconductors on the stock market could help in identifying potential investment opportunities. The future of semiconductors could also indicate potential growth areas for investment.
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics
+TITLE: https://www.aranca.com/knowledge-library/articles/procurement-research/impact-of-semiconductor-shortage-on-consumer-electronics
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.quora.com/How-has-the-recent-semiconductor-shortage-affected-tech-stocks
+TITLE: How has the recent semiconductor shortage affected tech stocks? - Quora
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.z2data.com/insights/5-disruptions-to-the-semiconductor-industry
+TITLE: The Five Biggest Disruptions to the Semiconductor Supply Chain in 2024 - Z2Data
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.tandfonline.com/doi/full/10.1080/00207543.2024.2387074
+TITLE: Just a moment...
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,263 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.skyquestt.com/report/blockchain-ai-market
+TITLE: Blockchain AI Market Size , Share, Growth, Analysis and Trends Report | 2031
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,266 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: http://www.gmiresearch.com/report/blockchain-ai-market-analysis-industry-research/
+TITLE: Blockchain AI Market Size, Share, Growth & Analysis Report 2030
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,270 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.researchgate.net/publication/359648337_Artificial_Intelligence_and_Blockchain_Integration_in_Business_Trends_from_a_Bibliometric-Content_Analysis
+TITLE: Just a moment...
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,271 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2024.1377950/full
+TITLE: Frontiers | Integration of blockchain with artificial intelligence technologies in the energy sector: a systematic review
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,272 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.grandviewresearch.com/industry-analysis/blockchain-technology-market
+TITLE: Blockchain Technology Market Size & Growth Report, 2030
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Concise Summary:
+The global blockchain technology market is projected to grow at a compound annual growth rate (CAGR) of 87.7% from 2023 to 2030, increasing from USD 17.46 billion in 2023 to USD 1,431.54 billion in 2030. The growth is driven by increasing demand for secure and transparent transactions, adoption in supply chain management, and rising interest in cryptocurrencies and digital assets.
+
+KEY POINTS:
+- 2. Key Points:
+- The blockchain technology market was valued at USD 17.46 billion in 2023.
+- The market is expected to grow at a CAGR of 87.7% from 2023 to 2030, reaching USD 1,431.54 billion.
+- The growth is driven by demand for secure transactions, usage in supply chain management, and interest in cryptocurrencies.
+- Key companies in the market include IBM Corporation, Microsoft Corporation, The Linux Foundation, and Blockchain Tech LTD, among others.
+- The market covers regions such as North America, Europe, Asia Pacific, South America, Middle East & Africa.
+
+MARKET IMPACT:
+3. Market Impact Assessment:
+The projected growth of the blockchain market could lead to significant advancements in various industries, particularly finance, healthcare, and supply chain management. The adoption of blockchain technology for optimizing supply chain processes could curb fraud and improve efficiency. The escalating interest in cryptocurrencies could also lead to the creation and management of more digital assets, including Central Bank Digital Currencies (CBDCs).
+
+TRADING IMPLICATIONS:
+4. Trading Implications:
+Investors and traders could consider investing in companies that are key players in the blockchain technology market, such as IBM and Microsoft, or those that are likely to adopt blockchain technology. The high projected growth rate also suggests potential for new entrants in the market.
+=============================
+                    
+2024-12-04 15:53:51,272 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.researchgate.net/publication/363404288_The_Impact_of_COVID-19_on_Various_Aspects_of_Remote_Work_Software_and_Future_development
+TITLE: Just a moment...
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,272 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.sciencedirect.com/science/article/abs/pii/S1544612321003524
+TITLE: ScienceDirect
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,272 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.tandfonline.com/doi/full/10.1080/1331677X.2021.1986676
+TITLE: Just a moment...
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,273 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://medium.com/@asarav/the-impact-of-return-to-office-policies-on-stock-prices-3b31141bc749
+TITLE: The Impact of Return to Office Policies on Stock Prices | by Avinash Saravanan （アビナッシュ・サラバナン） | Medium
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Concise Summary:
+The article discusses the impact of Return-To-Office (RTO) policies on the share prices of tech giants like Apple, Google, and Amazon. Although the RTO policies were implemented with the aim of fostering innovation and maintaining corporate culture, the impact on share prices was minimal and mixed reactions were observed from investors.
+
+KEY POINTS:
+- 2. Key Points:
+- Many tech companies are implementing Return-To-Office (RTO) policies with the belief that in-person interactions can enhance collaboration, innovation, and maintain corporate culture.
+- Apple, Google, and Amazon implemented RTO policies and experienced minor fluctuations in their share prices but overall stability.
+- Investor reactions to these policies were mixed, with some supporting the decision while others expressed concerns about employee satisfaction and retention.
+- The share prices of these companies seem to be more influenced by overall market trends and company-specific performance rather than RTO policies.
+- The competitiveness of the tech talent market and potential employee turnover were identified as risks associated with RTO policies.
+
+MARKET IMPACT:
+3. Market Impact Assessment:
+The RTO policies seem to have a negligible impact on the market. While there were minor fluctuations in the share prices of the companies implementing these policies, the prices remained largely stable, suggesting that the market did not significantly react to these changes. The share prices appeared to be more influenced by broader market dynamics and company-specific factors.
+
+TRADING IMPLICATIONS:
+4. Trading Implications:
+The minimal impact of RTO policies on share prices suggests that traders should focus more on broader market trends and company-specific factors when making investment decisions. However, they should also consider the potential risks associated with these policies, such as potential employee turnover and its impact on company performance.
+=============================
+                    
+2024-12-04 15:53:51,273 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.longdom.org/open-access/effect-of-covid19-global-stock-and-share-market-of-major-it-giants-of-world-97042.html
+TITLE: Effect of Covid19 global stock and share market of major IT giant
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 15:53:51,285 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-12-04 15:53:51,285 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241204_155351.json
+2024-12-04 15:53:51,285 - __main__ - INFO - 
+Search completed:
+- Query: latest tech stock market trends
+- Total items processed: 30
+- Successful: 30
+- Failed: 0
+- Results saved to: outputs/web_search/results_20241204_155351.json
+        
+2024-12-04 15:57:34,459 - __main__ - INFO - Starting search with query: latest tech stock market trends
+2024-12-04 15:57:34,459 - __main__ - INFO - Using prompt template:
+Generate specific search queries based on this general query:
+
+Query: latest tech stock market trends
+
+Please generate 5 specific, targeted search queries that will help find relevant market information. 
+Each query should focus on different aspects of the topic.
+Format each query on a new line.
+Make queries specific and include relevant market terminology.
+2024-12-04 15:57:39,003 - __main__ - INFO - AI Response:
+1. "Recent advancements in AI technology stocks and their market performance"
+2. "Latest IPOs in the technology sector and their impact on stock market trends"
+3. "Impact of 5G technology on telecom sector stocks"
+4. "Investment trends in cybersecurity stocks in the latest quarter"
+5. "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 15:57:39,004 - __main__ - INFO - 
+=== Generated Search Queries ===
+2024-12-04 15:57:39,004 - __main__ - INFO - Original Query: latest tech stock market trends
+2024-12-04 15:57:39,004 - __main__ - INFO - Additional Queries Generated: 5
+2024-12-04 15:57:39,004 - __main__ - INFO - 
+All Queries:
+2024-12-04 15:57:39,004 - __main__ - INFO - 1. latest tech stock market trends
+2024-12-04 15:57:39,004 - __main__ - INFO - 2. "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 15:57:39,004 - __main__ - INFO - 3. "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 15:57:39,005 - __main__ - INFO - 4. "Impact of 5G technology on telecom sector stocks"
+2024-12-04 15:57:39,005 - __main__ - INFO - 5. "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 15:57:39,005 - __main__ - INFO - 6. "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 15:57:39,005 - __main__ - INFO - 
+=== Search Process Starting ===
+Original Query: latest tech stock market trends
+Total Queries Generated: 6
+
+2024-12-04 15:57:39,005 - __main__ - INFO - 
+=== Processing Query 1/6 ===
+Query: latest tech stock market trends
+
+2024-12-04 15:57:42,168 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 15:57:42,168 - __main__ - INFO - Query: latest tech stock market trends
+2024-12-04 15:57:42,168 - __main__ - INFO - URL 1: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+2024-12-04 15:57:42,168 - __main__ - INFO - URL 2: https://www.investors.com/technology/
+2024-12-04 15:57:42,168 - __main__ - INFO - URL 3: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+2024-12-04 15:57:42,168 - __main__ - INFO - URL 4: https://finance.yahoo.com/sectors/technology/
+2024-12-04 15:57:42,168 - __main__ - INFO - URL 5: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+2024-12-04 15:57:42,168 - __main__ - INFO - ================
+2024-12-04 15:57:42,168 - __main__ - INFO - 
+URLs found for query "latest tech stock market trends":
+- https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+- https://www.investors.com/technology/
+- https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+- https://finance.yahoo.com/sectors/technology/
+- https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+
+2024-12-04 15:57:42,169 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+Original Query: latest tech stock market trends
+2024-12-04 15:57:42,169 - __main__ - INFO - Trying method selenium for https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+2024-12-04 15:57:47,587 - __main__ - INFO - Successfully extracted content from https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html using selenium
+2024-12-04 15:57:47,587 - __main__ - INFO - Content type: Text only
+2024-12-04 15:57:47,588 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.investors.com/technology/
+Original Query: latest tech stock market trends
+2024-12-04 15:57:47,588 - __main__ - INFO - Trying method selenium for https://www.investors.com/technology/
+2024-12-04 15:57:51,598 - __main__ - INFO - Successfully extracted content from https://www.investors.com/technology/ using selenium
+2024-12-04 15:57:51,598 - __main__ - INFO - Content type: Text only
+2024-12-04 15:57:51,598 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+Original Query: latest tech stock market trends
+2024-12-04 15:57:51,598 - __main__ - INFO - Trying method selenium for https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+2024-12-04 15:58:53,356 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 60.000
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000104da3b08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000104d9c358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001048044b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x00000001047ef7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x00000001047ef550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x00000001047ed2dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x00000001047edf48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x00000001047fbb4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x000000010480f674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x00000001047ee574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x000000010480f53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x0000000104882040 cxxbridge1$string$len + 604180
+12  chromedriver                        0x000000010483d0b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x000000010483dd00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x0000000104d6ee4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x0000000104d72164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x0000000104d561c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x0000000104d72a24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x0000000104d479cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000104d8d138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x0000000104d8d2b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x0000000104d9bfcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 15:58:53,456 - __main__ - INFO - Successfully extracted content from https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/ using selenium
+2024-12-04 15:58:53,456 - __main__ - INFO - Content type: Text only
+2024-12-04 15:58:53,456 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://finance.yahoo.com/sectors/technology/
+Original Query: latest tech stock market trends
+2024-12-04 15:58:53,456 - __main__ - INFO - Trying method selenium for https://finance.yahoo.com/sectors/technology/
+2024-12-04 15:59:53,930 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 59.258
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000104cb3b08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000104cac358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001047144b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x00000001046ff7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x00000001046ff550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x00000001046fd2dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x00000001046fdf48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x000000010470bb4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x000000010471f674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x00000001046fe574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x000000010471f53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x00000001047922c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x000000010474d0b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x000000010474dd00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x0000000104c7ee4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x0000000104c82164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x0000000104c661c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x0000000104c82a24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x0000000104c579cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000104c9d138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x0000000104c9d2b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x0000000104cabfcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 15:59:54,049 - __main__ - INFO - Successfully extracted content from https://finance.yahoo.com/sectors/technology/ using selenium
+2024-12-04 15:59:54,049 - __main__ - INFO - Content type: Text only
+2024-12-04 15:59:54,050 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+Original Query: latest tech stock market trends
+2024-12-04 15:59:54,050 - __main__ - INFO - Trying method selenium for https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+2024-12-04 16:00:02,969 - __main__ - INFO - Successfully extracted content from https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/ using selenium
+2024-12-04 16:00:02,969 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 16:00:02,980 - __main__ - ERROR - Error in AI summary generation for https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html: Expecting value: line 1 column 3 (char 2)
+2024-12-04 16:00:02,984 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 3 (char 2)
+
+2024-12-04 16:00:02,984 - __main__ - ERROR - Error in AI summary generation for https://www.investors.com/technology/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:00:02,985 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:00:02,985 - __main__ - ERROR - Error in AI summary generation for https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/: Expecting value: line 1 column 2 (char 1)
+2024-12-04 16:00:02,985 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+2024-12-04 16:00:02,985 - __main__ - ERROR - Error in AI summary generation for https://finance.yahoo.com/sectors/technology/: Expecting value: line 1 column 2 (char 1)
+2024-12-04 16:00:02,985 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+2024-12-04 16:00:17,011 - __main__ - INFO - 
+Query 1 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 16:00:17,011 - __main__ - INFO - 
+=== Processing Query 2/6 ===
+Query: "Recent advancements in AI technology stocks and their market performance"
+
+2024-12-04 16:00:20,273 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:00:20,274 - __main__ - INFO - Query: "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 16:00:20,274 - __main__ - INFO - URL 1: https://www.investors.com/news/technology/artificial-intelligence-stocks/
+2024-12-04 16:00:20,274 - __main__ - INFO - URL 2: https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx
+2024-12-04 16:00:20,274 - __main__ - INFO - URL 3: https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/
+2024-12-04 16:00:20,274 - __main__ - INFO - URL 4: https://www.blackrock.com/us/individual/insights/expert-take-on-ai-and-technology-stocks
+2024-12-04 16:00:20,274 - __main__ - INFO - URL 5: https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble
+2024-12-04 16:00:20,274 - __main__ - INFO - ================
+2024-12-04 16:00:20,274 - __main__ - INFO - 
+URLs found for query ""Recent advancements in AI technology stocks and their market performance"":
+- https://www.investors.com/news/technology/artificial-intelligence-stocks/
+- https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx
+- https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/
+- https://www.blackrock.com/us/individual/insights/expert-take-on-ai-and-technology-stocks
+- https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble
+
+2024-12-04 16:00:20,274 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.investors.com/news/technology/artificial-intelligence-stocks/
+Original Query: "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 16:00:20,274 - __main__ - INFO - Trying method selenium for https://www.investors.com/news/technology/artificial-intelligence-stocks/
+2024-12-04 16:00:23,386 - __main__ - INFO - Successfully extracted content from https://www.investors.com/news/technology/artificial-intelligence-stocks/ using selenium
+2024-12-04 16:00:23,386 - __main__ - INFO - Content type: Text only
+2024-12-04 16:00:23,386 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx
+Original Query: "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 16:00:23,386 - __main__ - INFO - Trying method selenium for https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx
+2024-12-04 16:00:26,506 - __main__ - INFO - Successfully extracted content from https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx using selenium
+2024-12-04 16:00:26,506 - __main__ - INFO - Content type: Text only
+2024-12-04 16:00:26,506 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/
+Original Query: "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 16:00:26,506 - __main__ - INFO - Trying method selenium for https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/
+2024-12-04 16:00:30,853 - __main__ - INFO - Successfully extracted content from https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/ using selenium
+2024-12-04 16:00:30,853 - __main__ - INFO - Content type: Text only
+2024-12-04 16:00:30,853 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.blackrock.com/us/individual/insights/expert-take-on-ai-and-technology-stocks
+Original Query: "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 16:00:30,853 - __main__ - INFO - Trying method selenium for https://www.blackrock.com/us/individual/insights/expert-take-on-ai-and-technology-stocks
+2024-12-04 16:00:35,343 - __main__ - INFO - Successfully extracted content from https://www.blackrock.com/us/individual/insights/expert-take-on-ai-and-technology-stocks using selenium
+2024-12-04 16:00:35,344 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 16:00:35,344 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble
+Original Query: "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 16:00:35,344 - __main__ - INFO - Trying method selenium for https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble
+2024-12-04 16:00:45,257 - __main__ - INFO - Successfully extracted content from https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble using selenium
+2024-12-04 16:00:45,258 - __main__ - INFO - Content type: Text only
+2024-12-04 16:00:45,264 - __main__ - ERROR - Error in AI summary generation for https://www.investors.com/news/technology/artificial-intelligence-stocks/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:00:45,265 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:00:45,265 - __main__ - ERROR - Error in AI summary generation for https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:00:45,265 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:00:45,265 - __main__ - ERROR - Error in AI summary generation for https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:00:45,266 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:00:57,404 - __main__ - ERROR - Error in AI summary generation for https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble: '6b28f0ad-b0e0-4605-a8f7-8eab51648dab'
+2024-12-04 16:00:57,404 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: '6b28f0ad-b0e0-4605-a8f7-8eab51648dab'
+
+2024-12-04 16:00:57,405 - __main__ - INFO - 
+Query 2 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 16:00:57,405 - __main__ - INFO - 
+=== Processing Query 3/6 ===
+Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+
+2024-12-04 16:01:00,719 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:01:00,719 - __main__ - INFO - Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 16:01:00,719 - __main__ - INFO - URL 1: https://www.ey.com/en_gl/insights/ipo/trends
+2024-12-04 16:01:00,719 - __main__ - INFO - URL 2: https://economictimes.indiatimes.com/markets/ipo
+2024-12-04 16:01:00,719 - __main__ - INFO - URL 3: https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms
+2024-12-04 16:01:00,719 - __main__ - INFO - URL 4: https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms
+2024-12-04 16:01:00,719 - __main__ - INFO - URL 5: https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms
+2024-12-04 16:01:00,719 - __main__ - INFO - ================
+2024-12-04 16:01:00,719 - __main__ - INFO - 
+URLs found for query ""Latest IPOs in the technology sector and their impact on stock market trends"":
+- https://www.ey.com/en_gl/insights/ipo/trends
+- https://economictimes.indiatimes.com/markets/ipo
+- https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms
+- https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms
+- https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms
+
+2024-12-04 16:01:00,719 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.ey.com/en_gl/insights/ipo/trends
+Original Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 16:01:00,719 - __main__ - INFO - Trying method selenium for https://www.ey.com/en_gl/insights/ipo/trends
+2024-12-04 16:01:09,936 - __main__ - INFO - Successfully extracted content from https://www.ey.com/en_gl/insights/ipo/trends using selenium
+2024-12-04 16:01:09,937 - __main__ - INFO - Content type: Text only
+2024-12-04 16:01:09,937 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://economictimes.indiatimes.com/markets/ipo
+Original Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 16:01:09,937 - __main__ - INFO - Trying method selenium for https://economictimes.indiatimes.com/markets/ipo
+2024-12-04 16:02:10,372 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 59.489
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000102ebfb08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000102eb8358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001029204b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x000000010290b7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x000000010290b550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x00000001029092dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x0000000102909f48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x0000000102917b4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x000000010292b674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x000000010290a574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x000000010292b53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x000000010299e2c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x00000001029590b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x0000000102959d00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x0000000102e8ae4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x0000000102e8e164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x0000000102e721c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x0000000102e8ea24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x0000000102e639cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000102ea9138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x0000000102ea92b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x0000000102eb7fcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 16:02:10,480 - __main__ - INFO - Successfully extracted content from https://economictimes.indiatimes.com/markets/ipo using selenium
+2024-12-04 16:02:10,480 - __main__ - INFO - Content type: Text only
+2024-12-04 16:02:10,481 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms
+Original Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 16:02:10,481 - __main__ - INFO - Trying method selenium for https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms
+2024-12-04 16:03:10,942 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 58.488
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x0000000104b53b08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000104b4c358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001045b44b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x000000010459f7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x000000010459f550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x000000010459d2dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x000000010459df48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x00000001045abb4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x00000001045bf674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x000000010459e574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x00000001045bf53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x00000001046322c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x00000001045ed0b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x00000001045edd00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x0000000104b1ee4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x0000000104b22164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x0000000104b061c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x0000000104b22a24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x0000000104af79cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000104b3d138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x0000000104b3d2b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x0000000104b4bfcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 16:03:11,047 - __main__ - INFO - Successfully extracted content from https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms using selenium
+2024-12-04 16:03:11,047 - __main__ - INFO - Content type: Text only
+2024-12-04 16:03:11,048 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms
+Original Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 16:03:11,048 - __main__ - INFO - Trying method selenium for https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms
+2024-12-04 16:04:11,548 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 58.743
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x00000001007d3b08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x00000001007cc358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001002344b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x000000010021f7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x000000010021f550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x000000010021d2dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x000000010021df48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x000000010022bb4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x000000010023f674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x000000010021e574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x000000010023f53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x00000001002b22c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x000000010026d0b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x000000010026dd00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x000000010079ee4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x00000001007a2164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x00000001007861c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x00000001007a2a24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x00000001007779cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x00000001007bd138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x00000001007bd2b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x00000001007cbfcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 16:04:11,652 - __main__ - INFO - Successfully extracted content from https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms using selenium
+2024-12-04 16:04:11,652 - __main__ - INFO - Content type: Text only
+2024-12-04 16:04:11,652 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms
+Original Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 16:04:11,652 - __main__ - INFO - Trying method selenium for https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms
+2024-12-04 16:05:13,089 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 60.000
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x000000010339fb08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x0000000103398358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x0000000102e004b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x0000000102deb7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x0000000102deb550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x0000000102de92dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x0000000102de9f48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x0000000102df7b4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x0000000102e0b674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x0000000102dea574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x0000000102e0b53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x0000000102e7e040 cxxbridge1$string$len + 604180
+12  chromedriver                        0x0000000102e390b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x0000000102e39d00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x000000010336ae4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x000000010336e164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x00000001033521c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x000000010336ea24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x00000001033439cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x0000000103389138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x00000001033892b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x0000000103397fcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 16:05:13,198 - __main__ - INFO - Successfully extracted content from https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms using selenium
+2024-12-04 16:05:13,198 - __main__ - INFO - Content type: Text only
+2024-12-04 16:05:15,391 - __main__ - ERROR - Error in AI summary generation for https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms: '9fb23540-61f0-4e55-907c-17f8f260643a'
+2024-12-04 16:05:15,392 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: '9fb23540-61f0-4e55-907c-17f8f260643a'
+
+2024-12-04 16:05:15,403 - __main__ - ERROR - Error in AI summary generation for https://economictimes.indiatimes.com/markets/ipo: '9fb23540-61f0-4e55-907c-17f8f260643a'
+2024-12-04 16:05:15,404 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: '9fb23540-61f0-4e55-907c-17f8f260643a'
+
+2024-12-04 16:05:15,526 - __main__ - ERROR - Error in AI summary generation for https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms: '9fb23540-61f0-4e55-907c-17f8f260643a'
+2024-12-04 16:05:15,527 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: '9fb23540-61f0-4e55-907c-17f8f260643a'
+
+2024-12-04 16:05:27,988 - __main__ - ERROR - Error in AI summary generation for https://www.ey.com/en_gl/insights/ipo/trends: '9fb23540-61f0-4e55-907c-17f8f260643a'
+2024-12-04 16:05:27,989 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: '9fb23540-61f0-4e55-907c-17f8f260643a'
+
+2024-12-04 16:05:27,989 - __main__ - INFO - 
+Query 3 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 16:05:27,989 - __main__ - INFO - 
+=== Processing Query 4/6 ===
+Query: "Impact of 5G technology on telecom sector stocks"
+
+2024-12-04 16:05:31,233 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:05:31,234 - __main__ - INFO - Query: "Impact of 5G technology on telecom sector stocks"
+2024-12-04 16:05:31,234 - __main__ - INFO - URL 1: https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOoovi6jP8BiNuJtlyqAxsrFG3fBY-wC4IsqTSwGFxOID9b6gQqgM
+2024-12-04 16:05:31,234 - __main__ - INFO - URL 2: https://www.pwc.com/gx/en/industries/tmt/5g/telecommunications-at-5g.html
+2024-12-04 16:05:31,234 - __main__ - INFO - URL 3: https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/
+2024-12-04 16:05:31,234 - __main__ - INFO - URL 4: https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/
+2024-12-04 16:05:31,234 - __main__ - INFO - URL 5: https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html
+2024-12-04 16:05:31,234 - __main__ - INFO - ================
+2024-12-04 16:05:31,234 - __main__ - INFO - 
+URLs found for query ""Impact of 5G technology on telecom sector stocks"":
+- https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOoovi6jP8BiNuJtlyqAxsrFG3fBY-wC4IsqTSwGFxOID9b6gQqgM
+- https://www.pwc.com/gx/en/industries/tmt/5g/telecommunications-at-5g.html
+- https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/
+- https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/
+- https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html
+
+2024-12-04 16:05:31,234 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOoovi6jP8BiNuJtlyqAxsrFG3fBY-wC4IsqTSwGFxOID9b6gQqgM
+Original Query: "Impact of 5G technology on telecom sector stocks"
+2024-12-04 16:05:31,235 - __main__ - INFO - Trying method selenium for https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOoovi6jP8BiNuJtlyqAxsrFG3fBY-wC4IsqTSwGFxOID9b6gQqgM
+2024-12-04 16:05:38,156 - __main__ - INFO - Successfully extracted content from https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOoovi6jP8BiNuJtlyqAxsrFG3fBY-wC4IsqTSwGFxOID9b6gQqgM using selenium
+2024-12-04 16:05:38,156 - __main__ - INFO - Content type: Text only
+2024-12-04 16:05:38,156 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.pwc.com/gx/en/industries/tmt/5g/telecommunications-at-5g.html
+Original Query: "Impact of 5G technology on telecom sector stocks"
+2024-12-04 16:05:38,156 - __main__ - INFO - Trying method selenium for https://www.pwc.com/gx/en/industries/tmt/5g/telecommunications-at-5g.html
+2024-12-04 16:05:42,010 - __main__ - INFO - Successfully extracted content from https://www.pwc.com/gx/en/industries/tmt/5g/telecommunications-at-5g.html using selenium
+2024-12-04 16:05:42,011 - __main__ - INFO - Content type: Text only
+2024-12-04 16:05:42,011 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/
+Original Query: "Impact of 5G technology on telecom sector stocks"
+2024-12-04 16:05:42,011 - __main__ - INFO - Trying method selenium for https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/
+2024-12-04 16:05:46,004 - __main__ - INFO - Successfully extracted content from https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/ using selenium
+2024-12-04 16:05:46,004 - __main__ - INFO - Content type: Text only
+2024-12-04 16:05:46,004 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/
+Original Query: "Impact of 5G technology on telecom sector stocks"
+2024-12-04 16:05:46,004 - __main__ - INFO - Trying method selenium for https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/
+2024-12-04 16:05:50,564 - __main__ - INFO - Successfully extracted content from https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/ using selenium
+2024-12-04 16:05:50,564 - __main__ - INFO - Content type: Text only
+2024-12-04 16:05:50,564 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html
+Original Query: "Impact of 5G technology on telecom sector stocks"
+2024-12-04 16:05:50,564 - __main__ - INFO - Trying method selenium for https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html
+2024-12-04 16:05:54,614 - __main__ - INFO - Successfully extracted content from https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html using selenium
+2024-12-04 16:05:54,615 - __main__ - INFO - Content type: Text only
+2024-12-04 16:06:07,545 - __main__ - ERROR - Error in AI summary generation for https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOoovi6jP8BiNuJtlyqAxsrFG3fBY-wC4IsqTSwGFxOID9b6gQqgM: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+2024-12-04 16:06:07,546 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+
+2024-12-04 16:06:08,246 - __main__ - ERROR - Error in AI summary generation for https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+2024-12-04 16:06:08,247 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+
+2024-12-04 16:06:09,476 - __main__ - ERROR - Error in AI summary generation for https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+2024-12-04 16:06:09,477 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+
+2024-12-04 16:06:15,763 - __main__ - ERROR - Error in AI summary generation for https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+2024-12-04 16:06:15,764 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'f86e31de-9f9f-4ebc-bb6d-3a6aa5cdecb9'
+
+2024-12-04 16:06:15,764 - __main__ - INFO - 
+Query 4 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 16:06:15,765 - __main__ - INFO - 
+=== Processing Query 5/6 ===
+Query: "Investment trends in cybersecurity stocks in the latest quarter"
+
+2024-12-04 16:06:19,016 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:06:19,016 - __main__ - INFO - Query: "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 16:06:19,016 - __main__ - INFO - URL 1: https://www.investors.com/news/technology/cybersecurity-stocks/
+2024-12-04 16:06:19,016 - __main__ - INFO - URL 2: https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html
+2024-12-04 16:06:19,016 - __main__ - INFO - URL 3: https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth
+2024-12-04 16:06:19,016 - __main__ - INFO - URL 4: https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/
+2024-12-04 16:06:19,016 - __main__ - INFO - URL 5: https://aliceblueonline.com/top-cybersecurity-stocks/
+2024-12-04 16:06:19,016 - __main__ - INFO - ================
+2024-12-04 16:06:19,016 - __main__ - INFO - 
+URLs found for query ""Investment trends in cybersecurity stocks in the latest quarter"":
+- https://www.investors.com/news/technology/cybersecurity-stocks/
+- https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html
+- https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth
+- https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/
+- https://aliceblueonline.com/top-cybersecurity-stocks/
+
+2024-12-04 16:06:19,016 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.investors.com/news/technology/cybersecurity-stocks/
+Original Query: "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 16:06:19,016 - __main__ - INFO - Trying method selenium for https://www.investors.com/news/technology/cybersecurity-stocks/
+2024-12-04 16:06:26,665 - __main__ - INFO - Successfully extracted content from https://www.investors.com/news/technology/cybersecurity-stocks/ using selenium
+2024-12-04 16:06:26,665 - __main__ - INFO - Content type: Text only
+2024-12-04 16:06:26,666 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html
+Original Query: "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 16:06:26,666 - __main__ - INFO - Trying method selenium for https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html
+2024-12-04 16:07:27,113 - __main__ - ERROR - Selenium extraction failed: Message: timeout: Timed out receiving message from renderer: 59.219
+  (Session info: chrome=131.0.6778.86)
+Stacktrace:
+0   chromedriver                        0x00000001049dfb08 cxxbridge1$str$ptr + 3651580
+1   chromedriver                        0x00000001049d8358 cxxbridge1$str$ptr + 3620940
+2   chromedriver                        0x00000001044404b4 cxxbridge1$string$len + 89224
+3   chromedriver                        0x000000010442b7e0 cxxbridge1$string$len + 4020
+4   chromedriver                        0x000000010442b550 cxxbridge1$string$len + 3364
+5   chromedriver                        0x00000001044292dc core::str::slice_error_fail::ha0e52dbcb60e6bae + 59404
+6   chromedriver                        0x0000000104429f48 core::str::slice_error_fail::ha0e52dbcb60e6bae + 62584
+7   chromedriver                        0x0000000104437b4c cxxbridge1$string$len + 54048
+8   chromedriver                        0x000000010444b674 cxxbridge1$string$len + 134728
+9   chromedriver                        0x000000010442a574 core::str::slice_error_fail::ha0e52dbcb60e6bae + 64164
+10  chromedriver                        0x000000010444b53c cxxbridge1$string$len + 134416
+11  chromedriver                        0x00000001044be2c8 cxxbridge1$string$len + 604828
+12  chromedriver                        0x00000001044790b0 cxxbridge1$string$len + 321668
+13  chromedriver                        0x0000000104479d00 cxxbridge1$string$len + 324820
+14  chromedriver                        0x00000001049aae4c cxxbridge1$str$ptr + 3435328
+15  chromedriver                        0x00000001049ae164 cxxbridge1$str$ptr + 3448408
+16  chromedriver                        0x00000001049921c0 cxxbridge1$str$ptr + 3333812
+17  chromedriver                        0x00000001049aea24 cxxbridge1$str$ptr + 3450648
+18  chromedriver                        0x00000001049839cc cxxbridge1$str$ptr + 3274432
+19  chromedriver                        0x00000001049c9138 cxxbridge1$str$ptr + 3558956
+20  chromedriver                        0x00000001049c92b4 cxxbridge1$str$ptr + 3559336
+21  chromedriver                        0x00000001049d7fcc cxxbridge1$str$ptr + 3620032
+22  libsystem_pthread.dylib             0x00000001aedea06c _pthread_start + 148
+23  libsystem_pthread.dylib             0x00000001aede4e2c thread_start + 8
+
+2024-12-04 16:07:27,245 - __main__ - INFO - Successfully extracted content from https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html using selenium
+2024-12-04 16:07:27,245 - __main__ - INFO - Content type: Text only
+2024-12-04 16:07:27,246 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth
+Original Query: "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 16:07:27,246 - __main__ - INFO - Trying method selenium for https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth
+2024-12-04 16:07:29,966 - __main__ - INFO - Successfully extracted content from https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth using selenium
+2024-12-04 16:07:29,966 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 16:07:29,967 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/
+Original Query: "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 16:07:29,967 - __main__ - INFO - Trying method selenium for https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/
+2024-12-04 16:07:37,501 - __main__ - INFO - Successfully extracted content from https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/ using selenium
+2024-12-04 16:07:37,501 - __main__ - INFO - Content type: Text only
+2024-12-04 16:07:37,502 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://aliceblueonline.com/top-cybersecurity-stocks/
+Original Query: "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 16:07:37,502 - __main__ - INFO - Trying method selenium for https://aliceblueonline.com/top-cybersecurity-stocks/
+2024-12-04 16:07:39,654 - __main__ - INFO - Successfully extracted content from https://aliceblueonline.com/top-cybersecurity-stocks/ using selenium
+2024-12-04 16:07:39,654 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 16:07:39,662 - __main__ - ERROR - Error in AI summary generation for https://www.investors.com/news/technology/cybersecurity-stocks/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:07:39,664 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:07:39,664 - __main__ - ERROR - Error in AI summary generation for https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:07:39,664 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:07:39,664 - __main__ - ERROR - Error in AI summary generation for https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth: Extra data: line 1 column 3578 (char 3577)
+2024-12-04 16:07:39,664 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 340, in decode
+    raise JSONDecodeError("Extra data", s, end)
+json.decoder.JSONDecodeError: Extra data: line 1 column 3578 (char 3577)
+
+2024-12-04 16:07:39,664 - __main__ - ERROR - Error in AI summary generation for https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:07:39,665 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:07:55,240 - __main__ - INFO - 
+Query 5 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 16:07:55,240 - __main__ - INFO - 
+=== Processing Query 6/6 ===
+Query: "Performance analysis of FAANG stocks in the recent market downturn"
+
+2024-12-04 16:07:58,376 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:07:58,376 - __main__ - INFO - Query: "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 16:07:58,376 - __main__ - INFO - URL 1: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+2024-12-04 16:07:58,376 - __main__ - INFO - URL 2: https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708
+2024-12-04 16:07:58,376 - __main__ - INFO - URL 3: https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416
+2024-12-04 16:07:58,376 - __main__ - INFO - URL 4: https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985
+2024-12-04 16:07:58,376 - __main__ - INFO - URL 5: https://www.businessinsider.com/personal-finance/investing/what-is-faang
+2024-12-04 16:07:58,376 - __main__ - INFO - ================
+2024-12-04 16:07:58,376 - __main__ - INFO - 
+URLs found for query ""Performance analysis of FAANG stocks in the recent market downturn"":
+- https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+- https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708
+- https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416
+- https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985
+- https://www.businessinsider.com/personal-finance/investing/what-is-faang
+
+2024-12-04 16:07:58,376 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+Original Query: "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 16:07:58,377 - __main__ - INFO - Trying method selenium for https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+2024-12-04 16:07:59,357 - __main__ - INFO - Successfully extracted content from https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade using selenium
+2024-12-04 16:07:59,357 - __main__ - INFO - Content type: Text only
+2024-12-04 16:07:59,358 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708
+Original Query: "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 16:07:59,358 - __main__ - INFO - Trying method selenium for https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708
+2024-12-04 16:08:07,296 - __main__ - INFO - Successfully extracted content from https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708 using selenium
+2024-12-04 16:08:07,297 - __main__ - INFO - Content type: Text only
+2024-12-04 16:08:07,297 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416
+Original Query: "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 16:08:07,297 - __main__ - INFO - Trying method selenium for https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416
+2024-12-04 16:08:10,407 - __main__ - INFO - Successfully extracted content from https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416 using selenium
+2024-12-04 16:08:10,407 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 16:08:10,408 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985
+Original Query: "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 16:08:10,408 - __main__ - INFO - Trying method selenium for https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985
+2024-12-04 16:08:11,934 - __main__ - INFO - Successfully extracted content from https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985 using selenium
+2024-12-04 16:08:11,934 - __main__ - INFO - Content type: Text only
+2024-12-04 16:08:11,934 - __main__ - INFO - 
+=== Processing URL ===
+URL: https://www.businessinsider.com/personal-finance/investing/what-is-faang
+Original Query: "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 16:08:11,934 - __main__ - INFO - Trying method selenium for https://www.businessinsider.com/personal-finance/investing/what-is-faang
+2024-12-04 16:08:14,172 - __main__ - INFO - Successfully extracted content from https://www.businessinsider.com/personal-finance/investing/what-is-faang using selenium
+2024-12-04 16:08:14,173 - __main__ - INFO - Content type: Contains tables/charts
+2024-12-04 16:08:14,179 - __main__ - ERROR - Error in AI summary generation for https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:08:14,181 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:08:14,181 - __main__ - ERROR - Error in AI summary generation for https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:08:14,181 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:08:14,181 - __main__ - ERROR - Error in AI summary generation for https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985: Expecting value: line 1 column 1 (char 0)
+2024-12-04 16:08:14,182 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 81, in run_parallel_ai_completion
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 105, in _run_openai_completion
+    await process_api_requests_from_file(config)
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/oai_parallel.py", line 155, in process_api_requests_from_file
+    request_json = json.loads(next(requests))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/anaconda3/envs/market_agents/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2024-12-04 16:08:40,040 - __main__ - ERROR - Error in AI summary generation for https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416: '7f861a51-a5f1-4af8-a1aa-56aa71636418'
+2024-12-04 16:08:40,041 - __main__ - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/research_agent_with_query_v2.py", line 547, in generate_ai_summary
+    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 88, in run_parallel_ai_completion
+    prompts = self._update_prompt_history(prompts, flattened_results)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/karolbhandari/Documents/market_agents/MarketAgents/market_agents/inference/parallel_inference.py", line 63, in _update_prompt_history
+    prompt_hashmap[output.source_id].add_chat_turn_history(output)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: '7f861a51-a5f1-4af8-a1aa-56aa71636418'
+
+2024-12-04 16:08:40,041 - __main__ - INFO - 
+Query 6 Results Summary:
+- URLs processed: 5
+- Successful extractions: 5
+- Failed extractions: 0
+
+2024-12-04 16:08:43,130 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:08:43,130 - __main__ - INFO - Query: latest tech stock market trends
+2024-12-04 16:08:43,130 - __main__ - INFO - URL 1: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+2024-12-04 16:08:43,130 - __main__ - INFO - URL 2: https://www.investors.com/technology/
+2024-12-04 16:08:43,130 - __main__ - INFO - URL 3: https://finance.yahoo.com/sectors/technology/
+2024-12-04 16:08:43,130 - __main__ - INFO - URL 4: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+2024-12-04 16:08:43,130 - __main__ - INFO - URL 5: https://finance.yahoo.com/chart/%5EYH311%2C%5EGSPC
+2024-12-04 16:08:43,130 - __main__ - INFO - ================
+2024-12-04 16:08:43,130 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 16:08:51,274 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:08:51,275 - __main__ - INFO - Query: "Recent advancements in AI technology stocks and their market performance"
+2024-12-04 16:08:51,275 - __main__ - INFO - URL 1: https://www.investors.com/news/technology/artificial-intelligence-stocks/
+2024-12-04 16:08:51,275 - __main__ - INFO - URL 2: https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx
+2024-12-04 16:08:51,275 - __main__ - INFO - URL 3: https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/
+2024-12-04 16:08:51,275 - __main__ - INFO - URL 4: https://www.blackrock.com/us/individual/insights/expert-take-on-ai-and-technology-stocks
+2024-12-04 16:08:51,275 - __main__ - INFO - URL 5: https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble
+2024-12-04 16:08:51,275 - __main__ - INFO - ================
+2024-12-04 16:08:51,275 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 16:08:59,508 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:08:59,509 - __main__ - INFO - Query: "Latest IPOs in the technology sector and their impact on stock market trends"
+2024-12-04 16:08:59,509 - __main__ - INFO - URL 1: https://www.ey.com/en_gl/insights/ipo/trends
+2024-12-04 16:08:59,509 - __main__ - INFO - URL 2: https://economictimes.indiatimes.com/markets/ipo
+2024-12-04 16:08:59,509 - __main__ - INFO - URL 3: https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms
+2024-12-04 16:08:59,509 - __main__ - INFO - URL 4: https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms
+2024-12-04 16:08:59,509 - __main__ - INFO - URL 5: https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms
+2024-12-04 16:08:59,509 - __main__ - INFO - ================
+2024-12-04 16:08:59,509 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 16:09:07,586 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:09:07,586 - __main__ - INFO - Query: "Impact of 5G technology on telecom sector stocks"
+2024-12-04 16:09:07,587 - __main__ - INFO - URL 1: https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOor1vsci2s0TNrydersr8SVJY2GGD9tBPntavCMNdpNv4Io_1t_4
+2024-12-04 16:09:07,587 - __main__ - INFO - URL 2: https://www.pwc.com/gx/en/industries/tmt/5g/telecommunications-at-5g.html
+2024-12-04 16:09:07,587 - __main__ - INFO - URL 3: https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/
+2024-12-04 16:09:07,587 - __main__ - INFO - URL 4: https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/
+2024-12-04 16:09:07,587 - __main__ - INFO - URL 5: https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html
+2024-12-04 16:09:07,587 - __main__ - INFO - ================
+2024-12-04 16:09:07,587 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 16:09:15,635 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:09:15,635 - __main__ - INFO - Query: "Investment trends in cybersecurity stocks in the latest quarter"
+2024-12-04 16:09:15,635 - __main__ - INFO - URL 1: https://www.investors.com/news/technology/cybersecurity-stocks/
+2024-12-04 16:09:15,635 - __main__ - INFO - URL 2: https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html
+2024-12-04 16:09:15,635 - __main__ - INFO - URL 3: https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth
+2024-12-04 16:09:15,635 - __main__ - INFO - URL 4: https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/
+2024-12-04 16:09:15,636 - __main__ - INFO - URL 5: https://aliceblueonline.com/top-cybersecurity-stocks/
+2024-12-04 16:09:15,636 - __main__ - INFO - ================
+2024-12-04 16:09:15,636 - __main__ - INFO - Rate limiting: sleeping for 5.00 seconds
+2024-12-04 16:09:23,953 - __main__ - INFO - 
+=== URLs Found ===
+2024-12-04 16:09:23,953 - __main__ - INFO - Query: "Performance analysis of FAANG stocks in the recent market downturn"
+2024-12-04 16:09:23,953 - __main__ - INFO - URL 1: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+2024-12-04 16:09:23,953 - __main__ - INFO - URL 2: https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708
+2024-12-04 16:09:23,953 - __main__ - INFO - URL 3: https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416
+2024-12-04 16:09:23,953 - __main__ - INFO - URL 4: https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985
+2024-12-04 16:09:23,953 - __main__ - INFO - URL 5: https://www.businessinsider.com/personal-finance/investing/what-is-faang
+2024-12-04 16:09:23,953 - __main__ - INFO - ================
+2024-12-04 16:09:23,954 - __main__ - INFO - 
+=== Final Search Summary ===
+Total Queries Processed: 6
+Total URLs Processed: 30
+Total Successful Extractions: 30
+
+Results by Query:
+- "latest tech stock market trends": 5 results
+- ""Recent advancements in AI technology stocks and their market performance"": 5 results
+- ""Latest IPOs in the technology sector and their impact on stock market trends"": 5 results
+- ""Impact of 5G technology on telecom sector stocks"": 5 results
+- ""Investment trends in cybersecurity stocks in the latest quarter"": 5 results
+- ""Performance analysis of FAANG stocks in the recent market downturn"": 5 results
+
+2024-12-04 16:09:23,954 - __main__ - INFO - 
+=== ARTICLE SUMMARIES ===
+2024-12-04 16:09:23,955 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://abmagazine.accaglobal.com/content/abmagazine/global/articles/2022/sep/business/trends-in-tech-stocks.html
+TITLE: Trends in tech stocks
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,955 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.investors.com/technology/
+TITLE: Access to this page has been denied.
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,955 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+TITLE: https://finance.yahoo.com/u/yahoo-finance/watchlists/tech-stocks-that-move-the-market/
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,955 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://finance.yahoo.com/sectors/technology/
+TITLE: https://finance.yahoo.com/sectors/technology/
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,955 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://finance.yahoo.com/screener/predefined/sec-ind_sec-largest-equities_technology/
+TITLE: Top Largest Companies In The Technology Sector List | Screener - Yahoo Finance
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Concise Summary:
+The text content provides a list of the top largest companies in the technology sector, including Apple, NVIDIA, and Microsoft. The table data includes information such as the company's name, stock symbol, intraday price, change, % change, volume, average volume over 3 months, market cap, PE ratio, and 52-week range.
+
+KEY POINTS:
+- 2. Key Points:
+- Apple, NVIDIA, and Microsoft are the top three largest companies in the tech sector.
+- Apple has the highest market cap at 3.668 trillion, followed by NVIDIA at 3.435 trillion and Microsoft at 3.206 trillion.
+- Palantir Technologies Inc. showed the highest percentage change at +6.88%.
+- The company with the highest volume was NVIDIA Corporation with 160.129M.
+- The company with the highest PE Ratio was Palantir Technologies Inc. at 354.80.
+
+MARKET IMPACT:
+3. Market Impact Assessment:
+The performance of these tech giants can significantly influence the overall market due to their substantial market capitalizations. Positive performance from these companies could potentially drive bullish market sentiment, while underperformance could lead to bearish sentiment.
+
+TRADING IMPLICATIONS:
+4. Trading Implications:
+Traders should monitor these companies due to their significant influence on the tech sector and broader market. The high PE ratio of Palantir suggests it might be overvalued, while the high volume for NVIDIA indicates significant market interest.
+=============================
+                    
+2024-12-04 16:09:23,955 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.investors.com/news/technology/artificial-intelligence-stocks/
+TITLE: Access to this page has been denied.
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.morningstar.co.uk/uk/news/257447/10-ai-stocks-to-invest-in.aspx
+TITLE: 10 AI Stocks to Invest In | Morningstar
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.theglobaltreasurer.com/2024/06/03/what-are-the-key-stock-markets-trends-and-highlights-in-ai-and-tech/
+TITLE: What are the Key Stock Markets Trends and Highlights in AI and Tech? - The Global Treasurer
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.blackrock.com/us/individual/insights/expert-take-on-ai-and-technology-stocks
+TITLE: Expert insight on AI and technology stocks | BlackRock
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Based on the provided information, it seems there is insufficient content to generate a comprehensive analysis. The text content appears to be a navigation guide for the BlackRock website, listing various investment strategies, fund types, and educational resources. It doesn't provide specific information about AI and technology stocks. The chart information is also lacking details. To provide a meaningful analysis, more specific data or information about the company's performance, market trends, or specific investment strategies would be required.
+
+KEY POINTS:
+
+
+MARKET IMPACT:
+Market impact analysis not available
+
+TRADING IMPLICATIONS:
+Trading implications not available
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.goldmansachs.com/insights/articles/ai-stocks-arent-in-a-bubble
+TITLE: AI stocks aren't in a bubble | Goldman Sachs
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.ey.com/en_gl/insights/ipo/trends
+TITLE: EY Global IPO Trends Q3 2024 | EY - Global
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://economictimes.indiatimes.com/markets/ipo
+TITLE: https://economictimes.indiatimes.com/markets/ipo
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms
+TITLE: https://economictimes.indiatimes.com/marketstats/pid-183,exchange-50,pageno-1,sortorder-desc,sortby-0.cms
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+You haven't provided any content for me to analyze. Please provide the financial information or news you'd like me to review.
+
+KEY POINTS:
+
+
+MARKET IMPACT:
+Market impact analysis not available
+
+TRADING IMPLICATIONS:
+Trading implications not available
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms
+TITLE: https://economictimes.indiatimes.com/afcons-infrastructure-ltd/ipos/isopen-,companyid-11878.cms
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms
+TITLE: https://economictimes.indiatimes.com/swiggy-ltd/ipos/isopen-,companyid-2232501.cms
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.logic-fruit.com/blog/wireless-communication/5g-impact-on-telecom/?srsltid=AfmBOoovi6jP8BiNuJtlyqAxsrFG3fBY-wC4IsqTSwGFxOID9b6gQqgM
+TITLE: 5G's Impact on Telecom Industry: Future Outlook
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.pwc.com/gx/en/industries/tmt/5g/telecommunications-at-5g.html
+TITLE: Telecommunications innovation. Powered by 5G. - PwC
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Concise Summary:
+The content appears to be a navigation or site map of PwC's global website, focusing on their industries and services, with a specific emphasis on 5G Telecommunications under Technology, Media, and Telecommunications (TMT) sector.
+
+KEY POINTS:
+- 2. Key Points:
+- The content is from PwC's global website.
+- It covers a wide range of industries and services offered by PwC.
+- 5G Telecommunications is highlighted under the Technology, Media & Telecommunications (TMT) sector.
+- The website is accessible to a global audience with a country-specific focus.
+- Other sectors mentioned include Aerospace, Automotive, Energy, Healthcare, Insurance, and more.
+
+MARKET IMPACT:
+3. Market Impact Assessment:
+The content doesn't provide specific information or data to assess market impact. However, the emphasis on 5G Telecommunications indicates PwC's focus on this emerging technology, which could potentially have significant impacts on the TMT sector and related industries.
+
+TRADING IMPLICATIONS:
+4. Trading Implications:
+Without specific financial data or market trends, it's difficult to determine direct trading implications from the content. However, investors and traders might take note of PwC's focus on 5G and TMT, considering these sectors for potential investment opportunities, given the expected growth of 5G technology.
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://metavshn.com/the-future-of-telecom-exploring-the-impact-of-5g/
+TITLE: The Future of Telecom: Exploring the Impact of 5G - METAVSHN
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,956 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://theincmagazine.com/5gs-impact-on-the-telecom-industry-a-transformative-shift/
+TITLE: 5G's Impact on the Telecom Industry: A Transformative Shift
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.calsoftinc.com/blogs/the-5g-uprising-influence-on-business-and-telco-industry.html
+TITLE: The 5G Uprising: Influence on Business and Telco Industry - Calsoft Blog
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.investors.com/news/technology/cybersecurity-stocks/
+TITLE: Access to this page has been denied.
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html
+TITLE: https://finance.yahoo.com/news/buy-3-cybersecurity-stocks-ahead-133800151.html
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.kiplinger.com/investing/stocks/tech-stocks/602685/cybersecurity-stocks-to-lock-up-growth
+TITLE: 6 Cybersecurity Stocks to Buy Now | Kiplinger
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.investors.com/news/technology/okta-stock-okta-earnings-news-q32024/
+TITLE: Access to this page has been denied.
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://aliceblueonline.com/top-cybersecurity-stocks/
+TITLE: Cybersecurity Stocks - Top Cybersecurity Stocks
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+1. Concise Summary:
+The content is a comprehensive analysis of top cybersecurity stocks, highlighting their performance and potential for growth. Cybersecurity companies are crucial in protecting networks, devices, and data from cyber threats. The stocks analyzed include Quick Heal Technologies Ltd, Sasken Technologies Ltd, Expleo Solutions Ltd, R S Software (India) Ltd, and Securekloud Technologies Ltd.
+
+KEY POINTS:
+- 2. Key Points:
+- Cybersecurity stocks are gaining interest due to the increasing prevalence of cyber threats.
+- Quick Heal Technologies Ltd and R S Software (India) Ltd have shown significant 1-year returns of 247.19% and 491.46% respectively.
+- Sasken Technologies Ltd has the highest 5-year average net profit margin of 20.75%.
+- Securekloud Technologies Ltd has experienced a decrease in both 1-year return and 6-month return.
+- The 5-year CAGR is highest for R S Software (India) Ltd at 74.45%.
+
+MARKET IMPACT:
+3. Market Impact Assessment:
+   - The strong performance of certain cybersecurity stocks, particularly Quick Heal Technologies and R S Software, may attract more investors to this sector, driving up prices.
+   - Companies with negative returns and profit margins, such as Securekloud Technologies, may face investor skepticism and potential sell-offs.
+   - Increased interest in cybersecurity stocks could potentially lead to more capital inflow into the tech sector.
+
+TRADING IMPLICATIONS:
+4. Trading Implications:
+   - Traders might consider investing in cybersecurity stocks with high returns and profit margins, like Quick Heal Technologies and R S Software.
+   - Investors should be cautious about stocks with negative returns and profit margins, such as Securekloud Technologies.
+   - Diversification within the tech sector, including investments in cybersecurity, could be a potential strategy for traders.
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.bajajfinserv.in/faang-stocks-performance-over-the-last-decade
+TITLE: Access Denied
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://fbs.eu/en/analytics/articles/faang-stocks-fundamental-analysis-29708
+TITLE: FAANG sector is an indicator of the whole market. It includes the most liquid stocks. What's going on with FAANG?
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://medium.com/@manisangsu/risk-and-return-analysis-using-faang-stocks-d0dc1026a416
+TITLE: Risk and return analysis using FAANG stocks | by Manisangsu Bhowmik , CFA, FRM | Medium
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.msci.com/www/blog-posts/did-faang-stocks-lead-the-us/01135384985
+TITLE: Under Maintenance | MSCI
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Summary generation failed
+
+KEY POINTS:
+- Error in key points extraction
+
+MARKET IMPACT:
+Impact analysis failed
+
+TRADING IMPLICATIONS:
+Trading analysis failed
+=============================
+                    
+2024-12-04 16:09:23,957 - __main__ - INFO - 
+=== ARTICLE DETAILS ===
+URL: https://www.businessinsider.com/personal-finance/investing/what-is-faang
+TITLE: FAANG Stocks 2024: Investing in the Future of Tech
+EXTRACTION METHOD: selenium
+
+SUMMARY:
+Based on the provided text, there's insufficient information to provide a comprehensive analysis. The text seems to be about FAANG stocks, which are the shares of five prominent American technology companies: Facebook, Amazon, Apple, Netflix, and Google (now Alphabet Inc.). However, the text does not provide specific data or details about these stocks, their performance, or their future outlook, which are critical for a financial analysis.
+
+KEY POINTS:
+- Key points:
+- The text is about FAANG stocks, which are key players in the tech industry.
+- There's a mention of investing in FAANG stocks and the risks associated with it.
+- The text does not provide specific data or details about these stocks.
+
+MARKET IMPACT:
+Market Impact Assessment: 
+Without specific data or information on the performance or outlook of FAANG stocks, it's impossible to assess the market impact.
+
+TRADING IMPLICATIONS:
+Trading Implications:
+Without detailed information or data, it's impossible to provide specific trading implications.
+=============================
+                    
+2024-12-04 16:09:23,968 - __main__ - ERROR - Database error: connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2024-12-04 16:09:23,968 - __main__ - INFO - Results saved to file: outputs/web_search/results_20241204_160923.json
+2024-12-04 16:09:23,968 - __main__ - INFO - 
+Search completed:
+- Query: latest tech stock market trends
+- Total items processed: 30
+- Successful: 30
+- Failed: 0
+- Results saved to: outputs/web_search/results_20241204_160923.json
+        
