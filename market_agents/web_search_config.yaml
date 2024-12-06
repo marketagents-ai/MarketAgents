@@ -1,7 +1,7 @@
-query: "latest tech stock market trends"
+query: "Top meme coins"
 max_concurrent_requests: 50
 rate_limit: 0.1
-content_max_length: 1000000
+content_max_length: 4000
 request_timeout: 30
 urls_per_query: 5
 use_ai_summary: true
@@ -20,21 +20,22 @@ headers:
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
   Accept-Language: "en-US,en;q=0.5"
 
-# Add this section if it's missing
 llm_configs:
   search_query_generation:
     client: "openai"
     model: "gpt-4"
     max_tokens: 1000
     temperature: 0.7
+    response_format: "json_beg"
     use_cache: true
-    system_prompt: "You are an expert market research analyst specializing in technology stocks."
-    prompt_template: "Generate 5 specific search queries related to: {query}"
+    system_prompt: "You are an expert market research analyst specializing in stocks & trading."
+    prompt_template: "Generate ONE specific search queries related to: {query} which covers latest news and market movements."
   content_analysis:
     client: "openai"
     model: "gpt-4"
-    max_tokens: 2000
+    max_tokens: 1000
     temperature: 0.5
+    response_format: "text"
     use_cache: true
-    system_prompt: "You are an expert financial analyst."
+    system_prompt: "You are an expert financial & Trading analyst."
     prompt_template: "{prompt}"

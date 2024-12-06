@@ -1,3 +1,29 @@
+
+
+
+text_only_analysis: |
+  Provide a structured market analysis summary:
+
+  1. OVERVIEW:
+  - Main points
+  - Key metrics
+  - Critical developments
+
+  2. TECHNICAL ANALYSIS:
+  {technical_analysis}
+
+  3. FUNDAMENTAL FACTORS:
+  {fundamental_analysis}
+
+  4. TRADING IMPLICATIONS:
+  {trading_implications}
+
+  5. RISK ASSESSMENT:
+  {risk_analysis}
+
+  6. RECOMMENDATIONS:
+  {recommendations}
+
 basic_summary: |
   Analyze this article and provide a comprehensive summary:
 
@@ -48,6 +74,12 @@ market_impact: |
   - Institutional investor reactions
   - Retail investor implications
 
+  5. DATA-DRIVEN INSIGHTS:
+  - Analysis of presented tables
+  - Interpretation of chart patterns
+  - Statistical correlations
+  - Historical comparisons from data
+
 trading_implications: |
   You are a professional trading strategist. Based on this article, provide specific trading recommendations:
 
@@ -86,12 +118,246 @@ trading_implications: |
   - Include relevant price levels
   - Suggest risk management approaches
 
+  6. QUANTITATIVE SIGNALS:
+  - Technical levels from charts
+  - Statistical arbitrage opportunities
+  - Relative value comparisons
+  - Quantitative risk metrics
+
+
+
+analysis_template: |
+  Analyze this content comprehensively:
+
+  Content: {content}
+
+  Provide analysis in ALL of the following formats:
+  1. Basic Summary
+  2. Key Points Analysis
+  3. Market Impact Analysis
+  4. Trading Implications
+  5. Content-Specific Analysis (Tables/Charts/Text)
+
+  Format the response as a structured JSON object containing all analyses.
+
+table_content_analysis: |
+  Analyze this market content containing tables:
+
+  {content}
+
+  Provide analysis in the following JSON structure:
+  {
+    "TABLE_METRICS": {
+      "key_statistics": "important numerical findings",
+      "trends": "identified trends from data",
+      "comparisons": "notable comparisons"
+    },
+    "MARKET_IMPLICATIONS": {
+      "data_insights": "insights from metrics",
+      "sector_impact": "sector-specific implications",
+      "trading_signals": "signals from the data"
+    }
+  }
+
+chart_content_analysis: |
+  Analyze this market content containing charts:
+
+  {content}
+
+  Provide analysis in the following JSON structure:
+  {
+    "TECHNICAL_ANALYSIS": {
+      "patterns": "identified chart patterns",
+      "indicators": "technical indicator readings",
+      "levels": "key price levels"
+    },
+    "MARKET_CONTEXT": {
+      "trend_analysis": "trend direction and strength",
+      "volume_analysis": "volume patterns and implications",
+      "trading_signals": "technical trading signals"
+    }
+  }
+
+mixed_content_analysis: |
+  Analyze this market content containing both tables and charts:
+
+  {content}
+
+  Provide analysis in the following JSON structure:
+  {
+    "QUANTITATIVE_ANALYSIS": {
+      "metrics": "key data points and statistics",
+      "trends": "identified trends",
+      "correlations": "important relationships"
+    },
+    "TECHNICAL_ANALYSIS": {
+      "patterns": "chart patterns and signals",
+      "indicators": "technical indicator readings",
+      "levels": "key price levels"
+    },
+    "MARKET_IMPLICATIONS": {
+      "insights": "combined data and technical insights",
+      "recommendations": "actionable recommendations",
+      "risks": "identified risk factors"
+    }
+  }
+
+summary_template: |
+  Provide a structured market analysis summary:
+
+  1. OVERVIEW:
+  - Main points
+  - Key metrics
+  - Critical developments
+
+  2. TECHNICAL ANALYSIS:
+  {technical_analysis}
+
+  3. FUNDAMENTAL FACTORS:
+  {fundamental_analysis}
+
+  4. TRADING IMPLICATIONS:
+  {trading_implications}
+
+  5. RISK ASSESSMENT:
+  {risk_analysis}
+
+  6. RECOMMENDATIONS:
+  {recommendations}
+
+basic_summary: |
+  Analyze this article and provide a comprehensive summary:
+
+  Article Content:
+  {content}
+
+  Please provide a detailed summary that captures all key information, main points, and important details from the article.
+
+key_points: |
+  Extract all important points from this article:
+
+  Article Content:
+  {content}
+
+  Please list all key points, including:
+  - Market movements and statistics
+  - Important announcements
+  - Policy changes
+  - Market reactions
+  - Notable quotes
+  - Significant data points
+
+market_impact: |
+  You are a senior market analyst. Analyze the market impact of this article and provide specific insights:
+
+  Article Content:
+  {content}
+
+  Focus your analysis on:
+  1. IMMEDIATE MARKET REACTIONS:
+  - Specific market movements mentioned
+  - Price changes and percentage moves
+  - Volume and trading activity
+
+  2. SECTOR-SPECIFIC IMPACTS:
+  - Which sectors are most affected?
+  - Winners and losers from these developments
+  - Potential ripple effects across industries
+
+  3. MACROECONOMIC IMPLICATIONS:
+  - Impact on interest rates and monetary policy
+  - Effects on inflation expectations
+  - Currency market implications
+  - Global market considerations
+
+  4. SENTIMENT ANALYSIS:
+  - Changes in market sentiment
+  - Institutional investor reactions
+  - Retail investor implications
+
+  5. DATA-DRIVEN INSIGHTS:
+  - Analysis of presented tables
+  - Interpretation of chart patterns
+  - Statistical correlations
+  - Historical comparisons from data
+
+trading_implications: |
+  You are a professional trading strategist. Based on this article, provide specific trading recommendations:
+
+  Article Content:
+  {content}
+
+  Please analyze and provide:
+
+  1. SPECIFIC TRADING OPPORTUNITIES:
+  - Individual stocks/sectors to watch
+  - Entry and exit points if mentioned
+  - Risk levels and potential targets
+  - Time horizons for trades
+
+  2. RISK ASSESSMENT:
+  - Key risk factors to monitor
+  - Potential hedging strategies
+  - Stop-loss considerations
+  - Volatility expectations
+
+  3. PORTFOLIO ADJUSTMENTS:
+  - Recommended sector rotations
+  - Asset allocation changes
+  - Position sizing suggestions
+  - Diversification considerations
+
+  4. TIMING CONSIDERATIONS:
+  - Short-term trading opportunities (1-5 days)
+  - Medium-term positioning (1-3 months)
+  - Long-term strategic implications
+  - Key dates and events to watch
+
+  5. SPECIFIC ACTIONABLE RECOMMENDATIONS:
+  - List specific trading ideas
+  - Provide clear rationale for each
+  - Include relevant price levels
+  - Suggest risk management approaches
+
+  6. QUANTITATIVE SIGNALS:
+  - Technical levels from charts
+  - Statistical arbitrage opportunities
+  - Relative value comparisons
+  - Quantitative risk metrics
+
+
+
+analysis_template: |
+  Analyze this content comprehensively:
+
+  Content: {content}
+
+  Provide analysis in ALL of the following formats:
+  1. Basic Summary
+  2. Key Points Analysis
+  3. Market Impact Analysis
+  4. Trading Implications
+  5. Content-Specific Analysis (Tables/Charts/Text)
+
+  Format the response as a structured JSON object containing all analyses.
+
+
 search_query_generation: |
-  Generate specific search queries based on this general query:
+  system_prompt: |
+    You are an expert market research analyst specializing in generating precise search queries. 
+    Your goal is to transform general market queries into specific, targeted search terms that will yield relevant and current market information.
+    Focus on:
+    - Including specific market terminology
+    - Adding time-relevant context
+    - Incorporating trending topics
+    - Using industry-standard terms
+    
+  prompt_template: |
+    Generate ONE specific search queries based on this general query:
 
-  Query: {query}
+    Query: {query}
 
-  Please generate 5 specific, targeted search queries that will help find relevant market information. 
-  Each query should focus on different aspects of the topic.
-  Format each query on a new line.
-  Make queries specific and include relevant market terminology.
+    Please generate one specific, targeted search query that will help find relevant market information. 
+    Each query should focus on different aspects of the topic.
+    Format each query on a new line.
+    Make queries specific and include relevant market terminology.

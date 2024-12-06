@@ -46,3 +46,4 @@ selenium-stealth
 undetected-chromedriver
 aiohttp-proxy
 tenacity
+yfinance
