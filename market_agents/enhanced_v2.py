@@ -202,6 +202,21 @@ class SearchManager:
             'user_agent': self.headers['User-Agent']
         }
         self.query_url_mapping = {}
+        self.content_extractor = ContentExtractor(config) 
+    async def _is_url_accessible(self, url: str) -> bool:
+        """Check if a URL is accessible"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.head(
+                    url, 
+                    headers=self.headers,
+                    follow_redirects=True,
+                    timeout=10.0
+                )
+                return response.status_code == 200
+        except Exception as e:
+            logger.warning(f"URL accessibility check failed for {url}: {str(e)}")
+            return False
         
     async def generate_search_queries(self, base_query: str) -> List[str]:
         try:
@@ -324,53 +339,180 @@ class SearchManager:
             time_modified_query = f"{base_query} {datetime.now().year} latest"
             return [time_modified_query]
         
-    def get_urls_for_query(self, query: str, num_results: int = 2) -> List[str]:
-        """Get URLs from Google search with retry logic"""
-        for attempt in range(self.max_retries):
+    async def get_urls_for_query(self, query: str, num_results: int = 2) -> List[str]:
+        """Get URLs from Google search with retry logic until we get valid, accessible content"""
+        all_urls = []
+        valid_urls = []
+        page = 0
+        max_pages = 10  # Increased max pages to try more results
+        max_retries = 3  # Retries per URL
+        
+        logger.info(f"\n=== Starting URL Collection for Query ===\nQuery: {query}\nTarget URLs: {num_results}")
+        
+        while len(valid_urls) < num_results and page < max_pages:
             try:
+                # Rate limiting
                 current_time = time.time()
-                time_since_last_request = current_time - self.last_request_time
-                if time_since_last_request < self.request_delay:
-                    sleep_time = self.request_delay - time_since_last_request
-                    logger.info(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
-                    time.sleep(sleep_time)
+                if current_time - self.last_request_time < self.request_delay:
+                    await asyncio.sleep(self.request_delay - (current_time - self.last_request_time))
                 
-                urls = list(search(
+                # Get more URLs than needed to account for invalid ones
+                batch_size = 5  # Get 5 URLs at a time
+                
+                # Get URLs for current page
+                new_urls = list(search(
                     query,
-                    num=num_results,
-                    stop=num_results,
-                    pause=self.search_params['pause']
+                    num=batch_size,
+                    start=page * batch_size,
+                    stop=batch_size,
+                    pause=2.0
                 ))
                 
                 self.last_request_time = time.time()
                 
-                if urls:
-                    logger.info(f"\n=== URLs Found ===")
-                    logger.info(f"Query: {query}")
-                    for i, url in enumerate(urls, 1):
-                        logger.info(f"URL {i}: {url}")
-                    logger.info("================")
+                # Filter out already processed URLs
+                new_urls = [url for url in new_urls if url not in all_urls]
+                all_urls.extend(new_urls)
+                
+                # Process each URL
+                for url in new_urls:
+                    if len(valid_urls) >= num_results:
+                        break
                     
-                    # Store query-URL mapping
-                    for url in urls:
-                        self.query_url_mapping[url] = query
-                    return urls
+                    # Skip known problematic domains
+                    problematic_domains = ['facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com']
+                    if any(domain in url.lower() for domain in problematic_domains):
+                        logger.info(f"Skipping social media URL: {url}")
+                        continue
+                    
+                    # Try multiple times to access the URL
+                    for retry in range(max_retries):
+                        try:
+                            # Check URL accessibility
+                            if not await self._is_url_accessible(url):
+                                logger.warning(f"URL not accessible (attempt {retry + 1}/{max_retries}): {url}")
+                                await asyncio.sleep(2)  # Wait before retry
+                                continue
+                            
+                            # Try to extract content
+                            title, content = await self.content_extractor.extract_content(url)
+                            
+                            # Verify content is valid and not a captcha page
+                            if self._is_valid_content(content):
+                                valid_urls.append(url)
+                                self.query_url_mapping[url] = query
+                                logger.info(f"Valid URL found ({len(valid_urls)}/{num_results}): {url}")
+                                break  # Break retry loop if successful
+                            else:
+                                logger.warning(f"Invalid content or captcha detected (attempt {retry + 1}/{max_retries}): {url}")
+                                await asyncio.sleep(2)  # Wait before retry
+                                
+                        except Exception as e:
+                            logger.error(f"Error processing URL (attempt {retry + 1}/{max_retries}): {url}, Error: {str(e)}")
+                            await asyncio.sleep(2)  # Wait before retry
+                    
+                    # Add delay between URLs
+                    await asyncio.sleep(2)
+                
+                page += 1
+                
+                # Log progress
+                logger.info(f"""
+                    Progress Update:
+                    - Valid URLs found: {len(valid_urls)}/{num_results}
+                    - Pages processed: {page}/{max_pages}
+                    - Total URLs checked: {len(all_urls)}
+                """)
+                
+                if not new_urls:
+                    logger.warning("No new URLs found in current page")
+                    break
                     
             except Exception as e:
-                logger.error(f"Search attempt {attempt + 1}/{self.max_retries} failed: {str(e)}")
-                if attempt < self.max_retries - 1:
-                    sleep_time = self.request_delay * (attempt + 1)
-                    logger.info(f"Retrying in {sleep_time} seconds...")
-                    time.sleep(sleep_time)
-                    
-        logger.error(f"All search attempts failed for query: {query}")
-        return []
+                logger.error(f"Search attempt on page {page} failed: {str(e)}")
+                await asyncio.sleep(self.request_delay * (page + 1))
+                page += 1
+        
+        if len(valid_urls) < num_results:
+            logger.warning(f"Could only find {len(valid_urls)} valid URLs out of {num_results} requested")
+        
+        return valid_urls[:num_results]
+    def _is_valid_content(self, content: Dict[str, Any]) -> bool:
+        """Check if content is valid and not a captcha page"""
+        try:
+            # Check if content is empty
+            if not content or not content.get('text'):
+                return False
+            
+            # Check for common captcha indicators
+            text = content.get('text', '').lower()
+            captcha_indicators = [
+                'captcha',
+                'security check',
+                'verify you are human',
+                'please verify',
+                'robot check',
+                'cloudflare',
+                'ddos protection',
+                'are you a robot',
+                'please wait',
+                'access denied'
+            ]
+            
+            if any(indicator in text for indicator in captcha_indicators):
+                return False
+            
+            # Check minimum content length (adjust as needed)
+            min_content_length = 100
+            if len(text.strip()) < min_content_length:
+                return False
+            
+            # Check if content seems to be an error page
+            error_indicators = [
+                '404 not found',
+                'page not found',
+                'access denied',
+                'forbidden',
+                'server error'
+            ]
+            
+            if any(indicator in text for indicator in error_indicators):
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking content validity: {str(e)}")
+            return False
 
 
 class ContentExtractor:
     def __init__(self, config):
         self.config = config
         self.timeout = 30 
+    async def extract_content(self, url: str) -> tuple[str, Dict[str, Any]]:
+        """Main method to extract content using configured methods"""
+        for method in self.config.methods:
+            try:
+                if method == "selenium":
+                    return await self.extract_with_selenium(url)
+                elif method == "playwright":
+                    return await self.extract_with_playwright(url)
+                elif method == "beautifulsoup":
+                    return await self.extract_with_beautifulsoup(url, self.config.headers)
+                elif method == "scrapy":
+                    return await self.extract_with_scrapy(url)
+                elif method == "requests_html":
+                    return await self.extract_with_requests_html(url)
+                elif method == "mechanicalsoup":
+                    return await self.extract_with_mechanicalsoup(url)
+                elif method == "httpx":
+                    return await self.extract_with_httpx(url)
+            except Exception as e:
+                logger.error(f"Error with {method}: {str(e)}")
+                continue
+        
+        return "", {"text": "", "tables": [], "charts": [], "has_data": False}
     def extract_tables(soup: BeautifulSoup) -> List[Dict]:
         """Extract table data from HTML content"""
         tables = []
@@ -811,101 +953,137 @@ class WebSearchAgent:
             return None
 
     async def generate_ai_summary(self, url: str, content: Union[str, Dict[str, Any]], content_type: str) -> Dict[str, Any]:
-        """Generate AI summary with enhanced market analysis"""
         try:
-            # Initialize market analysis components
-            market_indicators = {
-                'bullish': ['increase', 'rise', 'gain', 'up', 'higher', 'bull', 'growth'],
-                'bearish': ['decrease', 'fall', 'loss', 'down', 'lower', 'bear', 'decline']
-            }
+            # Get base LLM config
+            llm_config_dict = self.config.llm_configs["content_analysis"].copy()
+            
+            # Remove non-LLMConfig fields
+            system_prompt = llm_config_dict.pop('system_prompt', None)
+            prompt_template = llm_config_dict.pop('prompt_template', None)
+            llm_config = LLMConfig(**llm_config_dict)
 
-            # Process content based on type
+            # Process content
             if isinstance(content, dict):
-                # Extract and analyze tables and charts
-                tables = content.get('tables', [])
-                charts = content.get('charts', [])
-                text_content = content.get('text', '')[:self.config.content_max_length]
-                
-                # Perform market data analysis
-                market_analysis = self.analyze_market_data(tables, charts)
-                
-                # Get base LLM config and create analysis structure
-                llm_config_dict = self.config.llm_configs["content_analysis"].copy()
-                llm_config = LLMConfig(**llm_config_dict)
-
-                # Enhanced prompt with market analysis context
-                analysis_prompt = f"""
-                Analyze this content with focus on market implications:
-                
-                URL: {url}
-                Content Type: {content_type}
-                
-                Market Analysis Results:
-                - Price Movements: {json.dumps(market_analysis.get('price_movements', []))}
-                - Technical Indicators: {json.dumps(market_analysis.get('technical_indicators', {}))}
-                - Market Sentiment: {json.dumps(market_analysis.get('market_sentiment', {}))}
-                
-                Content:
-                {text_content}
-                
-                Please provide a comprehensive analysis including:
-                1. Market impact assessment
-                2. Trading implications
-                3. Risk analysis
-                4. Technical patterns identified
-                5. Sentiment indicators
-                """
-
-                # Create prompt context
-                context = LLMPromptContext(
-                    id=str(uuid.uuid4()),
-                    system_string=self.config.llm_configs["content_analysis"]["system_prompt"],
-                    new_message=analysis_prompt,
-                    llm_config=llm_config.dict(),
-                    use_history=False
-                )
-
-                # Get AI analysis
-                responses = await self.ai_utils.run_parallel_ai_completion([context])
-                
-                if responses and len(responses) > 0:
-                    ai_analysis = self._parse_ai_response(responses[0], bool(tables or charts))
-                    
-                    # Combine AI analysis with market data analysis
-                    combined_analysis = {
-                        "ai_summary": ai_analysis,
-                        "market_data_analysis": market_analysis,
-                        "technical_analysis": {
-                            "trend_analysis": market_analysis.get('trend_analysis', []),
-                            "support_resistance": market_analysis.get('support_resistance', []),
-                            "volume_analysis": market_analysis.get('technical_indicators', {}).get('volume_analysis', {})
-                        },
-                        "sentiment_analysis": {
-                            "market_sentiment": market_analysis.get('market_sentiment', {}),
-                            "indicator_sentiment": self._analyze_sentiment_indicators(text_content, market_indicators)
-                        }
-                    }
-                    
-                    return combined_analysis
-                
-                return self._get_default_summary(bool(tables or charts))
-
+                content_text = content.get('text', '')[:self.config.content_max_length]
             else:
-                # Handle plain text content
-                text_content = str(content)[:self.config.content_max_length]
-                sentiment_analysis = self._analyze_sentiment_indicators(text_content, market_indicators)
-                
-                # Create basic analysis structure
-                basic_analysis = {
-                    "content_summary": self._get_default_summary(False),
-                    "sentiment_analysis": sentiment_analysis
-                }
-                
-                return basic_analysis
+                content_text = str(content)[:self.config.content_max_length]
+
+            # Format the prompt with better error handling
+            formatted_prompt = f"""
+            Analyze this content and provide detailed insights in valid JSON format:
+
+            URL: {url}
+            CONTENT TYPE: {content_type}
+            
+            CONTENT:
+            {content_text}
+
+            Provide analysis in the following structure:
+            {{
+                "summary": "Brief overview of main points",
+                "key_points": ["point 1", "point 2"],
+                "market_impact": {{
+                    "short_term": "Immediate market implications",
+                    "medium_term": "1-3 month outlook",
+                    "long_term": "6+ month projections"
+                }},
+                "trading_implications": {{
+                    "entry_points": ["level 1", "level 2"],
+                    "exit_targets": ["target 1", "target 2"],
+                    "stop_loss_levels": ["stop 1", "stop 2"],
+                    "position_sizing": "Recommended position size"
+                }},
+                "technical_analysis": {{
+                    "trend_direction": "Current trend",
+                    "support_levels": ["level 1", "level 2"],
+                    "resistance_levels": ["level 1", "level 2"],
+                    "indicators": {{
+                        "rsi": "RSI analysis",
+                        "macd": "MACD analysis",
+                        "moving_averages": "MA analysis"
+                    }}
+                }},
+                "sentiment_analysis": {{
+                    "overall_sentiment": "bullish/bearish/neutral",
+                    "sentiment_score": 0,
+                    "social_metrics": {{
+                        "social_volume": "high/medium/low",
+                        "sentiment_trend": "improving/deteriorating/stable"
+                    }},
+                    "market_confidence": 0
+                }},
+                "risk_assessment": {{
+                    "risk_level": "high/medium/low",
+                    "risk_factors": ["risk 1", "risk 2"],
+                    "mitigation_strategies": ["strategy 1", "strategy 2"],
+                    "risk_reward_ratio": "ratio"
+                }},
+                "price_analysis": {{
+                    "current_price": "price",
+                    "target_prices": {{
+                        "short_term": ["target 1", "target 2"],
+                        "medium_term": ["target 1", "target 2"],
+                        "long_term": ["target 1", "target 2"]
+                    }},
+                    "price_drivers": ["driver 1", "driver 2"],
+                    "volatility_assessment": "high/medium/low"
+                }}
+            }}
+            """
+
+            # Create prompt context
+            context_id = str(uuid.uuid4())
+            context = LLMPromptContext(
+                id=context_id,
+                system_string="You are an expert financial analyst specializing in cryptocurrency markets. Provide detailed analysis in valid JSON format only.",
+                new_message=formatted_prompt,
+                llm_config=llm_config.dict(),
+                use_history=False,
+                source_id=context_id
+            )
+
+            # Process with retries and better error handling
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    responses = await self.ai_utils.run_parallel_ai_completion([context])
+                    
+                    if responses and responses[0]:
+                        response = responses[0]
+                        
+                        # Try to parse JSON response
+                        if response.json_object:
+                            return response.json_object.object
+                        
+                        if response.str_content:
+                            # Clean the response content
+                            content = response.str_content.strip()
+                            content = re.sub(r'^```json\s*', '', content)
+                            content = re.sub(r'^```\s*', '', content)
+                            content = re.sub(r'\s*```$', '', content)
+                            
+                            try:
+                                return json.loads(content)
+                            except json.JSONDecodeError:
+                                if attempt < max_retries - 1:
+                                    await asyncio.sleep(1 * (attempt + 1))
+                                    continue
+                                
+                                # Return structured fallback on final attempt
+                                return self._get_fallback_response(url, content_type)
+
+                except Exception as e:
+                    logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1 * (attempt + 1))
+                        continue
+
+            # Return structured fallback if all attempts fail
+            return self._get_fallback_response(url, content_type)
 
         except Exception as e:
             logger.error(f"Error in AI summary generation: {str(e)}")
-            return self._get_default_summary(False)
+            return self._get_fallback_response(url, content_type)
     def _clean_json_string(self, content: str) -> str:
         """Clean and prepare JSON string for parsing"""
         try:
@@ -1292,13 +1470,60 @@ class WebSearchAgent:
             logger.error(f"Error structuring text response: {str(e)}")
             return structured_response
 
-    def _get_fallback_response(self, analysis_type: str) -> Dict[str, Any]:
+    def _get_fallback_response(self, url: str, content_type: str) -> Dict[str, Any]:
         """Get structured fallback response"""
         return {
-            "error": "Analysis failed after multiple attempts",
-            "analysis_type": analysis_type,
-            "timestamp": datetime.now().isoformat(),
-            "structure": self._create_analysis_structure(analysis_type)
+            "summary": "Content analysis failed - using fallback response",
+            "key_points": ["Analysis not available"],
+            "market_impact": {
+                "short_term": "Analysis not available",
+                "medium_term": "Analysis not available",
+                "long_term": "Analysis not available"
+            },
+            "trading_implications": {
+                "entry_points": [],
+                "exit_targets": [],
+                "stop_loss_levels": [],
+                "position_sizing": "Analysis not available"
+            },
+            "technical_analysis": {
+                "trend_direction": "Analysis not available",
+                "support_levels": [],
+                "resistance_levels": [],
+                "indicators": {
+                    "rsi": "Analysis not available",
+                    "macd": "Analysis not available",
+                    "moving_averages": "Analysis not available"
+                }
+            },
+            "sentiment_analysis": {
+                "overall_sentiment": "neutral",
+                "sentiment_score": 0,
+                "social_metrics": {
+                    "social_volume": "low",
+                    "sentiment_trend": "stable"
+                },
+                "market_confidence": 0
+            },
+            "risk_assessment": {
+                "risk_level": "high",
+                "risk_factors": ["Analysis not available"],
+                "mitigation_strategies": [],
+                "risk_reward_ratio": "Not available"
+            },
+            "price_analysis": {
+                "current_price": "Not available",
+                "target_prices": {
+                    "short_term": [],
+                    "medium_term": [],
+                    "long_term": []
+                },
+                "price_drivers": [],
+                "volatility_assessment": "high"
+            },
+            "error": "Failed to generate analysis",
+            "url": url,
+            "content_type": content_type
         }
 
     def _get_error_response(self, url: str, content_type: str, error: str) -> Dict[str, Any]:
@@ -1563,37 +1788,39 @@ class WebSearchAgent:
             logger.error(f"Error processing URL: {str(e)}")
             return None
 
+
     async def process_search_query(self, query: str) -> None:
-        """Process a search query by generating multiple queries and fetching URLs"""
         try:
             # Generate multiple search queries using AI
             search_queries = await self.search_manager.generate_search_queries(query)
             
             logger.info(f"""
-                            === Search Process Starting ===
-                            Original Query: {query}
-                            Total Queries Generated: {len(search_queries)}
-                            """)
+                === Search Process Starting ===
+                Original Query: {query}
+                Total Queries Generated: {len(search_queries)}
+                """)
 
             # Process each search query separately
             all_results = []
+            total_urls_processed = 0  # Add counter
             
             for idx, search_query in enumerate(search_queries, 1):
                 logger.info(f"""
-                                === Processing Query {idx}/{len(search_queries)} ===
-                                Query: {search_query}
-                                """)
+                    === Processing Query {idx}/{len(search_queries)} ===
+                    Query: {search_query}
+                    """)
                 
-                # Get URLs for this specific query
-                urls = self.search_manager.get_urls_for_query(
+                # Get URLs for this query
+                urls = await self.search_manager.get_urls_for_query(
                     search_query, 
                     num_results=self.config.urls_per_query
                 )
+                total_urls_processed += len(urls)  # Update counter
                 
                 logger.info(f"""
-                                URLs found for query "{search_query}":
-                                {chr(10).join(f'- {url}' for url in urls)}
-                                """)
+                    URLs found for query "{search_query}":
+                    {chr(10).join(f'- {url}' for url in urls)}
+                    """)
                 
                 # Store the query-URL mapping
                 for url in urls:
@@ -1607,25 +1834,25 @@ class WebSearchAgent:
                     all_results.extend(valid_results)
                     
                     logger.info(f"""
-                                Query {idx} Results Summary:
-                                - URLs processed: {len(urls)}
-                                - Successful extractions: {len(valid_results)}
-                                - Failed extractions: {len(urls) - len(valid_results)}
-                                """)
+                        Query {idx} Results Summary:
+                        - URLs processed: {len(urls)}
+                        - Successful extractions: {len(valid_results)}
+                        - Failed extractions: {len(urls) - len(valid_results)}
+                        """)
 
             # Store all results
             self.results = all_results
             
-            # Print final summary
+            # Print final summary using the counter
             logger.info(f"""
-                    === Final Search Summary ===
-                    Total Queries Processed: {len(search_queries)}
-                    Total URLs Processed: {sum(len(self.search_manager.get_urls_for_query(q)) for q in search_queries)}
-                    Total Successful Extractions: {len(self.results)}
+                === Final Search Summary ===
+                Total Queries Processed: {len(search_queries)}
+                Total URLs Processed: {total_urls_processed}
+                Total Successful Extractions: {len(self.results)}
 
-                    Results by Query:
-                    {chr(10).join(f'- "{q}": {len([r for r in self.results if self.search_manager.query_url_mapping.get(r.url) == q])} results' for q in search_queries)}
-                    """)
+                Results by Query:
+                {chr(10).join(f'- "{q}": {len([r for r in self.results if self.search_manager.query_url_mapping.get(r.url) == q])} results' for q in search_queries)}
+                """)
 
         except Exception as e:
             logger.error(f"Error processing search query: {str(e)}")

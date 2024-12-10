@@ -811,101 +811,299 @@ class WebSearchAgent:
             return None
 
     async def generate_ai_summary(self, url: str, content: Union[str, Dict[str, Any]], content_type: str) -> Dict[str, Any]:
-        """Generate AI summary with enhanced market analysis"""
         try:
-            # Initialize market analysis components
-            market_indicators = {
-                'bullish': ['increase', 'rise', 'gain', 'up', 'higher', 'bull', 'growth'],
-                'bearish': ['decrease', 'fall', 'loss', 'down', 'lower', 'bear', 'decline']
+            # Get base LLM config
+            llm_config_dict = self.config.llm_configs["content_analysis"].copy()
+            
+            # Remove non-LLMConfig fields
+            system_prompt = llm_config_dict.pop('system_prompt', None)
+            prompt_template = llm_config_dict.pop('prompt_template', None)
+            llm_config = LLMConfig(**llm_config_dict)
+
+            # Process content
+            if isinstance(content, dict):
+                content_text = content.get('text', '')[:self.config.content_max_length]
+            else:
+                content_text = str(content)[:self.config.content_max_length]
+
+            # Enhanced analysis request with new metrics
+            analysis_request = {
+                "url": url,
+                "content_type": content_type,
+                "request": {
+                    "summary": "Provide a concise summary of the main points",
+                    "key_points": "List the key points about memecoins and market trends",
+                    "market_impact": "Analyze potential market impact and trends",
+                    "trading_implications": "Provide specific trading insights and recommendations",
+                    "technical_analysis": "Provide technical analysis indicators and patterns",
+                    "sentiment_analysis": "Analyze market sentiment and social metrics",
+                    "risk_assessment": "Evaluate potential risks and mitigation strategies",
+                    "price_predictions": "Provide price predictions and target levels"
+                }
             }
 
-            # Process content based on type
-            if isinstance(content, dict):
-                # Extract and analyze tables and charts
-                tables = content.get('tables', [])
-                charts = content.get('charts', [])
-                text_content = content.get('text', '')[:self.config.content_max_length]
-                
-                # Perform market data analysis
-                market_analysis = self.analyze_market_data(tables, charts)
-                
-                # Get base LLM config and create analysis structure
-                llm_config_dict = self.config.llm_configs["content_analysis"].copy()
-                llm_config = LLMConfig(**llm_config_dict)
+            # Enhanced prompt with new metrics
+            formatted_prompt = f"""
+            Analyze this content and provide comprehensive insights in JSON format:
 
-                # Enhanced prompt with market analysis context
-                analysis_prompt = f"""
-                Analyze this content with focus on market implications:
-                
-                URL: {url}
-                Content Type: {content_type}
-                
-                Market Analysis Results:
-                - Price Movements: {json.dumps(market_analysis.get('price_movements', []))}
-                - Technical Indicators: {json.dumps(market_analysis.get('technical_indicators', {}))}
-                - Market Sentiment: {json.dumps(market_analysis.get('market_sentiment', {}))}
-                
-                Content:
-                {text_content}
-                
-                Please provide a comprehensive analysis including:
-                1. Market impact assessment
-                2. Trading implications
-                3. Risk analysis
-                4. Technical patterns identified
-                5. Sentiment indicators
-                """
+            URL: {url}
+            CONTENT TYPE: {content_type}
+            
+            CONTENT:
+            {content_text}
 
-                # Create prompt context
-                context = LLMPromptContext(
-                    id=str(uuid.uuid4()),
-                    system_string=self.config.llm_configs["content_analysis"]["system_prompt"],
-                    new_message=analysis_prompt,
-                    llm_config=llm_config.dict(),
-                    use_history=False
-                )
+            Please provide detailed analysis in the following JSON structure:
+            {{
+                "summary": "Brief overview of main points",
+                "key_points": ["point 1", "point 2", ...],
+                "market_impact": {{
+                    "short_term": "Immediate market implications",
+                    "medium_term": "1-3 month outlook",
+                    "long_term": "6+ month projections"
+                }},
+                "trading_implications": {{
+                    "entry_points": ["level 1", "level 2", ...],
+                    "exit_targets": ["target 1", "target 2", ...],
+                    "stop_loss_levels": ["stop 1", "stop 2", ...],
+                    "position_sizing": "Recommended position size and risk management"
+                }},
+                "technical_analysis": {{
+                    "trend_direction": "Current trend analysis",
+                    "support_levels": ["level 1", "level 2", ...],
+                    "resistance_levels": ["level 1", "level 2", ...],
+                    "indicators": {{
+                        "rsi": "RSI analysis",
+                        "macd": "MACD analysis",
+                        "moving_averages": "MA analysis"
+                    }},
+                    "patterns": ["pattern 1", "pattern 2", ...]
+                }},
+                "sentiment_analysis": {{
+                    "overall_sentiment": "bullish/bearish/neutral",
+                    "sentiment_score": "0-100 scale",
+                    "social_metrics": {{
+                        "social_volume": "high/medium/low",
+                        "sentiment_trend": "improving/deteriorating/stable"
+                    }},
+                    "market_confidence": "0-100 scale"
+                }},
+                "risk_assessment": {{
+                    "risk_level": "high/medium/low",
+                    "risk_factors": ["risk 1", "risk 2", ...],
+                    "mitigation_strategies": ["strategy 1", "strategy 2", ...],
+                    "risk_reward_ratio": "numerical ratio"
+                }},
+                "price_analysis": {{
+                    "current_price": "Current price level",
+                    "target_prices": {{
+                        "short_term": ["target 1", "target 2", ...],
+                        "medium_term": ["target 1", "target 2", ...],
+                        "long_term": ["target 1", "target 2", ...]
+                    }},
+                    "price_drivers": ["driver 1", "driver 2", ...],
+                    "volatility_assessment": "high/medium/low"
+                }}
+            }}
+            """
 
-                # Get AI analysis
-                responses = await self.ai_utils.run_parallel_ai_completion([context])
-                
-                if responses and len(responses) > 0:
-                    ai_analysis = self._parse_ai_response(responses[0], bool(tables or charts))
+            # Create prompt context with enhanced system prompt
+            context_id = str(uuid.uuid4())
+            context = LLMPromptContext(
+                id=context_id,
+                system_string="You are an expert financial analyst specializing in cryptocurrency markets. Provide detailed, quantitative analysis in valid JSON format only. Focus on actionable insights and specific price levels.",
+                new_message=formatted_prompt,
+                llm_config=llm_config.dict(),
+                use_history=False,
+                source_id=context_id
+            )
+
+            # Process response with retries
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    responses = await self.ai_utils.run_parallel_ai_completion([context])
                     
-                    # Combine AI analysis with market data analysis
-                    combined_analysis = {
-                        "ai_summary": ai_analysis,
-                        "market_data_analysis": market_analysis,
-                        "technical_analysis": {
-                            "trend_analysis": market_analysis.get('trend_analysis', []),
-                            "support_resistance": market_analysis.get('support_resistance', []),
-                            "volume_analysis": market_analysis.get('technical_indicators', {}).get('volume_analysis', {})
-                        },
-                        "sentiment_analysis": {
-                            "market_sentiment": market_analysis.get('market_sentiment', {}),
-                            "indicator_sentiment": self._analyze_sentiment_indicators(text_content, market_indicators)
-                        }
-                    }
-                    
-                    return combined_analysis
-                
-                return self._get_default_summary(bool(tables or charts))
+                    if responses and len(responses) > 0:
+                        response = responses[0]
+                        
+                        if response.json_object:
+                            return response.json_object.object
+                        
+                        if response.str_content:
+                            content = response.str_content.strip()
+                            content = re.sub(r'^```json\s*', '', content)
+                            content = re.sub(r'^```\s*', '', content)
+                            content = re.sub(r'\s*```$', '', content)
+                            
+                            try:
+                                return json.loads(content)
+                            except json.JSONDecodeError:
+                                json_match = re.search(r'({[\s\S]*})', content)
+                                if json_match:
+                                    try:
+                                        return json.loads(json_match.group(1))
+                                    except json.JSONDecodeError:
+                                        pass
+                                
+                                # Enhanced fallback structure
+                                return {
+                                    "summary": content[:500],
+                                    "key_points": [line.strip() for line in content.split('\n') if line.strip()],
+                                    "market_impact": {
+                                        "short_term": "Analysis pending",
+                                        "medium_term": "Analysis pending",
+                                        "long_term": "Analysis pending"
+                                    },
+                                    "trading_implications": {
+                                        "entry_points": [],
+                                        "exit_targets": [],
+                                        "stop_loss_levels": [],
+                                        "position_sizing": "Analysis pending"
+                                    },
+                                    "technical_analysis": {
+                                        "trend_direction": "Analysis pending",
+                                        "support_levels": [],
+                                        "resistance_levels": [],
+                                        "indicators": {},
+                                        "patterns": []
+                                    },
+                                    "sentiment_analysis": {
+                                        "overall_sentiment": "neutral",
+                                        "sentiment_score": 50,
+                                        "social_metrics": {
+                                            "social_volume": "medium",
+                                            "sentiment_trend": "stable"
+                                        },
+                                        "market_confidence": 50
+                                    },
+                                    "risk_assessment": {
+                                        "risk_level": "medium",
+                                        "risk_factors": ["Analysis pending"],
+                                        "mitigation_strategies": [],
+                                        "risk_reward_ratio": "1:1"
+                                    },
+                                    "price_analysis": {
+                                        "current_price": "Not available",
+                                        "target_prices": {
+                                            "short_term": [],
+                                            "medium_term": [],
+                                            "long_term": []
+                                        },
+                                        "price_drivers": [],
+                                        "volatility_assessment": "medium"
+                                    }
+                                }
 
-            else:
-                # Handle plain text content
-                text_content = str(content)[:self.config.content_max_length]
-                sentiment_analysis = self._analyze_sentiment_indicators(text_content, market_indicators)
-                
-                # Create basic analysis structure
-                basic_analysis = {
-                    "content_summary": self._get_default_summary(False),
-                    "sentiment_analysis": sentiment_analysis
-                }
-                
-                return basic_analysis
+                except Exception as e:
+                    logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1 * (attempt + 1))
+                        continue
+
+            # Enhanced fallback response
+            return {
+                "summary": "Content analysis failed after multiple attempts",
+                "key_points": ["Analysis not available"],
+                "market_impact": {
+                    "short_term": "Analysis not available",
+                    "medium_term": "Analysis not available",
+                    "long_term": "Analysis not available"
+                },
+                "trading_implications": {
+                    "entry_points": [],
+                    "exit_targets": [],
+                    "stop_loss_levels": [],
+                    "position_sizing": "Analysis not available"
+                },
+                "technical_analysis": {
+                    "trend_direction": "Analysis not available",
+                    "support_levels": [],
+                    "resistance_levels": [],
+                    "indicators": {},
+                    "patterns": []
+                },
+                "sentiment_analysis": {
+                    "overall_sentiment": "neutral",
+                    "sentiment_score": 0,
+                    "social_metrics": {
+                        "social_volume": "low",
+                        "sentiment_trend": "stable"
+                    },
+                    "market_confidence": 0
+                },
+                "risk_assessment": {
+                    "risk_level": "high",
+                    "risk_factors": ["Analysis not available"],
+                    "mitigation_strategies": [],
+                    "risk_reward_ratio": "Not available"
+                },
+                "price_analysis": {
+                    "current_price": "Not available",
+                    "target_prices": {
+                        "short_term": [],
+                        "medium_term": [],
+                        "long_term": []
+                    },
+                    "price_drivers": [],
+                    "volatility_assessment": "high"
+                },
+                "error": "Failed to generate valid JSON response",
+                "url": url,
+                "content_type": content_type
+            }
 
         except Exception as e:
             logger.error(f"Error in AI summary generation: {str(e)}")
-            return self._get_default_summary(False)
+            return {
+                "summary": "Error occurred during analysis",
+                "key_points": ["Analysis failed"],
+                "market_impact": {
+                    "short_term": "Error in analysis",
+                    "medium_term": "Error in analysis",
+                    "long_term": "Error in analysis"
+                },
+                "trading_implications": {
+                    "entry_points": [],
+                    "exit_targets": [],
+                    "stop_loss_levels": [],
+                    "position_sizing": "Error in analysis"
+                },
+                "technical_analysis": {
+                    "trend_direction": "Error in analysis",
+                    "support_levels": [],
+                    "resistance_levels": [],
+                    "indicators": {},
+                    "patterns": []
+                },
+                "sentiment_analysis": {
+                    "overall_sentiment": "neutral",
+                    "sentiment_score": 0,
+                    "social_metrics": {
+                        "social_volume": "low",
+                        "sentiment_trend": "stable"
+                    },
+                    "market_confidence": 0
+                },
+                "risk_assessment": {
+                    "risk_level": "high",
+                    "risk_factors": ["Analysis failed"],
+                    "mitigation_strategies": [],
+                    "risk_reward_ratio": "Not available"
+                },
+                "price_analysis": {
+                    "current_price": "Error in analysis",
+                    "target_prices": {
+                        "short_term": [],
+                        "medium_term": [],
+                        "long_term": []
+                    },
+                    "price_drivers": [],
+                    "volatility_assessment": "high"
+                },
+                "error": str(e),
+                "url": url,
+                "content_type": content_type
+            }
     def _clean_json_string(self, content: str) -> str:
         """Clean and prepare JSON string for parsing"""
         try:

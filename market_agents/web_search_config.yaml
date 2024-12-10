@@ -1,4 +1,4 @@
-query: "Top meme coins"
+query: "Cryptocurrency to invest on"
 max_concurrent_requests: 50
 rate_limit: 0.1
 content_max_length: 4000
@@ -24,18 +24,43 @@ llm_configs:
   search_query_generation:
     client: "openai"
     model: "gpt-4"
-    max_tokens: 1000
-    temperature: 0.7
+    max_tokens: 500
+    temperature: 0.3
     response_format: "json_beg"
     use_cache: true
-    system_prompt: "You are an expert market research analyst specializing in stocks & trading."
-    prompt_template: "Generate ONE specific search queries related to: {query} which covers latest news and market movements."
+    system_prompt: |
+      You are an expert market research analyst specializing in cryptocurrency and trading.
+      Generate precise, targeted search queries that will yield current market information and investment opportunities.
+    prompt_template: |
+      Generate search queries based on this general query:
+
+      Time Context:
+      - Current Year: {current_year}
+      - Current Month: {current_month}
+      
+      Base Query: {query}
+      
+      Please generate TWO search queries that:
+      1. Include specific time frames (e.g., "{current_year} Q1", "{current_month} {current_year}", "last 30 days")
+      2. Focus on recent developments and trends
+      3. Include terms like "latest", "recent", "current", "upcoming"
+      4. Consider both immediate news and short-term historical context
+
+      Return the response in the following JSON format:
+      {{
+        "queries": [
+          "query1 with time context",
+          "query2 with time context"
+        ]
+      }}
+
+
   content_analysis:
     client: "openai"
     model: "gpt-4"
     max_tokens: 1000
     temperature: 0.5
-    response_format: "text"
+    response_format: "json_beg"
     use_cache: true
     system_prompt: "You are an expert financial & Trading analyst."
     prompt_template: "{prompt}"

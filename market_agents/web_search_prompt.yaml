@@ -353,11 +353,24 @@ search_query_generation: |
     - Using industry-standard terms
     
   prompt_template: |
-    Generate ONE specific search queries based on this general query:
+    Generate search queries based on this general query:
 
-    Query: {query}
+    Time Context:
+    - Current Year: {current_year}
+    - Current Month: {current_month}
+    
+    Base Query: {query}
+    
+    Please generate TWO search queries that:
+    1. Include specific time frames (e.g., "2024 Q1", "December 2023", "last 30 days")
+    2. Focus on recent developments and trends
+    3. Include terms like "latest", "recent", "current", "upcoming"
+    4. Consider both immediate news and short-term historical context
 
-    Please generate one specific, targeted search query that will help find relevant market information. 
-    Each query should focus on different aspects of the topic.
-    Format each query on a new line.
-    Make queries specific and include relevant market terminology.
+    Return the response in the following JSON format:
+    {
+      "queries": [
+        "query1 with time context",
+        "query2 with time context"
+      ]
+    }
