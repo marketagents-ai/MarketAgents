@@ -733,6 +733,7 @@ class ChatThread (SQLModel, table=True):
 
         json_object = llm_output.json_object
         str_content = llm_output.content
+        executable = False
         print(f"adding assistant response with content: {str_content} and json_object: {json_object}")
         if not json_object:
             if str_content:
@@ -769,6 +770,8 @@ class ChatThread (SQLModel, table=True):
                     tool_executable=tool.callable,
                     tool_structured_with_id=self.use_tool_id_for_structured_tools if not tool.callable else False
                 )
+                if tool.callable:
+                    executable = True
             elif self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and not tool.callable and not self.use_tool_id_for_structured_tools:
                 assert json_object is not None, "json_object is None, cannot add to history"
                 structured_response = json.dumps(json_object.object)
@@ -779,6 +782,7 @@ class ChatThread (SQLModel, table=True):
                     tool_name=tool_name,
                     tool_json_schema=tool.json_schema,
                 )
+                
             elif self.llm_config.response_format != ResponseFormat.auto_tools and tool is not None:
                 print(f"current response format: {self.llm_config.response_format}")
                 assert json_object is not None, "json_object is None, cannot add to history"
@@ -806,7 +810,7 @@ class ChatThread (SQLModel, table=True):
         self.history.append(assistant_message)
         self.processed_outputs.append(llm_output)
         self.new_message = None
-        if self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and tool is not None and self.use_tool_id_for_structured_tools:
+        if self.llm_config.response_format in [ResponseFormat.auto_tools,ResponseFormat.tool] and executable is False and self.use_tool_id_for_structured_tools:
             structured_tool_response = ChatMessage(
                 role=MessageRole.tool,
                 content=json.dumps({
@@ -891,6 +895,7 @@ class ChatThread (SQLModel, table=True):
             return False
             
         last_message = self.history[-1]
+        print(f"last message: {last_message}")
         if last_message.role != MessageRole.assistant:
             return False
             

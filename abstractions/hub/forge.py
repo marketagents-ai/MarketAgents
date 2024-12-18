@@ -97,7 +97,7 @@ async def call_forge_api(input_data: ForgeInput) -> 'ForgeResponse':
                 if polled_status == "succeeded":
                     try:
                         # Only return when we have a successful result
-                        return ForgeResponse(**poll_data)
+                        return poll_data
                     except ValidationError as e:
                         logger.error("Response validation failed:")
                         for error in e.errors():
