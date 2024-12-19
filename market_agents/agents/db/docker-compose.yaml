@@ -19,6 +19,7 @@ services:
     environment:
       DB_NAME: market_simulation
       DB_USER: db_user
+      POSTGRES_PASSWORD: db_pwd@123
       DB_PASSWORD: db_pwd@123
       DB_HOST: db
       DB_PORT: 5432
