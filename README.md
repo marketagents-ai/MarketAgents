@@ -50,6 +50,6 @@ To install the `market_agents` package in editable mode, follow these steps:
 You can run the `run_simulation.sh` as follows:
 
 ```sh
-python3 market_agents/run_simulation.sh
+sh market_agents/run_simulation.sh
 ```
 
