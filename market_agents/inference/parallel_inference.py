@@ -208,11 +208,18 @@ class ParallelAIUtilities:
         }
         if prompt.oai_response_format:
             request["response_format"] = prompt.oai_response_format
+
         if prompt.llm_config.response_format == "tool" and prompt.structured_output:
             tool = prompt.get_tool()
             if tool:
                 request["tools"] = [tool]
                 request["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
+        else:
+            tools = prompt.get_openai_tools()
+            if tools:
+                request["tools"] = tools
+                request["tool_choice"] = "auto"
+
         if self._validate_openai_request(request):
             return request
         else:
@@ -246,16 +253,20 @@ class ParallelAIUtilities:
             "max_tokens": prompt.llm_config.max_tokens,
             "temperature": prompt.llm_config.temperature,
         }
+        if prompt.llm_config.response_format == "json_object":
+            raise ValueError("VLLM does not support json_object response format otherwise infinite whitespaces are returned")
+        if prompt.oai_response_format and prompt.oai_response_format:
+            request["response_format"] = prompt.oai_response_format
         if prompt.llm_config.response_format == "tool" and prompt.structured_output:
             tool = prompt.get_tool()
             if tool:
                 request["tools"] = [tool]
                 request["tool_choice"] = {"type": "function", "function": {"name": prompt.structured_output.schema_name}}
-        if prompt.llm_config.response_format == "json_object":
-            raise ValueError("VLLM does not support json_object response format otherwise infinite whitespaces are returned")
-        if prompt.oai_response_format and prompt.oai_response_format:
-            request["response_format"] = prompt.oai_response_format
-        
+        else:
+            tools = prompt.get_openai_tools()
+            if tools:
+                request["tools"] = tools
+                request["tool_choice"] = "auto"
         if self._validate_vllm_request(request):
             return request
         else:

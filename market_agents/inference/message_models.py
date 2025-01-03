@@ -1,5 +1,6 @@
+from market_agents.agents.tool_caller.utils import function_to_json
 from pydantic import BaseModel, Field, computed_field, ValidationError, model_validator
-from typing import Literal, Optional, Union, Dict, Any, List, Iterable, Tuple
+from typing import Callable, Literal, Optional, Union, Dict, Any, List, Iterable, Tuple
 import json
 import time
 from typing_extensions import Self
@@ -123,6 +124,7 @@ class LLMPromptContext(BaseModel):
     postfill: str = Field(default="\n\nPlease provide your response in JSON format.", description="postfill user response with an instruction")
     structured_output : Optional[StructuredTool] = None
     use_schema_instruction: bool = Field(default=False, description="Whether to use the schema instruction")
+    tools: Optional[List[Callable]] = None
     llm_config: LLMConfig
     use_history: bool = Field(default=True, description="Whether to use the history")
     
@@ -220,7 +222,12 @@ class LLMPromptContext(BaseModel):
             return self.structured_output.get_anthropic_tool()
         else:
             return None
-
+            
+    def get_openai_tools(self) -> Optional[List[ChatCompletionToolParam]]:
+        """Convert the tools into OpenAI function signatures."""
+        if not self.tools:
+            return None
+        return [function_to_json(tool) for tool in self.tools]
     
 class Usage(BaseModel):
     prompt_tokens: int
@@ -254,6 +261,11 @@ class LLMOutput(BaseModel):
     @property
     def json_object(self) -> Optional[GeneratedJsonObject]:
         return self._parse_result()[1]
+    
+    @computed_field
+    @property
+    def tool_calls(self) -> Optional[List[GeneratedJsonObject]]:
+        return self._parse_result()[4]
     
     @computed_field
     @property
@@ -302,21 +314,26 @@ class LLMOutput(BaseModel):
     
     
 
-    def _parse_oai_completion(self,chat_completion:ChatCompletion) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage], None]:
+    def _parse_oai_completion(self,chat_completion:ChatCompletion) -> Tuple[Optional[str], Optional[List[GeneratedJsonObject]], Optional[Usage], None]:
         message = chat_completion.choices[0].message
         content = message.content
 
         json_object = None
+        tool_calls = []
         usage = None
 
         if message.tool_calls:
-            tool_call = message.tool_calls[0]
-            name = tool_call.function.name
-            try:
-                object_dict = json.loads(tool_call.function.arguments)
-                json_object = GeneratedJsonObject(name=name, object=object_dict)
-            except json.JSONDecodeError:
-                json_object = GeneratedJsonObject(name=name, object={"raw": tool_call.function.arguments})
+            for tool_call in message.tool_calls:
+                name = tool_call.function.name
+                arguments = tool_call.function.arguments
+                try:
+                    object_dict = json.loads(arguments)
+                    tool_call_object = GeneratedJsonObject(name=name, object=object_dict)
+                except json.JSONDecodeError:
+                    tool_call_object = GeneratedJsonObject(name=name, object={"raw": arguments})
+                tool_calls.append(tool_call_object)
+            if tool_calls:
+                json_object = tool_calls[0]
         elif content is not None:
             if self.completion_kwargs:
                 name = self.completion_kwargs.get("response_format",{}).get("json_schema",{}).get("name",None)
@@ -336,7 +353,7 @@ class LLMOutput(BaseModel):
                 total_tokens=chat_completion.usage.total_tokens
             )
 
-        return content, json_object, usage, None
+        return content, json_object, usage, None, tool_calls
 
     def _parse_anthropic_message(self, message: Union[AnthropicMessage, PromptCachingBetaMessage]) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage],None]:
         content = None
