@@ -2,8 +2,10 @@ import uuid
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
+from market_agents.agents.tool_caller.engine import Engine
+from market_agents.agents.tool_caller.utils import function_to_json
 from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
@@ -50,7 +52,7 @@ class Agent(BaseModel):
     persona: Optional[str] = None
     system: Optional[str] = None
     task: Optional[str] = None
-    tools: Optional[Dict[str, Any]] = None
+    tools: Optional[List[Callable]] = None
     output_format: Optional[Union[Dict[str, Any], str]] = None
     llm_config: LLMConfig = Field(default_factory=LLMConfig)
     max_retries: int = 2
@@ -64,7 +66,7 @@ class Agent(BaseModel):
         super().__init__(**data)
         self.ai_utilities = ParallelAIUtilities()
 
-    async def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None, return_prompt: bool = False) -> Union[str, Dict[str, Any], LLMPromptContext]:
+    async def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None, json_tool: bool = False, return_prompt: bool = False) -> Union[str, Dict[str, Any], LLMPromptContext]:
         """Execute a task and return the result or the prompt context."""
         execution_task = task if task is not None else self.task
         if execution_task is None:
@@ -72,9 +74,14 @@ class Agent(BaseModel):
         
         execution_output_format = output_format if output_format is not None else self.output_format
         
-        # Update llm_config based on output_format
         if execution_output_format == "plain_text":
             self.llm_config.response_format = "text"
+        elif execution_output_format == "tool":
+            self.llm_config.response_format = "tool"
+            execution_output_format = "tool"
+        elif json_tool:
+            self.llm_config.response_format = "tool"
+            execution_output_format = self._load_output_schema(execution_output_format)
         else:
             self.llm_config.response_format = "structured_output"
             execution_output_format = self._load_output_schema(execution_output_format)
@@ -83,7 +90,7 @@ class Agent(BaseModel):
             execution_task,
             execution_output_format if isinstance(execution_output_format, dict) else None
         )
-        agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
+        #agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
         if return_prompt:
             return prompt_context
 
@@ -139,7 +146,9 @@ class Agent(BaseModel):
             system_string=system_message,
             new_message=user_message,
             llm_config=self.llm_config,
-            structured_output=structured_output
+            structured_output=structured_output,
+            tools=self.tools,
+            update_history=True
         )
     
     @retry(
@@ -166,9 +175,18 @@ class Agent(BaseModel):
                         return json.loads(llm_output.str_content)
                     except json.JSONDecodeError:
                         return extract_json_from_response(llm_output.str_content)
-            elif prompt_context.llm_config.response_format == "tool":
-                # Handle tool response format if needed
-                pass
+            elif prompt_context.llm_config.response_format == "tool" and prompt_context.structured_output:
+                if llm_output.json_object:
+                    return llm_output.json_object.object
+                elif llm_output.str_content:
+                    try:
+                        return json.loads(llm_output.str_content)
+                    except json.JSONDecodeError:
+                        return extract_json_from_response(llm_output.str_content)
+            elif prompt_context.llm_config.response_format == "tool" and llm_output.tool_calls:
+                print(str(llm_output.raw_result))
+                engine = Engine(tools=prompt_context.tools)
+                return engine.execute_tool_calls(llm_output.tool_calls)
             
             # If no specific handling or parsing failed, return the raw output
             agent_logger.warning(f"No parsing logic for response format '{prompt_context.llm_config.response_format}'. Returning raw output.")

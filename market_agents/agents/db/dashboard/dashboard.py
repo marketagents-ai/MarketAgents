@@ -39,6 +39,66 @@ def get_db_connection():
         print(f"Unable to connect to the database: {e}")
         raise
 
+def get_json_paths(obj, parent_path='', paths=None):
+    if paths is None:
+        paths = {}
+    
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            new_path = f"{parent_path}.{key}" if parent_path else key
+            if isinstance(value, (dict, list)):
+                get_json_paths(value, new_path, paths)
+            else:
+                # Determine the type of the leaf value
+                if isinstance(value, bool):
+                    paths[new_path] = 'boolean'
+                elif isinstance(value, int):
+                    paths[new_path] = 'integer'
+                elif isinstance(value, float):
+                    paths[new_path] = 'numeric'
+                elif isinstance(value, str):
+                    # Try to detect if it's a date
+                    try:
+                        datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        paths[new_path] = 'timestamp'
+                    except ValueError:
+                        paths[new_path] = 'text'
+                else:
+                    paths[new_path] = 'text'
+    
+    elif isinstance(obj, list):
+        for i, item in enumerate(obj[:5]):
+            new_path = f"{parent_path}[{i}]" if parent_path else str(i)
+            if isinstance(item, (dict, list)):
+                get_json_paths(item, new_path, paths)
+            else:
+                paths[new_path] = type(item).__name__
+    
+    return paths
+
+def build_json_selector(column_path):
+    parts = column_path.split('.')
+    if len(parts) == 1:
+        return sql.Identifier(parts[0])
+    
+    base = sql.Identifier(parts[0])
+    path_parts = []
+    
+    for part in parts[1:]:
+        if '[' in part and ']' in part:
+            array_path = part.split('[')
+            path_parts.append(sql.Literal(array_path[0]))
+            index = array_path[1].rstrip(']')
+            path_parts.append(sql.Literal(int(index)))
+        else:
+            path_parts.append(sql.Literal(part))
+    
+    result = base
+    for part in path_parts[:-1]:
+        result = sql.SQL('->').join([result, part])
+    
+    return sql.SQL('->>').join([result, path_parts[-1]])
+
 def get_column_types(cursor, table_name):
     query = """
     SELECT column_name, data_type, is_nullable
@@ -49,9 +109,48 @@ def get_column_types(cursor, table_name):
     columns = cursor.fetchall()
     
     result = {}
+    
     for column in columns:
-        column_name, data_type, is_nullable = column['column_name'], column['data_type'], column['is_nullable']
-        result[column_name] = {'type': data_type, 'nullable': is_nullable}
+        column_name = column['column_name']
+        data_type = column['data_type']
+        is_nullable = column['is_nullable']
+        
+        result[column_name] = {
+            'type': data_type,
+            'nullable': is_nullable
+        }
+        
+        if data_type in ('json', 'jsonb'):
+            sample_query = sql.SQL("""
+                SELECT DISTINCT {}
+                FROM {}
+                WHERE {} IS NOT NULL
+                LIMIT 100
+            """).format(
+                sql.Identifier(column_name),
+                sql.Identifier(table_name),
+                sql.Identifier(column_name)
+            )
+            
+            cursor.execute(sample_query)
+            samples = cursor.fetchall()
+            
+            for row in samples:
+                if row[column_name]:
+                    try:
+                        data = json.loads(row[column_name]) if isinstance(row[column_name], str) else row[column_name]
+                        json_paths = get_json_paths(data)
+                        for path, path_type in json_paths.items():
+                            full_path = f"{column_name}.{path}"
+                            result[full_path] = {
+                                'type': path_type,
+                                'nullable': 'YES',
+                                'is_json_field': True,
+                                'parent_column': column_name,
+                                'json_path': path
+                            }
+                    except (json.JSONDecodeError, AttributeError):
+                        continue
     
     return result
 
@@ -194,7 +293,18 @@ async def get_metrics_data(
         offset = (page - 1) * page_size
 
         if full_table:
-            select_parts = [sql.Identifier(col) for col in column_types.keys()]
+            select_parts = []
+            for col, info in column_types.items():
+                if info.get('is_json_field'):
+                    select_parts.append(
+                        sql.SQL("{} as {}").format(
+                            build_json_selector(col),
+                            sql.Identifier(col.replace('.', '_'))
+                        )
+                    )
+                else:
+                    select_parts.append(sql.Identifier(col))
+
             query = sql.SQL("SELECT {} FROM {} OFFSET {} LIMIT {}").format(
                 sql.SQL(', ').join(select_parts),
                 sql.Identifier(table_name),
@@ -205,8 +315,8 @@ async def get_metrics_data(
             if not x_column or not y_column:
                 raise HTTPException(status_code=400, detail="X and Y columns must be specified when not fetching full table.")
             
-            x_select = build_json_path_query(x_column)
-            y_select = build_json_path_query(y_column)
+            x_select = build_json_selector(x_column)
+            y_select = build_json_selector(y_column)
 
             query = sql.SQL("SELECT {} as x_value, {} as y_value FROM {} OFFSET {} LIMIT {}").format(
                 x_select,
@@ -279,42 +389,37 @@ async def search_database(
         if not column_types:
             raise HTTPException(status_code=404, detail="Table not found or has no columns.")
 
-        # If no specific columns are provided, search all columns
+        # If no columns specified, only use base columns
         if not columns:
-            columns = list(column_types.keys())
+            columns = [col for col in column_types.keys() if '.' not in col]
 
         # Construct the WHERE clause
         where_clauses = []
         for col in columns:
-            if column_types[col]['type'] in ('json', 'jsonb'):
-                # For JSON columns, use the ->> operator to search as text
-                where_clauses.append(
-                    sql.SQL("{} ->> {} ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(''),  # Empty string means the entire JSON object
-                        sql.Literal(f'%{search_term}%')
+            if col in column_types:
+                if column_types[col]['type'] in ('json', 'jsonb'):
+                    # Simple JSON text search
+                    where_clauses.append(
+                        sql.SQL("CAST({} AS TEXT) ILIKE {}").format(
+                            sql.Identifier(col),
+                            sql.Literal(f'%{search_term}%')
+                        )
                     )
-                )
-            elif column_types[col]['type'] in ('text', 'varchar', 'char'):
-                where_clauses.append(
-                    sql.SQL("{} ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(f'%{search_term}%')
+                else:
+                    where_clauses.append(
+                        sql.SQL("CAST({} AS TEXT) ILIKE {}").format(
+                            sql.Identifier(col),
+                            sql.Literal(f'%{search_term}%')
+                        )
                     )
-                )
-            else:
-                # For other types, cast to text before searching
-                where_clauses.append(
-                    sql.SQL("CAST({} AS TEXT) ILIKE {}").format(
-                        sql.Identifier(col),
-                        sql.Literal(f'%{search_term}%')
-                    )
-                )
+
+        if not where_clauses:
+            return {"data": [], "total_count": 0, "page": page, "page_size": page_size, "total_pages": 0}
 
         # Calculate offset
         offset = (page - 1) * page_size
 
-        # Construct the full query with pagination
+        # Construct the query
         query = sql.SQL("SELECT * FROM {} WHERE {} OFFSET {} LIMIT {}").format(
             sql.Identifier(table_name),
             sql.SQL(" OR ").join(where_clauses),

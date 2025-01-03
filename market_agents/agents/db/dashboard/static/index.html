@@ -3,23 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <title>MarketAgents SQL Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.1/plotly.min.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <header class="dashboard-header">
         <h1>MarketAgents LLM Dashboard</h1>
-        <img src="/static/marketagents_logo.jpg" alt="MarketAgents Logo" class="logo">
+        <img src="static/marketagents_logo.png" alt="MarketAgents Logo" class="logo">
     </header>
     <div class="dashboard">
-
-        <div>
+        <div class="controls-container">
             <button id="refreshButton" class="refresh-button"> ↺ </button>
- 
-                <button id="prevPage" class="prev-page"> ← </button>
-                <span id="pageInfo"></span>
-                <button id="nextPage" class="next-page"> → </button>
-
+            <button id="exportMarkdownButton">Export Markdown</button>
+            <button id="prevPage" class="prev-page"> ← </button>
+            <span id="pageInfo"></span>
+            <button id="nextPage" class="next-page"> → </button>
+            <input type="number" id="pageSizeInput" min="1" max="1000" value="100">
             <input type="text" id="searchInput" placeholder="SEARCH">
             <label for="tableSelect"></label>
             <select id="tableSelect"></select>
@@ -31,29 +30,24 @@
             <select id="xColumnSelect"></select>
             <label for="yColumnSelect">Y</label>
             <select id="yColumnSelect"></select>
-
         </div>
 
-        <div class="chart-container">
-            <canvas id="dataChart"></canvas>
+        <div class="chart-container" style="display: none;">
+            <div id="dataChart"></div>
+            <pre id="markdownOutput" class="markdown-output"></pre>
         </div>
         <div style="overflow-x: auto;">
             <table id="dataTable">
-                <thead id="tableHead">
-                    <!-- Table headers will be dynamically inserted here -->
-                </thead>
-                <tbody id="tableBody">
-                    <!-- Table rows will be dynamically inserted here -->
-                </tbody>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
             </table>
         </div>
     </div>
 
     <script>
-        let chartInstance = null;
         let currentPage = 1;
         let totalPages = 1;
-        const pageSize = 100;
+        let pageSize = 100;
 
         async function fetchTables() {
             try {
@@ -63,7 +57,6 @@
                 }
                 const tables = await response.json();
                 await populateTableSelect(tables);
-                // Fetch columns for the initially selected table
                 const initialTable = document.getElementById('tableSelect').value;
                 if (initialTable) {
                     const columns = await fetchColumnNames(initialTable);
@@ -156,8 +149,8 @@
 
         function isJSON(str) {
             try {
-                JSON.parse(str);
-                return true;
+                const parsed = JSON.parse(str);
+                return typeof parsed === 'object' && parsed !== null;
             } catch (e) {
                 return false;
             }
@@ -182,16 +175,18 @@
             const tableHead = document.getElementById('tableHead');
             const tableBody = document.getElementById('tableBody');
             
-            // Clear existing table content
             tableHead.innerHTML = '';
             tableBody.innerHTML = '';
 
-            // Create table header
-            const headerRow = document.createElement('tr');
+            // Get all keys and check which columns are all NULL
             const keys = Object.keys(data[0]);
-            keys.forEach((key, index) => {
+            const validColumns = keys.filter(key => {
+                return data.some(row => row[key] !== null);
+            });
+
+            const headerRow = document.createElement('tr');
+            validColumns.forEach((key, index) => {
                 const th = document.createElement('th');
-                // Use actual column names for chart view
                 if (key === 'x_value' && xColumn) {
                     th.textContent = xColumn;
                 } else if (key === 'y_value' && yColumn) {
@@ -204,10 +199,9 @@
             });
             tableHead.appendChild(headerRow);
 
-            // Populate table body
             data.forEach(row => {
                 const tr = document.createElement('tr');
-                keys.forEach(key => {
+                validColumns.forEach(key => {
                     const td = document.createElement('td');
                     const value = row[key];
                     if (value === null) {
@@ -227,25 +221,38 @@
             });
         }
 
+        // Replace your sortTable function with this corrected version
         function sortTable(n) {
             const table = document.getElementById('dataTable');
             let rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
             switching = true;
             dir = 'asc';
+
+            function getValue(cell) {
+                const value = cell.textContent.trim();
+                if (/^-?\d+$/.test(value)) {
+                    return parseInt(value, 10);
+                } else if (/^-?\d*\.?\d+$/.test(value)) {
+                    return parseFloat(value);
+                } else {
+                    return value.toLowerCase();
+                }
+            }
+
             while (switching) {
                 switching = false;
                 rows = table.rows;
                 for (i = 1; i < (rows.length - 1); i++) {
                     shouldSwitch = false;
-                    x = rows[i].getElementsByTagName('TD')[n];
-                    y = rows[i + 1].getElementsByTagName('TD')[n];
-                    if (dir == 'asc') {
-                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                    x = getValue(rows[i].getElementsByTagName('TD')[n]);
+                    y = getValue(rows[i + 1].getElementsByTagName('TD')[n]);
+                    if (dir === 'asc') {
+                        if (x > y) {
                             shouldSwitch = true;
                             break;
                         }
-                    } else if (dir == 'desc') {
-                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                    } else if (dir === 'desc') {
+                        if (x < y) {
                             shouldSwitch = true;
                             break;
                         }
@@ -256,101 +263,195 @@
                     switching = true;
                     switchcount++;
                 } else {
-                    if (switchcount == 0 && dir == 'asc') {
+                    if (switchcount === 0 && dir === 'asc') {
                         dir = 'desc';
                         switching = true;
                     }
                 }
             }
+
+            // After sorting, update the chart if we're in chart view
+            const viewSelect = document.getElementById('viewSelect');
+            if (viewSelect.value === 'chart') {
+                const tbody = table.getElementsByTagName('tbody')[0];
+                const rows = Array.from(tbody.getElementsByTagName('tr'));
+                
+                // Get the x and y values from the sorted table
+                const xValues = [];
+                const yValues = [];
+                
+                rows.forEach(row => {
+                    const cells = row.getElementsByTagName('td');
+                    // In chart view, we're looking for x_value and y_value columns
+                    const xValueCell = cells[0]; // First column is x_value
+                    const yValueCell = cells[1]; // Second column is y_value
+                    
+                    if (xValueCell && yValueCell) {
+                        const xValue = xValueCell.textContent.trim();
+                        const yValue = yValueCell.textContent.trim();
+                        
+                        xValues.push(xValue);
+                        // Try to convert y to number if possible
+                        yValues.push(!isNaN(parseFloat(yValue)) ? parseFloat(yValue) : yValue);
+                    }
+                });
+
+                // Update the Plotly chart with the new sorted data
+                if (xValues.length > 0 && yValues.length > 0) {
+                    Plotly.restyle('dataChart', {
+                        x: [xValues],
+                        y: [yValues]
+                    });
+                }
+            }
         }
 
+        // Add these helper functions for data type detection
+        function detectDataType(values) {
+            const sampleSize = Math.min(values.length, 10); // Check first 10 values
+            let dateCount = 0;
+            let numberCount = 0;
+            let categoricalCount = 0;
+
+            for (let i = 0; i < sampleSize; i++) {
+                const value = values[i];
+                if (!value && value !== 0) continue;
+
+                // Check if it's a date
+                const date = new Date(value);
+                if (!isNaN(date.getTime()) && value.length > 4) { // Length > 4 to avoid treating years as dates
+                    dateCount++;
+                    continue;
+                }
+
+                // Check if it's a number
+                if (!isNaN(parseFloat(value)) && isFinite(value)) {
+                    numberCount++;
+                    continue;
+                }
+
+                // If not date or number, consider it categorical
+                categoricalCount++;
+            }
+
+            // Determine predominant type
+            const max = Math.max(dateCount, numberCount, categoricalCount);
+            if (max === dateCount) return 'date';
+            if (max === numberCount) return 'number';
+            return 'categorical';
+        }
+
+        function analyzeDistribution(values) {
+            const uniqueValues = new Set(values).size;
+            const dataLength = values.length;
+            
+            // If more than 50% of values are unique, consider it continuous
+            return uniqueValues / dataLength > 0.5 ? 'continuous' : 'discrete';
+        }
+
+        // Replace your initChart function with this smarter version
         function initChart(data, xColumn, yColumn) {
+            const chartContainer = document.querySelector('.chart-container');
+            
             if (data.length === 0) {
+                chartContainer.style.display = 'none';
                 document.getElementById('dataChart').style.display = 'none';
                 return;
-            } else {
-                document.getElementById('dataChart').style.display = 'block';
             }
 
-            const ctx = document.getElementById('dataChart').getContext('2d');
+            chartContainer.style.display = 'block';
+            document.getElementById('dataChart').style.display = 'block';
 
-            // Destroy previous chart instance if exists
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-
-            // Parse data for x and y columns
             const xData = data.map(row => row.x_value);
             const yData = data.map(row => row.y_value);
 
-            // Determine chart type based on data
-            let chartType = 'line';
-            let xAxisType = 'category';
-            let yAxisType = 'linear';
+            // Detect data types
+            const xType = detectDataType(xData);
+            const yType = detectDataType(yData);
+            const xDistribution = analyzeDistribution(xData);
+            const yDistribution = analyzeDistribution(yData);
 
-            if (xData.some(x => x instanceof Date)) {
-                xAxisType = 'time';
-                chartType = 'line';
-            }
+            // Configure chart based on data types
+            let chartType = 'scatter';
+            let mode = 'lines+markers';
+            let markerSize = 6;
 
-            if (yData.some(y => y instanceof Date)) {
-                yAxisType = 'time';
-                chartType = 'line';
-            }
-
-            chartInstance = new Chart(ctx, {
-                type: chartType,
-                data: {
-                    labels: xData,
-                    datasets: [{
-                        label: yColumn,
-                        data: yData,
-                        backgroundColor: '#564caf',
-                        borderColor: '#463e8d',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: {
-                            type: xAxisType,
-                            time: xAxisType === 'time' ? {
-                                unit: 'day',
-                                displayFormats: {
-                                    day: 'MMM D'
-                                }
-                            } : undefined,
-                            title: {
-                                display: true,
-                                text: xColumn
-                            }
-                        },
-                        y: {
-                            type: yAxisType,
-                            time: yAxisType === 'time' ? {
-                                unit: 'day',
-                                displayFormats: {
-                                    day: 'MMM D'
-                                }
-                            } : undefined,
-                            title: {
-                                display: true,
-                                text: yColumn
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        title: {
-                            display: false,
-                            text: `${yColumn} vs ${xColumn}`
-                        }
-                    }
+            // Determine the best chart type based on data characteristics
+            if (xType === 'categorical' || yType === 'categorical') {
+                if (xDistribution === 'discrete' && yType === 'number') {
+                    chartType = 'bar';
+                    mode = 'none';
                 }
-            });
+            } else if (xType === 'date' && yType === 'number') {
+                mode = 'lines+markers';
+                markerSize = 4; // Smaller markers for time series
+            } else if (xType === 'number' && yType === 'number') {
+                if (xDistribution === 'discrete' && yDistribution === 'discrete') {
+                    mode = 'markers';
+                    markerSize = 8; // Larger markers for discrete data
+                }
+            }
+
+            const trace = {
+                x: xData,
+                y: yData,
+                type: chartType,
+                mode: mode,
+                name: yColumn,
+                line: {
+                    color: '#463e8d',
+                    width: 2
+                },
+                marker: {
+                    color: '#564caf',
+                    size: markerSize
+                }
+            };
+
+            const layout = {
+                xaxis: {
+                    gridcolor: '#e1e1e1',
+                    zeroline: false,
+                    automargin: true
+                },
+                yaxis: {
+                    gridcolor: '#e1e1e1',
+                    zeroline: false,
+                    automargin: true
+                },
+                plot_bgcolor: '#ffffff',
+                paper_bgcolor: '#ffffff',
+                margin: {
+                    l: 60,
+                    r: 30,
+                    t: 30,
+                    b: 50
+                },
+                showlegend: false,
+                hovermode: 'closest'
+            };
+
+            // Add histogram if appropriate
+            if (chartType === 'scatter' && yType === 'number') {
+                layout.yaxis.showspikes = true;
+                layout.xaxis.showspikes = true;
+            }
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'chart_export',
+                    height: 500,
+                    width: 700,
+                    scale: 2
+                }
+            };
+
+            Plotly.newPlot('dataChart', [trace], layout, config);
         }
 
         function updatePaginationInfo(currentPage, totalPages) {
@@ -405,20 +506,42 @@
             totalPages = result.total_pages;
             updatePaginationInfo(currentPage, totalPages);
 
-            // Pass xColumn and yColumn to populateTable
+            // Sort the data before displaying
+            if (result.data.length > 0) {
+                const firstKey = Object.keys(result.data[0])[0]; // Get the first column name
+                result.data.sort((a, b) => {
+                    const aVal = a[firstKey];
+                    const bVal = b[firstKey];
+                    
+                    // Handle different data types
+                    if (!isNaN(Date.parse(aVal)) && !isNaN(Date.parse(bVal))) {
+                        // Date comparison
+                        return new Date(aVal) - new Date(bVal);
+                    } else if (!isNaN(aVal) && !isNaN(bVal)) {
+                        // Numeric comparison
+                        return parseFloat(aVal) - parseFloat(bVal);
+                    } else {
+                        // String comparison
+                        return String(aVal).localeCompare(String(bVal));
+                    }
+                });
+            }
+
             populateTable(result.data, isChartView ? xColumn : null, isChartView ? yColumn : null);
             
             if (isChartView && !searchTerm) {
                 initChart(result.data, xColumn, yColumn);
-                document.getElementById('dataChart').style.display = 'block';
+                document.getElementById('markdownOutput').style.display = 'none';
             } else {
-                if (chartInstance) {
-                    chartInstance.destroy();
+                const chartContainer = document.querySelector('.chart-container');
+                chartContainer.style.display = 'none';
+                if (document.getElementById('dataChart')) {
+                    Plotly.purge('dataChart');
                 }
                 document.getElementById('dataChart').style.display = 'none';
+                document.getElementById('markdownOutput').style.display = 'none';
             }
 
-            // Update input states after refreshing
             updateInputStates();
         }
 
@@ -432,9 +555,9 @@
             const refreshButton = document.getElementById('refreshButton');
             const prevPageButton = document.getElementById('prevPage');
             const nextPageButton = document.getElementById('nextPage');
+            const pageSizeInput = document.getElementById('pageSizeInput');
 
             tableSelect.addEventListener('change', async () => {
-                // Disable inputs while fetching new data
                 tableSelect.disabled = true;
                 xColumnSelect.disabled = true;
                 yColumnSelect.disabled = true;
@@ -442,34 +565,26 @@
                 searchInput.disabled = true;
 
                 try {
-                    // Fetch column names for the new table
                     const columns = await fetchColumnNames(tableSelect.value);
-                    
-                    // Populate column selects with new data
                     populateColumnSelects(columns);
 
-                    // Reset selections and inputs
                     xColumnSelect.selectedIndex = 0;
                     yColumnSelect.selectedIndex = 0;
                     searchInput.value = '';
 
-                    // Set view to 'table' by default
                     viewSelect.value = 'table';
 
-                    // Re-enable inputs
                     xColumnSelect.disabled = true;
                     yColumnSelect.disabled = true;
                     viewSelect.disabled = false;
                     searchInput.disabled = false;
 
-                    // Reset current page and refresh the dashboard
                     currentPage = 1;
                     await refreshDashboard(1);
                 } catch (error) {
                     console.error('Error changing table:', error);
                     alert(`Failed to change table: ${error.message}`);
                 } finally {
-                    // Ensure table select is re-enabled even if an error occurred
                     tableSelect.disabled = false;
                 }
             });
@@ -488,7 +603,8 @@
             prevPageButton.addEventListener('click', () => {
                 if (currentPage > 1) {
                     refreshDashboard(currentPage - 1);
-                }});
+                }
+            });
 
             nextPageButton.addEventListener('click', () => {
                 if (currentPage < totalPages) {
@@ -496,14 +612,25 @@
                 }
             });
 
-            // Fetch tables after all other setup is complete
-            await fetchTables();
+            pageSizeInput.addEventListener('change', () => {
+                pageSize = parseInt(pageSizeInput.value, 10);
+                if (isNaN(pageSize) || pageSize < 1 || pageSize > 1000) {
+                    pageSize = 100;
+                    pageSizeInput.value = '100';
+                }
+                refreshDashboard(1);
+            });
 
-            // Initial refresh of the dashboard
+            await fetchTables();
             await refreshDashboard(1);
+
+            const exportMarkdownButton = document.getElementById('exportMarkdownButton');
+            exportMarkdownButton.addEventListener('click', () => {
+                const markdown = tableToMarkdown();
+                displayMarkdown(markdown);
+            });
         });
 
-        // Helper function to debounce function calls
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -516,16 +643,65 @@
             };
         }
 
-        // Add event listener for search input with debounce
         const debouncedSearch = debounce(() => refreshDashboard(1), 300);
         document.getElementById('searchInput').addEventListener('input', debouncedSearch);
 
-        // Add event listeners for column selection changes
         document.getElementById('xColumnSelect').addEventListener('change', () => refreshDashboard(1));
         document.getElementById('yColumnSelect').addEventListener('change', () => refreshDashboard(1));
-
-        // Add event listener for full table checkbox
         document.getElementById('viewSelect').addEventListener('change', () => refreshDashboard(1));
+
+        function tableToMarkdown() {
+            const table = document.getElementById('dataTable');
+            const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+
+            let markdown = '';
+            let useTable = true;
+
+            rows.forEach(row => {
+                Array.from(row.cells).forEach(cell => {
+                    if (cell.textContent.length > 512) {
+                        useTable = false;
+                    }
+                });
+            });
+
+            if (useTable) {
+                markdown += '| ' + headers.join(' | ') + ' |\n';
+                markdown += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
+
+                rows.forEach(row => {
+                    const cells = Array.from(row.cells).map(cell => cell.textContent);
+                    markdown += '| ' + cells.join(' | ') + ' |\n';
+                });
+            } else {
+                rows.forEach((row, rowIndex) => {
+                    markdown += `Row ${rowIndex + 1}:\n\n`;
+                    Array.from(row.cells).forEach((cell, cellIndex) => {
+                        markdown += `${headers[cellIndex]}: ${cell.textContent}\n\n`;
+                    });
+                    markdown += '---\n\n';
+                });
+            }
+
+            return markdown;
+        }
+
+        function displayMarkdown(markdown) {
+            const chartContainer = document.querySelector('.chart-container');
+            const markdownOutput = document.getElementById('markdownOutput');
+            
+            if (markdown.trim() === '') {
+                chartContainer.style.display = 'none';
+                markdownOutput.style.display = 'none';
+                return;
+            }
+            
+            chartContainer.style.display = 'block';
+            markdownOutput.style.display = 'block';
+            markdownOutput.textContent = markdown;
+            document.getElementById('dataChart').style.display = 'none';
+        }
     </script>
 </body>
 </html>
