@@ -5,8 +5,10 @@ host: "localhost"
 port: "5433"
 index_method: "ivfflat"
 lists: 100
-embedding_api_url: "http://localhost:8080/embed"
-model: "jinaai/jina-embeddings-v2-base-en"
+embedding_api_url: "https://api.openai.com/v1/embeddings"
+model: "text-embedding-ada-002"
+#embedding_api_url: "http://localhost:8080/embed"
+#model: "jinaai/jina-embeddings-v2-base-en"
 batch_size: 32
 timeout: 10
 retry_attempts: 3
@@ -18,4 +20,4 @@ context_window: 512
 top_k: 3
 similarity_threshold: 0.7
 encoding_format: "float"
-model_type: "openai"
+embedding_provider: "openai"

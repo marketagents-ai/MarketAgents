@@ -23,7 +23,7 @@ class MarketMemoryConfig(BaseSettings):
     top_k: int = Field(default=3)
     similarity_threshold: float = Field(default=0.7)
     encoding_format: str = Field(default="float")
-    model_type: str = Field(default="local")
+    embedding_provider: str = Field(default="tei")
 
 def load_config_from_yaml(yaml_path: str = "config.yaml") -> MarketMemoryConfig:
     with open(yaml_path, 'r') as f:
