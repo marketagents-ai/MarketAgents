@@ -9,6 +9,20 @@ class MemoryEmbedder:
     def __init__(self, config):
         self.config = config
 
+    def get_embeddings(self, texts):
+        """Get embeddings with retry logic and batch processing."""
+        single_input = isinstance(texts, str)
+        texts = [texts] if single_input else texts
+
+        if self.config.embedding_provider == "openai":
+            all_embeddings = self._get_openai_embeddings(texts)
+        elif self.config.embedding_provider == "tei":
+            all_embeddings = self._get_tei_embeddings(texts)
+        else:
+            raise NotImplementedError(f"Unknown embedding provider: {self.config.embedding_provider}")
+
+        return all_embeddings[0] if single_input else all_embeddings
+
     def _get_openai_embeddings(self, texts):
         """Embeddings from OpenAI API."""
         load_dotenv()
@@ -45,7 +59,7 @@ class MemoryEmbedder:
         return all_embeddings
 
 
-    def _get_standard_embeddings(self, texts):
+    def _get_tei_embeddings(self, texts):
         """Embeddings for local embedding model."""
         all_embeddings = []
         for i in range(0, len(texts), self.config.batch_size):
@@ -71,19 +85,6 @@ class MemoryEmbedder:
                         raise e
                     time.sleep(self.config.retry_delay)
         return all_embeddings
-
-
-    def get_embeddings(self, texts):
-        """Get embeddings with retry logic and batch processing."""
-        single_input = isinstance(texts, str)
-        texts = [texts] if single_input else texts
-
-        if self.config.model_type == "openai":
-            all_embeddings = self._get_openai_embeddings(texts)
-        else:
-            all_embeddings = self._get_standard_embeddings(texts)
-
-        return all_embeddings[0] if single_input else all_embeddings
 
 if __name__ == "__main__":
     # test run for embedding
