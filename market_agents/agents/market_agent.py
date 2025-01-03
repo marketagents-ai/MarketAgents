@@ -52,29 +52,31 @@ class MarketAgent(LLMAgent):
     async def perceive(
             self,
             environment_name: str,
-            return_prompt: bool = False
+            return_prompt: bool = False,
+            structured_tool: bool = False
         ) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
         environment_info = self.environments[environment_name].get_global_state()
-        recent_memories = self.memory[-1:] if self.memory else []
+        recent_memories = [self.memory[-1]] if self.memory else [{"content": "No previous memories"}]
         
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
-            recent_memories=recent_memories if recent_memories else []
+            recent_memories=recent_memories
         )
         
         prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
         
-        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), return_prompt=return_prompt)
+        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), json_tool=structured_tool, return_prompt=return_prompt)
 
     async def generate_action(
             self,
             environment_name: str,
             perception: Optional[str] = None,
-            return_prompt: bool = False
+            return_prompt: bool = False,
+            structured_tool: bool = False,
         ) -> Union[Dict[str, Any], LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
@@ -101,7 +103,7 @@ class MarketAgent(LLMAgent):
      
         action_schema = action_space.get_action_schema()
         
-        response = await self.execute(prompt, output_format=action_schema, return_prompt=return_prompt)
+        response = await self.execute(prompt, output_format=action_schema, json_tool=structured_tool, return_prompt=return_prompt)
         
         if not return_prompt:
             action = {
@@ -118,7 +120,8 @@ class MarketAgent(LLMAgent):
         environment_name: str,
         environment_reward_weight: float = 0.5,
         self_reward_weight: float = 0.5,
-        return_prompt: bool = False
+        return_prompt: bool = False,
+        structured_tool: bool = False,
     ) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
@@ -172,6 +175,7 @@ class MarketAgent(LLMAgent):
         response = await self.execute(
             prompt,
             output_format=ReflectionSchema.model_json_schema(),
+            json_tool=structured_tool,
             return_prompt=return_prompt
         )
 

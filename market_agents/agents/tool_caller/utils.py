@@ -1,9 +1,21 @@
 import inspect
+import json
 from typing import Callable
 
-def function_to_json(func: Callable) -> dict:
+from openai.types.chat import (
+    ChatCompletionMessageParam,
+    ChatCompletionToolParam
+)
+
+from openai.types.shared_params import (
+    ResponseFormatText,
+    ResponseFormatJSONObject,
+    FunctionDefinition
+)
+
+def function_to_json(func) -> ChatCompletionToolParam:
     """
-    Converts a Python function into a JSON-serializable dictionary
+    Converts a Python function into a ChatCompletionToolParam
     that describes the function's signature, including its name,
     description, and parameters.
 
@@ -11,11 +23,11 @@ def function_to_json(func: Callable) -> dict:
         func: The function to be converted.
 
     Returns:
-        A dictionary representing the function's signature in JSON format.
+        A ChatCompletionToolParam representing the function's signature.
     """
     type_map = {
         str: "string",
-        int: "integer",
+        int: "integer", 
         float: "number",
         bool: "boolean",
         list: "array",
@@ -46,15 +58,15 @@ def function_to_json(func: Callable) -> dict:
         if param.default == inspect._empty
     ]
 
-    return {
-        "type": "function",
-        "function": {
-            "name": func.__name__,
-            "description": func.__doc__ or "",
-            "parameters": {
+    return ChatCompletionToolParam(
+        type="function",
+        function=FunctionDefinition(
+            name=func.__name__,
+            description=func.__doc__ or "",
+            parameters={
                 "type": "object",
                 "properties": parameters,
                 "required": required,
-            },
-        },
-    }
+            }
+        )
+    )
