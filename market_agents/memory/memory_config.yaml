@@ -17,3 +17,5 @@ vector_dim: 768
 context_window: 512
 top_k: 3
 similarity_threshold: 0.7
+encoding_format: "float"
+model_type: "openai"
