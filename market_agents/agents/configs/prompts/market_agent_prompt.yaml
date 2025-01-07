@@ -6,6 +6,9 @@ perception: |
 
   ## Recent Memories
   {recent_memories}
+  
+  ## Long Term Memories
+  {long_term_memories}
 
   Generate a brief monologue about your current perception of this environment.
   Use emojis to fully express yourself when needed.

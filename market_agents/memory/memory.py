@@ -16,6 +16,9 @@ class MemoryObject(BaseModel):
     created_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = None
 
+class ShortTermMemory(BaseModel):
+    memories: List[MemoryObject]
+
 class MarketMemory:
     """
     A memory module that can:
@@ -24,6 +27,7 @@ class MarketMemory:
     - Support both short-term (chronological) and long-term (embedding-based) retrieval
     """
     def __init__(self, config, db_conn: DatabaseConnection, embedder: MemoryEmbedder):
+
         self.config = config
         self.db = db_conn
         self.embedder = embedder

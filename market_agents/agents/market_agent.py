@@ -9,10 +9,18 @@ from market_agents.environments.environment import MultiAgentEnvironment, LocalO
 from market_agents.agents.protocols.protocol import Protocol
 from market_agents.agents.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
 from market_agents.agents.personas.persona import Persona
+from market_agents.memory.memory import MarketMemory, ShortTermMemory
+from market_agents.memory.vector_search import MemoryRetriever, LongTermMemory
+from market_agents.memory.config import MarketMemoryConfig
+from market_agents.memory.embedding import MemoryEmbedder
 
 
 class MarketAgent(LLMAgent):
-    memory: List[Dict[str, Any]] = Field(default_factory=list)
+    memory: MarketMemory
+    retriever: MemoryRetriever
+    embedder: MemoryEmbedder
+    short_term_memory: ShortTermMemory = None
+    long_term_memory: LongTermMemory = None
     last_perception: Optional[Dict[str, Any]] = None
     last_action: Optional[Dict[str, Any]] = None
     last_observation: Optional[LocalObservation] = Field(default_factory=dict)
@@ -25,6 +33,8 @@ class MarketAgent(LLMAgent):
     @classmethod
     def create(
         cls,
+        memory_config: MarketMemoryConfig,
+        db_conn,
         agent_id: str,
         use_llm: bool,
         llm_config: Optional[LLMConfig] = None,
@@ -33,6 +43,15 @@ class MarketAgent(LLMAgent):
         persona: Optional[Persona] = None,
         econ_agent: Optional[EconomicAgent] = None,
     ) -> 'MarketAgent':
+        cls.embedder = MemoryEmbedder(memory_config)
+        cls.retriever = MemoryRetriever(memory_config, db_conn, cls.embedder)
+        cls.memory = MarketMemory(memory_config, db_conn, cls.embedder)
+
+        short_term_memories = cls.memory.get_memories(agent_id, limit=10)
+        cls.short_term_memory = ShortTermMemory(memories=short_term_memories)
+        #TODO what query to be passed into `search_agent_memory`?
+        long_term_memories = cls.retriever.search_agent_memory(agent_id)
+        cls.long_term_memory = LongTermMemory(memories=long_term_memories)
 
         agent = cls(
             id=agent_id,
@@ -44,7 +63,7 @@ class MarketAgent(LLMAgent):
             protocol=protocol,
             address=f"agent_{agent_id}_address",
             use_llm=use_llm,
-            economic_agent=econ_agent,
+            economic_agent=econ_agent
         )
 
         return agent
@@ -59,12 +78,12 @@ class MarketAgent(LLMAgent):
             raise ValueError(f"Environment {environment_name} not found")
 
         environment_info = self.environments[environment_name].get_global_state()
-        recent_memories = [self.memory[-1]] if self.memory else [{"content": "No previous memories"}]
         
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
-            recent_memories=recent_memories
+            short_term_memory=self.short_term_memory,
+            long_term_memory=self.long_term_memory
         )
         
         prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
@@ -190,7 +209,7 @@ class MarketAgent(LLMAgent):
                 normalized_environment_reward * environment_reward_weight +
                 self_reward * self_reward_weight
             )
-            
+            #TODO fix the below to use short/l
             self.memory.append({
                 "type": "reflection",
                 "content": response.get("reflection", ""),

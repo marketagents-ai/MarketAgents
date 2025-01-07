@@ -4,6 +4,10 @@ from typing import Dict, Any, List, Optional, Union
 import yaml
 import os
 
+from market_agents.memory.memory import ShortTermMemory
+from market_agents.memory.vector_search import LongTermMemory
+
+
 def json_to_markdown(data: Union[Dict, List, Any], indent: int = 0) -> str:
     """Convert JSON/dict data to a markdown formatted string."""
     if data is None:
@@ -45,10 +49,11 @@ def json_to_markdown(data: Union[Dict, List, Any], indent: int = 0) -> str:
 class AgentPromptVariables(BaseModel):
     environment_name: str
     environment_info: Any
-    recent_memories: List[Dict[str, Any]] = Field(default_factory=list)
+    short_term_memory: ShortTermMemory = None
+    long_term_memory: LongTermMemory = None
     perception: Optional[Any] = None
     observation: Optional[Any] = None
-    action_space: Dict[str, Any] = {}
+    action_space: Dict[str, Any] = Field(default_factory=dict)
     last_action: Optional[Any] = None
     reward: Optional[float] = None
     previous_strategy: Optional[str] = None

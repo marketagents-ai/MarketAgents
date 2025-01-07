@@ -6,8 +6,8 @@ from uuid import UUID
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from memory.embedding import MemoryEmbedder
-from memory.setup_db import DatabaseConnection
+from embedding import MemoryEmbedder
+from setup_db import DatabaseConnection
 
 class KnowledgeObject(BaseModel):
     knowledge_id: UUID = Field(default_factory=uuid.uuid4)
@@ -167,7 +167,7 @@ class SemanticChunker(KnowledgeChunker):
 
 if __name__ == "__main__":
     import os
-    from memory.config import load_config_from_yaml
+    from config import load_config_from_yaml
     # Load configuration and initialize services
     current_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(current_dir, "memory_config.yaml")

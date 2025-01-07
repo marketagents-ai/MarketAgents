@@ -1,10 +1,14 @@
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
 
 class RetrievedMemory(BaseModel):
     text: str
     similarity: float
     context: str = ""
+
+class LongTermMemory(BaseModel):
+    memories: List[RetrievedMemory] = Field(default_factory=list)
 
 class MemoryRetriever:
     """
