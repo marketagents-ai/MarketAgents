@@ -1,24 +1,23 @@
-from typing import Dict, Any, List, Optional, Type, Union
+import json
 from datetime import datetime
-from market_agents.agents.market_schemas import PerceptionSchema, ReflectionSchema
+from typing import Dict, Any, Optional, Type, Union
+
 from pydantic import Field
+
 from market_agents.agents.base_agent.agent import Agent as LLMAgent
-from market_agents.inference.message_models import LLMConfig, LLMPromptContext
+from market_agents.agents.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
+from market_agents.agents.market_schemas import PerceptionSchema, ReflectionSchema
+from market_agents.agents.personas.persona import Persona
+from market_agents.agents.protocols.protocol import Protocol
 from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.environments.environment import MultiAgentEnvironment, LocalObservation
-from market_agents.agents.protocols.protocol import Protocol
-from market_agents.agents.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
-from market_agents.agents.personas.persona import Persona
-from market_agents.memory.memory import MarketMemory, ShortTermMemory
-from market_agents.memory.vector_search import MemoryRetriever, LongTermMemory
+from market_agents.inference.message_models import LLMConfig, LLMPromptContext
 from market_agents.memory.config import MarketMemoryConfig
-from market_agents.memory.embedding import MemoryEmbedder
+from market_agents.memory.memory import ShortTermMemory, MemoryObject
+from market_agents.memory.vector_search import LongTermMemory
 
 
 class MarketAgent(LLMAgent):
-    memory: MarketMemory
-    retriever: MemoryRetriever
-    embedder: MemoryEmbedder
     short_term_memory: ShortTermMemory = None
     long_term_memory: LongTermMemory = None
     last_perception: Optional[Dict[str, Any]] = None
@@ -32,26 +31,20 @@ class MarketAgent(LLMAgent):
 
     @classmethod
     def create(
-        cls,
-        memory_config: MarketMemoryConfig,
-        db_conn,
-        agent_id: str,
-        use_llm: bool,
-        llm_config: Optional[LLMConfig] = None,
-        environments: Optional[Dict[str, MultiAgentEnvironment]] = None,
-        protocol: Optional[Type[Protocol]] = None,
-        persona: Optional[Persona] = None,
-        econ_agent: Optional[EconomicAgent] = None,
+            cls,
+            memory_config: MarketMemoryConfig,
+            db_conn,
+            agent_id: str,
+            use_llm: bool,
+            llm_config: Optional[LLMConfig] = None,
+            environments: Optional[Dict[str, MultiAgentEnvironment]] = None,
+            protocol: Optional[Type[Protocol]] = None,
+            persona: Optional[Persona] = None,
+            econ_agent: Optional[EconomicAgent] = None,
     ) -> 'MarketAgent':
-        cls.embedder = MemoryEmbedder(memory_config)
-        cls.retriever = MemoryRetriever(memory_config, db_conn, cls.embedder)
-        cls.memory = MarketMemory(memory_config, db_conn, cls.embedder)
+        cls.short_term_memory = ShortTermMemory(memory_config, db_conn)
 
-        short_term_memories = cls.memory.get_memories(agent_id, limit=10)
-        cls.short_term_memory = ShortTermMemory(memories=short_term_memories)
-        #TODO what query to be passed into `search_agent_memory`?
-        long_term_memories = cls.retriever.search_agent_memory(agent_id)
-        cls.long_term_memory = LongTermMemory(memories=long_term_memories)
+        cls.long_term_memory = LongTermMemory(memory_config, db_conn)
 
         agent = cls(
             id=agent_id,
@@ -73,22 +66,23 @@ class MarketAgent(LLMAgent):
             environment_name: str,
             return_prompt: bool = False,
             structured_tool: bool = False
-        ) -> Union[str, LLMPromptContext]:
+    ) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
         environment_info = self.environments[environment_name].get_global_state()
-        
+
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
             short_term_memory=self.short_term_memory,
             long_term_memory=self.long_term_memory
         )
-        
+
         prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
-        
-        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), json_tool=structured_tool, return_prompt=return_prompt)
+
+        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), json_tool=structured_tool,
+                                  return_prompt=return_prompt)
 
     async def generate_action(
             self,
@@ -96,7 +90,7 @@ class MarketAgent(LLMAgent):
             perception: Optional[str] = None,
             return_prompt: bool = False,
             structured_tool: bool = False,
-        ) -> Union[Dict[str, Any], LLMPromptContext]:
+    ) -> Union[Dict[str, Any], LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
@@ -108,7 +102,7 @@ class MarketAgent(LLMAgent):
         serialized_action_space = {
             "allowed_actions": [action_type.__name__ for action_type in action_space.allowed_actions]
         }
-        
+
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
@@ -117,13 +111,14 @@ class MarketAgent(LLMAgent):
             last_action=self.last_action,
             observation=self.last_observation
         )
-        
+
         prompt = self.prompt_manager.get_action_prompt(variables.model_dump())
-     
+
         action_schema = action_space.get_action_schema()
-        
-        response = await self.execute(prompt, output_format=action_schema, json_tool=structured_tool, return_prompt=return_prompt)
-        
+
+        response = await self.execute(prompt, output_format=action_schema, json_tool=structured_tool,
+                                      return_prompt=return_prompt)
+
         if not return_prompt:
             action = {
                 "sender": self.id,
@@ -135,16 +130,16 @@ class MarketAgent(LLMAgent):
             return response
 
     async def reflect(
-        self,
-        environment_name: str,
-        environment_reward_weight: float = 0.5,
-        self_reward_weight: float = 0.5,
-        return_prompt: bool = False,
-        structured_tool: bool = False,
+            self,
+            environment_name: str,
+            environment_reward_weight: float = 0.5,
+            self_reward_weight: float = 0.5,
+            return_prompt: bool = False,
+            structured_tool: bool = False,
     ) -> Union[str, LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
-        
+
         total_weight = environment_reward_weight + self_reward_weight
         if total_weight == 0:
             raise ValueError("Sum of weights must not be zero.")
@@ -169,12 +164,12 @@ class MarketAgent(LLMAgent):
 
         environment_info = environment.get_global_state()
         previous_strategy = None
-        if self.memory:
-            for memory_item in reversed(self.memory):
-                if 'strategy_update' in memory_item:
-                    previous_strategy = memory_item['strategy_update']
+        if self.short_term_memory.memories:
+            for memory_item in reversed(self.short_term_memory.memories):
+                if 'strategy_update' in memory_item.metadata:
+                    previous_strategy = memory_item.metadata['strategy_update']
                     break
-        
+
         if previous_strategy is None:
             previous_strategy = "No previous strategy available"
         elif isinstance(previous_strategy, list):
@@ -206,20 +201,20 @@ class MarketAgent(LLMAgent):
             normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
 
             total_reward = (
-                normalized_environment_reward * environment_reward_weight +
-                self_reward * self_reward_weight
+                    normalized_environment_reward * environment_reward_weight +
+                    self_reward * self_reward_weight
             )
-            #TODO fix the below to use short/l
-            self.memory.append({
-                "type": "reflection",
-                "content": response.get("reflection", ""),
-                "strategy_update": response.get("strategy_update", ""),
-                "observation": observation if isinstance(observation, dict) else observation.model_dump(),
-                "environment_reward": round(environment_reward, 4),
-                "self_reward": round(self_reward, 4),
-                "total_reward": round(total_reward, 4),
-                "timestamp": datetime.now().isoformat()
-            })
+            self.short_term_memory.store_memory(MemoryObject(
+                agent_id=self.id,
+                cognitive_step="reflection",
+                metadata={"reflection": response.get("reflection", ""), "total_reward": round(total_reward, 4),
+                          "self_reward": round(self_reward, 4),
+                          "observation": observation if isinstance(observation, dict) else observation.model_dump(),
+                          "strategy_update": response.get("strategy_update", "")},
+                content=json.dumps(response),
+                created_at=datetime.now(),
+
+            ))
             return response.get("reflection", "")
         else:
             return response

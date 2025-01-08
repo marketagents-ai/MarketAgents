@@ -1,14 +1,12 @@
 from typing import List
 from pydantic import BaseModel, Field
+from market_agents.memory.config import MarketMemoryConfig
 
 
 class RetrievedMemory(BaseModel):
     text: str
     similarity: float
     context: str = ""
-
-class LongTermMemory(BaseModel):
-    memories: List[RetrievedMemory] = Field(default_factory=list)
 
 class MemoryRetriever:
     """
@@ -82,9 +80,25 @@ class MemoryRetriever:
             context = context + "..."
         return context
 
+
+class LongTermMemory(BaseModel):
+    memories: List[RetrievedMemory] = Field(default_factory=list)
+    memory_retriever: MemoryRetriever
+
+    def __init__(self, memory_config: MarketMemoryConfig, db_conn):
+        super().__init__()
+        embedder = MemoryEmbedder(memory_config)
+        self.memory_retriever = MemoryRetriever(config=memory_config, db_conn=db_conn, embedding_service=embedder)
+
+    def store_memory(self, retrieved_memory: RetrievedMemory):
+        pass
+
+    def retrieve_recent_memories(self, agent_id: str, query: str = None, top_k: int = None) -> List[RetrievedMemory]:
+        return self.memory_retriever.search_agent_memory(agent_id=agent_id, query=query, top_k=top_k)
+
 if __name__ == "__main__":
     import os
-    from config import load_config_from_yaml
+    from config import load_config_from_yaml, MarketMemoryConfig
     from setup_db import DatabaseConnection
     from embedding import MemoryEmbedder
     from knowledge_base import MarketKnowledgeBase

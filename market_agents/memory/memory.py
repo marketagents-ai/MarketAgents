@@ -1,11 +1,15 @@
 import json
 import uuid
-from uuid import UUID
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
+from typing import List, Optional, Dict, Any, Union
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 from embedding import MemoryEmbedder
+from market_agents.memory.config import MarketMemoryConfig
 from setup_db import DatabaseConnection
+
 
 class MemoryObject(BaseModel):
     memory_id: UUID = Field(default_factory=uuid.uuid4)
@@ -16,8 +20,6 @@ class MemoryObject(BaseModel):
     created_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = None
 
-class ShortTermMemory(BaseModel):
-    memories: List[MemoryObject]
 
 class MarketMemory:
     """
@@ -26,6 +28,7 @@ class MarketMemory:
     - Retrieve recent or filtered memories by various criteria (cognitive_step, metadata keys, time ranges, etc.)
     - Support both short-term (chronological) and long-term (embedding-based) retrieval
     """
+
     def __init__(self, config, db_conn: DatabaseConnection, embedder: MemoryEmbedder):
 
         self.config = config
@@ -58,13 +61,13 @@ class MarketMemory:
             raise e
 
     def get_memories(
-        self,
-        agent_id: str,
-        limit: int = 10,
-        cognitive_step: Union[str, List[str], None] = None,
-        metadata_filters: Optional[Dict[str, Any]] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
+            self,
+            agent_id: str,
+            limit: int = 10,
+            cognitive_step: Union[str, List[str], None] = None,
+            metadata_filters: Optional[Dict[str, Any]] = None,
+            start_time: Optional[datetime] = None,
+            end_time: Optional[datetime] = None
     ) -> List[MemoryObject]:
         """
         Retrieve memories filtered by optional parameters, sorted by recency (created_at DESC).
@@ -132,12 +135,12 @@ class MarketMemory:
             raise e
 
     def delete_memories(
-        self,
-        agent_id: str,
-        cognitive_step: Union[str, List[str], None] = None,
-        metadata_filters: Optional[Dict[str, Any]] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
+            self,
+            agent_id: str,
+            cognitive_step: Union[str, List[str], None] = None,
+            metadata_filters: Optional[Dict[str, Any]] = None,
+            start_time: Optional[datetime] = None,
+            end_time: Optional[datetime] = None
     ) -> int:
         """
         Delete memories filtered by optional parameters.
@@ -181,3 +184,22 @@ class MarketMemory:
         except Exception as e:
             self.db.conn.rollback()
             raise e
+
+
+class ShortTermMemory(BaseModel):
+    memories: List[MemoryObject]
+    marker_memory: MarketMemory
+
+    def __init__(self, memory_config: MarketMemoryConfig, db_conn):
+        super().__init__()
+        embedder = MemoryEmbedder(memory_config)
+        self.marker_memory = MarketMemory(memory_config, db_conn, embedder)
+
+    def retrieve_recent_memories(self, agent_id: str, limit: int = 10, start_time: Optional[datetime] = None,
+                                 end_time: Optional[datetime] = None, cognitive_step: Optional[str] = None):
+        self.memories = self.marker_memory.get_memories(limit=limit, agent_id=agent_id, start_time=start_time,
+                                                        end_time=end_time, cognitive_step=cognitive_step)
+        return self.memories
+
+    def store_memory(self, memory_object: MemoryObject):
+        self.marker_memory.store_memory(memory_object)
