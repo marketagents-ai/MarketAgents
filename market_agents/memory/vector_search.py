@@ -1,6 +1,7 @@
 from typing import List
 from pydantic import BaseModel, Field
 from market_agents.memory.config import MarketMemoryConfig
+from market_agents.memory.memory import MemoryObject
 
 
 class RetrievedMemory(BaseModel):
@@ -89,9 +90,10 @@ class LongTermMemory(BaseModel):
         super().__init__()
         embedder = MemoryEmbedder(memory_config)
         self.memory_retriever = MemoryRetriever(config=memory_config, db_conn=db_conn, embedding_service=embedder)
+        self.memory_store = MarketMemory(memory_config, db_conn, embedder)
 
-    def store_memory(self, retrieved_memory: RetrievedMemory):
-        pass
+    def store_memory(self, memory_object: MemoryObject):
+        self.memory_store.store_memory(memory_object)
 
     def retrieve_recent_memories(self, agent_id: str, query: str = None, top_k: int = None) -> List[RetrievedMemory]:
         return self.memory_retriever.search_agent_memory(agent_id=agent_id, query=query, top_k=top_k)

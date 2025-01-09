@@ -42,12 +42,11 @@ class MarketAgent(LLMAgent):
             persona: Optional[Persona] = None,
             econ_agent: Optional[EconomicAgent] = None,
     ) -> 'MarketAgent':
-        cls.short_term_memory = ShortTermMemory(memory_config, db_conn)
-
-        cls.long_term_memory = LongTermMemory(memory_config, db_conn)
 
         agent = cls(
             id=agent_id,
+            long_term_memory=LongTermMemory(memory_config, db_conn),
+            short_term_memory=ShortTermMemory(memory_config, db_conn),
             role=persona.role if persona else "agent",
             persona=persona.persona if persona else None,
             objectives=persona.objectives if persona else None,
@@ -207,13 +206,22 @@ class MarketAgent(LLMAgent):
             self.short_term_memory.store_memory(MemoryObject(
                 agent_id=self.id,
                 cognitive_step="reflection",
-                metadata={"reflection": response.get("reflection", ""), "total_reward": round(total_reward, 4),
+                metadata={"total_reward": round(total_reward, 4),
                           "self_reward": round(self_reward, 4),
                           "observation": observation if isinstance(observation, dict) else observation.model_dump(),
                           "strategy_update": response.get("strategy_update", "")},
-                content=json.dumps(response),
+                content=json.dumps(response.get("reflection", "")),
                 created_at=datetime.now(),
-
+            ))
+            self.long_term_memory.store_memory(MemoryObject(
+                agent_id=self.id,
+                cognitive_step="reflection",
+                metadata={"total_reward": round(total_reward, 4),
+                          "self_reward": round(self_reward, 4),
+                          "observation": observation if isinstance(observation, dict) else observation.model_dump(),
+                          "strategy_update": response.get("strategy_update", "")},
+                content=json.dumps(response.get("reflection", "")),
+                created_at=datetime.now(),
             ))
             return response.get("reflection", "")
         else:
