@@ -19,7 +19,7 @@ class MemoryRetriever:
         self.embedding_service = embedding_service
         self.full_text = ""
 
-    def search_knowledge_base(self, query: str, top_k: int = None) -> List[RetrievedMemory]:
+    async def search_knowledge_base(self, query: str, top_k: int = None) -> List[RetrievedMemory]:
         self.db.connect()
         query_embedding = self.embedding_service.get_embeddings(query)
         top_k = top_k or self.config.top_k
@@ -49,7 +49,7 @@ class MemoryRetriever:
 
         return results
 
-    def search_agent_memory(self, agent_id: str, query: str, top_k: int = None) -> List[RetrievedMemory]:
+    async def search_agent_memory(self, agent_id: str, query: str, top_k: int = None) -> List[RetrievedMemory]:
         self.db.connect()
         query_embedding = self.embedding_service.get_embeddings(query)
         top_k = top_k or self.config.top_k
@@ -92,11 +92,11 @@ class LongTermMemory(BaseModel):
         self.memory_retriever = MemoryRetriever(config=memory_config, db_conn=db_conn, embedding_service=embedder)
         self.memory_store = MarketMemory(memory_config, db_conn, embedder)
 
-    def store_memory(self, memory_object: MemoryObject):
-        self.memory_store.store_memory(memory_object)
+    async def store_memory(self, memory_object: MemoryObject):
+        await self.memory_store.store_memory(memory_object)
 
-    def retrieve_recent_memories(self, agent_id: str, query: str = None, top_k: int = None) -> List[RetrievedMemory]:
-        return self.memory_retriever.search_agent_memory(agent_id=agent_id, query=query, top_k=top_k)
+    async def retrieve_recent_memories(self, agent_id: str, query: str = None, top_k: int = None) -> List[RetrievedMemory]:
+        return await self.memory_retriever.search_agent_memory(agent_id=agent_id, query=query, top_k=top_k)
 
 if __name__ == "__main__":
     import os
@@ -105,6 +105,7 @@ if __name__ == "__main__":
     from embedding import MemoryEmbedder
     from knowledge_base import MarketKnowledgeBase
     from memory import MarketMemory, MemoryObject
+    import asyncio
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(current_dir, "memory_config.yaml")
@@ -137,12 +138,12 @@ if __name__ == "__main__":
     # Now perform the searches
     retriever = MemoryRetriever(config, db_conn, embedder)
 
-    doc_results = retriever.search_knowledge_base("quarterly earnings")
+    doc_results = asyncio.run(retriever.search_knowledge_base("quarterly earnings"))
     print("\nDocument Search Results:")
     for r in doc_results:
         print(f"Text: {r.text}\nSimilarity: {r.similarity}\nContext: {r.context}\n")
 
-    agent_mem_results = retriever.search_agent_memory("crypto_agent_123", "strategy shift")
+    agent_mem_results = asyncio.run(retriever.search_agent_memory("crypto_agent_123", "strategy shift"))
     print("\nAgent Memory Search Results:")
     for r in agent_mem_results:
         print(f"Text: {r.text}\nSimilarity: {r.similarity}\n")

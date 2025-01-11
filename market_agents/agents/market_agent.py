@@ -15,6 +15,7 @@ from market_agents.inference.message_models import LLMConfig, LLMPromptContext
 from market_agents.memory.config import MarketMemoryConfig
 from market_agents.memory.memory import ShortTermMemory, MemoryObject
 from market_agents.memory.vector_search import LongTermMemory
+import asyncio
 
 
 class MarketAgent(LLMAgent):
@@ -80,8 +81,40 @@ class MarketAgent(LLMAgent):
 
         prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
 
-        return await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), json_tool=structured_tool,
+        response = await self.execute(prompt, output_format=PerceptionSchema.model_json_schema(), json_tool=structured_tool,
                                   return_prompt=return_prompt)
+
+        asyncio.create_task(
+            self.short_term_memory.store_memory(MemoryObject(
+                agent_id=self.id,
+                cognitive_step="perception",
+                metadata={
+                    "strategy": response.get("strategy", []),
+                    "reflection": response.get("reflection", ""),
+                    "environment_name": environment_name,
+                    "environment_info": environment_info
+                },
+                content=json.dumps(response.get("perception", "")),
+                created_at=datetime.now(),
+            ))
+        )
+
+        asyncio.create_task(
+            self.long_term_memory.store_memory(MemoryObject(
+                agent_id=self.id,
+                cognitive_step="perception",
+                metadata={
+                    "strategy": response.get("strategy", []),
+                    "reflection": response.get("reflection", ""),
+                    "environment_name": environment_name,
+                    "environment_info": environment_info
+                },
+                content=json.dumps(response.get("perception", "")),
+                created_at=datetime.now(),
+            ))
+        )
+
+        return response
 
     async def generate_action(
             self,
@@ -124,8 +157,72 @@ class MarketAgent(LLMAgent):
                 "content": response,
             }
             self.last_action = response
+            asyncio.create_task(
+                self.short_term_memory.store_memory(MemoryObject(
+                    agent_id=self.id,
+                    cognitive_step="action",
+                    metadata={
+                        "action_space": serialized_action_space,
+                        "last_action": self.last_action,
+                        "observation": self.last_observation,
+                        "perception": perception,
+                        "environment_name": environment_name,
+                        "environment_info": environment_info
+                    },
+                    content=json.dumps(action),
+                    created_at=datetime.now(),
+                ))
+            )
+            asyncio.create_task(
+                self.long_term_memory.store_memory(MemoryObject(
+                    agent_id=self.id,
+                    cognitive_step="action",
+                    metadata={
+                        "action_space": serialized_action_space,
+                        "last_action": self.last_action,
+                        "observation": self.last_observation,
+                        "perception": perception,
+                        "environment_name": environment_name,
+                        "environment_info": environment_info
+                    },
+                    content=json.dumps(action),
+                    created_at=datetime.now(),
+                ))
+            )
             return action
         else:
+            asyncio.create_task(
+                self.short_term_memory.store_memory(MemoryObject(
+                    agent_id=self.id,
+                    cognitive_step="action",
+                    metadata={
+                        "action_space": serialized_action_space,
+                        "last_action": self.last_action,
+                        "observation": self.last_observation,
+                        "perception": perception,
+                        "environment_name": environment_name,
+                        "environment_info": environment_info
+                    },
+                    content=json.dumps(response),
+                    created_at=datetime.now(),
+                ))
+            )
+            asyncio.create_task(
+                self.long_term_memory.store_memory(MemoryObject(
+                    agent_id=self.id,
+                    cognitive_step="action",
+                    metadata={
+                        "action_space": serialized_action_space,
+                        "last_action": self.last_action,
+                        "observation": self.last_observation,
+                        "perception": perception,
+                        "environment_name": environment_name,
+                        "environment_info": environment_info
+                    },
+                    content=json.dumps(response),
+                    created_at=datetime.now(),
+                ))
+            )
             return response
 
     async def reflect(
@@ -203,26 +300,39 @@ class MarketAgent(LLMAgent):
                     normalized_environment_reward * environment_reward_weight +
                     self_reward * self_reward_weight
             )
-            self.short_term_memory.store_memory(MemoryObject(
-                agent_id=self.id,
-                cognitive_step="reflection",
-                metadata={"total_reward": round(total_reward, 4),
-                          "self_reward": round(self_reward, 4),
-                          "observation": observation if isinstance(observation, dict) else observation.model_dump(),
-                          "strategy_update": response.get("strategy_update", "")},
-                content=json.dumps(response.get("reflection", "")),
-                created_at=datetime.now(),
-            ))
-            self.long_term_memory.store_memory(MemoryObject(
-                agent_id=self.id,
-                cognitive_step="reflection",
-                metadata={"total_reward": round(total_reward, 4),
-                          "self_reward": round(self_reward, 4),
-                          "observation": observation if isinstance(observation, dict) else observation.model_dump(),
-                          "strategy_update": response.get("strategy_update", "")},
-                content=json.dumps(response.get("reflection", "")),
-                created_at=datetime.now(),
-            ))
+
+            asyncio.create_task(
+                self.short_term_memory.store_memory(MemoryObject(
+                    agent_id=self.id,
+                    cognitive_step="reflection",
+                    metadata={"total_reward": round(total_reward, 4),
+                              "self_reward": round(self_reward, 4),
+                              "observation": observation if isinstance(observation, dict) else observation.model_dump(),
+                              "strategy_update": response.get("strategy_update", ""),
+                              "environment_reward": round(environment_reward, 4),
+                              "environment_name": environment_name,
+                              "environment_info": environment_info
+                              },
+                    content=json.dumps(response.get("reflection", "")),
+                    created_at=datetime.now(),
+                ))
+            )
+            asyncio.create_task(
+                self.long_term_memory.store_memory(MemoryObject(
+                    agent_id=self.id,
+                    cognitive_step="reflection",
+                    metadata={"total_reward": round(total_reward, 4),
+                              "self_reward": round(self_reward, 4),
+                              "observation": observation if isinstance(observation, dict) else observation.model_dump(),
+                              "strategy_update": response.get("strategy_update", ""),
+                              "environment_reward": round(environment_reward, 4),
+                              "environment_name": environment_name,
+                              "environment_info": environment_info
+                              },
+                    content=json.dumps(response.get("reflection", "")),
+                    created_at=datetime.now(),
+                ))
+            )
             return response.get("reflection", "")
         else:
             return response

@@ -35,7 +35,7 @@ class MarketMemory:
         self.db = db_conn
         self.embedder = embedder
 
-    def store_memory(self, memory_object: MemoryObject):
+    async def store_memory(self, memory_object: MemoryObject):
         self.db.connect()
         try:
             # Generate embedding if not provided
@@ -60,7 +60,7 @@ class MarketMemory:
             self.db.conn.rollback()
             raise e
 
-    def get_memories(
+    async def get_memories(
             self,
             agent_id: str,
             limit: int = 10,
@@ -134,7 +134,7 @@ class MarketMemory:
         except Exception as e:
             raise e
 
-    def delete_memories(
+    async def delete_memories(
             self,
             agent_id: str,
             cognitive_step: Union[str, List[str], None] = None,
@@ -195,11 +195,11 @@ class ShortTermMemory(BaseModel):
         embedder = MemoryEmbedder(memory_config)
         self.marker_memory = MarketMemory(memory_config, db_conn, embedder)
 
-    def retrieve_recent_memories(self, agent_id: str, limit: int = 10, start_time: Optional[datetime] = None,
+    async def retrieve_recent_memories(self, agent_id: str, limit: int = 10, start_time: Optional[datetime] = None,
                                  end_time: Optional[datetime] = None, cognitive_step: Optional[str] = None):
-        self.memories = self.marker_memory.get_memories(limit=limit, agent_id=agent_id, start_time=start_time,
+        self.memories = await self.marker_memory.get_memories(limit=limit, agent_id=agent_id, start_time=start_time,
                                                         end_time=end_time, cognitive_step=cognitive_step)
         return self.memories
 
-    def store_memory(self, memory_object: MemoryObject):
-        self.marker_memory.store_memory(memory_object)
+    async def store_memory(self, memory_object: MemoryObject):
+        await self.marker_memory.store_memory(memory_object)
