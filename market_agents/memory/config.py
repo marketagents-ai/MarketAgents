@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 
 class MarketMemoryConfig(BaseSettings):
-    dbname: str = Field(default="my_first_table")
+    dbname: str = Field(default="agent_memory")
     user: str = Field(default="db_user")
     password: str = Field(default="password")
     host: str = Field(default="localhost")
@@ -18,12 +18,12 @@ class MarketMemoryConfig(BaseSettings):
     retry_delay: float = Field(default=1.0)
     min_chunk_size: int = Field(default=64)
     max_chunk_size: int = Field(default=256)
-    vector_dim: int = Field(default=768)
+    vector_dim: int = Field(default=768, description="Options: 768, 1536, etc.")
     context_window: int = Field(default=512)
     top_k: int = Field(default=3)
     similarity_threshold: float = Field(default=0.7)
     encoding_format: str = Field(default="float")
-    embedding_provider: str = Field(default="tei")
+    embedding_provider: str = Field(default="tei", description="Options: tei, openai, etc.")
 
 def load_config_from_yaml(yaml_path: str = "config.yaml") -> MarketMemoryConfig:
     with open(yaml_path, 'r') as f:
