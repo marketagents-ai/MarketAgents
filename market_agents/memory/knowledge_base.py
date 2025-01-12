@@ -6,8 +6,8 @@ from uuid import UUID
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from memory.embedding import MemoryEmbedder
-from memory.setup_db import DatabaseConnection
+from embedding import MemoryEmbedder
+from setup_db import DatabaseConnection
 
 class KnowledgeObject(BaseModel):
     knowledge_id: UUID = Field(default_factory=uuid.uuid4)
@@ -30,17 +30,18 @@ class KnowledgeChunker(ABC):
 class MarketKnowledgeBase:
     """
     A base class for agent knowledge bases built with embeddings for semantic search.
-    - method to splits text into chunks, embeds them, and stores them.
-    - method to remove all stored knowledge.
-    - methods to handle chunking and saving to the database.
+    Dynamically handles agent- or knowledge base-specific tables.
     """
 
-    def __init__(self, config, db_conn: DatabaseConnection, embedding_service: MemoryEmbedder, chunking_method:Optional[KnowledgeChunker] = None):
+    def __init__(self, config, db_conn: DatabaseConnection, embedding_service: MemoryEmbedder, table_prefix: str, chunking_method: Optional[KnowledgeChunker] = None):
         self.config = config
         self.db = db_conn
         self.embedding_service = embedding_service
         self.chunking_method = chunking_method
-        self.full_text = ""
+        self.table_prefix = table_prefix
+        self.knowledge_objects_table = f"{table_prefix}_knowledge_objects"
+        self.knowledge_chunks_table = f"{table_prefix}_knowledge_chunks"
+        self.db.create_knowledge_base_tables(table_prefix)
 
     def ingest_knowledge(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> UUID:
         """Process a document: chunk, embed, and store as a KnowledgeObject."""
@@ -52,7 +53,7 @@ class MarketKnowledgeBase:
 
         knowledge_id = self._save_knowledge_and_chunks(text, chunks, metadata)
         return knowledge_id
-    
+
     def _chunk(self, text: str) -> List[KnowledgeChunk]:
         if self.chunking_method:
             return self.chunking_method.chunk(text)
@@ -64,20 +65,22 @@ class MarketKnowledgeBase:
             return default_chunker.chunk(text)
 
     def _save_knowledge_and_chunks(self, document_text: str, chunks: List[KnowledgeChunk], metadata: Optional[Dict[str, Any]]) -> UUID:
-        """Save knowledge object and chunks to database."""
+        """Save knowledge object and chunks to the dynamically named tables."""
         knowledge_id = uuid.uuid4()
         self.db.connect()
         try:
-            self.db.cursor.execute("""
-                INSERT INTO knowledge_objects (knowledge_id, content, metadata)
+            # Insert into the knowledge objects table
+            self.db.cursor.execute(f"""
+                INSERT INTO {self.knowledge_objects_table} (knowledge_id, content, metadata)
                 VALUES (%s, %s, %s)
                 RETURNING created_at;
             """, (str(knowledge_id), document_text, json.dumps(metadata) if metadata else json.dumps({})))
             created_at = self.db.cursor.fetchone()[0]
 
+            # Insert chunks into the knowledge chunks table
             for chunk in chunks:
-                self.db.cursor.execute("""
-                    INSERT INTO knowledge_chunks (knowledge_id, text, start_pos, end_pos, embedding)
+                self.db.cursor.execute(f"""
+                    INSERT INTO {self.knowledge_chunks_table} (knowledge_id, text, start_pos, end_pos, embedding)
                     VALUES (%s, %s, %s, %s, %s);
                 """, (str(knowledge_id), chunk.text, chunk.start, chunk.end, chunk.embedding))
 
@@ -88,15 +91,16 @@ class MarketKnowledgeBase:
             raise e
 
     def clear_knowledge_base(self):
-        """Clear all knowledge entries."""
+        """Clear all knowledge entries from the dynamically named tables."""
         self.db.connect()
         try:
-            self.db.cursor.execute("DELETE FROM knowledge_chunks;")
-            self.db.cursor.execute("DELETE FROM knowledge_objects;")
+            self.db.cursor.execute(f"DELETE FROM {self.knowledge_chunks_table};")
+            self.db.cursor.execute(f"DELETE FROM {self.knowledge_objects_table};")
             self.db.conn.commit()
         except Exception as e:
             self.db.conn.rollback()
             raise e
+
     
 class SemanticChunker(KnowledgeChunker):
     def __init__(self, min_size: int, max_size: int):
@@ -167,7 +171,11 @@ class SemanticChunker(KnowledgeChunker):
 
 if __name__ == "__main__":
     import os
-    from memory.config import load_config_from_yaml
+    from config import load_config_from_yaml
+    from knowledge_base import MarketKnowledgeBase
+    from embedding import MemoryEmbedder
+    from setup_db import DatabaseConnection
+
     # Load configuration and initialize services
     current_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(current_dir, "memory_config.yaml")
@@ -175,9 +183,12 @@ if __name__ == "__main__":
     config = load_config_from_yaml(config_path)
     db_conn = DatabaseConnection(config)
     embedder = MemoryEmbedder(config)
+
+    # Specify the table prefix for the knowledge base (e.g., "market_analysis")
+    table_prefix = "market_analysis"
     
-    # Initialize MarketKnowledgeBase
-    knowledge_base = MarketKnowledgeBase(config, db_conn, embedder)
+    # Initialize MarketKnowledgeBase with the table prefix
+    knowledge_base = MarketKnowledgeBase(config, db_conn, embedder, table_prefix=table_prefix)
     
     # Test document for ingestion
     test_doc = """
@@ -194,13 +205,17 @@ if __name__ == "__main__":
     """
 
     try:
-        # Ingest the test document: chunk, embed, and store in knowledge base
+        # Ingest the test document: chunk, embed, and store in the knowledge base
         metadata = {"source": "test_document", "category": "financial_report"}
         knowledge_id = knowledge_base.ingest_knowledge(test_doc, metadata=metadata)
         print(f"Successfully ingested knowledge object with ID: {knowledge_id}")
 
         # Verify that the document (knowledge object) was stored
-        db_conn.cursor.execute("SELECT content, metadata FROM knowledge_objects WHERE knowledge_id = %s", (str(knowledge_id),))
+        db_conn.cursor.execute(f"""
+            SELECT content, metadata 
+            FROM {table_prefix}_knowledge_objects 
+            WHERE knowledge_id = %s
+        """, (str(knowledge_id),))
         stored_doc = db_conn.cursor.fetchone()
         print("\nStored knowledge object content and metadata:")
         if stored_doc:
@@ -211,7 +226,11 @@ if __name__ == "__main__":
             print("Knowledge object not found in database.")
         
         # Retrieve and display chunks
-        db_conn.cursor.execute("SELECT text, embedding FROM knowledge_chunks WHERE knowledge_id = %s", (str(knowledge_id),))
+        db_conn.cursor.execute(f"""
+            SELECT text, embedding 
+            FROM {table_prefix}_knowledge_chunks 
+            WHERE knowledge_id = %s
+        """, (str(knowledge_id),))
         chunks = db_conn.cursor.fetchall()
         print(f"\nRetrieved {len(chunks)} chunks from the database:")
         for i, (chunk_text, chunk_embedding) in enumerate(chunks, 1):
