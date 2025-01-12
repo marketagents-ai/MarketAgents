@@ -69,10 +69,10 @@ class MarketAgent(LLMAgent):
             raise ValueError(f"Environment {environment_name} not found")
 
         environment_info = self.environments[environment_name].get_global_state()
-        short_term_memories = self.short_term_memory.retrieve_recent_memories(limit=5)
+        stm_cognitive = self.short_term_memory.retrieve_recent_memories(limit=5)
 
 
-        long_term_memories = self.long_term_memory.retrieve_episodic_memories(
+        ltm_episodes = self.long_term_memory.retrieve_episodic_memories(
              agent_id=self.id,
              query=self.task if self.task else environment_info,
              top_k=2
@@ -81,8 +81,8 @@ class MarketAgent(LLMAgent):
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
-            short_term_memory=short_term_memories,
-            long_term_memory=long_term_memories,
+            short_term_memory=[mem.dict() for mem in stm_cognitive],
+            long_term_memory=[episode.dict() for episode in ltm_episodes],
         )
 
         prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
