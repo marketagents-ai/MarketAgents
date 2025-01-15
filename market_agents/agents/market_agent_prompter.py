@@ -4,44 +4,6 @@ from typing import Dict, Any, List, Optional, Union
 import yaml
 import os
 
-def json_to_markdown(data: Union[Dict, List, Any], indent: int = 0) -> str:
-    """Convert JSON/dict data to a markdown formatted string."""
-    if data is None:
-        return "None"
-    
-    if isinstance(data, str):
-        # Clean up newlines and escape characters for markdown compatibility
-        return data.replace('\\n', '\n').replace('\\', '')
-    
-    if isinstance(data, (int, float, bool)):
-        return str(data)
-    
-    indent_str = "  " * indent
-    if isinstance(data, list):
-        if not data:
-            return "None"
-        markdown = ""
-        for item in data:
-            item_str = json_to_markdown(item, indent + 1)
-            markdown += f"{indent_str}- {item_str}\n"
-        return markdown.rstrip()
-    
-    if isinstance(data, dict):
-        if not data:
-            return "None"
-        markdown = ""
-        for key, value in data.items():
-            value_str = json_to_markdown(value, indent + 1)
-            if isinstance(value, (dict, list)) and value:
-                markdown += f"{indent_str}{key}:\n{value_str}\n"
-            else:
-                markdown += f"{indent_str}{key}: {value_str}\n"
-        return markdown.rstrip()
-    
-    # For any other types, convert to string
-    return str(data)
-
-
 class AgentPromptVariables(BaseModel):
     environment_name: str
     environment_info: Any
@@ -81,7 +43,7 @@ class MarketAgentPromptManager(BaseModel):
                 formatted_vars[key] = "N/A"
             elif isinstance(value, (dict, list)):
                 # Convert dict/list values to markdown format
-                formatted_vars[key] = json_to_markdown(value).strip()
+                formatted_vars[key] = self.json_to_markdown(value).strip()
             else:
                 formatted_vars[key] = str(value) if value else "N/A"
         
@@ -100,3 +62,40 @@ class MarketAgentPromptManager(BaseModel):
 
     def get_reflection_prompt(self, variables: Dict[str, Any]) -> str:
         return self.format_prompt('reflection', variables)
+    
+    def json_to_markdown(self, data: Union[Dict, List, Any], indent: int = 0) -> str:
+        """Convert JSON/dict data to a markdown formatted string."""
+        if data is None:
+            return "None"
+        
+        if isinstance(data, str):
+            # Clean up newlines and escape characters for markdown compatibility
+            return data.replace('\\n', '\n').replace('\\', '')
+        
+        if isinstance(data, (int, float, bool)):
+            return str(data)
+        
+        indent_str = "  " * indent
+        if isinstance(data, list):
+            if not data:
+                return "None"
+            markdown = ""
+            for item in data:
+                item_str = self.json_to_markdown(item, indent + 1)
+                markdown += f"{indent_str}- {item_str}\n"
+            return markdown.rstrip()
+        
+        if isinstance(data, dict):
+            if not data:
+                return "None"
+            markdown = ""
+            for key, value in data.items():
+                value_str = self.json_to_markdown(value, indent + 1)
+                if isinstance(value, (dict, list)) and value:
+                    markdown += f"{indent_str}{key}:\n{value_str}\n"
+                else:
+                    markdown += f"{indent_str}{key}: {value_str}\n"
+            return markdown.rstrip()
+        
+        # For any other types, convert to string
+        return str(data)

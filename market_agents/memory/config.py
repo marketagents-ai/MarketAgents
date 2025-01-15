@@ -19,10 +19,11 @@ class MarketMemoryConfig(BaseSettings):
     min_chunk_size: int = Field(default=64)
     max_chunk_size: int = Field(default=256)
     vector_dim: int = Field(default=768, description="Options: 768, 1536, etc.")
-    context_window: int = Field(default=512)
+    max_input: int = Field(default=512)
     top_k: int = Field(default=3)
     similarity_threshold: float = Field(default=0.7)
     encoding_format: str = Field(default="float")
+
     embedding_provider: str = Field(default="tei", description="Options: tei, openai, etc.")
 
 def load_config_from_yaml(yaml_path: str = "config.yaml") -> MarketMemoryConfig:

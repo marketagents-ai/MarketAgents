@@ -12,12 +12,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class GroupChatMessage(BaseModel):
-    content: str
-    message_type: Literal["propose_topic", "group_message"]
-    agent_id: str
-    cohort_id: str
-    sub_round: int
-
+    content: str = Field(description="agent's opinions & arguments on the topic. express yourself with emojis")
+    
 class GroupChatAction(LocalAction):
     action: GroupChatMessage
 
@@ -26,17 +22,13 @@ class GroupChatAction(LocalAction):
         return cls(
             agent_id=agent_id, 
             action=GroupChatMessage(
-                content="Sample message", 
-                message_type="group_message",
-                agent_id=agent_id,
-                cohort_id="sample_cohort",
-                sub_round=1
+                content="Sample message"
             )
         )
-
+    
     @classmethod
     def action_schema(cls) -> Dict[str, Any]:
-        return cls.model_json_schema()
+        return GroupChatMessage.model_json_schema()
 
 class GroupChatGlobalAction(GlobalAction):
     actions: Dict[str, Dict[str, Any]]
@@ -63,7 +55,8 @@ class GroupChat(Mechanism):
     max_rounds: int = Field(..., description="Maximum number of chat rounds")
     current_round: int = Field(default=0, description="Current round number")
     messages: List[GroupChatMessage] = Field(default_factory=list)
-    topics: Dict[str, str] = Field(default_factory=dict)  # cohort_id -> topic
+    topics: Dict[str, str] = Field(default_factory=dict)
+    current_topic: str = Field(default="")
     sequential: bool = Field(default=False, description="Whether the mechanism is sequential")
 
     def step(self, action: Union[GroupChatAction, GroupChatGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
@@ -177,32 +170,34 @@ class GroupChat(Mechanism):
                 continue 
         return new_messages
 
-    def _update_topic(self, cohort_id: str, new_topic: str):
-        self.topics[cohort_id] = new_topic
-        logger.info(f"Updated topic for cohort {cohort_id} to: {new_topic}")
+    def _update_topic(self, new_topic: str, round_num: int):
+        self.topics[round_num] = new_topic
+        self.current_topic = new_topic
+        logger.debug(f"Updated topic for round {round_num} to: {new_topic}")
 
     def _create_observations(self, new_messages: List[GroupChatMessage]) -> Dict[str, GroupChatLocalObservation]:
         observations = {}
         for message in new_messages:
             agent_id = message.agent_id
             observation = GroupChatObservation(
-                messages=[msg for msg in new_messages if msg.cohort_id == message.cohort_id],
-                current_topic=self.topics.get(message.cohort_id, "")
+                messages=new_messages,
+                current_topic=self.current_topic
             )
             observations[agent_id] = GroupChatLocalObservation(
                 agent_id=agent_id,
                 observation=observation
             )
         return observations
-
-    def get_global_state(self) -> Dict[str, Any]:
+    
+    def get_global_state(self) -> str:
+        """Global state including topic history and current topic"""
         return {
-            "current_round": self.current_round,
-            "messages": [message.dict() for message in self.messages],
-            "topics": self.topics,
+            "messages": self.messages,
+            "current_topic": self.current_topic
         }
-
+    
     def reset(self) -> None:
         self.current_round = 0
         self.messages = []
+        self.current_topic = ""
         logger.info("GroupChat mechanism has been reset.")

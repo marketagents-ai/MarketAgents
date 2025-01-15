@@ -4,13 +4,13 @@ perception: |
   ## Environment State
   {environment_info}
 
-  ## Recent Memories
+  ## Recent Cognitive Memories
   {short_term_memory}
   
-  ## Long Term Memories
+  ## Long Term Episodic Memories
   {long_term_memory}
 
-  Generate a brief monologue about your current perception of this environment.
+  Generate a brief monologue about your current perception of this environment and memories.
   Use emojis to fully express yourself when needed.
 
 action: |
@@ -48,7 +48,7 @@ reflection: |
   Actions:
   1. Reflect on your actions, observations and reward (if available)
   2. Assign yourself a reward between 0.0 and 1.0 based on your performance and alignment with your objectives & strategy.
-  3. Update strategy based on this reflection and your previous strategy.
+  3. Update strategy based on reflection, reward and previous strategy as a verbal reinforcement learning step.
 
   ## Previous Strategy
   {previous_strategy}

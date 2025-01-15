@@ -1,24 +1,28 @@
-dbname: "market_simulation"
+dbname: "market_agents"
 user: "db_user"
 password: "db_pwd@123"
 host: "localhost"
-port: "5434"
+port: "5433"
+#host: "38.128.232.35"
+#port: "5434"
 index_method: "ivfflat"
 lists: 100
-embedding_api_url: "https://api.openai.com/v1/embeddings"
-model: "text-embedding-ada-002"
+#embedding_api_url: "https://api.openai.com/v1/embeddings"
+#model: "text-embedding-ada-002"
 #embedding_api_url: "http://localhost:8080/embed"
-#model: "jinaai/jina-embeddings-v2-base-en"
+embedding_api_url: "http://38.128.232.35:8080/embed"
+model: "jinaai/jina-embeddings-v2-base-en"
 batch_size: 32
 timeout: 10
 retry_attempts: 3
 retry_delay: 1.0
 min_chunk_size: 256
 max_chunk_size: 1024
-vector_dim: 1536 #openai embed dim
-#vector_dim: 768
-context_window: 512
+# vector_dim: 1536 #openai embed dim
+vector_dim: 768
+max_input: 4096
 top_k: 3
 similarity_threshold: 0.7
 encoding_format: "float"
-embedding_provider: "openai"
+embedding_provider: "tei"
+#embedding_provider: "openai"

@@ -19,6 +19,10 @@ class MemoryRetriever:
         self.embedding_service = embedding_service
         self.full_text = ""
 
+    def _sanitize_id(self, agent_id: str) -> str:
+        """Sanitize agent ID for table names"""
+        return agent_id.replace('-', '_')
+
     def search_knowledge_base(self, table_prefix: str, query: str, top_k: int = None) -> List[RetrievedMemory]:
         """
         Search a specific knowledge base for relevant content based on semantic similarity.
@@ -56,15 +60,13 @@ class MemoryRetriever:
         return results
 
     def search_agent_cognitive_memory(self, agent_id: str, query: str, top_k: int = None) -> List[RetrievedMemory]:
-        """
-        Search a specific agent's short-term/cognitive memory table for relevant content 
-        based on semantic similarity.
-        """
+        """Search a specific agent's cognitive memory"""
         self.db.connect()
         query_embedding = self.embedding_service.get_embeddings(query)
         top_k = top_k or self.config.top_k
-
-        agent_cognitive_table = f"agent_{agent_id}_cognitive"
+        
+        safe_id = self._sanitize_id(agent_id)
+        agent_cognitive_table = f"agent_{safe_id}_cognitive"
 
         self.db.cursor.execute(f"""
             SELECT content,
@@ -82,15 +84,13 @@ class MemoryRetriever:
         return results
 
     def search_agent_episodic_memory(self, agent_id: str, query: str, top_k: int = None) -> List[RetrievedMemory]:
-        """
-        Search an agent's episodic memory table (agent_{agent_id}_episodic) for relevant 
-        episodes based on semantic similarity to the 'embedding' column.
-        """
+        """Search an agent's episodic memory"""
         self.db.connect()
         query_embedding = self.embedding_service.get_embeddings(query)
         top_k = top_k or self.config.top_k
 
-        agent_episodic_table = f"agent_{agent_id}_episodic"
+        safe_id = self._sanitize_id(agent_id)
+        agent_episodic_table = f"agent_{safe_id}_episodic"
 
         self.db.cursor.execute(f"""
             SELECT 
@@ -100,6 +100,7 @@ class MemoryRetriever:
                 total_reward, 
                 strategy_update, 
                 metadata,
+                created_at,
                 (1 - (embedding <=> %s::vector)) AS similarity
             FROM {agent_episodic_table}
             ORDER BY similarity DESC
@@ -108,14 +109,15 @@ class MemoryRetriever:
 
         rows = self.db.cursor.fetchall()
         results = []
-        for (mem_id, task_query, steps_json, total_reward, strategy_update, meta, sim) in rows:
+        for (mem_id, task_query, steps_json, total_reward, strategy_update, meta, created_at, sim) in rows:
             content_dict = {
                 "memory_id": str(mem_id),
                 "task_query": task_query,
                 "cognitive_steps": steps_json,
                 "total_reward": total_reward,
                 "strategy_update": strategy_update,
-                "metadata": meta
+                "metadata": meta,
+                "created_at": created_at.isoformat()
             }
             content_str = json.dumps(content_dict)
             results.append(RetrievedMemory(text=content_str, similarity=sim, context=""))

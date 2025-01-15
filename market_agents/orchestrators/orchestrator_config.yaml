@@ -1,10 +1,11 @@
 # orchestrator_config.yaml
 
-num_agents: 10
+num_agents: 5
 max_rounds: 2
 environment_order:
   - group_chat
   - auction
+tool_mode: true
 agent_config:
   num_units: 10
   buyer_base_value: 120.0
@@ -18,23 +19,77 @@ agent_config:
   noise_factor: 0.05
   max_relative_spread: 0.2
 llm_configs:
-  - name: "gpt4o-mini-high-temp"
-    client: "openai"
-    model: "gpt-4o-mini"
-    temperature: 0.7
-    max_tokens: 1024
-    use_cache: false
+    - name: "gpt-4o-mini"
+      model: "gpt-4o-mini"
+      client: "openai"
+      max_tokens: 2048
+      temperature: 0.5
+      use_cache: true
+#    - name: "qwen"
+#      model: "Qwen/QwQ-32B-Preview"
+#      client: "vllm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "hermes"
+#      model: "NousResearch/Hermes-3-Llama-3.1-8B"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "qwen"
+#      model: "Qwen/Qwen2.5-7B-Instruct"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "internlm"
+#      model: "internlm/internlm2_5-7b-chat"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "mistral"
+#      model: "mistralai/Mistral-7B-Instruct-v0.3"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.0
+#      use_cache: true
+#    - name: "llama"
+#      model: "meta-llama/Llama-3.1-8B-Instruct"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "functionary"
+#      model: "meetkai/functionary-small-v3.1"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "toolace"
+#      model: "Team-ACE/ToolACE-8B"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "minicpm"
+#      model: "openbmb/MiniCPM3-4B"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
 environment_configs:
   group_chat:
     name: "group_chat"
-    address: "localhost:8000"
+    address: "localhost:8001"
     max_rounds: 5
     initial_topic: "Initial Market Discussion"
     sub_rounds: 3
-    group_size: 5
+    group_size: 4
   auction:
     name: "auction"
-    address: "localhost:8001"
+    address: ""
     max_rounds: 5
     good_name: "strawberry"
 protocol: "acl_message"

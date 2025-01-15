@@ -17,16 +17,11 @@ from market_agents.environments.mechanisms.auction import (
     DoubleAuction,
     GlobalAuctionAction
 )
-from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.economics.econ_models import (
     Ask,
     Bid,
-    BuyerPreferenceSchedule,
-    SellerPreferenceSchedule,
     Trade
 )
-from market_agents.inference.message_models import LLMOutput
-from market_agents.agents.protocols.acl_message import ACLMessage
 from market_agents.orchestrators.config import AuctionConfig, OrchestratorConfig
 from market_agents.orchestrators.logger_utils import (
     log_section,
@@ -35,13 +30,10 @@ from market_agents.orchestrators.logger_utils import (
     log_running,
     log_perception,
     log_action,
-    log_reflection,
-    log_round,
-    log_completion,
-    log_trade,
-    print_ascii_art
+    log_round
 )
 from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
+from market_agents.orchestrators.agent_cognitive import AgentCognitiveProcessor
 
 # Define AuctionTracker for tracking auction-specific data
 class AuctionTracker:
@@ -50,8 +42,19 @@ class AuctionTracker:
         self.per_round_surplus: List[float] = []
         self.per_round_quantities: List[int] = []
 
-    def add_trade(self, trade: Trade):
-        self.all_trades.append(trade)
+    def add_trade(self, trade: Trade, buyer_surplus: float, seller_surplus: float, round_num: int):
+        trade_data = {
+            'buyer_id': str(trade.buyer_id),
+            'seller_id': str(trade.seller_id),
+            'quantity': trade.quantity,
+            'price': trade.price,
+            'buyer_surplus': round(buyer_surplus, 2),
+            'seller_surplus': round(seller_surplus, 2),
+            'total_surplus': round(buyer_surplus + seller_surplus, 2),
+            'round': round_num
+        }
+        self.all_trades.append(trade_data)
+        logging.debug("Added trade to tracker: {trade_data}")
 
     def add_round_data(self, surplus: float, quantity: int):
         self.per_round_surplus.append(surplus)
@@ -63,6 +66,21 @@ class AuctionTracker:
             "total_surplus": sum(self.per_round_surplus),
             "total_quantity": sum(self.per_round_quantities)
         }
+
+    def get_trades_data(self) -> List[Dict]:
+        return [
+            {
+                'buyer_id': trade['buyer_id'],
+                'seller_id': trade['seller_id'],
+                'quantity': trade['quantity'],
+                'price': trade['price'],
+                'buyer_surplus': trade['buyer_surplus'],
+                'seller_surplus': trade['seller_surplus'],
+                'total_surplus': trade['total_surplus'],
+                'round': trade['round']
+            }
+            for trade in self.all_trades
+        ]
 
 # Implement the AuctionOrchestrator class
 class AuctionOrchestrator(BaseEnvironmentOrchestrator):
@@ -87,14 +105,20 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         self.environment = None
         self.tracker = AuctionTracker()
         self.agent_surpluses: Dict[str, float] = {}
+        self.logger = logger or logging.getlogger(__name__)
+        self.cognitive_processor = AgentCognitiveProcessor(ai_utils, data_inserter, self.logger, self.orchestrator_config.tool_mode)
+
         
-    def setup_environment(self):
+    async def setup_environment(self):
+        """Sets up the auction environment and assigns it to agents"""
         log_section(self.logger, "CONFIGURING AUCTION ENVIRONMENT")
+        
         # Create the auction mechanism
         double_auction = DoubleAuction(
             max_rounds=self.config.max_rounds,
             good_name=self.orchestrator_config.agent_config.good_name
         )
+        
         # Set up the multi-agent environment
         self.environment = MultiAgentEnvironment(
             name=self.config.name,
@@ -104,12 +128,24 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
             observation_space=AuctionObservationSpace(),
             mechanism=double_auction
         )
-        # Assign the environment to agents without overwriting existing environments
+        
+        # Assign the environment to agents
         for agent in self.agents:
             if not hasattr(agent, 'environments') or agent.environments is None:
                 agent.environments = {}
             agent.environments[self.environment_name] = self.environment
+            
         log_environment_setup(self.logger, self.environment_name)
+        self.logger.info("Auction environment setup complete.")
+        
+        # Verify environments are properly set
+        for agent in self.agents:
+            if self.environment_name not in agent.environments:
+                self.logger.error(f"Agent {agent.index} missing auction environment!")
+            else:
+                self.logger.info(f"Agent {agent.index} environments: {list(agent.environments.keys())}")
+
+        return self.environment
 
     async def run_environment(self, round_num: int):
         log_running(self.logger, self.environment_name)
@@ -123,10 +159,11 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         self.set_agent_system_messages(round_num, env.mechanism.good_name)
 
         log_section(self.logger, "AGENT PERCEPTIONS")
-        # Run agents' perception in parallel
-        perception_prompts = await self.run_parallel_perceive()
-        perceptions = await self.ai_utils.run_parallel_ai_completion(perception_prompts, update_history=False)
-        self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
+        # Run agents' perception in parallel using imported cognitive method
+        perceptions = await self.cognitive_processor.run_parallel_perceive(
+            self.agents, 
+            self.environment_name
+        )
 
         # Map perceptions to agents
         perceptions_map = {perception.source_id: perception for perception in perceptions}
@@ -135,8 +172,8 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
             perception = perceptions_map.get(agent.id)
             if perception:
                 log_persona(self.logger, agent.index, agent.persona)
-                log_perception(self.logger, agent.index, f"{perception.json_object.object if perception.json_object else perception.str_content}")
-                agent.last_perception = perception.json_object.object if perception.json_object else None
+                log_perception(self.logger, agent.index, perception.json_object.object if perception and perception.json_object else None)
+                agent.last_perception = perception.json_object.object if perception and perception.json_object else ""
             else:
                 self.logger.warning(f"No perception found for agent {agent.index}")
                 agent.last_perception = None
@@ -145,10 +182,11 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         perception_contents = [agent.last_perception or "" for agent in self.agents]
 
         log_section(self.logger, "AGENT ACTIONS")
-        # Run agents' action generation in parallel
-        action_prompts = await self.run_parallel_generate_action(perception_contents)
-        actions = await self.ai_utils.run_parallel_ai_completion(action_prompts, update_history=False)
-        self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
+        # Run agents' action generation in parallel using imported cognitive method
+        actions = await self.cognitive_processor.run_parallel_action(
+            self.agents,
+            self.environment_name
+        )
 
         actions_map = {action.source_id: action for action in actions}
 
@@ -203,75 +241,10 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
 
         # Run reflection step
         log_section(self.logger, "AGENT REFLECTIONS")
-        await self.run_reflection()
-
-    async def run_parallel_perceive(self) -> List[Any]:
-        perceive_prompts = []
-        for agent in self.agents:
-            perceive_prompt = await agent.perceive(self.environment_name, return_prompt=True)
-            perceive_prompts.append(perceive_prompt)
-        return perceive_prompts
-
-    async def run_parallel_generate_action(self, perceptions: List[str]) -> List[Any]:
-        action_prompts = []
-        for agent, perception in zip(self.agents, perceptions):
-            action_prompt = await agent.generate_action(self.environment_name, perception, return_prompt=True)
-            action_prompts.append(action_prompt)
-        return action_prompts
-
-    async def run_parallel_reflect(self) -> List[Any]:
-        reflect_prompts = []
-        agents_with_observations = []
-        for agent in self.agents:
-            if agent.last_observation:
-                reflect_prompt = await agent.reflect(self.environment_name, return_prompt=True)
-                reflect_prompts.append(reflect_prompt)
-                agents_with_observations.append(agent)
-            else:
-                self.logger.info(f"Skipping reflection for agent {agent.index} due to no observation")
-        return reflect_prompts, agents_with_observations
-
-    async def run_reflection(self):
-        # Run agents' reflection in parallel
-        reflect_prompts, agents_with_observations = await self.run_parallel_reflect()
-        if reflect_prompts:
-            reflections = await self.ai_utils.run_parallel_ai_completion(reflect_prompts, update_history=False)
-            self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
-
-            for agent, reflection in zip(agents_with_observations, reflections):
-                if reflection.json_object:
-                    log_reflection(self.logger, agent.index, f"{reflection.json_object.object}")
-                    # Access the surplus from agent's last_step.info
-                    environment_reward = agent.last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if agent.last_step else 0.0
-                    self_reward = reflection.json_object.object.get("self_reward", 0.0)
-                    
-                    # Normalize environment_reward
-                    normalized_environment_reward = environment_reward / (1 + abs(environment_reward))
-                    normalized_environment_reward = max(0.0, min(normalized_environment_reward, 1.0))
-                    
-                    # Weighted average of normalized environment_reward and self_reward
-                    total_reward = normalized_environment_reward * 0.5 + self_reward * 0.5
-                    
-                    # Add logging for rewards
-                    self.logger.info(
-                        f"Agent {agent.index} rewards - Environment Reward: {environment_reward}, "
-                        f"Normalized Environment Reward: {normalized_environment_reward}, "
-                        f"Self Reward: {self_reward}, Total Reward: {total_reward}"
-                    )
-                    agent.memory.append({
-                        "type": "reflection",
-                        "content": reflection.json_object.object.get("reflection", ""),
-                        "strategy_update": reflection.json_object.object.get("strategy_update", ""),
-                        "observation": agent.last_observation,
-                        "environment_reward": round(environment_reward, 4),
-                        "self_reward": round(self_reward, 4),
-                        "total_reward": round(total_reward, 4),
-                        "timestamp": datetime.now().isoformat()
-                    })
-                else:
-                    self.logger.warning(f"No reflection JSON object for agent {agent.index}")
-        else:
-            self.logger.info("No reflections generated this round.")
+        await self.cognitive_processor.run_parallel_reflect(
+            self.agents,
+            self.environment_name
+        )
 
     def set_agent_system_messages(self, round_num: int, good_name: str):
         # Set system messages for agents based on their role and round number
@@ -343,6 +316,8 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         self.logger.info(f"Processing {len(global_observation.all_trades)} trades")
         
         log_section(self.logger, "TRADES")
+        
+        # Process each trade from the global observation
         for trade in global_observation.all_trades:
             try:
                 buyer = next(agent for agent in self.agents if agent.id == trade.buyer_id)
@@ -353,21 +328,24 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
                 seller.economic_agent.process_trade(trade)
                 
                 # Calculate surpluses
-                buyer_surplus = buyer.economic_agent.calculate_individual_surplus()
-                seller_surplus = seller.economic_agent.calculate_individual_surplus()
+                buyer_surplus = round(buyer.economic_agent.calculate_individual_surplus(), 2)
+                seller_surplus = round(seller.economic_agent.calculate_individual_surplus(), 2)
                 
-                self.logger.info(f"Buyer surplus: {buyer_surplus}, Seller surplus: {seller_surplus}")
+                self.logger.info(f"Buyer surplus: {buyer_surplus:.2f}, Seller surplus: {seller_surplus:.2f}")
                 
-                agent_surpluses[buyer.id] = agent_surpluses.get(buyer.id, 0) + buyer_surplus
-                agent_surpluses[seller.id] = agent_surpluses.get(seller.id, 0) + seller_surplus
+                # Update agent surpluses
+                agent_surpluses[buyer.id] = round(agent_surpluses.get(buyer.id, 0) + buyer_surplus, 2)
+                agent_surpluses[seller.id] = round(agent_surpluses.get(seller.id, 0) + seller_surplus, 2)
                 
-                trade_surplus = buyer_surplus + seller_surplus
+                # Add trade to tracker with current round number from mechanism
+                self.tracker.add_trade(trade, buyer_surplus, seller_surplus, global_observation.market_summary.trades_count)
                 
-                self.tracker.add_trade(trade)
+                trade_surplus = round(buyer_surplus + seller_surplus, 2)
                 round_surplus += trade_surplus
                 round_quantity += trade.quantity
+                
                 self.logger.info(f"Executed trade: {trade}")
-                self.logger.info(f"Trade surplus: {trade_surplus}")
+                self.logger.info(f"Trade surplus: {trade_surplus:.2f}")
                 
             except Exception as e:
                 self.logger.error(f"Error processing trade: {str(e)}")
@@ -380,10 +358,16 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         for agent_id, agent_observation in global_observation.observations.items():
             try:
                 agent = next(agent for agent in self.agents if agent.id == agent_id)
-                agent.last_observation = agent_observation
+                # Pre-serialize the observation
+                if hasattr(agent_observation, 'serialize_json'):
+                    serialized_observation = json.loads(agent_observation.serialize_json())
+                elif hasattr(agent_observation, 'model_dump'):
+                    serialized_observation = agent_observation.model_dump()
+                else:
+                    serialized_observation = str(agent_observation)
+                    
+                agent.last_observation = serialized_observation
                 agent.last_step = env_state
-                
-                observation = agent_observation.observation
             except Exception as e:
                 self.logger.error(f"Error updating agent {agent_id} state: {str(e)}")
                 self.logger.exception("Exception details:")
@@ -413,8 +397,23 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         return summary
 
     async def process_round_results(self, round_num: int):
-        # Save round data to the database
         try:
+            agents_data = [
+                {
+                    'id': str(agent.id),
+                    'role': agent.role,
+                    'is_llm': agent.use_llm,
+                    'max_iter': self.orchestrator_config.max_rounds,
+                    'llm_config': agent.llm_config if isinstance(agent.llm_config, dict) else agent.llm_config.dict()
+                }
+                for agent in self.agents
+            ]
+            agent_id_map = self.data_inserter.insert_agents(agents_data)
+            
+            trades_data = self.tracker.get_trades_data()
+            if trades_data:
+                self.data_inserter.insert_trades(trades_data, agent_id_map)
+            
             self.data_inserter.insert_round_data(
                 round_num,
                 self.agents,
@@ -422,9 +421,11 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
                 self.orchestrator_config,
                 {self.environment_name: self.tracker}
             )
+            
             self.logger.info(f"Data for round {round_num} inserted successfully.")
         except Exception as e:
             self.logger.error(f"Error inserting data for round {round_num}: {str(e)}")
+            self.logger.exception("Exception details:")
 
     async def run(self):
         self.setup_environment()
@@ -435,7 +436,7 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         # Print simulation summary after all rounds
         self.print_summary()
 
-    def print_summary(self):
+    async def print_summary(self):
         log_section(self.logger, "AUCTION SIMULATION SUMMARY")
 
         total_buyer_surplus = sum(
@@ -475,6 +476,12 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
             print(f"  Goods: {agent.economic_agent.endowment.current_basket.goods_dict}")
             surplus = agent.economic_agent.calculate_individual_surplus()
             print(f"  Individual Surplus: {surplus:.2f}")
-            if agent.memory:
-                print(f"  Last Reflection: {agent.memory[-1]['content']}")
+            
+            # Get the most recent reflection from short-term memory
+            try:
+                recent_reflections = await agent.short_term_memory.retrieve_recent_memories(cognitive_step='reflection', limit=1)
+                if recent_reflections:
+                    print(f"  Last Reflection: {recent_reflections[0].content}")
+            except Exception as e:
+                self.logger.warning(f"Failed to retrieve reflection for agent {agent.index}: {e}")
             print()

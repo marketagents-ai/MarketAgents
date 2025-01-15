@@ -9,17 +9,23 @@ class DatabaseConnection:
         self.cursor = None
 
     def connect(self):
-        """Establish a connection to the database."""
-        if not self.conn:
-            self._ensure_database_exists()
+        """Establish a new connection if needed"""
+        if self.conn is None or (hasattr(self.conn, 'closed') and self.conn.closed):
             self.conn = psycopg2.connect(
                 dbname=self.config.dbname,
                 user=self.config.user,
                 password=self.config.password,
                 host=self.config.host,
-                port=self.config.port
+                port=self.config.port,
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5
             )
+            self.conn.set_session(autocommit=False)
             self.cursor = self.conn.cursor()
+            
+            self.cursor.execute("SET statement_timeout = '60s'")
 
     def close(self):
         """Close the database connection."""
@@ -31,6 +37,7 @@ class DatabaseConnection:
     def _ensure_database_exists(self):
         """Ensure the database exists, creating it if necessary."""
         try:
+            # Connect to default postgres database
             temp_conn = psycopg2.connect(
                 dbname="postgres",
                 user=self.config.user,
@@ -38,7 +45,7 @@ class DatabaseConnection:
                 host=self.config.host,
                 port=self.config.port
             )
-            temp_conn.autocommit = True
+            temp_conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             temp_cur = temp_conn.cursor()
             try:
                 temp_cur.execute(f"CREATE DATABASE {self.config.dbname}")
@@ -47,24 +54,26 @@ class DatabaseConnection:
             finally:
                 temp_cur.close()
                 temp_conn.close()
+
+            # Connect to the new database and create pgvector extension
+            self.connect()
+            self.cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            self.conn.commit()
+
         except Exception as e:
             print(f"Error ensuring database exists: {e}")
             raise
 
     def ensure_connection(self):
-        """Ensure database connection and cursor are active."""
+        """Check connection and reconnect if needed"""
         try:
-            # Reconnect if connection is closed
-            if not self.conn or self.conn.closed != 0:
-                self.connect()
-            # Reinitialize cursor if closed
-            if not self.cursor or self.cursor.closed:
-                self.cursor = self.conn.cursor()
-            # Validate connection with a simple query
             self.cursor.execute("SELECT 1")
-        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        except (psycopg2.OperationalError, psycopg2.InterfaceError, AttributeError):
             self.connect()
-            self.cursor = self.conn.cursor()
+
+    def _sanitize_table_name(self, name: str) -> str:
+        """Sanitize table name by replacing hyphens with underscores"""
+        return name.replace('-', '_')
 
     def create_knowledge_base_tables(self, base_name: str):
         """Create separate tables for a specific knowledge base."""
@@ -108,7 +117,8 @@ class DatabaseConnection:
         This can store single-step or short-horizon items (akin to 'STM').
         """
         self.connect()
-        cognitive_table = f"agent_{agent_id}_cognitive"
+        sanitized_agent_id = self._sanitize_table_name(agent_id)
+        cognitive_table = f"agent_{sanitized_agent_id}_cognitive"
 
         self.cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {cognitive_table} (
@@ -121,7 +131,7 @@ class DatabaseConnection:
             );
         """)
 
-        index_name = f"agent_{agent_id}_cognitive_index"
+        index_name = f"agent_{sanitized_agent_id}_cognitive_index"
         self.cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS {index_name}
             ON {cognitive_table} USING ivfflat (embedding vector_cosine_ops)
@@ -138,7 +148,8 @@ class DatabaseConnection:
     def clear_agent_cognitive_memory(self, agent_id: str):
         """Clear all cognitive memory entries for a specific agent."""
         self.connect()
-        cognitive_table = f"agent_{agent_id}_cognitive"
+        sanitized_agent_id = self._sanitize_table_name(agent_id)
+        cognitive_table = f"agent_{sanitized_agent_id}_cognitive"
         try:
             self.cursor.execute(f"TRUNCATE TABLE {cognitive_table};")
             self.conn.commit()
@@ -153,7 +164,8 @@ class DatabaseConnection:
         plus other relevant episodic info (task_query, total_reward, etc.).
         """
         self.connect()
-        episodic_table = f"agent_{agent_id}_episodic"
+        sanitized_agent_id = self._sanitize_table_name(agent_id)
+        episodic_table = f"agent_{sanitized_agent_id}_episodic"
 
         self.cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {episodic_table} (
@@ -168,7 +180,7 @@ class DatabaseConnection:
             );
         """)
 
-        index_name = f"agent_{agent_id}_episodic_index"
+        index_name = f"agent_{sanitized_agent_id}_episodic_index"
         self.cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS {index_name}
             ON {episodic_table} USING ivfflat (embedding vector_cosine_ops)
@@ -185,7 +197,8 @@ class DatabaseConnection:
     def clear_agent_episodic_memory(self, agent_id: str):
         """Clear all episodic (long-horizon) memory entries for a specific agent."""
         self.connect()
-        episodic_table = f"agent_{agent_id}_episodic"
+        sanitized_agent_id = self._sanitize_table_name(agent_id)
+        episodic_table = f"agent_{sanitized_agent_id}_episodic"
         try:
             self.cursor.execute(f"TRUNCATE TABLE {episodic_table};")
             self.conn.commit()
