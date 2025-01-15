@@ -38,6 +38,17 @@ def serialize_memory_data(memory_data):
         return memory_data
     else:
         return str(memory_data)
+    
+def validate_json(data):
+    """Validate if data is JSON or can be parsed as JSON."""
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, str):
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            return None
+    return None
 
 class SimulationDataInserter:
     def __init__(self, db_params):
@@ -104,7 +115,7 @@ class SimulationDataInserter:
                 logging.error(f"Error inserting agent memory: {e}")
         logging.info(f"Inserted {len(memories)} agent memories into the database")
 
-    def insert_groupchat_messages(self, messages: List[Dict[str, Any]], round_num: int):
+    def insert_groupchat_messages(self, messages: List[Dict[str, Any]], round_num: int, agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO groupchat (message_id, agent_id, round, sub_round, cohort_id, content, timestamp, topic)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -112,12 +123,18 @@ class SimulationDataInserter:
         try:
             with self.conn.cursor() as cur:
                 for message in messages:
+                    # Get the mapped agent ID from the database
+                    agent_id = agent_id_map.get(str(message['agent_id']))
+                    if agent_id is None:
+                        logging.error(f"No matching UUID found for agent_id: {message['agent_id']}")
+                        continue
+
                     cur.execute(query, (
                         message['message_id'],
-                        message['agent_id'],
+                        agent_id,  # Use the mapped agent_id
                         round_num,
                         message['sub_round'],
-                        message['cohort_id'],  # Use cohort_id instead of batch
+                        message['cohort_id'],
                         message['content'],
                         message['timestamp'],
                         message.get('topic')
@@ -249,9 +266,14 @@ class SimulationDataInserter:
             raise
 
     def insert_trades(self, trades_data: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
+        # Add logging to debug the incoming data
+        logging.info(f"Attempting to insert trades: {trades_data}")
+        logging.info(f"Agent ID map: {agent_id_map}")
+        
         query = """
         INSERT INTO trades (buyer_id, seller_id, quantity, price, buyer_surplus, seller_surplus, total_surplus, round)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
         """
         try:
             with self.conn.cursor() as cur:
@@ -260,10 +282,9 @@ class SimulationDataInserter:
                     seller_id = agent_id_map.get(str(trade['seller_id']))
                     
                     if buyer_id is None or seller_id is None:
-                        logging.error(f"No matching UUID found for buyer_id: {trade['buyer_id']} or seller_id: {trade['seller_id']}")
+                        logging.error(f"Missing agent mapping - buyer_id: {trade['buyer_id']}, seller_id: {trade['seller_id']}")
                         continue
-
-                    cur.execute(query, (
+                    values = (
                         buyer_id,
                         seller_id,
                         trade['quantity'],
@@ -272,12 +293,19 @@ class SimulationDataInserter:
                         trade['seller_surplus'],
                         trade['total_surplus'],
                         trade['round']
-                    ))
+                    )
+                    logging.info(f"Inserting trade with values: {values}")
+                    
+                    cur.execute(query, values)
+                    trade_id = cur.fetchone()[0]
+                    logging.info(f"Successfully inserted trade with ID: {trade_id}")
+                    
             self.conn.commit()
-            logging.info(f"Inserted {len(trades_data)} trades into the database")
+            logging.info(f"Successfully committed {len(trades_data)} trades to database")
         except Exception as e:
             self.conn.rollback()
             logging.error(f"Error inserting trades: {str(e)}")
+            logging.exception("Full exception details:")
             raise
 
     def insert_interactions(self, interactions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
@@ -488,7 +516,26 @@ class SimulationDataInserter:
             logging.error(f"Error inserting AI requests: {str(e)}")
             raise
 
-    def insert_round_data(self, round_num: int, agents: List[Any], environments: Dict[str, Any], config: Any, trackers: Dict[str, Any]):
+    def insert_round_data(
+        self, 
+        round_num: int, 
+        agents: List[Any], 
+        environment: Any,
+        config: Any, 
+        tracker: Any,
+        environment_name: str = 'auction'
+    ):
+        """
+        Insert simulation data for a specific round.
+        
+        Args:
+            round_num (int): The current round number
+            agents (List[Any]): List of agent objects
+            environment (Any): The environment object
+            config (Any): Configuration object
+            tracker (Any): The tracker object for this environment
+            environment_name (str): Name of the environment (defaults to 'auction')
+        """
         try:
             # Insert agent data
             agents_data = [
@@ -502,17 +549,6 @@ class SimulationDataInserter:
                 for agent in agents
             ]
             agent_id_map = self.insert_agents(agents_data)
-
-            # Insert agent memories
-            memories_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'step_id': round_num,
-                    'memory_data': serialize_memory_data(agent.memory[-1] if agent.memory else {})
-                }
-                for agent in agents
-            ]
-            self.insert_agent_memories(memories_data)
 
             # Allocations data
             logging.info("Preparing allocations data")
@@ -528,11 +564,9 @@ class SimulationDataInserter:
                 }
                 for agent in agents
             ]
-            logging.info(f"Inserting {len(allocations_data)} allocations")
             self.insert_allocations(allocations_data, agent_id_map)
-            logging.info("Allocations insertion complete")
 
-                        # Schedules data
+            # Schedules data
             logging.info("Preparing schedules data")
             schedules_data = [
                 {
@@ -544,9 +578,7 @@ class SimulationDataInserter:
                 }
                 for agent in agents
             ]
-            logging.info(f"Inserting {len(schedules_data)} schedules")
             self.insert_schedules(schedules_data)
-            logging.info("Schedules insertion complete")
 
             # Orders data
             logging.info("Preparing orders data")
@@ -562,9 +594,7 @@ class SimulationDataInserter:
                 for agent in agents
                 for order in agent.economic_agent.pending_orders.get(config.agent_config.good_name, [])
             ]
-            logging.info(f"Inserting {len(orders_data)} orders")
             self.insert_orders(orders_data, agent_id_map)
-            logging.info("Orders insertion complete")
 
             # Interactions data
             logging.info("Preparing interactions data")
@@ -578,128 +608,100 @@ class SimulationDataInserter:
                 for agent in agents
                 for interaction in agent.interactions
             ]
-            logging.info(f"Inserting {len(interactions_data)} interactions")
             self.insert_interactions(interactions_data, agent_id_map)
-            logging.info("Interactions insertion complete")
 
-           # Perceptions data
+            # Perceptions data
             logging.info("Preparing perceptions data")
             perceptions_data = []
             for agent in agents:
                 if agent.last_perception is not None:
-                    perceptions_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'monologue': str(agent.last_perception.get('monologue', '')),
-                        'strategy': str(agent.last_perception.get('strategy', '')),
-                        'confidence': agent.last_perception.get('confidence', 0)
-                    })
+                    perception = validate_json(agent.last_perception)
+                    if perception is not None:
+                        perceptions_data.append({
+                            'memory_id': str(agent.id),
+                            'environment_name': environment_name,
+                            'monologue': str(perception.get('monologue', '')),
+                            'strategy': str(perception.get('strategy', '')),
+                            'confidence': perception.get('confidence', 0)
+                        })
+                    else:
+                        logging.warning(f"Invalid JSON perception data for agent {agent.id}: {agent.last_perception}")
 
             if perceptions_data:
-                logging.info(f"Inserting {len(perceptions_data)} perceptions")
                 self.insert_perceptions(perceptions_data, agent_id_map)
-                logging.info("Perceptions insertion complete")
-            else:
-                logging.info("No perceptions to insert")
-            
+
             # Actions data
             logging.info("Preparing actions data")
-            actions_data = []
-            for agent in agents:
-                if hasattr(agent, 'last_action') and agent.last_action:
-                    actions_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'action': agent.last_action
-                    })
-
-            logging.info(f"Inserting {len(actions_data)} actions")
+            actions_data = [
+                {
+                    'memory_id': str(agent.id),
+                    'environment_name': environment_name,
+                    'action': agent.last_action
+                }
+                for agent in agents
+                if hasattr(agent, 'last_action') and agent.last_action
+            ]
             self.insert_actions(actions_data, agent_id_map)
-            logging.info("Actions insertion complete")
 
             # Observations and Reflections data
             logging.info("Preparing observations and reflections data")
-            observations_data = []
-            reflections_data = []
-            for agent in agents:
-                if agent.last_observation:
-                    observations_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'observation': serialize_memory_data(agent.last_observation)
-                    })
-                if agent.memory and agent.memory[-1]['type'] == 'reflection':
-                    reflection = agent.memory[-1]
-                    reflections_data.append({
-                        'memory_id': str(agent.id),
-                        'environment_name': 'auction',
-                        'reflection': reflection.get('content', ''),
-                        'self_reward': reflection.get('self_reward', 0),
-                        'environment_reward': reflection.get('environment_reward', 0),
-                        'total_reward': reflection.get('total_reward', 0),
-                        'strategy_update': reflection.get('strategy_update', '')
-                    })
+            observations_data = [
+                {
+                    'memory_id': str(agent.id),
+                    'environment_name': environment_name,
+                    'observation': serialize_memory_data(agent.last_observation)
+                }
+                for agent in agents
+                if agent.last_observation
+            ]
 
-            logging.info(f"Inserting {len(observations_data)} observations")
             self.insert_observations(observations_data, agent_id_map)
-            logging.info(f"Inserting {len(reflections_data)} reflections")
-            self.insert_reflections(reflections_data, agent_id_map)
-            logging.info("Observations and reflections insertion complete")
 
             # Trades data
             logging.info("Preparing trades data")
             trades_data = []
-            for env_name, tracker in trackers.items():
-                if env_name == 'auction':
-                    for trade in tracker.all_trades:
-                        buyer_id = str(trade.buyer_id)
-                        seller_id = str(trade.seller_id)
-                        buyer = next((agent for agent in agents if str(agent.id) == buyer_id), None)
-                        seller = next((agent for agent in agents if str(agent.id) == seller_id), None)
-                        if buyer and seller:
-                            buyer_surplus = buyer.economic_agent.calculate_individual_surplus()
-                            seller_surplus = seller.economic_agent.calculate_individual_surplus()
-                            total_surplus = buyer_surplus + seller_surplus
-
-                            trades_data.append({
-                                'buyer_id': buyer_id,
-                                'seller_id': seller_id,
-                                'quantity': trade.quantity,
-                                'price': trade.price,
-                                'buyer_surplus': buyer_surplus,
-                                'seller_surplus': seller_surplus,
-                                'total_surplus': total_surplus,
-                                'round': round_num
-                            })
+            if hasattr(tracker, 'all_trades'):
+                logging.info(f"Found {len(tracker.all_trades)} trades in tracker")
+                for trade_info in tracker.all_trades:
+                    # The trade_info is now a dictionary from the AuctionTracker
+                    try:
+                        trades_data.append({
+                            'buyer_id': trade_info['buyer_id'],
+                            'seller_id': trade_info['seller_id'],
+                            'quantity': trade_info['quantity'],
+                            'price': trade_info['price'],
+                            'buyer_surplus': trade_info['buyer_surplus'],
+                            'seller_surplus': trade_info['seller_surplus'],
+                            'total_surplus': trade_info['total_surplus'],
+                            'round': trade_info['round']
+                        })
+                        logging.info(f"Processed trade: {trades_data[-1]}")
+                    except Exception as e:
+                        logging.error(f"Error processing trade {trade_info}: {str(e)}")
 
             if trades_data:
-                logging.info(f"Inserting {len(trades_data)} trades")
+                logging.info(f"Attempting to insert {len(trades_data)} trades")
                 self.insert_trades(trades_data, agent_id_map)
-                logging.info("Trades insertion complete")
             else:
-                logging.info("No trades to insert")
+                logging.warning("No trades data found to insert")
 
+            # Group chat data
             groupchat_data = []
-            for env_name, env in environments.items():
-                if hasattr(env, 'mechanism') and hasattr(env.mechanism, 'topics'):  # Check if it's a group chat environment
-                    for message in env.mechanism.messages:
-                        groupchat_data.append({
-                            'message_id': str(uuid.uuid4()),
-                            'agent_id': str(message.agent_id),
-                            'round': round_num,
-                            'sub_round': getattr(message, 'sub_round', None),
-                            'cohort_id': message.cohort_id,  # Add cohort_id from message
-                            'content': message.content,
-                            'timestamp': message.timestamp if hasattr(message, 'timestamp') else datetime.now(),
-                            'topic': env.mechanism.topics.get(message.cohort_id, '')  # Get topic for specific cohort
-                        })
+            if hasattr(environment, 'mechanism') and hasattr(environment.mechanism, 'topics'):
+                for message in environment.mechanism.messages:
+                    groupchat_data.append({
+                        'message_id': str(uuid.uuid4()),
+                        'agent_id': str(message.agent_id),
+                        'round': round_num,
+                        'sub_round': getattr(message, 'sub_round', None),
+                        'cohort_id': message.cohort_id,
+                        'content': message.content,
+                        'timestamp': message.timestamp if hasattr(message, 'timestamp') else datetime.now(),
+                        'topic': environment.mechanism.topics.get(message.cohort_id, '')
+                    })
             
             if groupchat_data:
-                logging.info(f"Inserting {len(groupchat_data)} group chat messages")
-                self.insert_groupchat_messages(groupchat_data, round_num)
-                logging.info("Group chat messages insertion complete")
-            else:
-                logging.info("No group chat data to insert")
+                self.insert_groupchat_messages(groupchat_data, round_num, agent_id_map)
 
         except Exception as e:
             self.conn.rollback()

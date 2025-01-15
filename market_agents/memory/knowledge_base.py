@@ -6,8 +6,8 @@ from uuid import UUID
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from embedding import MemoryEmbedder
-from setup_db import DatabaseConnection
+from market_agents.memory.embedding import MemoryEmbedder
+from market_agents.memory.setup_db import DatabaseConnection
 
 class KnowledgeObject(BaseModel):
     knowledge_id: UUID = Field(default_factory=uuid.uuid4)
@@ -168,77 +168,3 @@ class SemanticChunker(KnowledgeChunker):
             ))
 
         return chunks
-
-if __name__ == "__main__":
-    import os
-    from config import load_config_from_yaml
-    from knowledge_base import MarketKnowledgeBase
-    from embedding import MemoryEmbedder
-    from setup_db import DatabaseConnection
-
-    # Load configuration and initialize services
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(current_dir, "memory_config.yaml")
-
-    config = load_config_from_yaml(config_path)
-    db_conn = DatabaseConnection(config)
-    embedder = MemoryEmbedder(config)
-
-    # Specify the table prefix for the knowledge base (e.g., "market_analysis")
-    table_prefix = "market_analysis"
-    
-    # Initialize MarketKnowledgeBase with the table prefix
-    knowledge_base = MarketKnowledgeBase(config, db_conn, embedder, table_prefix=table_prefix)
-    
-    # Test document for ingestion
-    test_doc = """
-    Market Analysis Report - Q4 2023
-    
-    The technology sector showed strong performance in Q4 2023. Cloud computing companies reported significant growth, with major players expanding their market share. AI-driven solutions saw increased adoption across industries.
-    
-    Key Highlights:
-    • Cloud revenue grew by 25% YoY
-    • Enterprise AI adoption increased 40%
-    • Cybersecurity spending up 15%
-    
-    Market leaders continued to invest heavily in R&D, focusing on next-generation technologies. The semiconductor shortage showed signs of easing, though supply chain challenges persist in some areas.
-    """
-
-    try:
-        # Ingest the test document: chunk, embed, and store in the knowledge base
-        metadata = {"source": "test_document", "category": "financial_report"}
-        knowledge_id = knowledge_base.ingest_knowledge(test_doc, metadata=metadata)
-        print(f"Successfully ingested knowledge object with ID: {knowledge_id}")
-
-        # Verify that the document (knowledge object) was stored
-        db_conn.cursor.execute(f"""
-            SELECT content, metadata 
-            FROM {table_prefix}_knowledge_objects 
-            WHERE knowledge_id = %s
-        """, (str(knowledge_id),))
-        stored_doc = db_conn.cursor.fetchone()
-        print("\nStored knowledge object content and metadata:")
-        if stored_doc:
-            doc_content, doc_metadata = stored_doc
-            print("Content:\n", doc_content)
-            print("Metadata:", doc_metadata)
-        else:
-            print("Knowledge object not found in database.")
-        
-        # Retrieve and display chunks
-        db_conn.cursor.execute(f"""
-            SELECT text, embedding 
-            FROM {table_prefix}_knowledge_chunks 
-            WHERE knowledge_id = %s
-        """, (str(knowledge_id),))
-        chunks = db_conn.cursor.fetchall()
-        print(f"\nRetrieved {len(chunks)} chunks from the database:")
-        for i, (chunk_text, chunk_embedding) in enumerate(chunks, 1):
-            print(f"\nChunk {i}:")
-            print("Text:", chunk_text)
-            print("Embedding present:", "Yes" if chunk_embedding is not None else "No")
-            
-    except Exception as e:
-        print(f"Error during document ingestion or retrieval: {e}")
-    finally:
-        db_conn.conn.close()

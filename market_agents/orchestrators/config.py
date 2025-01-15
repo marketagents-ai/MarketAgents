@@ -30,6 +30,7 @@ class GroupChatConfig(BaseModel):
     address: str
     max_rounds: int
     initial_topic: str
+    groupchat_api_url: str = Field(default="http://localhost:8001")
     sub_rounds: int = Field(default=3)
     group_size: int = Field(default=100)
 
@@ -60,7 +61,7 @@ class OrchestratorConfig(BaseSettings):
     environment_order: List[str]
     protocol: str
     database_config: DatabaseConfig = DatabaseConfig()
-
+    tool_mode: bool
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
 def load_config(config_path: Path) -> OrchestratorConfig:

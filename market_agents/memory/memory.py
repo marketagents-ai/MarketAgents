@@ -1,25 +1,21 @@
+import asyncio
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from fastapi import logger
+from pydantic import BaseModel, Field, ConfigDict
 
-from embedding import MemoryEmbedder
+from market_agents.memory.embedding import MemoryEmbedder
 from market_agents.memory.config import MarketMemoryConfig
-from setup_db import DatabaseConnection
-from MarketMemory.market_memory.vector_search import MemoryRetriever
+from market_agents.memory.setup_db import DatabaseConnection
+from market_agents.memory.vector_search import MemoryRetriever
 
 
 class MemoryObject(BaseModel):
-    """
-    A single step of cognitive memory.
-      - 'perception'
-      - 'action'
-      - 'reflection'
-    or other single cognitive step.
-    """
+    """A single step of cognitive memory."""
     memory_id: UUID = Field(default_factory=uuid.uuid4)
     agent_id: str
     cognitive_step: str
@@ -27,6 +23,27 @@ class MemoryObject(BaseModel):
     embedding: Optional[List[float]] = None
     created_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = None
+
+    def serialize_metadata(self) -> Optional[str]:
+            """Serialize metadata to JSON string, handling datetime objects"""
+            if not self.metadata:
+                return None
+                
+            def serialize_value(v):
+                if isinstance(v, datetime):
+                    return v.isoformat()
+                if hasattr(v, 'serialize_json'):
+                    return json.loads(v.serialize_json())
+                if hasattr(v, 'model_dump'):
+                    return v.model_dump()
+                if isinstance(v, dict):
+                    return {k: serialize_value(v2) for k, v2 in v.items()}
+                if isinstance(v, list):
+                    return [serialize_value(v2) for v2 in v]
+                return v
+
+            serialized_metadata = {k: serialize_value(v) for k, v in self.metadata.items()}
+            return json.dumps(serialized_metadata)
 
 
 class CognitiveStep(BaseModel):
@@ -41,6 +58,7 @@ class EpisodicMemoryObject(BaseModel):
     """
     An entire 'episode' of task execution. 
     It aggregates multiple steps (CognitiveStep),
+    plus optional fields like total_reward, strategy_update, etc.
     """
     memory_id: UUID = Field(default_factory=uuid.uuid4)
     agent_id: str
@@ -51,10 +69,32 @@ class EpisodicMemoryObject(BaseModel):
     embedding: Optional[List[float]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     metadata: Optional[Dict[str, Any]] = None
+    similarity: Optional[float] = None
 
+class BaseMemory:
+    """Base class with common initialization and sanitization"""
+    
+    def __init__(self, config: MarketMemoryConfig, db_conn: DatabaseConnection, 
+                 embedder: MemoryEmbedder, agent_id: str):
+        self.config = config
+        self.db = db_conn
+        self.embedder = embedder
+        self.agent_id = agent_id
+        self.safe_id = self._sanitize_id(agent_id)
+        
+        # Initialize database connection
+        self._initialize_database()
 
+    @staticmethod
+    def _sanitize_id(agent_id: str) -> str:
+        """Sanitize agent ID for table names"""
+        return agent_id.replace('-', '_')
 
-class CognitiveMemory:
+    def _initialize_database(self):
+        """Ensure database connection is ready"""
+        self.db.connect()
+
+class CognitiveMemory(BaseMemory):
     """
     Handles storing and retrieving single-step memory items in agent_{agent_id}_cognitive table.
     """
@@ -66,40 +106,41 @@ class CognitiveMemory:
         embedder: MemoryEmbedder,
         agent_id: str
     ):
-        self.config = config
-        self.db = db_conn
-        self.embedder = embedder
-        self.agent_id = agent_id
-
-        self.cognitive_table = f"agent_{agent_id}_cognitive"
-        self.db.create_agent_cognitive_memory_table(agent_id)
+        BaseMemory.__init__(self, config, db_conn, embedder, agent_id)
+        self.cognitive_table = f"agent_{self.safe_id}_cognitive"
+        self.db.create_agent_cognitive_memory_table(self.agent_id)
 
     def store_cognitive_item(self, memory_object: MemoryObject):
         """
-        Insert a single cognitive step into the 'cognitive' table.
+        Insert a single cognitive step into the 'cognitive' table,
+        returning the DB's actual created_at timestamp.
         """
         self.db.connect()
         try:
-            # Generate embedding if missing
             if memory_object.embedding is None:
                 memory_object.embedding = self.embedder.get_embeddings(memory_object.content)
 
-            now = memory_object.created_at or datetime.utcnow()
+            now = memory_object.created_at or datetime.now(timezone.utc)
 
             self.db.cursor.execute(f"""
                 INSERT INTO {self.cognitive_table}
                 (memory_id, cognitive_step, content, embedding, created_at, metadata)
                 VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING created_at;
+                RETURNING created_at
             """, (
                 str(memory_object.memory_id),
                 memory_object.cognitive_step,
                 memory_object.content,
                 memory_object.embedding,
                 now,
-                json.dumps(memory_object.metadata) if memory_object.metadata else json.dumps({})
+                memory_object.serialize_metadata()
             ))
-            memory_object.created_at = self.db.cursor.fetchone()[0]
+            row = self.db.cursor.fetchone()
+            if row:
+                memory_object.created_at = row[0]
+            else:
+                memory_object.created_at = now
+
             self.db.conn.commit()
         except Exception as e:
             self.db.conn.rollback()
@@ -146,14 +187,25 @@ class CognitiveMemory:
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
-        query = f"""
-            SELECT memory_id, cognitive_step, content, embedding, created_at, metadata
-            FROM {self.cognitive_table}
-            WHERE {where_clause}
-            ORDER BY created_at DESC
-            LIMIT %s;
-        """
         params.append(limit)
+        
+        query = f"""
+            WITH recent_memories AS (
+                SELECT 
+                    memory_id, 
+                    cognitive_step, 
+                    content,
+                    embedding, 
+                    created_at, 
+                    metadata
+                FROM {self.cognitive_table}
+                WHERE {where_clause}
+                ORDER BY created_at DESC
+                LIMIT %s
+            )
+            SELECT * FROM recent_memories
+            ORDER BY created_at ASC;
+        """
 
         try:
             self.db.cursor.execute(query, tuple(params))
@@ -161,9 +213,13 @@ class CognitiveMemory:
 
             items = []
             for row in rows:
+                if len(row) != 6:
+                    continue
+
                 mem_id, step, content, embedding, created_at, meta = row
                 if isinstance(embedding, str):
                     embedding = [float(x) for x in embedding.strip('[]').split(',')]
+
                 mo = MemoryObject(
                     memory_id=UUID(mem_id),
                     agent_id=self.agent_id,
@@ -232,7 +288,7 @@ class CognitiveMemory:
             raise e
 
 
-class EpisodicMemory:
+class EpisodicMemory(BaseMemory):
     """
     Manages the 'episodic' memory table named agent_{agent_id}_episodic.
     Each row represents a full 'episode' containing multiple steps.
@@ -245,13 +301,9 @@ class EpisodicMemory:
         embedder: MemoryEmbedder,
         agent_id: str
     ):
-        self.config = config
-        self.db = db_conn
-        self.embedder = embedder
-        self.agent_id = agent_id
-
-        self.episodic_table = f"agent_{agent_id}_episodic"
-        self.db.create_agent_episodic_memory_table(agent_id)
+        BaseMemory.__init__(self, config, db_conn, embedder, agent_id)
+        self.episodic_table = f"agent_{self.safe_id}_episodic"
+        self.db.create_agent_episodic_memory_table(self.agent_id)
 
     def store_episode(self, episode: EpisodicMemoryObject):
         """
@@ -261,14 +313,14 @@ class EpisodicMemory:
         try:
             # If no embedding was provided, derive from the task_query + cognitive steps
             if episode.embedding is None:
-                episode.embedding = self.embedder.get_embeddings(f"Task:{episode.task_query} + {episode.cognitive_steps}")
+                concat_str = f"Task:{episode.task_query} + Steps:{episode.cognitive_steps}"
+                episode.embedding = self.embedder.get_embeddings(concat_str)
 
-            # Convert steps to JSON for storing
             step_data = [step.dict() for step in episode.cognitive_steps]
             strategy_data = episode.strategy_update if episode.strategy_update else []
             meta = episode.metadata if episode.metadata else {}
 
-            now = episode.created_at or datetime.utcnow()
+            now = episode.created_at or datetime.now(timezone.utc)
 
             self.db.cursor.execute(f"""
                 INSERT INTO {self.episodic_table}
@@ -322,8 +374,15 @@ class EpisodicMemory:
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
         query = f"""
-            SELECT memory_id, task_query, cognitive_steps, total_reward,
-                   strategy_update, embedding, created_at, metadata
+            SELECT 
+                memory_id, 
+                task_query, 
+                cognitive_steps, 
+                total_reward,
+                strategy_update, 
+                embedding, 
+                created_at, 
+                metadata
             FROM {self.episodic_table}
             WHERE {where_clause}
             ORDER BY created_at DESC
@@ -334,12 +393,12 @@ class EpisodicMemory:
         try:
             self.db.cursor.execute(query, tuple(params))
             rows = self.db.cursor.fetchall()
+
             episodes = []
             for row in rows:
                 (mem_id, task_query, steps_json, reward, strategy_json,
                  embedding, created_at, meta) = row
 
-                # Convert JSON fields back to python objects
                 if isinstance(steps_json, str):
                     steps_list = json.loads(steps_json)
                 else:
@@ -379,7 +438,7 @@ class EpisodicMemory:
     ) -> int:
         """
         Delete entire episodes based on optional filters.
-        Returns the count of deleted rows.
+        Returns how many rows were deleted.
         """
         self.db.connect()
 
@@ -413,10 +472,8 @@ class EpisodicMemory:
             raise e
 
 class ShortTermMemory(BaseModel):
-    """
-    A convenience wrapper around the CognitiveMemory class,
-    used to store & retrieve single-step memory for an agent over short intervals.
-    """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     cognitive_memory: CognitiveMemory
     items_cache: List[MemoryObject] = Field(default_factory=list)
 
@@ -425,11 +482,22 @@ class ShortTermMemory(BaseModel):
             cognitive_memory=CognitiveMemory(memory_config, db_conn, MemoryEmbedder(memory_config), agent_id)
         )
 
-    def store_memory(self, memory_object: MemoryObject):
+    async def store_memory(self, memory_object: MemoryObject):
+        """
+        Asynchronously store memory by offloading the synchronous DB call
+        to a thread pool. Use run_in_executor so we can call create_task().
+        """
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._store_memory_sync, memory_object)
+
+    def _store_memory_sync(self, memory_object: MemoryObject):
+        """
+        Synchronous method that calls `store_cognitive_item` and updates items_cache.
+        """
         self.cognitive_memory.store_cognitive_item(memory_object)
         self.items_cache.append(memory_object)
 
-    def retrieve_recent_memories(
+    async def retrieve_recent_memories(
         self,
         limit: int = 10,
         cognitive_step: Optional[Union[str, List[str]]] = None,
@@ -437,36 +505,38 @@ class ShortTermMemory(BaseModel):
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None
     ) -> List[MemoryObject]:
-        return self.cognitive_memory.get_cognitive_items(
-            limit=limit,
-            cognitive_step=cognitive_step,
-            metadata_filters=metadata_filters,
-            start_time=start_time,
-            end_time=end_time
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self.cognitive_memory.get_cognitive_items(
+                limit=limit,
+                cognitive_step=cognitive_step,
+                metadata_filters=metadata_filters,
+                start_time=start_time,
+                end_time=end_time
+            )
         )
 
-    def clear_memories(
+    async def clear_memories(
         self,
         cognitive_step: Optional[Union[str, List[str]]] = None,
         metadata_filters: Optional[Dict[str, Any]] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None
     ) -> int:
-        return self.cognitive_memory.delete_cognitive_items(
-            cognitive_step=cognitive_step,
-            metadata_filters=metadata_filters,
-            start_time=start_time,
-            end_time=end_time
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self.cognitive_memory.delete_cognitive_items(
+                cognitive_step=cognitive_step,
+                metadata_filters=metadata_filters,
+                start_time=start_time,
+                end_time=end_time
+            )
         )
 
-
 class LongTermMemory(BaseModel):
-    """
-    A class for long-term memory store & retrieval:
-      - A semantic search retriever (MemoryRetriever)
-      - An EpisodicMemory store
-    Used to store entire episodes and retrieve them via vector search.
-    """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     memory_retriever: MemoryRetriever
     episodic_store: EpisodicMemory
 
@@ -477,7 +547,7 @@ class LongTermMemory(BaseModel):
             episodic_store=EpisodicMemory(memory_config, db_conn, embedder, agent_id)
         )
 
-    def store_episodic_memory(
+    async def store_episodic_memory(
         self,
         agent_id: str,
         task_query: str,
@@ -487,14 +557,52 @@ class LongTermMemory(BaseModel):
         metadata: Optional[Dict[str, Any]] = None
     ):
         """
-        Convert a list of short-term steps into a single EpisodicMemoryObject for long-term storage.
+        An async wrapper that calls `_store_episodic_memory_sync` via run_in_executor
+        so we can schedule it with create_task(...).
         """
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            self._store_episodic_memory_sync,
+            agent_id,
+            task_query,
+            steps,
+            total_reward,
+            strategy_update,
+            metadata
+        )
+
+    def _store_episodic_memory_sync(
+        self,
+        agent_id: str,
+        task_query: str,
+        steps: List[MemoryObject],
+        total_reward: Optional[float],
+        strategy_update: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]]
+    ):
+        """
+        The synchronous logic that builds EpisodicMemoryObject and calls store_episode(...).
+        """
+
         csteps = []
         for step in steps:
+            raw_content = (step.content or "").strip()
+            try:
+                if not raw_content:
+                    parsed_content = {}
+                else:
+                    parsed_content = json.loads(raw_content)
+
+                if not isinstance(parsed_content, dict):
+                    parsed_content = {}
+            except (json.JSONDecodeError, TypeError):
+                parsed_content = {}
+
             csteps.append(
                 CognitiveStep(
                     step_type=step.cognitive_step,
-                    content=json.loads(step.content) if step.content else {}
+                    content=parsed_content
                 )
             )
 
@@ -504,34 +612,36 @@ class LongTermMemory(BaseModel):
             cognitive_steps=csteps,
             total_reward=total_reward,
             strategy_update=strategy_update,
-            metadata=metadata
+            metadata=metadata,
+            created_at=datetime.now(timezone.utc)
         )
         self.episodic_store.store_episode(episode)
 
-    def retrieve_episodic_memories(
+
+    async def retrieve_episodic_memories(
         self,
         agent_id: str,
         query: str,
         top_k: int = 5
     ) -> List[EpisodicMemoryObject]:
-        """
-        Perform vector-based semantic search on the agent_{agent_id}_episodic table
-        for relevant episodes using the MemoryRetriever.search_agent_episodic_memory method.
-        """
-        # 1. Search the agent's episodic table for top_k results
-        retrieved = self.memory_retriever.search_agent_episodic_memory(
-            agent_id=agent_id,
-            query=query,
-            top_k=top_k
+        loop = asyncio.get_event_loop()
+        retrieved = await loop.run_in_executor(
+            None,
+            lambda: self.memory_retriever.search_agent_episodic_memory(
+                agent_id=agent_id,
+                query=query,
+                top_k=top_k
+            )
         )
-
         episodes = []
         for memory_item in retrieved:
             content_dict = json.loads(memory_item.text)
             steps_json = content_dict.get("cognitive_steps", [])
             step_objs = [CognitiveStep(**step) for step in steps_json]
+            
+            created_at_str = content_dict.get("created_at")
+            created_at = datetime.fromisoformat(created_at_str)
 
-            # Build an EpisodicMemoryObject
             eobj = EpisodicMemoryObject(
                 memory_id=UUID(content_dict["memory_id"]),
                 agent_id=agent_id,
@@ -539,25 +649,27 @@ class LongTermMemory(BaseModel):
                 cognitive_steps=step_objs,
                 total_reward=content_dict.get("total_reward"),
                 strategy_update=content_dict.get("strategy_update"),
-                created_at=datetime.utcnow(),
-                metadata=content_dict.get("metadata", {})
+                created_at=created_at,
+                metadata=content_dict.get("metadata", {}),
+                similarity=round(memory_item.similarity, 2)
             )
             episodes.append(eobj)
 
         return episodes
 
-    def delete_episodic_memory(
+    async def delete_episodic_memory(
         self,
         agent_id: str,
         task_query: Optional[str] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None
     ) -> int:
-        """
-        Delete full episodes from agent_{agent_id}_episodic with optional filters.
-        """
-        return self.episodic_store.delete_episodes(
-            task_query=task_query,
-            start_time=start_time,
-            end_time=end_time
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self.episodic_store.delete_episodes(
+                task_query=task_query,
+                start_time=start_time,
+                end_time=end_time
+            )
         )

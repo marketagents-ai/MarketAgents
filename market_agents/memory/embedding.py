@@ -1,6 +1,8 @@
 import os
 import requests
 import time
+import tiktoken
+import logging
 from dotenv import load_dotenv
 
 class MemoryEmbedder:
@@ -9,11 +11,25 @@ class MemoryEmbedder:
     """
     def __init__(self, config):
         self.config = config
+        self.encoding = tiktoken.get_encoding("cl100k_base")
+        self.max_input = self.config.max_input - 1000
+        logging.info(f"Initialized MemoryEmbedder with {config.embedding_provider} provider")
+
+    def _truncate_text(self, text: str) -> str:
+        """Truncate text to max_input tokens using tiktoken."""
+        tokens = self.encoding.encode(text)
+        if len(tokens) > self.max_input:
+            logging.warning(f"Text truncated from {len(tokens)} to {self.max_input} tokens")
+            tokens = tokens[:self.max_input]
+            text = self.encoding.decode(tokens)
+        return text
 
     def get_embeddings(self, texts):
         """Get embeddings with retry logic and batch processing."""
         single_input = isinstance(texts, str)
         texts = [texts] if single_input else texts
+
+        texts = [self._truncate_text(text) for text in texts]
 
         if self.config.embedding_provider == "openai":
             all_embeddings = self._get_openai_embeddings(texts)
@@ -94,14 +110,3 @@ class MemoryEmbedder:
                 time.sleep(self.config.retry_delay)
 
         raise RuntimeError("Unexpected error in _send_embedding_request")
-
-if __name__ == "__main__":
-    # test run for embedding
-    from config import load_config_from_yaml
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(current_dir, "memory_config.yaml")
-
-    config = load_config_from_yaml(config_path)
-    embedder = MemoryEmbedder(config)
-    emb = embedder.get_embeddings("This is a test sentence for embedding.")
-    print("Embedding:", emb)

@@ -40,7 +40,7 @@ elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* ]]; then
     if ! command_exists psql; then
         echo "PostgreSQL is not installed or not in PATH. Please install PostgreSQL first."
         exit 1
-    }
+    fi
 
     # Get PostgreSQL installation directory
     PG_DIR=$(dirname "$(which psql)")

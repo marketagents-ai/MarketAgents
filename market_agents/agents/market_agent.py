@@ -1,7 +1,7 @@
 import json
 import asyncio
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Type, Union, List
 
 from pydantic import Field
@@ -69,19 +69,36 @@ class MarketAgent(LLMAgent):
             raise ValueError(f"Environment {environment_name} not found")
 
         environment_info = self.environments[environment_name].get_global_state()
-        stm_cognitive = self.short_term_memory.retrieve_recent_memories(limit=5)
+        stm_cognitive = await self.short_term_memory.retrieve_recent_memories(limit=5)
+        short_term_memories = []
+        for mem in stm_cognitive:
+            short_term_memories.append({
+                "cognitive_step": mem.cognitive_step,
+                "content": mem.content
+            })
 
+        print("\nCognitive Memory Results:")
+        memory_strings = [f"Memory {i+1}:\n{mem}" for i, mem in enumerate(short_term_memories)]
+        print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
 
-        ltm_episodes = self.long_term_memory.retrieve_episodic_memories(
+        task_str = f"Task: {self.task}" if self.task else ""
+        env_state_str = f"Environment state: {str(environment_info)}" if environment_info else ""
+        query_str = (task_str + "\n" + env_state_str).strip()
+
+        ltm_episodes = await self.long_term_memory.retrieve_episodic_memories(
              agent_id=self.id,
-             query=self.task if self.task else environment_info,
+             query=query_str,
              top_k=2
         )
+
+        print("\nEpisodic Memory Results:")
+        memory_strings = [f"Memory {i+1}:\n{mem.model_dump()}" for i, mem in enumerate(ltm_episodes)]
+        print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
 
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
-            short_term_memory=[mem.dict() for mem in stm_cognitive],
+            short_term_memory=short_term_memories,
             long_term_memory=[episode.dict() for episode in ltm_episodes],
         )
 
@@ -90,7 +107,7 @@ class MarketAgent(LLMAgent):
             prompt,
             output_format=PerceptionSchema.model_json_schema(),
             json_tool=structured_tool,
-            return_prompt=return_prompt
+            return_prompt=return_prompt,
         )
 
         if not return_prompt:
@@ -101,14 +118,14 @@ class MarketAgent(LLMAgent):
                     "environment_name": environment_name,
                     "environment_info": environment_info
                 },
-                content=json.dumps(response.get("perception", "")),
-                created_at=datetime.now(),
+                content=json.dumps(response),
+                created_at=datetime.now(timezone.utc),
             )
 
             self.episode_steps.append(perception_mem)
-            asyncio.create_task(self.short_term_memory.store_memory(perception_mem))
+            task = asyncio.create_task(self.short_term_memory.store_memory(perception_mem))
 
-            self.last_perception = response.get("perception", {})
+            self.last_perception = response
         return response
 
     async def generate_action(
@@ -117,14 +134,14 @@ class MarketAgent(LLMAgent):
         perception: Optional[str] = None,
         return_prompt: bool = False,
         structured_tool: bool = False,
+        action_schema: Dict = None
     ) -> Union[Dict[str, Any], LLMPromptContext]:
         if environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
 
         environment = self.environments[environment_name]
-        if perception is None and not return_prompt:
-            perception_obj = await self.perceive(environment_name)
-            perception = perception_obj.get("perception", {})
+        #if perception is None and not return_prompt:
+        #    perception = await self.perceive(environment_name)
         environment_info = environment.get_global_state()
 
         action_space = environment.action_space
@@ -142,7 +159,9 @@ class MarketAgent(LLMAgent):
         )
 
         prompt = self.prompt_manager.get_action_prompt(variables.model_dump())
-        action_schema = action_space.get_action_schema()
+
+        if not action_schema:
+            action_schema = action_space.get_action_schema()
 
         response = await self.execute(
             prompt,
@@ -167,11 +186,11 @@ class MarketAgent(LLMAgent):
                     "environment_info": environment_info
                 },
                 content=json.dumps(response),
-                created_at=datetime.now(),
+                created_at=datetime.now(timezone.utc),
             )
 
             self.episode_steps.append(action_mem)
-            asyncio.create_task(self.short_term_memory.store_memory(action_mem))
+            task = asyncio.create_task(self.short_term_memory.store_memory(action_mem))
 
             return action
         else:
@@ -209,24 +228,37 @@ class MarketAgent(LLMAgent):
         environment_info = environment.get_global_state()
 
         if observation:
+            # Pre-serialize observation data
+            if hasattr(observation, 'serialize_json'):
+                observation_content = json.loads(observation.serialize_json())
+            elif hasattr(observation, 'model_dump'):
+                observation_content = observation.model_dump()
+            else:
+                observation_content = str(observation)
+                
             observation_mem = MemoryObject(
                 agent_id=self.id,
                 cognitive_step="observation",
                 metadata={
                     "environment_name": environment_name,
-                    "environment_info": environment_info
+                    "environment_info": environment_info,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 },
-                content=json.dumps(observation),
-                created_at=datetime.now(),
+                content=json.dumps(observation_content),
+                created_at=datetime.now(timezone.utc)
             )
+
             self.episode_steps.append(observation_mem)
-            asyncio.create_task(self.short_term_memory.store_memory(observation_mem))
+            task = asyncio.create_task(self.short_term_memory.store_memory(observation_mem))
 
         previous_strategy = "No previous strategy available"
-        previous_reflection = self.short_term_memory.retrieve_recent_memories(cognitive_step='reflection', limit=1)
+        previous_reflection = await self.short_term_memory.retrieve_recent_memories(cognitive_step='reflection', limit=1)
         if previous_reflection:
             last_reflection_obj = previous_reflection[0]
             previous_strategy = last_reflection_obj.metadata.get("strategy_update", "")
+            if isinstance(previous_strategy, list):
+                previous_strategy = " ".join(previous_strategy)
+
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
@@ -268,20 +300,22 @@ class MarketAgent(LLMAgent):
                     "environment_info": environment_info
                 },
                 content=json.dumps(response.get("reflection", "")),
-                created_at=datetime.now(),
+                created_at=datetime.now(timezone.utc),
             )
 
             self.episode_steps.append(reflection_mem)
-            asyncio.create_task(self.short_term_memory.store_memory(reflection_mem))
-            asyncio.create_task(self.long_term_memory.store_episodic_memory(
+            task = await self.short_term_memory.store_memory(reflection_mem)
+
+            task_str = f"Task: {self.task}" if self.task else ""
+            env_state_str = f"Environment state: {str(environment_info)}" if environment_info else ""
+            query_str = (task_str + "\n" + env_state_str).strip()
+            await self.long_term_memory.store_episodic_memory(
                 agent_id=self.id,
-                task_query=self.task if self.task else environment_info,
+                task_query=query_str,
                 steps=self.episode_steps,
                 total_reward=round(total_reward_val),
                 strategy_update=response.get("strategy_update", ""),
                 metadata=None
-            ))
+            )
             self.episode_steps.clear()
-            return response.get("reflection", "")
-        else:
-            return response
+        return response

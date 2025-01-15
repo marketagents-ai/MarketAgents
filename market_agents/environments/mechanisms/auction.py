@@ -1,5 +1,7 @@
 # double_auction.py
 
+from datetime import datetime
+import json
 import logging
 from typing import Any, List, Dict, Union, Type, Optional, Tuple
 from pydantic import BaseModel, Field, field_validator
@@ -40,20 +42,40 @@ class AuctionAction(LocalAction):
 class GlobalAuctionAction(GlobalAction):
     actions: Dict[str, AuctionAction]
 
-
 class AuctionObservation(BaseModel):
     trades: List[Trade] = Field(default_factory=list, description="List of trades the agent participated in")
     market_summary: MarketSummary = Field(default_factory=MarketSummary, description="Summary of market activity")
     waiting_orders: List[Union[Bid, Ask]] = Field(default_factory=list, description="List of orders waiting to be executed")
 
+    def serialize_json(self) -> str:
+        """Serialize the observation to JSON string, handling datetime objects"""
+        return json.dumps(self.model_dump(), default=lambda x: x.isoformat() if isinstance(x, datetime) else x.model_dump() if hasattr(x, 'model_dump') else x)
 
 class AuctionLocalObservation(LocalObservation):
     observation: AuctionObservation
 
+    def serialize_json(self) -> str:
+        """Serialize the local observation to JSON string"""
+        return json.dumps({
+            "agent_id": self.agent_id,
+            "observation": json.loads(self.observation.serialize_json())
+        })
+
 class AuctionGlobalObservation(GlobalObservation):
     observations: Dict[str, AuctionLocalObservation]
-    all_trades: List[Trade] = Field(default_factory=list, description="All trades executed in this round")
-    market_summary: MarketSummary = Field(default_factory=MarketSummary, description="Summary of market activity")
+    all_trades: List[Trade]
+    market_summary: MarketSummary
+
+    def serialize_json(self) -> str:
+        """Serialize the global observation to JSON string"""
+        return json.dumps({
+            "observations": {
+                agent_id: json.loads(obs.serialize_json())
+                for agent_id, obs in self.observations.items()
+            },
+            "all_trades": [trade.model_dump() for trade in self.all_trades],
+            "market_summary": self.market_summary.model_dump()
+        })
 
 
 class AuctionActionSpace(ActionSpace):

@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from market_agents.agents.tool_caller.engine import Engine
-from market_agents.agents.tool_caller.utils import function_to_json
 from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
@@ -78,7 +77,6 @@ class Agent(BaseModel):
             self.llm_config.response_format = "text"
         elif execution_output_format == "tool":
             self.llm_config.response_format = "tool"
-            execution_output_format = "tool"
         elif json_tool:
             self.llm_config.response_format = "tool"
             execution_output_format = self._load_output_schema(execution_output_format)

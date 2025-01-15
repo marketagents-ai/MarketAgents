@@ -10,8 +10,8 @@ from typing import List, Dict, Union
 import warnings
 
 import yaml
-from auction_orchestrator import AuctionOrchestrator
-from groupchat_orchestrator import GroupChatOrchestrator
+from market_agents.orchestrators.auction_orchestrator import AuctionOrchestrator
+from market_agents.orchestrators.groupchat_orchestrator import GroupChatOrchestrator
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.agents.personas.persona import Persona, generate_persona, save_persona_to_file
 from market_agents.agents.protocols.acl_message import ACLMessage
@@ -29,13 +29,15 @@ from market_agents.inference.parallel_inference import ParallelAIUtilities, Requ
 from market_agents.orchestrators.base_orchestrator import BaseEnvironmentOrchestrator
 from market_agents.orchestrators.config import OrchestratorConfig, load_config
 from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
+from market_agents.memory.setup_db import DatabaseConnection
+from market_agents.memory.config import MarketMemoryConfig, load_config_from_yaml
 from market_agents.orchestrators.logger_utils import (
     log_section,
     log_environment_setup,
     log_agent_init,
     log_round,
     print_ascii_art,
-    orchestartion_logger,
+    orchestration_logger,
     log_completion
 )
 
@@ -46,10 +48,23 @@ class MetaOrchestrator:
         self.config = config
         self.agents: List[MarketAgent] = []
         self.ai_utils = self._initialize_ai_utils()
+        self.memory_config = self._initialize_memory_config()
+        self.db_conn = self._initialize_database()
         self.data_inserter = self._initialize_data_inserter()
-        self.logger = orchestartion_logger
+        self.logger = orchestration_logger
         self.environment_order = environment_order or config.environment_order
         self.environment_orchestrators = {}
+
+    def _initialize_memory_config(self) -> MarketMemoryConfig:
+        # Load memory configuration from YAML
+        config_path = "market_agents/memory/memory_config.yaml"
+        return load_config_from_yaml(config_path)
+
+    def _initialize_database(self) -> DatabaseConnection:
+        # Initialize database connection
+        db_conn = DatabaseConnection(self.memory_config)
+        db_conn._ensure_database_exists()
+        return db_conn
 
     def _initialize_ai_utils(self):
         # Initialize AI utilities
@@ -97,6 +112,11 @@ class MetaOrchestrator:
         num_agents = len(personas)
         num_buyers = num_agents // 2
         num_sellers = num_agents - num_buyers
+
+        # Initialize agent memory tables
+        agent_ids = [str(uuid.uuid4()) for _ in range(num_agents)]
+        self.db_conn.init_agent_cognitive_memory(agent_ids)
+        self.db_conn.init_agent_episodic_memory(agent_ids)
 
         for i, persona in enumerate(personas):
             agent_uuid = str(uuid.uuid4())
@@ -168,7 +188,9 @@ class MetaOrchestrator:
                 environments={},
                 protocol=ACLMessage,
                 persona=persona,
-                econ_agent=economic_agent
+                econ_agent=economic_agent,
+                memory_config=self.memory_config,
+                db_conn=self.db_conn
             )
 
             # Initialize last_perception and last_observation
@@ -216,22 +238,28 @@ class MetaOrchestrator:
                 continue
             
             # Initialize environment for this orchestrator
-            orchestrator.setup_environment()
+            #orchestrator.setup_environment()
             orchestrators[env_name] = orchestrator
             self.logger.info(f"Initialized {env_name} environment")
             
         # Verify environments are properly set for all agents
         for agent in self.agents:
             env_names = agent.environments.keys() if hasattr(agent, 'environments') else []
-            self.logger.info(f"Agent {agent.index} has environments: {list(env_names)}")
+            #self.logger.info(f"Agent {agent.index} has environments: {list(env_names)}")
             
         return orchestrators
 
     async def run_simulation(self):
-        # Initialize environment orchestrators once at the start
+        # Initialize environment orchestrators
         self.environment_orchestrators = self._initialize_environment_orchestrators()
         
-        # Run simulation rounds - each round includes both environments in sequence
+        # Set up each environment before starting simulation
+        for env_name, orchestrator in self.environment_orchestrators.items():
+            self.logger.info(f"Setting up {env_name} environment...")
+            await orchestrator.setup_environment()  # Properly await setup
+            self.logger.info(f"Setup complete for {env_name} environment")
+        
+        # Run simulation rounds - each round includes environments in sequence
         for round_num in range(1, self.config.max_rounds + 1):
             log_round(self.logger, round_num)
             
@@ -261,8 +289,12 @@ class MetaOrchestrator:
     async def start(self):
         print_ascii_art()
         log_section(self.logger, "Simulation Starting")
-        await self.run_simulation()
-        log_completion(self.logger, "Simulation completed successfully")
+        try:
+            await self.run_simulation()
+            log_completion(self.logger, "Simulation completed successfully")
+        finally:
+            # Clean up database connection
+            self.db_conn.close()
 
 if __name__ == "__main__":
     import sys
