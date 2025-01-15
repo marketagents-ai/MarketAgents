@@ -9,6 +9,7 @@ class AgentPromptVariables(BaseModel):
     environment_info: Any
     short_term_memory: Optional[List[Dict[str, Any]]] = None
     long_term_memory: Optional[List[Dict[str, Any]]] = None
+    documents: Optional[List[Dict[str, Any]]] = None
     perception: Optional[Any] = None
     observation: Optional[Any] = None
     action_space: Dict[str, Any] = Field(default_factory=dict)
