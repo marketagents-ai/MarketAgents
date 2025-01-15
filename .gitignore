@@ -15,6 +15,7 @@ llm_agents/logs*
 **/venv
 **/venv/*
 **/venv/**
+*.log
 venv
 venv/*
 venv/**
@@ -23,3 +24,4 @@ venv/**
 /outputs
 /vscode
 /.vscode
+.DS_store

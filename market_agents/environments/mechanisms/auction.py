@@ -1,9 +1,9 @@
 # double_auction.py
 
 from datetime import datetime
+import json
 import logging
 from typing import Any, List, Dict, Union, Type, Optional, Tuple
-from flask import json
 from pydantic import BaseModel, Field, field_validator
 from market_agents.environments.environment import (
     Mechanism, LocalAction, GlobalAction, LocalObservation, GlobalObservation,
