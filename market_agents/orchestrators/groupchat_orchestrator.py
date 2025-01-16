@@ -218,9 +218,10 @@ class GroupChatOrchestrator:
         for cohort_id, proposer_id in self.topic_proposers.items():
             proposer_agent = self.agent_dict[proposer_id]
             # Set system message for proposer
-            good_name = self.orchestrator_config.agent_config.good_name
-            proposer_agent_task = f"You are the group chat topic proposer agent. Your role is to propose interesting and relevant topics for group discussion about {good_name}.\n"
-            proposer_agent_task += f"Consider recent events, trends, or news related to {good_name}. Propose a specific topic for discussion that would be relevant to market participants. Please describe the topic in detail."
+            initial_topic = self.config.initial_topic
+            proposer_agent_task = f"You are the group chat topic proposer agent. Your role is to propose interesting and relevant topics for group discussion about {initial_topic}.\n"
+            #proposer_agent_task += f"Consider recent events, trends, or news related to {good_name}.\n" 
+            proposer_agent_task += "Propose a specific topic for discussion that would be relevant to participants. Please describe the topic in detail."
             prompt = await proposer_agent.generate_action(
                 self.config.name,
                 proposer_agent_task,
@@ -313,17 +314,17 @@ class GroupChatOrchestrator:
                     'messages': agent_messages[-1] if agent_messages else None
                 }
 
-        #    # Agents perceive the messages
-        #    perceptions = await self.cognitive_processor.run_parallel_perceive(cohort_agents, self.config.name)
-        #    # Log personas and perceptions
-        #    for agent, perception in zip(cohort_agents, perceptions):
-        #        log_persona(self.logger, agent.index, agent.persona)
-        #        log_perception(
-        #            self.logger, 
-        #            agent.index, 
-        #            perception.json_object.object if perception and perception.json_object else None
-        #        )
-        #        agent.last_perception = perception.json_object.object if perception.json_object else perception.str_content
+            # Agents perceive the messages
+            perceptions = await self.cognitive_processor.run_parallel_perceive(cohort_agents, self.config.name)
+            # Log personas and perceptions
+            for agent, perception in zip(cohort_agents, perceptions):
+                log_persona(self.logger, agent.index, agent.persona)
+                log_perception(
+                    self.logger, 
+                    agent.index, 
+                    perception.json_object.object if perception and perception.json_object else None
+                )
+                agent.last_perception = perception.json_object.object if perception.json_object else perception.str_content
 
             # Agents generate actions (messages)
             actions = await self.cognitive_processor.run_parallel_action(cohort_agents, self.config.name)
