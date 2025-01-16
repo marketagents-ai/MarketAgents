@@ -7,8 +7,8 @@ perception: |
   ## Recent Cognitive Memories
   {short_term_memory}
   
-    ## Retrieved Documents
-  {retrieved_documents}
+  ## Retrieved Documents
+  {documents}
   
   ## Long Term Episodic Memories
   {long_term_memory}
