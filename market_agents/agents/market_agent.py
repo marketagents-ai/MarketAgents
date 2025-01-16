@@ -94,12 +94,21 @@ class MarketAgent(LLMAgent):
              query=query_str,
              top_k=2
         )
+        retrieved_documents = []
         if self.knowledge_agent:
-            retrieved_documents = self.knowledge_agent.retrieve(self.task, environment_name)
+            kb_table_prefix = self.knowledge_agent.market_kb.table_prefix
+            retrieved_documents = self.knowledge_agent.retrieve(
+                query_str, 
+                kb_table_prefix)
 
         print("\nEpisodic Memory Results:")
         memory_strings = [f"Memory {i+1}:\n{mem.model_dump()}" for i, mem in enumerate(ltm_episodes)]
         print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
+
+        if retrieved_documents:
+            print("\nRetrieved Documents:")
+            doc_strings = [f"Document {i+1}:\n{doc.model_dump()}" for i, doc in enumerate(retrieved_documents)]
+            print("\033[95m" + "\n\n".join(doc_strings) + "\033[0m")
 
         variables = AgentPromptVariables(
             environment_name=environment_name,
