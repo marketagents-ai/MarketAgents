@@ -6,9 +6,13 @@ import os
 import random
 import uuid
 from pathlib import Path
-from typing import List, Dict, Union
+from typing import List, Dict, Optional, Union
 import warnings
 
+from market_agents.memory.embedding import MemoryEmbedder
+from market_agents.memory.knowledge_base import MarketKnowledgeBase
+from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
+from market_agents.memory.vector_search import MemoryRetriever
 import yaml
 from market_agents.orchestrators.auction_orchestrator import AuctionOrchestrator
 from market_agents.orchestrators.groupchat_orchestrator import GroupChatOrchestrator
@@ -50,6 +54,7 @@ class MetaOrchestrator:
         self.ai_utils = self._initialize_ai_utils()
         self.memory_config = self._initialize_memory_config()
         self.db_conn = self._initialize_database()
+        self.embedder = MemoryEmbedder(config=self.memory_config)
         self.data_inserter = self._initialize_data_inserter()
         self.logger = orchestration_logger
         self.environment_order = environment_order or config.environment_order
@@ -105,6 +110,49 @@ class MetaOrchestrator:
             save_persona_to_file(new_persona, personas_dir)
 
         return existing_personas[:self.config.num_agents]
+    
+    def _initialize_knowledge_base(self, kb_name: str) -> Optional[KnowledgeBaseAgent]:
+        """Initialize knowledge base agent if specified"""
+        print(f"\nAttempting to initialize knowledge base: {kb_name}")
+        if not kb_name:
+            print("No knowledge base name provided")
+            return None
+            
+        try:
+            # Initialize knowledge base with the given prefix
+            print(f"Initializing MarketKnowledgeBase with prefix: {kb_name}")
+            market_kb = MarketKnowledgeBase(
+                config=self.memory_config,
+                db_conn=self.db_conn,
+                embedding_service=self.embedder,
+                table_prefix=kb_name
+            )
+            
+            print("Initializing MemoryRetriever")
+            retriever = MemoryRetriever(
+                config=self.memory_config,
+                db_conn=self.db_conn,
+                embedding_service=self.embedder
+            )
+            
+            print("Creating KnowledgeBaseAgent")
+            kb_agent = KnowledgeBaseAgent(
+                market_kb=market_kb,
+                retriever=retriever
+            )
+            
+            # Test if tables exist and have data
+            if not market_kb.check_table_exists(self.db_conn, kb_name):
+                print(f"Tables for {kb_name} don't exist or are empty")
+                return None
+                
+            print("Knowledge base initialized successfully")
+            return kb_agent
+                    
+        except Exception as e:
+            print(f"Error initializing knowledge base: {str(e)}")
+            self.logger.error(f"Error initializing knowledge base '{kb_name}': {str(e)}")
+            return None
 
     def generate_agents(self):
         log_section(self.logger, "Generating Agents")
@@ -181,6 +229,15 @@ class MetaOrchestrator:
                 max_relative_spread=agent_config.get('max_relative_spread', 0.2)
             )
 
+            if agent_config.get('knowledge_base'):
+                kb_name = agent_config.get('knowledge_base')
+                print(f"\nInitializing knowledge base for agent {i} with kb_name: {kb_name}")
+                knowledge_agent = self._initialize_knowledge_base(kb_name)
+                print(f"Knowledge agent initialized: {knowledge_agent is not None}")
+            else:
+                knowledge_agent = None
+                print(f"\nNo knowledge base configured for agent {i}")
+
             agent = MarketAgent.create(
                 agent_id=agent_uuid,
                 use_llm=agent_config.get('use_llm', True),
@@ -190,7 +247,8 @@ class MetaOrchestrator:
                 persona=persona,
                 econ_agent=economic_agent,
                 memory_config=self.memory_config,
-                db_conn=self.db_conn
+                db_conn=self.db_conn,
+                knowledge_agent=knowledge_agent if knowledge_agent else None
             )
 
             # Initialize last_perception and last_observation
@@ -214,18 +272,18 @@ class MetaOrchestrator:
             if not env_config:
                 self.logger.warning(f"Configuration for environment '{env_name}' not found.")
                 continue
-                
-            if env_name == 'auction':
-                orchestrator = AuctionOrchestrator(
+
+            if env_name == 'group_chat':
+                orchestrator = GroupChatOrchestrator(
                     config=env_config,
                     orchestrator_config=self.config,
                     agents=self.agents,
                     ai_utils=self.ai_utils,
                     data_inserter=self.data_inserter,
                     logger=self.logger
-                )
-            elif env_name == 'group_chat':
-                orchestrator = GroupChatOrchestrator(
+                )             
+            elif env_name == 'auction':
+                orchestrator = AuctionOrchestrator(
                     config=env_config,
                     orchestrator_config=self.config,
                     agents=self.agents,

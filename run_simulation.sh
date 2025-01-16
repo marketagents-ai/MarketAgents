@@ -80,7 +80,7 @@ start_time=$(date +%s)
 
 # Run the orchestrator script
 echo "Starting market simulation with parallel orchestration..."
-python3 "$ORCHESTRATOR_SCRIPT" --environments group_chat auction 2>&1 | tee simulation_output.log
+python3 "$ORCHESTRATOR_SCRIPT" 2>&1 | tee simulation_output.log
 
 orchestrator_exit_code=${PIPESTATUS[0]}
 
