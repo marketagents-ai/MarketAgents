@@ -27,37 +27,46 @@ class MemoryRetriever:
         """
         Search a specific knowledge base for relevant content based on semantic similarity.
         """
-        self.db.connect()
-        query_embedding = self.embedding_service.get_embeddings(query)
-        top_k = top_k or self.config.top_k
+        try:
+            self.db.conn.rollback()
+            self.db.ensure_connection()
+            
+            query_embedding = self.embedding_service.get_embeddings(query)
+            top_k = top_k or self.config.top_k
 
-        knowledge_chunks_table = f"{table_prefix}_knowledge_chunks"
-        knowledge_objects_table = f"{table_prefix}_knowledge_objects"
+            knowledge_chunks_table = f"{table_prefix}_knowledge_chunks"
+            knowledge_objects_table = f"{table_prefix}_knowledge_objects"
 
-        self.db.cursor.execute(f"""
-            WITH ranked_chunks AS (
-                SELECT DISTINCT ON (c.text)
-                    c.id, c.text, c.start_pos, c.end_pos, k.content,
-                    (1 - (c.embedding <=> %s::vector)) AS similarity
-                FROM {knowledge_chunks_table} c
-                JOIN {knowledge_objects_table} k ON c.knowledge_id = k.knowledge_id
-                WHERE (1 - (c.embedding <=> %s::vector)) >= %s
-                ORDER BY c.text, similarity DESC
-            )
-            SELECT * FROM ranked_chunks
-            ORDER BY similarity DESC
-            LIMIT %s;
-        """, (query_embedding, query_embedding, self.config.similarity_threshold, top_k))
+            self.db.cursor.execute(f"""
+                WITH ranked_chunks AS (
+                    SELECT DISTINCT ON (c.text)
+                        c.id, c.text, c.start_pos, c.end_pos, k.content,
+                        (1 - (c.embedding <=> %s::vector)) AS similarity
+                    FROM {knowledge_chunks_table} c
+                    JOIN {knowledge_objects_table} k ON c.knowledge_id = k.knowledge_id
+                    WHERE (1 - (c.embedding <=> %s::vector)) >= %s
+                    ORDER BY c.text, similarity DESC
+                )
+                SELECT * FROM ranked_chunks
+                ORDER BY similarity DESC
+                LIMIT %s;
+            """, (query_embedding, query_embedding, self.config.similarity_threshold, top_k))
 
-        results = []
-        rows = self.db.cursor.fetchall()
-        for row in rows:
-            _, text, start_pos, end_pos, full_content, sim = row
-            self.full_text = full_content
-            context = self._get_context(start_pos, end_pos, full_content)
-            results.append(RetrievedMemory(text=text, similarity=sim, context=context))
+            results = []
+            rows = self.db.cursor.fetchall()
+            for row in rows:
+                _, text, start_pos, end_pos, full_content, sim = row
+                self.full_text = full_content
+                context = self._get_context(start_pos, end_pos, full_content)
+                results.append(RetrievedMemory(text=text, similarity=sim, context=context))
 
-        return results
+            self.db.conn.commit()
+            return results
+            
+        except Exception as e:
+            self.db.conn.rollback()
+            print(f"Error during knowledge base search: {str(e)}")
+            raise
 
     def search_agent_cognitive_memory(self, agent_id: str, query: str, top_k: int = None) -> List[RetrievedMemory]:
         """Search a specific agent's cognitive memory"""
@@ -127,8 +136,8 @@ class MemoryRetriever:
         """
         Extracts context around a specific text chunk within a full document.
         """
-        start_idx = max(0, start - self.config.context_window)
-        end_idx = min(len(full_text), end + self.config.context_window)
+        start_idx = max(0, start - self.config.max_input)
+        end_idx = min(len(full_text), end + self.config.max_input)
         context = full_text[start_idx:end_idx].strip()
         if start_idx > 0:
             context = "..." + context

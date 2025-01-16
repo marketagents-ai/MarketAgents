@@ -7,6 +7,7 @@ import yaml
 from pathlib import Path
 
 class AgentConfig(BaseModel):
+    knowledge_base: str
     num_units: int
     buyer_base_value: float
     seller_base_value: float

@@ -16,7 +16,7 @@ batch_size: 32
 timeout: 10
 retry_attempts: 3
 retry_delay: 1.0
-min_chunk_size: 256
+min_chunk_size: 512
 max_chunk_size: 1024
 # vector_dim: 1536 #openai embed dim
 vector_dim: 768

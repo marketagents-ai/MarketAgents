@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 import json
+import logging
 import uuid
 import re
+
 from uuid import UUID
 from datetime import datetime
+from typing import List
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from market_agents.memory.embedding import MemoryEmbedder
@@ -41,7 +44,25 @@ class MarketKnowledgeBase:
         self.table_prefix = table_prefix
         self.knowledge_objects_table = f"{table_prefix}_knowledge_objects"
         self.knowledge_chunks_table = f"{table_prefix}_knowledge_chunks"
-        self.db.create_knowledge_base_tables(table_prefix)
+        if not self.check_table_exists(db_conn, table_prefix):
+            self.db.create_knowledge_base_tables(table_prefix)
+
+    @classmethod
+    def check_table_exists(cls, db_conn: DatabaseConnection, table_prefix: str) -> bool:
+        """Check if knowledge base tables exist"""
+        try:
+            db_conn.connect()
+            db_conn.cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = %s
+                );
+            """, (f"{table_prefix}_knowledge_objects",))
+            
+            return db_conn.cursor.fetchone()[0]
+        except Exception as e:
+            logging.error(f"Error checking knowledge base existence: {str(e)}")
+            return False
 
     def ingest_knowledge(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> UUID:
         """Process a document: chunk, embed, and store as a KnowledgeObject."""
@@ -100,8 +121,7 @@ class MarketKnowledgeBase:
         except Exception as e:
             self.db.conn.rollback()
             raise e
-
-    
+        
 class SemanticChunker(KnowledgeChunker):
     def __init__(self, min_size: int, max_size: int):
         self.min_size = min_size

@@ -4,9 +4,10 @@ num_agents: 5
 max_rounds: 2
 environment_order:
   - group_chat
-  - auction
+#  - auction
 tool_mode: true
 agent_config:
+#  knowledge_base: "hamlet_kb"
   num_units: 10
   buyer_base_value: 120.0
   seller_base_value: 80.0
@@ -85,6 +86,7 @@ environment_configs:
     address: "localhost:8001"
     max_rounds: 5
     initial_topic: "Initial Market Discussion"
+  #  initial_topic: "Hamlet's famous 'To be or not to be' soliloquy"
     sub_rounds: 3
     group_size: 4
   auction:

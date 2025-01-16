@@ -15,6 +15,7 @@ from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.environments.environment import MultiAgentEnvironment, LocalObservation
 from market_agents.inference.message_models import LLMConfig, LLMPromptContext
 from market_agents.memory.config import MarketMemoryConfig
+from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
 from market_agents.memory.memory import MemoryObject, ShortTermMemory, LongTermMemory
 
 class MarketAgent(LLMAgent):
@@ -29,6 +30,7 @@ class MarketAgent(LLMAgent):
     address: str = Field(default="", description="Agent's address")
     prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
     economic_agent: Optional[EconomicAgent] = None
+    knowledge_agent: Optional[KnowledgeBaseAgent] = None
 
     @classmethod
     def create(
@@ -42,6 +44,7 @@ class MarketAgent(LLMAgent):
         protocol: Optional[Type[Protocol]] = None,
         persona: Optional[Persona] = None,
         econ_agent: Optional[EconomicAgent] = None,
+        knowledge_agent: Optional[KnowledgeBaseAgent] = None
     ) -> 'MarketAgent':
         agent = cls(
             id=agent_id,
@@ -55,7 +58,8 @@ class MarketAgent(LLMAgent):
             protocol=protocol,
             address=f"agent_{agent_id}_address",
             use_llm=use_llm,
-            economic_agent=econ_agent
+            economic_agent=econ_agent,
+            knowledge_agent=knowledge_agent
         )
         return agent
 
@@ -90,16 +94,28 @@ class MarketAgent(LLMAgent):
              query=query_str,
              top_k=2
         )
+        retrieved_documents = []
+        if self.knowledge_agent:
+            kb_table_prefix = self.knowledge_agent.market_kb.table_prefix
+            retrieved_documents = self.knowledge_agent.retrieve(
+                query_str, 
+                kb_table_prefix)
 
         print("\nEpisodic Memory Results:")
         memory_strings = [f"Memory {i+1}:\n{mem.model_dump()}" for i, mem in enumerate(ltm_episodes)]
         print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
 
+        if retrieved_documents:
+            print("\nRetrieved Documents:")
+            doc_strings = [f"Document {i+1}:\n{doc.model_dump()}" for i, doc in enumerate(retrieved_documents)]
+            print("\033[95m" + "\n\n".join(doc_strings) + "\033[0m")
+
         variables = AgentPromptVariables(
             environment_name=environment_name,
             environment_info=environment_info,
             short_term_memory=short_term_memories,
-            long_term_memory=[episode.dict() for episode in ltm_episodes],
+            long_term_memory=[episode.model_dump() for episode in ltm_episodes],
+            documents=[doc.model_dump() for doc in retrieved_documents]
         )
 
         prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
@@ -235,7 +251,7 @@ class MarketAgent(LLMAgent):
                 observation_content = observation.model_dump()
             else:
                 observation_content = str(observation)
-                
+
             observation_mem = MemoryObject(
                 agent_id=self.id,
                 cognitive_step="observation",
