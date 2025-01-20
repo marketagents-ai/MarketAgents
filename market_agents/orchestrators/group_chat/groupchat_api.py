@@ -2,10 +2,14 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any, Union
+from datetime import datetime
 import uvicorn
 import random
 import logging
+
+from market_agents.memory.knowledge_base import KnowledgeObject
+from market_agents.memory.memory import EpisodicMemoryObject, MemoryObject
 
 app = FastAPI()
 logger = logging.getLogger("groupchat_api")
@@ -16,7 +20,10 @@ cohorts: Dict[str, List[str]] = {}
 topics: Dict[str, str] = {}
 messages: Dict[str, List[Dict]] = {}
 agents: Dict[str, Dict] = {}
-proposers: Dict[str, str] = {} 
+proposers: Dict[str, str] = {}
+cognitive_memory: Dict[str, List[Dict]] = {}
+episodic_memory: Dict[str, List[Dict]] = {}
+knowledge_base: Dict[str, Dict] = {}
 
 # Pydantic models
 class Agent(BaseModel):
@@ -59,6 +66,23 @@ class GetMessagesResponse(BaseModel):
 class GetTopicResponse(BaseModel):
     cohort_id: str
     topic: str
+
+class CognitiveMemoryParams(BaseModel):
+    limit: Optional[int] = 10
+    cognitive_step: Optional[Union[str, List[str]]] = None
+    metadata_filters: Optional[Dict[str, Any]] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+
+class EpisodicMemoryParams(BaseModel):
+    agent_id: str
+    query: str
+    top_k: Optional[int] = 5
+
+class KnowledgeQueryParams(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
+    table_prefix: Optional[str] = None
 
 # Endpoint to register agents (optional)
 @app.post("/register_agent")
@@ -170,6 +194,130 @@ def get_proposer(cohort_id: str):
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+@app.post("/memory/cognitive")
+def add_cognitive_memory(memory_object: MemoryObject):
+    """Adds a cognitive memory entry for an agent."""
+    agent_id = memory_object.agent_id
+    if agent_id not in cognitive_memory:
+        cognitive_memory[agent_id] = []
+    cognitive_memory[agent_id].append(memory_object.dict())
+    logger.debug(f"Added cognitive memory for agent {agent_id}")
+    return {"message": "Cognitive memory added"}
+
+
+@app.post("/memory/episodic")
+def add_episodic_memory(memory_object: EpisodicMemoryObject):
+    """Adds an episodic memory entry for an agent."""
+    agent_id = memory_object.agent_id
+    if agent_id not in episodic_memory:
+        episodic_memory[agent_id] = []
+    episodic_memory[agent_id].append(memory_object.dict())
+    logger.debug(f"Added episodic memory for agent {agent_id}")
+    return {"message": "Episodic memory added"}
+
+
+@app.get("/memory/cognitive/{agent_id}")
+def get_cognitive_memory(agent_id: str, params: CognitiveMemoryParams):
+    """Retrieves cognitive memory for an agent based on optional query parameters."""
+    if agent_id not in cognitive_memory:
+        raise HTTPException(status_code=404, detail="No cognitive memory found for this agent")
+
+    memories = cognitive_memory.get(agent_id, [])
+    filtered_memories = []
+
+    for mem in memories:
+        if params.cognitive_step:
+            if isinstance(params.cognitive_step, str):
+                if mem.get('cognitive_step') != params.cognitive_step:
+                    continue
+            elif isinstance(params.cognitive_step, list):
+                if mem.get('cognitive_step') not in params.cognitive_step:
+                    continue
+        if params.metadata_filters:
+            for key, value in params.metadata_filters.items():
+                if mem.get('metadata', {}).get(key) != value:
+                    continue
+
+        filtered_memories.append(mem)
+    if params.start_time or params.end_time:
+
+        filtered_memories_time = []
+        for mem in filtered_memories:
+
+            try:
+                memory_time = datetime.fromisoformat(mem.get('metadata', {}).get('timestamp'))
+
+                if params.start_time and memory_time < params.start_time:
+                    continue
+
+                if params.end_time and memory_time > params.end_time:
+                    continue
+
+                filtered_memories_time.append(mem)
+            except (ValueError, TypeError) as e:
+                logger.error(f"Invalid date time or no timestamp, error: {e}")
+                continue
+
+        filtered_memories = filtered_memories_time
+
+    return filtered_memories[:params.limit]
+
+
+@app.get("/memory/episodic/{agent_id}")
+def get_episodic_memory(agent_id: str, query: str, top_k: int = 5):
+    """Retrieves episodic memory episodes for an agent (PLACEHOLDER)."""
+    if agent_id not in episodic_memory:
+        raise HTTPException(status_code=404, detail="No episodic memory found for this agent")
+    # In a real implementation, you would perform a similarity search
+    # Here, we just return the first 'top_k' memories.
+    logger.debug(f"Retrieved episodic memory for agent {agent_id} with query {query} top k {top_k}")
+    return episodic_memory.get(agent_id, [])[:top_k]
+
+
+@app.delete("/memory/{agent_id}")
+def delete_memory(agent_id: str):
+    """Deletes all memory for a specific agent."""
+    if agent_id in cognitive_memory:
+        del cognitive_memory[agent_id]
+    if agent_id in episodic_memory:
+        del episodic_memory[agent_id]
+
+    logger.debug(f"Deleted memory for agent {agent_id}")
+    return {"message": f"Memory for agent {agent_id} deleted"}
+
+
+# Knowledge Base Endpoints
+@app.post("/knowledge/ingest")
+def ingest_knowledge(knowledge_object: KnowledgeObject):
+    """Ingests a knowledge entry into the knowledge base."""
+    knowledge_id = knowledge_object.knowledge_id
+    knowledge_base[knowledge_id] = knowledge_object.dict()
+    logger.debug(f"Ingested knowledge with id {knowledge_id}")
+    return {"message": "Knowledge ingested"}
+
+
+@app.get("/knowledge/search")
+def search_knowledge(query: str, top_k: int = 5, table_prefix: Optional[str] = None):
+    """Searches the knowledge base (PLACEHOLDER)."""
+    # In a real implementation, you'd use the table_prefix to target a specific kb.
+    # You would perform similarity search logic here, but we are returning the first k items for this placeholder implementation
+    results = [value for value in knowledge_base.values()][:top_k]
+    logger.debug(f"Searched knowledge base with query: {query}, prefix {table_prefix}")
+
+    return results
+
+
+@app.delete("/knowledge/{knowledge_id}")
+def delete_knowledge(knowledge_id: str):
+    """Deletes a knowledge entry from the knowledge base."""
+    if knowledge_id in knowledge_base:
+        del knowledge_base[knowledge_id]
+        logger.debug(f"Deleted knowledge with id {knowledge_id}")
+        return {"message": f"Knowledge with id {knowledge_id} deleted"}
+    else:
+        raise HTTPException(status_code=404, detail="knowledge not found")
 
 # Run the FastAPI application
 if __name__ == "__main__":
