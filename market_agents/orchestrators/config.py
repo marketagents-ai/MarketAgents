@@ -8,23 +8,7 @@ from pathlib import Path
 
 class AgentConfig(BaseModel):
     knowledge_base: str
-    num_units: int
-    buyer_base_value: float
-    seller_base_value: float
     use_llm: bool
-    buyer_initial_cash: float
-    buyer_initial_goods: int
-    seller_initial_cash: float
-    seller_initial_goods: int
-    good_name: str
-    noise_factor: float
-    max_relative_spread: float
-
-class AuctionConfig(BaseModel):
-    name: str
-    address: str
-    max_rounds: int
-    good_name: str
 
 class GroupChatConfig(BaseModel):
     name: str
@@ -34,6 +18,16 @@ class GroupChatConfig(BaseModel):
     groupchat_api_url: str = Field(default="http://localhost:8001")
     sub_rounds: int = Field(default=3)
     group_size: int = Field(default=100)
+
+class ResearchConfig(BaseModel):
+    name: str
+    address: str
+    max_rounds: int
+    initial_topic: str
+    research_api_url: str = Field(default="http://localhost:8002")
+    sub_rounds: int = Field(default=3)
+    group_size: int = Field(default=100)
+    schema_model: str = Field(..., description="Name of Pydantic model class from research_schemas.py")
 
 class LLMConfigModel(BaseModel):
     name: str
@@ -58,7 +52,7 @@ class OrchestratorConfig(BaseSettings):
     max_rounds: int
     agent_config: AgentConfig
     llm_configs: List[LLMConfigModel]
-    environment_configs: Dict[str, Union[AuctionConfig, GroupChatConfig]]
+    environment_configs: Dict[str, Union[GroupChatConfig, ResearchConfig]]
     environment_order: List[str]
     protocol: str
     database_config: DatabaseConfig = DatabaseConfig()

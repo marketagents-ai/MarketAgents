@@ -133,7 +133,14 @@ class AgentCognitiveProcessor:
                     log_reflection(self.logger, agent.index, reflection_content)
                     
                     # Calculate rewards
-                    environment_reward = agent.last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if agent.last_step else None
+                    environment = agent.environments.get(environment_name)
+                    if environment and environment.mechanism:
+                        last_step = environment.mechanism.last_step
+                        environment_reward = last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if last_step else None
+                    else:
+                        environment_reward = None
+                        self.logger.warning(f"Could not get environment step for agent {agent.id}")
+
                     self_reward = reflection_content.get("self_reward", 0.0)
                     
                     total_reward = None

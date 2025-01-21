@@ -146,168 +146,6 @@ class SimulationDataInserter:
             logging.error(f"Error inserting group chat messages: {str(e)}")
             raise
 
-    def insert_allocations(self, allocations: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
-        query = """
-        INSERT INTO allocations (agent_id, goods, cash, locked_goods, locked_cash, initial_goods, initial_cash)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        try:
-            with self.conn.cursor() as cur:
-                for allocation in allocations:
-                    agent_id = agent_id_map.get(str(allocation['agent_id']))
-                    if agent_id is None:
-                        logging.error(f"No matching UUID found for agent_id: {allocation['agent_id']}")
-                        continue
-                    cur.execute(query, (
-                        agent_id,
-                        allocation['goods'],
-                        allocation['cash'],
-                        allocation['locked_goods'],
-                        allocation['locked_cash'],
-                        allocation['initial_goods'],
-                        allocation['initial_cash']
-                    ))
-            self.conn.commit()
-            logging.info(f"Inserted {len(allocations)} allocations into the database")
-        except Exception as e:
-            self.conn.rollback()
-            logging.error(f"Error inserting allocations: {str(e)}")
-            raise
-    
-    def insert_schedules(self, schedules_data: List[Dict[str, Any]]):
-        """
-        Inserts schedule data into the preference_schedules table without handling conflicts.
-
-        Args:
-            schedules_data (List[Dict[str, Any]]): List of schedule dictionaries containing:
-                - agent_id (UUID)
-                - is_buyer (bool)
-                - values (BuyerPreferenceSchedule or None)
-                - costs (SellerPreferenceSchedule or None)
-                - initial_endowment (Basket)
-        """
-        query = """
-        INSERT INTO preference_schedules (agent_id, is_buyer, values, costs, initial_endowment)
-        VALUES (%s, %s, %s, %s, %s)
-        """
-        try:
-            with self.conn.cursor() as cur:
-                for schedule in schedules_data:
-                    logging.debug(f"Inserting schedule: {schedule}")
-
-                    # Handle 'values' and 'costs' based on is_buyer
-                    if schedule['is_buyer']:
-                        values_json = json.dumps(schedule['values'], default=json_serial) if schedule['values'] else None
-                        costs_json = None
-                    else:
-                        values_json = None
-                        costs_json = json.dumps(schedule['costs'], default=json_serial) if schedule['costs'] else None
-
-                    # Handle 'initial_endowment'
-                    initial_endowment = schedule['initial_endowment']
-                    if hasattr(initial_endowment, 'dict'):
-                        # Convert Basket instance to dict
-                        initial_endowment_serializable = initial_endowment.dict()
-                    else:
-                        # Assume it's already a dict or another serializable type
-                        initial_endowment_serializable = initial_endowment
-
-                    try:
-                        initial_endowment_json = json.dumps(initial_endowment_serializable)
-                    except TypeError as e:
-                        logging.error(f"Error serializing 'initial_endowment' for agent_id {schedule['agent_id']}: {e}")
-                        raise
-
-                    # Execute the SQL Insert without ON CONFLICT
-                    try:
-                        cur.execute(query, (
-                            schedule['agent_id'],
-                            schedule['is_buyer'],
-                            values_json,
-                            costs_json,
-                            initial_endowment_json
-                        ))
-                    except psycopg2.Error as db_err:
-                        logging.error(f"Database error inserting schedule for agent_id {schedule['agent_id']}: {db_err}")
-                        raise
-            self.conn.commit()
-            logging.info(f"Successfully inserted {len(schedules_data)} schedules")
-        except Exception as e:
-            self.conn.rollback()
-            logging.error(f"Error inserting schedules: {str(e)}")
-            logging.exception("Exception details:")
-            raise
-
-    def insert_orders(self, orders: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
-        query = """
-        INSERT INTO orders (agent_id, is_buy, quantity, price, base_value, base_cost)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """
-        try:
-            with self.conn.cursor() as cur:
-                for order in orders:
-                    agent_id = agent_id_map.get(str(order['agent_id']))
-                    if agent_id is None:
-                        logging.error(f"No matching UUID found for agent_id: {order['agent_id']}")
-                        continue
-                    cur.execute(query, (
-                        agent_id,
-                        order['is_buy'],
-                        order['quantity'],
-                        order['price'],
-                        order['base_value'],
-                        order['base_cost']
-                    ))
-            self.conn.commit()
-            logging.info(f"Inserted {len(orders)} orders into the database")
-        except Exception as e:
-            self.conn.rollback()
-            logging.error(f"Error inserting orders: {str(e)}")
-            raise
-
-    def insert_trades(self, trades_data: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
-        # Add logging to debug the incoming data
-        logging.info(f"Attempting to insert trades: {trades_data}")
-        logging.info(f"Agent ID map: {agent_id_map}")
-        
-        query = """
-        INSERT INTO trades (buyer_id, seller_id, quantity, price, buyer_surplus, seller_surplus, total_surplus, round)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """
-        try:
-            with self.conn.cursor() as cur:
-                for trade in trades_data:
-                    buyer_id = agent_id_map.get(str(trade['buyer_id']))
-                    seller_id = agent_id_map.get(str(trade['seller_id']))
-                    
-                    if buyer_id is None or seller_id is None:
-                        logging.error(f"Missing agent mapping - buyer_id: {trade['buyer_id']}, seller_id: {trade['seller_id']}")
-                        continue
-                    values = (
-                        buyer_id,
-                        seller_id,
-                        trade['quantity'],
-                        trade['price'],
-                        trade['buyer_surplus'],
-                        trade['seller_surplus'],
-                        trade['total_surplus'],
-                        trade['round']
-                    )
-                    logging.info(f"Inserting trade with values: {values}")
-                    
-                    cur.execute(query, values)
-                    trade_id = cur.fetchone()[0]
-                    logging.info(f"Successfully inserted trade with ID: {trade_id}")
-                    
-            self.conn.commit()
-            logging.info(f"Successfully committed {len(trades_data)} trades to database")
-        except Exception as e:
-            self.conn.rollback()
-            logging.error(f"Error inserting trades: {str(e)}")
-            logging.exception("Full exception details:")
-            raise
-
     def insert_interactions(self, interactions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO interactions (agent_id, round, task, response)
@@ -550,52 +388,6 @@ class SimulationDataInserter:
             ]
             agent_id_map = self.insert_agents(agents_data)
 
-            # Allocations data
-            logging.info("Preparing allocations data")
-            allocations_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'goods': agent.economic_agent.endowment.current_basket.goods_dict.get(config.agent_config.good_name, 0),
-                    'cash': agent.economic_agent.endowment.current_basket.cash,
-                    'locked_goods': getattr(agent.economic_agent, 'locked_goods', {}).get(config.agent_config.good_name, 0),
-                    'locked_cash': getattr(agent.economic_agent, 'locked_cash', 0),
-                    'initial_goods': agent.economic_agent.endowment.initial_basket.goods_dict.get(config.agent_config.good_name, 0),
-                    'initial_cash': agent.economic_agent.endowment.initial_basket.cash
-                }
-                for agent in agents
-            ]
-            self.insert_allocations(allocations_data, agent_id_map)
-
-            # Schedules data
-            logging.info("Preparing schedules data")
-            schedules_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'is_buyer': agent.role == "buyer",
-                    'values': agent.economic_agent.value_schedules.get(config.agent_config.good_name, {}),
-                    'costs': agent.economic_agent.cost_schedules.get(config.agent_config.good_name, {}),
-                    'initial_endowment': agent.economic_agent.endowment.initial_basket
-                }
-                for agent in agents
-            ]
-            self.insert_schedules(schedules_data)
-
-            # Orders data
-            logging.info("Preparing orders data")
-            orders_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'is_buy': isinstance(order, Bid),
-                    'quantity': order.quantity,
-                    'price': order.price,
-                    'base_value': getattr(order, 'base_value', None),
-                    'base_cost': getattr(order, 'base_cost', None)
-                }
-                for agent in agents
-                for order in agent.economic_agent.pending_orders.get(config.agent_config.good_name, [])
-            ]
-            self.insert_orders(orders_data, agent_id_map)
-
             # Interactions data
             logging.info("Preparing interactions data")
             interactions_data = [
@@ -657,34 +449,6 @@ class SimulationDataInserter:
 
             self.insert_observations(observations_data, agent_id_map)
 
-            # Trades data
-            logging.info("Preparing trades data")
-            trades_data = []
-            if hasattr(tracker, 'all_trades'):
-                logging.info(f"Found {len(tracker.all_trades)} trades in tracker")
-                for trade_info in tracker.all_trades:
-                    # The trade_info is now a dictionary from the AuctionTracker
-                    try:
-                        trades_data.append({
-                            'buyer_id': trade_info['buyer_id'],
-                            'seller_id': trade_info['seller_id'],
-                            'quantity': trade_info['quantity'],
-                            'price': trade_info['price'],
-                            'buyer_surplus': trade_info['buyer_surplus'],
-                            'seller_surplus': trade_info['seller_surplus'],
-                            'total_surplus': trade_info['total_surplus'],
-                            'round': trade_info['round']
-                        })
-                        logging.info(f"Processed trade: {trades_data[-1]}")
-                    except Exception as e:
-                        logging.error(f"Error processing trade {trade_info}: {str(e)}")
-
-            if trades_data:
-                logging.info(f"Attempting to insert {len(trades_data)} trades")
-                self.insert_trades(trades_data, agent_id_map)
-            else:
-                logging.warning("No trades data found to insert")
-
             # Group chat data
             groupchat_data = []
             if hasattr(environment, 'mechanism') and hasattr(environment.mechanism, 'topics'):
@@ -723,9 +487,7 @@ class SimulationDataInserter:
 def addapt_uuid(uuid_value):
     return AsIs(f"'{uuid_value}'")
 
-# Register the UUID adapter
 register_adapter(uuid.UUID, addapt_uuid)
 
 if __name__ == "__main__":
-    # This section can be used for testing or standalone execution
     pass

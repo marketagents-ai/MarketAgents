@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
-from market_agents.environments.environment import MultiAgentEnvironment
+from market_agents.environments.environment import LocalEnvironmentStep, MultiAgentEnvironment
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.environments.mechanisms.group_chat import GroupChat, GroupChatActionSpace, GroupChatObservationSpace
 from market_agents.orchestrators.config import GroupChatConfig, OrchestratorConfig
