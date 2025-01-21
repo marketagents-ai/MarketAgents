@@ -3,6 +3,8 @@ user: "db_user"
 password: "db_pwd@123"
 host: "localhost"
 port: "5433"
+pool_min: 1
+pool_max: 10
 #host: "38.128.232.35"
 #port: "5434"
 index_method: "ivfflat"
@@ -16,6 +18,9 @@ batch_size: 32
 timeout: 10
 retry_attempts: 3
 retry_delay: 1.0
+retry_max_delay: 60
+retry_backoff_factor: 2
+retry_jitter: 0.1
 min_chunk_size: 512
 max_chunk_size: 1024
 # vector_dim: 1536 #openai embed dim
