@@ -6,11 +6,10 @@ import re
 
 from uuid import UUID
 from datetime import datetime
-from typing import List
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from market_agents.memory.embedding import MemoryEmbedder
-from market_agents.memory.setup_db import DatabaseConnection
+from market_agents.memory.agent_storage.setup_db import DatabaseConnection
 
 class KnowledgeObject(BaseModel):
     knowledge_id: UUID = Field(default_factory=uuid.uuid4)
