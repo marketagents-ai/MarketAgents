@@ -47,35 +47,37 @@ class MemoryService:
             knowledge_objects_table = f"{table_prefix}_knowledge_objects"
             knowledge_chunks_table = f"{table_prefix}_knowledge_chunks"
 
-            # Create knowledge objects table
-            await self.db.execute(f"""
-                CREATE TABLE IF NOT EXISTS {knowledge_objects_table} (
-                    knowledge_id UUID PRIMARY KEY,
-                    content TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    metadata JSONB DEFAULT '{{}}'::jsonb
-                );
-            """)
+            # Use a transaction to execute all queries atomically
+            async with self.db.safe_transaction() as conn:
+                # Create knowledge objects table
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {knowledge_objects_table} (
+                        knowledge_id UUID PRIMARY KEY,
+                        content TEXT,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        metadata JSONB DEFAULT '{{}}'::jsonb
+                    );
+                """)
 
-            # Create knowledge chunks table
-            await self.db.execute(f"""
-                CREATE TABLE IF NOT EXISTS {knowledge_chunks_table} (
-                    id SERIAL PRIMARY KEY,
-                    knowledge_id UUID REFERENCES {knowledge_objects_table}(knowledge_id),
-                    text TEXT,
-                    start_pos INTEGER,
-                    end_pos INTEGER,
-                    embedding vector({self.config.vector_dim}),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
+                # Create knowledge chunks table
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {knowledge_chunks_table} (
+                        id SERIAL PRIMARY KEY,
+                        knowledge_id UUID REFERENCES {knowledge_objects_table}(knowledge_id),
+                        text TEXT,
+                        start_pos INTEGER,
+                        end_pos INTEGER,
+                        embedding vector({self.config.vector_dim}),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
 
-            # Add vector index for the chunks
-            await self.db.execute(f"""
-                CREATE INDEX IF NOT EXISTS {table_prefix}_chunks_index
-                ON {knowledge_chunks_table} USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = {self.config.lists});
-            """)
+                # Add vector index for the chunks
+                await conn.execute(f"""
+                    CREATE INDEX IF NOT EXISTS {table_prefix}_chunks_index
+                    ON {knowledge_chunks_table} USING ivfflat (embedding vector_cosine_ops)
+                    WITH (lists = {self.config.lists});
+                """)
 
         except Exception as e:
             self.logger.error(f"Error creating knowledge base tables: {str(e)}")
@@ -90,24 +92,26 @@ class MemoryService:
             sanitized_agent_id = self.db._sanitize_table_name(agent_id)
             cognitive_table = f"agent_{sanitized_agent_id}_cognitive"
 
-            # Create cognitive memory table
-            await self.db.execute(f"""
-                CREATE TABLE IF NOT EXISTS {cognitive_table} (
-                    memory_id UUID PRIMARY KEY,
-                    cognitive_step TEXT,
-                    content TEXT,
-                    embedding vector({self.config.vector_dim}),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    metadata JSONB DEFAULT '{{}}'::jsonb
-                );
-            """)
+            # Use a transaction to ensure atomic execution
+            async with self.db.safe_transaction() as conn:
+                # Create cognitive memory table
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {cognitive_table} (
+                        memory_id UUID PRIMARY KEY,
+                        cognitive_step TEXT,
+                        content TEXT,
+                        embedding vector({self.config.vector_dim}),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        metadata JSONB DEFAULT '{{}}'::jsonb
+                    );
+                """)
 
-            # Create index for cognitive memory table
-            await self.db.execute(f"""
-                CREATE INDEX IF NOT EXISTS agent_{sanitized_agent_id}_cognitive_index
-                ON {cognitive_table} USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = {self.config.lists});
-            """)
+                # Create index for cognitive memory table
+                await conn.execute(f"""
+                    CREATE INDEX IF NOT EXISTS agent_{sanitized_agent_id}_cognitive_index
+                    ON {cognitive_table} USING ivfflat (embedding vector_cosine_ops)
+                    WITH (lists = {self.config.lists});
+                """)
 
         except Exception as e:
             self.logger.error(f"Error creating agent cognitive memory table: {str(e)}")
@@ -123,26 +127,28 @@ class MemoryService:
             sanitized_agent_id = self.db._sanitize_table_name(agent_id)
             episodic_table = f"agent_{sanitized_agent_id}_episodic"
 
-            # Create episodic memory table
-            await self.db.execute(f"""
-                CREATE TABLE IF NOT EXISTS {episodic_table} (
-                    memory_id UUID PRIMARY KEY,
-                    task_query TEXT,
-                    cognitive_steps JSONB,
-                    total_reward DOUBLE PRECISION,
-                    strategy_update JSONB,
-                    embedding vector({self.config.vector_dim}),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    metadata JSONB DEFAULT '{{}}'::jsonb
-                );
-            """)
+            # Use a transaction to ensure atomic execution
+            async with self.db.safe_transaction() as conn:
+                # Create episodic memory table
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {episodic_table} (
+                        memory_id UUID PRIMARY KEY,
+                        task_query TEXT,
+                        cognitive_steps JSONB,
+                        total_reward DOUBLE PRECISION,
+                        strategy_update JSONB,
+                        embedding vector({self.config.vector_dim}),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        metadata JSONB DEFAULT '{{}}'::jsonb
+                    );
+                """)
 
-            # Create index for episodic memory table
-            await self.db.execute(f"""
-                CREATE INDEX IF NOT EXISTS agent_{sanitized_agent_id}_episodic_index
-                ON {episodic_table} USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = {self.config.lists});
-            """)
+                # Create index for episodic memory table
+                await conn.execute(f"""
+                    CREATE INDEX IF NOT EXISTS agent_{sanitized_agent_id}_episodic_index
+                    ON {episodic_table} USING ivfflat (embedding vector_cosine_ops)
+                    WITH (lists = {self.config.lists});
+                """)
 
         except Exception as e:
             self.logger.error(f"Error creating agent episodic memory table: {str(e)}")
@@ -451,8 +457,8 @@ class MemoryService:
             chunks_table = f"{prefix}_knowledge_chunks"
             objects_table = f"{prefix}_knowledge_objects"
 
-            # Start transaction to ensure atomic deletion
-            async with self.db.transaction() as conn:
+            # Use the safe_transaction to ensure retryable, atomic behavior
+            async with self.db.safe_transaction() as conn:
                 # Delete chunks first due to foreign key constraint
                 await conn.execute(
                     f"DELETE FROM {chunks_table} WHERE knowledge_id = $1",
