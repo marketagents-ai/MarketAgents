@@ -67,9 +67,18 @@ class MarketKnowledgeBase:
     def ingest_knowledge(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> UUID:
         """Process a document: chunk, embed, and store as a KnowledgeObject."""
         chunks = self._chunk(text)
-        embeddings = self.embedding_service.get_embeddings([c.text for c in chunks])
+        
+        # Process embeddings in batches according to config
+        all_embeddings = []
+        chunk_texts = [c.text for c in chunks]
+        
+        for i in range(0, len(chunk_texts), self.config.batch_size):
+            batch = chunk_texts[i:i + self.config.batch_size]
+            logging.info(f"Getting embedding for batch:\n{batch}")
+            batch_embeddings = self.embedding_service.get_embeddings(batch)
+            all_embeddings.extend(batch_embeddings)
 
-        for chunk, emb in zip(chunks, embeddings):
+        for chunk, emb in zip(chunks, all_embeddings):
             chunk.embedding = emb
 
         knowledge_id = self._save_knowledge_and_chunks(text, chunks, metadata)

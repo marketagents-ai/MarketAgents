@@ -40,11 +40,12 @@ class MarketAgentPromptManager(BaseModel):
         # Convert empty values to N/A and format JSON/dict values as markdown
         formatted_vars = {}
         for key, value in variables.items():
-            if value is None or (isinstance(value, (list, dict)) and not value):
+            if value is None:
                 formatted_vars[key] = "N/A"
             elif isinstance(value, (dict, list)):
-                # Convert dict/list values to markdown format
-                formatted_vars[key] = self.json_to_markdown(value).strip()
+                # Always format collections, even if empty
+                formatted = self.json_to_markdown(value).strip()
+                formatted_vars[key] = formatted if formatted else "No entries"
             else:
                 formatted_vars[key] = str(value) if value else "N/A"
         
