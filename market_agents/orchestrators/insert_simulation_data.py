@@ -9,7 +9,7 @@ import logging
 import uuid
 from datetime import datetime
 from market_agents.economics.econ_models import Bid, BuyerPreferenceSchedule, SellerPreferenceSchedule
-from market_agents.agents.db.setup_database import create_database, create_tables
+from .setup_orchestrator_db import create_database, setup_orchestrator_tables
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -58,7 +58,7 @@ class SimulationDataInserter:
         self.conn = psycopg2.connect(**db_params)
         self.cursor = self.conn.cursor()
         
-        create_tables(db_params)
+        setup_orchestrator_tables(db_params)
 
     def __del__(self):
         if hasattr(self, 'cursor') and self.cursor:
@@ -68,10 +68,11 @@ class SimulationDataInserter:
 
     def insert_agents(self, agents_data):
         query = """
-            INSERT INTO agents (id, role, is_llm, max_iter, llm_config)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO agents (id, role, persona, is_llm, max_iter, llm_config)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 role = EXCLUDED.role,
+                persona = EXCLUDED.persona,
                 is_llm = EXCLUDED.is_llm,
                 max_iter = EXCLUDED.max_iter,
                 llm_config = EXCLUDED.llm_config
@@ -85,9 +86,10 @@ class SimulationDataInserter:
                     cur.execute(query, (
                         agent_id,
                         agent['role'],
+                        json.dumps(agent.get('persona', {})),
                         agent['is_llm'],
                         agent['max_iter'],
-                        json.dumps(agent['llm_config'])
+                        json.dumps(agent['llm_config']),
                     ))
                     inserted_id = cur.fetchone()
                     if inserted_id:
@@ -173,19 +175,20 @@ class SimulationDataInserter:
 
     def insert_observations(self, observations: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
-        INSERT INTO observations (memory_id, environment_name, observation)
-        VALUES (%s, %s, %s)
+        INSERT INTO observations (agent_id, environment_name, round, observation)
+        VALUES (%s, %s, %s, %s)
         """
         try:
             with self.conn.cursor() as cur:
                 for observation in observations:
-                    memory_id = agent_id_map.get(str(observation['memory_id']))
-                    if memory_id is None:
-                        logging.error(f"No matching UUID found for memory_id: {observation['memory_id']}")
+                    agent_id = agent_id_map.get(str(observation['agent_id']))
+                    if agent_id is None:
+                        logging.error(f"No matching UUID found for agent_id: {observation['agent_id']}")
                         continue
                     cur.execute(query, (
-                        memory_id,
+                        agent_id,
                         observation['environment_name'],
+                        observation['round'],
                         psycopg2.extras.Json(observation['observation'])
                     ))
             self.conn.commit()
@@ -195,52 +198,25 @@ class SimulationDataInserter:
             logging.error(f"Error inserting observations: {str(e)}")
             raise
 
-    def insert_reflections(self, reflections: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
-        query = """
-        INSERT INTO reflections (memory_id, environment_name, reflection, self_reward, environment_reward, total_reward, strategy_update)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        try:
-            with self.conn.cursor() as cur:
-                for reflection in reflections:
-                    memory_id = agent_id_map.get(str(reflection['memory_id']))
-                    if memory_id is None:
-                        logging.error(f"No matching UUID found for memory_id: {reflection['memory_id']}")
-                        continue
-                    cur.execute(query, (
-                        memory_id,
-                        reflection['environment_name'],
-                        reflection['reflection'],
-                        reflection['self_reward'],
-                        reflection['environment_reward'],
-                        reflection['total_reward'],
-                        reflection['strategy_update']
-                    ))
-            self.conn.commit()
-            logging.info(f"Inserted {len(reflections)} reflections into the database")
-        except Exception as e:
-            self.conn.rollback()
-            logging.error(f"Error inserting reflections: {str(e)}")
-            raise
-
     def insert_perceptions(self, perceptions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
-        INSERT INTO perceptions (memory_id, environment_name, monologue, strategy, confidence)
+        INSERT INTO perceptions (memory_id, agent_id, environment_name, round, observation)
         VALUES (%s, %s, %s, %s, %s)
         """
         try:
             with self.conn.cursor() as cur:
                 for perception in perceptions:
-                    memory_id = agent_id_map.get(str(perception['memory_id']))
-                    if memory_id is None:
-                        logging.error(f"No matching UUID found for memory_id: {perception['memory_id']}")
+                    agent_id = agent_id_map.get(str(perception['agent_id']))
+                    memory_id = perception.get('memory_id', uuid.uuid4())  # Generate UUID if not provided
+                    if agent_id is None:
+                        logging.error(f"No matching UUID found for agent_id: {perception['agent_id']}")
                         continue
                     cur.execute(query, (
                         memory_id,
+                        agent_id,
                         perception['environment_name'],
-                        perception['monologue'],
-                        perception['strategy'],
-                        perception['confidence']
+                        perception['round'],
+                        psycopg2.extras.Json(perception['observation'])
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(perceptions)} perceptions into the database")
@@ -252,32 +228,75 @@ class SimulationDataInserter:
     def insert_actions(self, actions: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
         query = """
         INSERT INTO actions (
-            memory_id, 
-            environment_name, 
+            memory_id,
+            agent_id, 
+            environment_name,
+            round,
             action
         )
-        VALUES (%s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s)
         """
         try:
             with self.conn.cursor() as cur:
                 for action in actions:
-                    memory_id = agent_id_map.get(str(action['memory_id']))
-                    if memory_id is None:
-                        logging.error(f"No matching UUID found for memory_id: {action['memory_id']}")
+                    agent_id = agent_id_map.get(str(action['agent_id']))
+                    memory_id = action.get('memory_id', uuid.uuid4())  # Generate UUID if not provided
+                    if agent_id is None:
+                        logging.error(f"No matching UUID found for agent_id: {action['agent_id']}")
                         continue
-                    environment_name = action['environment_name']
-                    action_data = action['action']
-                    
                     cur.execute(query, (
                         memory_id,
-                        environment_name,
-                        json.dumps(action_data, default=str)
+                        agent_id,
+                        action['environment_name'],
+                        action['round'],
+                        json.dumps(action['action'], default=str)
                     ))
             self.conn.commit()
             logging.info(f"Inserted {len(actions)} actions into the database")
         except Exception as e:
             self.conn.rollback()
             logging.error(f"Error inserting actions: {str(e)}")
+            raise
+
+    def insert_reflections(self, reflections: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
+        query = """
+        INSERT INTO reflections (
+            memory_id,
+            agent_id,
+            environment_name,
+            round,
+            reflection,
+            self_reward,
+            environment_reward,
+            total_reward,
+            strategy_update
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                for reflection in reflections:
+                    agent_id = agent_id_map.get(str(reflection['agent_id']))
+                    memory_id = reflection.get('memory_id', uuid.uuid4())  # Generate UUID if not provided
+                    if agent_id is None:
+                        logging.error(f"No matching UUID found for agent_id: {reflection['agent_id']}")
+                        continue
+                    cur.execute(query, (
+                        memory_id,
+                        agent_id,
+                        reflection['environment_name'],
+                        reflection['round'],
+                        reflection['reflection'],
+                        reflection.get('self_reward'),
+                        reflection.get('environment_reward'),
+                        reflection.get('total_reward'),
+                        reflection.get('strategy_update')
+                    ))
+            self.conn.commit()
+            logging.info(f"Inserted {len(reflections)} reflections into the database")
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(f"Error inserting reflections: {str(e)}")
             raise
 
     def insert_ai_requests(self, ai_requests):
@@ -363,23 +382,14 @@ class SimulationDataInserter:
         tracker: Any,
         environment_name: str = 'auction'
     ):
-        """
-        Insert simulation data for a specific round.
-        
-        Args:
-            round_num (int): The current round number
-            agents (List[Any]): List of agent objects
-            environment (Any): The environment object
-            config (Any): Configuration object
-            tracker (Any): The tracker object for this environment
-            environment_name (str): Name of the environment (defaults to 'auction')
-        """
+        """Insert simulation data for a specific round."""
         try:
             # Insert agent data
             agents_data = [
                 {
                     'id': str(agent.id),
                     'role': agent.role,
+                    'persona': agent.persona.dict() if hasattr(agent.persona, 'dict') else agent.persona,
                     'is_llm': agent.use_llm,
                     'max_iter': config.max_rounds,
                     'llm_config': agent.llm_config if isinstance(agent.llm_config, dict) else agent.llm_config.dict()
@@ -387,20 +397,6 @@ class SimulationDataInserter:
                 for agent in agents
             ]
             agent_id_map = self.insert_agents(agents_data)
-
-            # Interactions data
-            logging.info("Preparing interactions data")
-            interactions_data = [
-                {
-                    'agent_id': str(agent.id),
-                    'round': round_num,
-                    'task': interaction['type'],
-                    'response': serialize_memory_data(interaction['content'])
-                }
-                for agent in agents
-                for interaction in agent.interactions
-            ]
-            self.insert_interactions(interactions_data, agent_id_map)
 
             # Perceptions data
             logging.info("Preparing perceptions data")
@@ -410,11 +406,10 @@ class SimulationDataInserter:
                     perception = validate_json(agent.last_perception)
                     if perception is not None:
                         perceptions_data.append({
-                            'memory_id': str(agent.id),
+                            'agent_id': str(agent.id),  # Changed from memory_id to agent_id
                             'environment_name': environment_name,
-                            'monologue': str(perception.get('monologue', '')),
-                            'strategy': str(perception.get('strategy', '')),
-                            'confidence': perception.get('confidence', 0)
+                            'round': round_num,
+                            'observation': perception  # Changed to include full perception
                         })
                     else:
                         logging.warning(f"Invalid JSON perception data for agent {agent.id}: {agent.last_perception}")
@@ -426,28 +421,54 @@ class SimulationDataInserter:
             logging.info("Preparing actions data")
             actions_data = [
                 {
-                    'memory_id': str(agent.id),
+                    'agent_id': str(agent.id),  # Changed from memory_id to agent_id
                     'environment_name': environment_name,
+                    'round': round_num,
                     'action': agent.last_action
                 }
                 for agent in agents
                 if hasattr(agent, 'last_action') and agent.last_action
             ]
-            self.insert_actions(actions_data, agent_id_map)
+            if actions_data:
+                self.insert_actions(actions_data, agent_id_map)
 
-            # Observations and Reflections data
-            logging.info("Preparing observations and reflections data")
-            observations_data = [
+            # Observations data
+            logging.info("Preparing observations data")
+            observations_data = []
+            for agent in agents:
+                if hasattr(agent, 'last_observation') and agent.last_observation:
+                    observations_data.append({
+                        'agent_id': str(agent.id),
+                        'environment_name': environment_name,
+                        'round': round_num,
+                        'observation': serialize_memory_data(agent.last_observation)
+                    })
+                else:
+                    logging.debug(f"Agent {agent.id} has no last_observation")
+
+            if observations_data:
+                self.insert_observations(observations_data, agent_id_map)
+            else:
+                logging.warning("No observations data to insert")
+
+            # Reflections data (if available)
+            logging.info("Preparing reflections data")
+            reflections_data = [
                 {
-                    'memory_id': str(agent.id),
+                    'agent_id': str(agent.id),  # Changed from memory_id to agent_id
                     'environment_name': environment_name,
-                    'observation': serialize_memory_data(agent.last_observation)
+                    'round': round_num,
+                    'reflection': str(agent.last_reflection) if hasattr(agent, 'last_reflection') else None,
+                    'self_reward': getattr(agent, 'self_reward', 0.0),
+                    'environment_reward': getattr(agent, 'environment_reward', 0.0),
+                    'total_reward': getattr(agent, 'total_reward', 0.0),
+                    'strategy_update': getattr(agent, 'strategy_update', '')
                 }
                 for agent in agents
-                if agent.last_observation
+                if hasattr(agent, 'last_reflection') and agent.last_reflection
             ]
-
-            self.insert_observations(observations_data, agent_id_map)
+            if reflections_data:
+                self.insert_reflections(reflections_data, agent_id_map)
 
             # Group chat data
             groupchat_data = []
@@ -474,7 +495,7 @@ class SimulationDataInserter:
 
     def check_tables_exist(self):
         cursor = self.conn.cursor()
-        tables = ['agents', 'agent_memories', 'allocations', 'groupchat', 'trades']
+        tables = ['agents', 'agent_memories', 'groupchat', 'perceptions', 'actions', 'reflections']
         for table in tables:
             cursor.execute(f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table}')")
             exists = cursor.fetchone()[0]

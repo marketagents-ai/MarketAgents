@@ -12,22 +12,20 @@ class AgentConfig(BaseModel):
 
 class GroupChatConfig(BaseModel):
     name: str
-    address: str
     max_rounds: int
     initial_topic: str
-    groupchat_api_url: str = Field(default="http://localhost:8001")
     sub_rounds: int = Field(default=3)
     group_size: int = Field(default=100)
+    api_url: str = Field(default="http://localhost:8001")
 
 class ResearchConfig(BaseModel):
     name: str
-    address: str
     max_rounds: int
     initial_topic: str
-    research_api_url: str = Field(default="http://localhost:8002")
     sub_rounds: int = Field(default=3)
     group_size: int = Field(default=100)
     schema_model: str = Field(..., description="Name of Pydantic model class from research_schemas.py")
+    api_url: str = Field(default="http://localhost:8002")
 
 class LLMConfigModel(BaseModel):
     name: str

@@ -2,6 +2,7 @@
 
 import asyncio
 import importlib
+import json
 import logging
 from typing import List, Dict, Any, Optional, Type
 from datetime import datetime
@@ -62,7 +63,7 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
         self.environment = ResearchEnvironment(
             summary_model=self.summary_model,
             name=self.config.name,
-            address=self.config.address,
+            api_url=self.config.api_url,
             max_steps=self.config.max_rounds
         )
 
@@ -109,13 +110,11 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
                 await self.run_round(r)
 
     async def run_round(self, round_num: int):
-        """
-        Orchestrates a single round of research steps among all agents.
-        """
+        """Orchestrates a single round of research steps among all agents."""
         self.logger.info(f"=== Running Research Round {round_num} ===")
 
         try:
-            # 1) Agents perceive environment state
+            # Agents perceive environment state
             self.logger.info(f"Round {round_num}: Agents perceiving environment...")
             perceptions = await self.cognitive_processor.run_parallel_perceive(self.agents, self.config.name)
             
@@ -128,64 +127,119 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
                     perception.json_object.object if perception and perception.json_object else None
                 )
 
-            # 2) Agents produce summary actions
+            # Agents produce summary actions
             self.logger.info(f"Round {round_num}: Gathering agent research summaries...")
             actions = await self.cognitive_processor.run_parallel_action(self.agents, self.config.name)
             
-            # Log actions
+            # Log actions and store them in agent state
             for agent, action in zip(self.agents, actions or []):
-                if action and action.json_object and action.json_object.object:
-                    log_action(self.logger, agent.index, str(action.json_object.object))
-                else:
-                    log_action(self.logger, agent.index, action.str_content if action else "No action")
+                try:
+                    content = None
+                    if action and action.json_object and action.json_object.object:
+                        content = action.json_object.object
+                    elif action and hasattr(action, 'str_content'):
+                        content = action.str_content
 
-            # 3) Construct a GlobalAction and step the environment
+                    # Store the action in agent's state
+                    agent.last_action = content
+                    
+                    # Log the action using the same format as perception/reflection
+                    log_action(self.logger, agent.index, content)
+
+                except Exception as e:
+                    self.logger.error(f"Error processing action for agent {agent.id}: {str(e)}", exc_info=True)
+                    agent.last_action = None
+
+            # Construct a GlobalAction and step the environment
             global_actions = {}
             for agent, action_response in zip(self.agents, actions or []):
                 try:
-                    # Parse the action response into our summary model
                     if action_response and action_response.json_object and action_response.json_object.object:
                         summary_dict = action_response.json_object.object
                         summary_instance = self.summary_model.model_validate(summary_dict)
                     else:
-                        # Create an empty instance if no valid response
                         summary_instance = self.summary_model.model_construct()
                     
                     local_action = ResearchAction(agent_id=agent.id, action=summary_instance)
                     global_actions[agent.id] = local_action
+                    
                 except Exception as e:
-                    self.logger.error(f"Error creating action for agent {agent.id}: {e}")
-                    # Create empty instance as fallback
+                    self.logger.error(
+                        f"Error creating action for agent {agent.id}: {str(e)}\n"
+                        f"Raw action data: {action_response.json_object.object if action_response and action_response.json_object else None}",
+                        exc_info=True
+                    )
                     summary_instance = self.summary_model.model_construct()
                     local_action = ResearchAction(agent_id=agent.id, action=summary_instance)
                     global_actions[agent.id] = local_action
 
-            research_global_action = ResearchGlobalAction(actions=global_actions)
-            step_result = self.environment.step(research_global_action)
+                research_global_action = ResearchGlobalAction(actions=global_actions)
+                step_result = self.environment.step(research_global_action)
 
-            # 4) Process results and store in database
-            await self.process_round_results(round_num, step_result)
+                # After environment step, store the observation in agent state
+                for agent in self.agents:
+                    if (step_result and 
+                        step_result.global_observation and 
+                        step_result.global_observation.observations):
+                        # Access observations through global_observation
+                        agent.last_observation = step_result.global_observation.observations.get(agent.id)
+                    else:
+                        agent.last_observation = None
 
-            # 5) Agents reflect on new environment observation
-            self.logger.info(f"Round {round_num}: Agents reflecting on environment changes...")
-            try:
-                reflections = await self.cognitive_processor.run_parallel_reflect(self.agents, self.config.name)
-                
-                # Log reflections
-                if reflections:
-                    for agent, reflection in zip(self.agents, reflections):
-                        log_reflection(
-                            self.logger, 
-                            agent.index, 
-                            reflection.json_object.object if reflection and reflection.json_object else None
+                # Agents reflect on new environment observation
+                self.logger.info(f"Round {round_num}: Agents reflecting on environment changes...")
+                try:
+                    reflection_prompts = []
+                    agents_with_observations = []
+                    
+                    for agent in self.agents:
+                        if agent.last_observation and agent.last_observation.observation:
+                            reflect_prompt = await agent.reflect(
+                                self.config.name, 
+                                return_prompt=True, 
+                                structured_tool=self.orchestrator_config.tool_mode
+                            )
+                            reflection_prompts.append(reflect_prompt)
+                            agents_with_observations.append(agent)
+                    
+                    if reflection_prompts:
+                        reflections = await self.cognitive_processor.run_parallel_reflect(
+                            agents_with_observations, 
+                            self.config.name
                         )
-                else:
-                    self.logger.warning("No reflections received from agents")
-            except Exception as e:
-                self.logger.error(f"Error during reflection step: {e}")
-                self.logger.exception("Reflection step failed but continuing...")
+                        
+                        # Log reflections
+                        if reflections:
+                            for agent, reflection in zip(agents_with_observations, reflections):
+                                try:
+                                    content = None
+                                    if reflection and reflection.json_object and reflection.json_object.object:
+                                        content = reflection.json_object.object
+                                    elif reflection and hasattr(reflection, 'str_content'):
+                                        content = reflection.str_content
 
-            self.logger.info(f"Round {round_num} complete.\n")
+                                    if content:
+                                        # Store reflection in agent's state
+                                        agent.last_reflection = content
+                                        # Log the reflection
+                                        log_reflection(self.logger, agent.index, content)
+                                    else:
+                                        self.logger.warning(f"No reflection content for agent {agent.index}")
+                                except Exception as e:
+                                    self.logger.error(f"Error processing reflection for agent {agent.id}: {str(e)}")
+                        else:
+                            self.logger.warning("No reflections received from agents")
+                    else:
+                        self.logger.warning("No agents had observations to reflect on")
+
+                except Exception as e:
+                    self.logger.error(f"Error during reflection step: {str(e)}", exc_info=True)
+                    self.logger.exception("Reflection step failed but continuing...")
+
+                self.logger.info(f"Round {round_num} complete.\n")
+
+            # Process results and store in database
+            await self.process_round_results(round_num, step_result)
             
         except Exception as e:
             self.logger.error(f"Error in round {round_num}: {e}")
@@ -250,23 +304,46 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
         await self.print_summary()
 
     async def print_summary(self):
-        """
-        Print or store any final summary, aggregator results, etc.
-        We'll just fetch the environment's aggregator state if final.
-        """
+        """Print or store any final summary, aggregator results, etc."""
+        # ANSI color codes
+        PINK = "\033[95m"
+        TEAL = "\033[96m"
+        RESET = "\033[0m"
+        
         self.logger.info("=== RESEARCH SIMULATION SUMMARY ===")
 
-        # Possibly the environment may have final aggregator data in last step
+        # Get environment state
         global_state = self.environment.get_global_state()
         self.logger.info(f"Final Environment State: {global_state}")
 
-        # Or you might fetch from environment.history, or from the Mechanism if you prefer
-        # E.g. final aggregator summaries from the last round
-        # ...
-
-        print("\nFinal Agent States:")
+        # Print last actions in both formats
+        print(f"\n{PINK}Final Agent States (JSONL):{RESET}")
         for agent in self.agents:
-            print(f"Agent {agent.index}: last action = {agent.last_action}")
+            if agent.last_action:
+                try:
+                    # Create a dictionary with agent index and action
+                    jsonl_entry = {
+                        "agent_index": agent.index,
+                        "last_action": agent.last_action if isinstance(agent.last_action, dict) else json.loads(agent.last_action)
+                    }
+                    print(f"{PINK}{json.dumps(jsonl_entry)}{RESET}")
+                except Exception as e:
+                    self.logger.error(f"Error creating JSONL for agent {agent.index}: {e}")
+
+        print(f"\n{TEAL}Final Agent States (Pretty):{RESET}")
+        for agent in self.agents:
+            print(f"\n{TEAL}Agent {agent.index}:{RESET}")
+            if agent.last_action:
+                try:
+                    # Try to format as JSON if possible
+                    if isinstance(agent.last_action, dict):
+                        print(f"{TEAL}Last action = {json.dumps(agent.last_action, indent=2)}{RESET}")
+                    else:
+                        print(f"{TEAL}Last action = {agent.last_action}{RESET}")
+                except Exception as e:
+                    print(f"{TEAL}Last action = {str(agent.last_action)}{RESET}")
+            else:
+                print(f"{TEAL}Last action = None{RESET}")
         print()
 
         self.logger.info("Finished printing summary.")

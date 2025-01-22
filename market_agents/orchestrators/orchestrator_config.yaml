@@ -1,13 +1,13 @@
 # orchestrator_config.yaml
 
 num_agents: 4
-max_rounds: 1
+max_rounds: 2
 environment_order:
   - group_chat
   - research
 tool_mode: true
 agent_config:
-  knowledge_base: "hamlet_kb"
+  knowledge_base: "shakespeare_kb"
   use_llm: true
 llm_configs:
     - name: "gpt-4o-mini"
@@ -73,22 +73,21 @@ llm_configs:
 environment_configs:
   group_chat:
     name: "group_chat"
-    address: "localhost:8001"
+    address: "http://localhost:8001"
     max_rounds: 5
   #  initial_topic: "Initial Market Discussion"
     initial_topic: "Hamlet's famous 'To be or not to be' soliloquy"
     sub_rounds: 2
     group_size: 4
   research:
-    name: "market_research"
-    address: "research_env_1"
+    name: "literary_research"
+    address: "http://localhost:8002"
     max_rounds: 5
 #    initial_topic: "Market Analysis"
     initial_topic: "Hamlet's famous 'To be or not to be' soliloquy"
-    research_api_url: "http://localhost:8002"
-    sub_rounds: 3
-    group_size: 100
-    schema_model: "LiteraryAnalysis" 
+    sub_rounds: 2
+    group_size: 4
+    schema_model: "ThematicElement" 
 protocol: "acl_message"
 database_config:
   db_host: "localhost"
