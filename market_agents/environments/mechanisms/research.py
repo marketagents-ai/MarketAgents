@@ -39,35 +39,55 @@ class ResearchGlobalAction(GlobalAction):
 
 
 class ResearchObservation(BaseModel):
-    """
-    Holds the agent's own summary (if needed) plus any aggregator outputs you want.
-    """
+    """Individual observation containing research summary data"""
     own_summary: Optional[BaseModel] = None
-    aggregator_notes: Optional[str] = None
+    aggregator_notes: str = ""
+
+    def dict(self, *args, **kwargs):
+        """Custom dict method to handle BaseModel serialization"""
+        d = super().dict(*args, **kwargs)
+        if self.own_summary:
+            d['own_summary'] = self.own_summary.dict()
+        return d
 
 
 class ResearchLocalObservation(LocalObservation):
+    """Local observation for a specific agent"""
+    agent_id: str
     observation: ResearchObservation
+
+    def dict(self, *args, **kwargs):
+        """Custom dict method to handle nested observation"""
+        d = super().dict(*args, **kwargs)
+        if self.observation:
+            d['observation'] = self.observation.dict()
+        return d
 
 
 class ResearchGlobalObservation(GlobalObservation):
-
+    """Global observation containing all agent observations"""
     observations: Dict[str, ResearchLocalObservation]
-    all_actions_this_round: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    all_actions_this_round: Optional[Dict[str, Any]] = None
     final_all_summaries: Optional[List[Dict[str, Any]]] = None
-    aggregator_notes: Optional[str] = None
+    aggregator_notes: str = ""
 
-    def serialize_json(self) -> str:
-        data = {
-            "observations": {
-                agent_id: obs.observation.dict() 
-                for agent_id, obs in self.observations.items()
-            },
-            "all_actions_this_round": self.all_actions_this_round,
-            "final_all_summaries": self.final_all_summaries,
-            "aggregator_notes": self.aggregator_notes,
+    def dict(self, *args, **kwargs):
+        """Custom dict method to handle nested observations"""
+        d = super().dict(*args, **kwargs)
+        if self.observations:
+            d['observations'] = {
+                k: v.dict() for k, v in self.observations.items()
+            }
+        return d
+
+    @property
+    def global_obs(self) -> Optional[Any]:
+        """Get the global observation for all agents."""
+        return {
+            'all_actions_this_round': self.all_actions_this_round,
+            'final_all_summaries': self.final_all_summaries,
+            'aggregator_notes': self.aggregator_notes
         }
-        return json.dumps(data, indent=2, default=str)
     
 class ResearchActionSpace(ActionSpace):
     allowed_actions: List[Type[LocalAction]] = [ResearchAction]
@@ -103,6 +123,7 @@ class ResearchMechanism(Mechanism):
     current_round: int = Field(default=0, description="Current step or round.")
     
     round_summaries: List[Dict[str, Any]] = Field(default_factory=list)
+    last_step: Optional[EnvironmentStep] = Field(default=None, description="Last environment step")
 
     def step(self, action: Union[ResearchAction, ResearchGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
         logger.debug(f"ResearchMechanism step: {action}")
@@ -139,9 +160,11 @@ class ResearchMechanism(Mechanism):
                 done=done,
                 info={
                     "round": self.current_round,
-                    "note": "Sequential step"
+                    "note": "Sequential step",
+                    "agent_rewards": {action.agent_id: 1.0}
                 }
             )
+            self.last_step = local_step
             return local_step
 
         else:
@@ -164,6 +187,8 @@ class ResearchMechanism(Mechanism):
 
             # Build local observations for each agent
             local_observations: Dict[str, ResearchLocalObservation] = {}
+            agent_rewards: Dict[str, float] = {}
+            
             for agent_id, local_action in action.actions.items():
                 local_obs = ResearchLocalObservation(
                     agent_id=agent_id,
@@ -173,6 +198,7 @@ class ResearchMechanism(Mechanism):
                     )
                 )
                 local_observations[agent_id] = local_obs
+                agent_rewards[agent_id] = 1.0
 
             # If final round, gather all data
             final_data = None
@@ -195,8 +221,12 @@ class ResearchMechanism(Mechanism):
             env_step = EnvironmentStep(
                 global_observation=global_obs,
                 done=done,
-                info={"round": self.current_round}
+                info={
+                    "round": self.current_round,
+                    "agent_rewards": agent_rewards
+                }
             )
+            self.last_step = env_step
             return env_step
 
     def get_global_state(self) -> Dict[str, Any]:
@@ -208,6 +238,7 @@ class ResearchMechanism(Mechanism):
             "current_round": self.current_round,
             "max_rounds": self.max_rounds,
             "round_summaries_count": len(self.round_summaries),
+            "last_step": self.last_step.dict() if self.last_step else None
         }
 
     def reset(self) -> None:
@@ -216,6 +247,7 @@ class ResearchMechanism(Mechanism):
         """
         self.current_round = 0
         self.round_summaries.clear()
+        self.last_step = None  # Reset last step
         logger.info("ResearchMechanism reset complete.")
 
 
