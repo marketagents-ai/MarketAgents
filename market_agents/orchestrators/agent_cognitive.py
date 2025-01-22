@@ -24,8 +24,8 @@ class AgentCognitiveProcessor:
         def serialize_value(v):
             if isinstance(v, datetime):
                 return v.isoformat()
-            if hasattr(v, 'serialize_json'):
-                return json.loads(v.serialize_json())
+            if hasattr(v, 'dict'):
+                return v.dict()
             if hasattr(v, 'model_dump'):
                 return v.model_dump()
             if isinstance(v, dict):
@@ -35,10 +35,10 @@ class AgentCognitiveProcessor:
             return v
 
         try:
-            if hasattr(content, 'serialize_json'):
-                return content.serialize_json()
+            if hasattr(content, 'dict'):
+                return json.dumps(content.dict())
             elif hasattr(content, 'model_dump'):
-                return json.dumps(content.model_dump(), default=serialize_value)
+                return json.dumps(content.model_dump())
             elif isinstance(content, dict):
                 return json.dumps({k: serialize_value(v) for k, v in content.items()})
             elif isinstance(content, list):
@@ -155,9 +155,16 @@ class AgentCognitiveProcessor:
                             f"Total: {total_reward}"
                         )
 
-                    # Store reflection in memory
-                    observation_data = self._serialize_content(agent.last_observation) if agent.last_observation else None
-                            
+                    # Serialize the observation before storing
+                    try:
+                        if agent.last_observation:
+                            observation_data = agent.last_observation.dict() if hasattr(agent.last_observation, 'dict') else str(agent.last_observation)
+                        else:
+                            observation_data = None
+                    except Exception as e:
+                        self.logger.warning(f"Failed to serialize observation: {e}")
+                        observation_data = str(agent.last_observation)
+
                     memory_obj = MemoryObject(
                         agent_id=agent.id,
                         cognitive_step="reflection",
@@ -179,15 +186,18 @@ class AgentCognitiveProcessor:
                     env_state_str = f"Environment state: {str(agent.environments[environment_name].get_global_state())}"
                     query_str = (task_str + "\n" + env_state_str).strip()
                     
+                    # Ensure metadata is JSON serializable
+                    serializable_metadata = {
+                        "environment": environment_name,
+                        "observation": observation_data
+                    }
+                    
                     await agent.long_term_memory.store_episodic_memory(
                         agent_id=agent.id,
                         task_query=query_str,
                         steps=self.episode_steps[safe_id],
                         total_reward=total_reward,
                         strategy_update=reflection_content.get("strategy_update", []),
-                        metadata={
-                            "environment": environment_name,
-                            "observation": agent.last_observation
-                        }
+                        metadata=serializable_metadata
                     )
                     self.episode_steps[safe_id].clear()
