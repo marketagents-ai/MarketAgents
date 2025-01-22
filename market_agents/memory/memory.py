@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Union
 from uuid import UUID
 
-from fastapi import logger
 from pydantic import BaseModel, Field, ConfigDict
 
 from market_agents.memory.embedding import MemoryEmbedder
@@ -110,38 +109,34 @@ class CognitiveMemory(BaseMemory):
         self.cognitive_table = f"agent_{self.safe_id}_cognitive"
         self.db.create_agent_cognitive_memory_table(self.agent_id)
 
-    def store_cognitive_item(self, memory_object: MemoryObject):
-        """
-        Insert a single cognitive step into the 'cognitive' table,
-        returning the DB's actual created_at timestamp.
-        """
-        self.db.connect()
+    def store_cognitive_item(self, memory_object: MemoryObject) -> None:
+        """Store a single cognitive memory item."""
         try:
-            if memory_object.embedding is None:
+            # Generate embedding if not already present
+            if not memory_object.embedding:
                 memory_object.embedding = self.embedder.get_embeddings(memory_object.content)
 
-            now = memory_object.created_at or datetime.now(timezone.utc)
+            # Serialize metadata
+            metadata_json = memory_object.serialize_metadata()
 
-            self.db.cursor.execute(f"""
-                INSERT INTO {self.cognitive_table}
+            # Insert the memory item
+            self.db.cursor.execute(
+                f"""
+                INSERT INTO {self.cognitive_table} 
                 (memory_id, cognitive_step, content, embedding, created_at, metadata)
                 VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING created_at
-            """, (
-                str(memory_object.memory_id),
-                memory_object.cognitive_step,
-                memory_object.content,
-                memory_object.embedding,
-                now,
-                memory_object.serialize_metadata()
-            ))
-            row = self.db.cursor.fetchone()
-            if row:
-                memory_object.created_at = row[0]
-            else:
-                memory_object.created_at = now
-
+                """,
+                (
+                    str(memory_object.memory_id),
+                    memory_object.cognitive_step,
+                    memory_object.content,
+                    memory_object.embedding,
+                    memory_object.created_at or datetime.now(timezone.utc),
+                    metadata_json
+                )
+            )
             self.db.conn.commit()
+
         except Exception as e:
             self.db.conn.rollback()
             raise e
