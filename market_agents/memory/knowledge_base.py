@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-import json
-import logging
 import uuid
 import re
 
@@ -8,8 +6,6 @@ from uuid import UUID
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from market_agents.memory.embedding import MemoryEmbedder
-from market_agents.memory.agent_storage.setup_db import DatabaseConnection
 
 class KnowledgeObject(BaseModel):
     knowledge_id: UUID = Field(default_factory=uuid.uuid4)
@@ -29,98 +25,6 @@ class KnowledgeChunker(ABC):
     def chunk(self, text: str) -> List[KnowledgeChunk]:
         pass
 
-class MarketKnowledgeBase:
-    """
-    A base class for agent knowledge bases built with embeddings for semantic search.
-    Dynamically handles agent- or knowledge base-specific tables.
-    """
-
-    def __init__(self, config, db_conn: DatabaseConnection, embedding_service: MemoryEmbedder, table_prefix: str, chunking_method: Optional[KnowledgeChunker] = None):
-        self.config = config
-        self.db = db_conn
-        self.embedding_service = embedding_service
-        self.chunking_method = chunking_method
-        self.table_prefix = table_prefix
-        self.knowledge_objects_table = f"{table_prefix}_knowledge_objects"
-        self.knowledge_chunks_table = f"{table_prefix}_knowledge_chunks"
-        if not self.check_table_exists(db_conn, table_prefix):
-            self.db.create_knowledge_base_tables(table_prefix)
-
-    @classmethod
-    def check_table_exists(cls, db_conn: DatabaseConnection, table_prefix: str) -> bool:
-        """Check if knowledge base tables exist"""
-        try:
-            db_conn.connect()
-            db_conn.cursor.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = %s
-                );
-            """, (f"{table_prefix}_knowledge_objects",))
-            
-            return db_conn.cursor.fetchone()[0]
-        except Exception as e:
-            logging.error(f"Error checking knowledge base existence: {str(e)}")
-            return False
-
-    def ingest_knowledge(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> UUID:
-        """Process a document: chunk, embed, and store as a KnowledgeObject."""
-        chunks = self._chunk(text)
-        embeddings = self.embedding_service.get_embeddings([c.text for c in chunks])
-
-        for chunk, emb in zip(chunks, embeddings):
-            chunk.embedding = emb
-
-        knowledge_id = self._save_knowledge_and_chunks(text, chunks, metadata)
-        return knowledge_id
-
-    def _chunk(self, text: str) -> List[KnowledgeChunk]:
-        if self.chunking_method:
-            return self.chunking_method.chunk(text)
-        else:
-            default_chunker = SemanticChunker(
-                min_size=self.config.min_chunk_size,
-                max_size=self.config.max_chunk_size
-            )
-            return default_chunker.chunk(text)
-
-    def _save_knowledge_and_chunks(self, document_text: str, chunks: List[KnowledgeChunk], metadata: Optional[Dict[str, Any]]) -> UUID:
-        """Save knowledge object and chunks to the dynamically named tables."""
-        knowledge_id = uuid.uuid4()
-        self.db.connect()
-        try:
-            # Insert into the knowledge objects table
-            self.db.cursor.execute(f"""
-                INSERT INTO {self.knowledge_objects_table} (knowledge_id, content, metadata)
-                VALUES (%s, %s, %s)
-                RETURNING created_at;
-            """, (str(knowledge_id), document_text, json.dumps(metadata) if metadata else json.dumps({})))
-            created_at = self.db.cursor.fetchone()[0]
-
-            # Insert chunks into the knowledge chunks table
-            for chunk in chunks:
-                self.db.cursor.execute(f"""
-                    INSERT INTO {self.knowledge_chunks_table} (knowledge_id, text, start_pos, end_pos, embedding)
-                    VALUES (%s, %s, %s, %s, %s);
-                """, (str(knowledge_id), chunk.text, chunk.start, chunk.end, chunk.embedding))
-
-            self.db.conn.commit()
-            return knowledge_id
-        except Exception as e:
-            self.db.conn.rollback()
-            raise e
-
-    def clear_knowledge_base(self):
-        """Clear all knowledge entries from the dynamically named tables."""
-        self.db.connect()
-        try:
-            self.db.cursor.execute(f"DELETE FROM {self.knowledge_chunks_table};")
-            self.db.cursor.execute(f"DELETE FROM {self.knowledge_objects_table};")
-            self.db.conn.commit()
-        except Exception as e:
-            self.db.conn.rollback()
-            raise e
-        
 class SemanticChunker(KnowledgeChunker):
     def __init__(self, min_size: int, max_size: int):
         self.min_size = min_size

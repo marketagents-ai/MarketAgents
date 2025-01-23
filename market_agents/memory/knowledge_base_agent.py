@@ -1,22 +1,20 @@
 from typing import Dict, List, Optional, Any
-from uuid import UUID
 from pydantic import BaseModel, Field
 
-from market_agents.memory.knowledge_base import MarketKnowledgeBase
-from market_agents.memory.vector_search import RetrievedMemory
-from market_agents.memory.vector_search import MemoryRetriever
+from market_agents.memory.agent_storage.agent_storage_api import IngestKnowledgeRequest, KnowledgeQueryParams
+from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
+from market_agents.memory.memory_models import RetrievedMemory
+
 
 class KnowledgeBaseAgent(BaseModel):
-    market_kb: MarketKnowledgeBase
-    retriever: MemoryRetriever
-    knowledge_bases: Dict[str, MarketKnowledgeBase] = Field(default_factory=dict)
+    agent_storage_utils: AgentStorageAPIUtils
     retrieved_knowledge: List[RetrievedMemory] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True
 
-    def store(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> UUID:
-        return self.market_kb.ingest_knowledge(text, metadata)
+    async def store(self, text: str, metadata: Optional[Dict[str, Any]] = None):
+        return await self.agent_storage_utils.ingest_knowledge(IngestKnowledgeRequest(metadata=metadata, text=text))
 
-    def retrieve(self, query: str, table_prefix: str) -> List[RetrievedMemory]:
-        return self.retriever.search_knowledge_base(table_prefix, query, self.market_kb.config.top_k)
+    async def retrieve(self, query: str, table_prefix: str):
+        return await self.agent_storage_utils.search_knowledge(KnowledgeQueryParams(query=query, table_prefix=table_prefix))

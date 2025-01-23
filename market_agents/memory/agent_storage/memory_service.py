@@ -10,6 +10,7 @@ from market_agents.memory.config import MarketMemoryConfig
 from market_agents.memory.embedding import MemoryEmbedder
 from market_agents.memory.knowledge_base import KnowledgeChunk, SemanticChunker
 from market_agents.memory.memory import EpisodicMemoryObject, MemoryObject, CognitiveStep
+from market_agents.memory.memory_models import RetrievedMemory
 
 
 class MemoryService:
@@ -403,7 +404,7 @@ class MemoryService:
             query: str,
             top_k: int = 5,
             table_prefix: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[RetrievedMemory]:
         """
         Search the knowledge base using semantic similarity.
         """
@@ -416,32 +417,101 @@ class MemoryService:
             query_embedding = await self.embedder.get_embeddings(query)
 
             # Perform vector similarity search
-            results = await self.db.fetch(f"""
-                   WITH similarity_matches AS (
-                       SELECT 
-                           c.knowledge_id,
-                           c.text as chunk_text,
-                           c.embedding <-> $1 as similarity,
-                           o.content as full_content,
-                           o.metadata
-                       FROM {chunks_table} c
-                       JOIN {objects_table} o ON c.knowledge_id = o.knowledge_id
-                       ORDER BY similarity ASC
-                       LIMIT $2
-                   )
-                   SELECT * FROM similarity_matches;
-               """, query_embedding, top_k)
+            rows = await self.db.fetch(f"""
+                WITH ranked_chunks AS (
+                    SELECT DISTINCT ON (c.text)
+                        c.id, c.text, c.start_pos, c.end_pos, k.content,
+                        (1 - (c.embedding <=> %s::vector)) AS similarity
+                    FROM {chunks_table} c
+                    JOIN {objects_table} k ON c.knowledge_id = k.knowledge_id
+                    WHERE (1 - (c.embedding <=> %s::vector)) >= %s
+                    ORDER BY c.text, similarity DESC
+                )
+                SELECT * FROM ranked_chunks
+                ORDER BY similarity DESC
+                LIMIT %s;
+            """, query_embedding, query_embedding, self.config.similarity_threshold, top_k)
 
-            return [{
-                "knowledge_id": str(row["knowledge_id"]),
-                "chunk_text": row["chunk_text"],
-                "similarity_score": row["similarity"],
-                "full_content": row["full_content"],
-                "metadata": row["metadata"]
-            } for row in results]
+            results = []
+            for row in rows:
+                _, text, start_pos, end_pos, full_content, sim = row
+                self.full_text = full_content
+                context = self._get_context(start_pos, end_pos, full_content)
+                results.append(RetrievedMemory(text=text, similarity=sim, context=context))
+
+            return results
         except Exception as e:
             self.logger.error(f"Error searching knowledge base: {str(e)}")
             raise
+
+    async def search_cognitive_memory(
+            self,
+            query: str,
+            agent_id: str,
+            top_k: int = 5
+    ) -> List[RetrievedMemory]:
+        query_embedding = self.embedding_service.get_embeddings(query)
+        top_k = top_k or self.config.top_k
+
+        safe_id = self._sanitize_id(agent_id)
+        agent_cognitive_table = f"agent_{safe_id}_cognitive"
+
+        rows = await self.db.fetch(f"""
+            SELECT content,
+                   (1 - (embedding <=> %s::vector)) AS similarity
+            FROM {agent_cognitive_table}
+            ORDER BY similarity DESC
+            LIMIT %s;
+        """, query_embedding, top_k)
+
+        results = []
+        for row in rows:
+            content, sim = row
+            results.append(RetrievedMemory(text=content, similarity=sim))
+        return results
+
+    async def search_episodic_memory(
+            self,
+            query: str,
+            agent_id: str,
+            top_k: int = 5
+    ) -> List[RetrievedMemory]:
+        query_embedding = self.embedder.get_embeddings(query)
+        top_k = top_k or self.config.top_k
+
+        safe_id = self._sanitize_id(agent_id)
+        agent_episodic_table = f"agent_{safe_id}_episodic"
+
+        rows = await self.db.fetch(f"""
+            SELECT 
+                memory_id, 
+                task_query, 
+                cognitive_steps,
+                total_reward, 
+                strategy_update, 
+                metadata,
+                created_at,
+                (1 - (embedding <=> %s::vector)) AS similarity
+            FROM {agent_episodic_table}
+            ORDER BY similarity DESC
+            LIMIT %s;
+        """, query_embedding, top_k)
+
+        results = []
+        for (mem_id, task_query, steps_json, total_reward, strategy_update, meta, created_at, sim) in rows:
+            content_dict = {
+                "memory_id": str(mem_id),
+                "task_query": task_query,
+                "cognitive_steps": steps_json,
+                "total_reward": total_reward,
+                "strategy_update": strategy_update,
+                "metadata": meta,
+                "created_at": created_at.isoformat()
+            }
+            content_str = json.dumps(content_dict)
+            results.append(RetrievedMemory(text=content_str, similarity=sim, context=""))
+        return results
+
 
     async def delete_knowledge(
             self,
@@ -547,3 +617,20 @@ class MemoryService:
         except Exception as e:
             self.logger.error(f"Error building EpisodicMemoryObject: {str(e)}")
             raise
+
+    def _get_context(self, start: int, end: int, full_text: str) -> str:
+        """
+        Extracts context around a specific text chunk within a full document.
+        """
+        start_idx = max(0, start - self.config.max_input)
+        end_idx = min(len(full_text), end + self.config.max_input)
+        context = full_text[start_idx:end_idx].strip()
+        if start_idx > 0:
+            context = "..." + context
+        if end_idx < len(full_text):
+            context = context + "..."
+        return context
+
+    def _sanitize_id(self, agent_id: str) -> str:
+        """Sanitize agent ID for table names"""
+        return agent_id.replace('-', '_')

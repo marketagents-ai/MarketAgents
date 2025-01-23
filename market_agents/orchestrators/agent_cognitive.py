@@ -3,7 +3,8 @@ import json
 import logging
 from typing import Any, List
 from market_agents.agents.market_agent import MarketAgent
-from market_agents.memory.memory import MemoryObject, BaseMemory
+from market_agents.memory.agent_storage.memory_service import MemoryService
+from market_agents.memory.memory import MemoryObject
 from market_agents.orchestrators.logger_utils import log_perception, log_persona, log_reflection
 
 
@@ -17,7 +18,7 @@ class AgentCognitiveProcessor:
 
     def _get_safe_id(self, agent_id: str) -> str:
         """Get sanitized agent ID consistent with memory storage"""
-        return BaseMemory._sanitize_id(agent_id)
+        return MemoryService._sanitize_id(agent_id)
     
     def _serialize_content(self, content: Any) -> str:
         """Serialize content to JSON string, handling Pydantic models and datetimes"""

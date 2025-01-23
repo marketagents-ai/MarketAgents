@@ -154,6 +154,42 @@ class MemoryAPI:
                 self.logger.error(f"Error searching knowledge base: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
 
+        @self.router.get("/memory/episodic/search")
+        async def search_episodic_memory(
+            agent_id: str,
+            top_k: int,
+            query: str
+        ):
+            """Search episodic memory using semantic similarity."""
+            try:
+                results = await self.memory_service.search_episodic_memory(
+                    agent_id=agent_id,
+                    top_k=top_k,
+                    query=query
+                )
+                return {"matches": results}
+            except Exception as e:
+                self.logger.error(f"Error searching episodic memory: {str(e)}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.router.get("/memory/cognitive/search")
+        async def search_cognitive_memory(
+            agent_id: str,
+            top_k: int,
+            query: str
+        ):
+            """Search cognitive memory using semantic similarity."""
+            try:
+                results = await self.memory_service.search_cognitive_memory(
+                    agent_id=agent_id,
+                    top_k=top_k,
+                    query=query
+                )
+                return {"matches": results}
+            except Exception as e:
+                self.logger.error(f"Error searching cognitive memory: {str(e)}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         @self.router.delete("/knowledge/{knowledge_id}")
         async def delete_knowledge(
             knowledge_id: UUID,
