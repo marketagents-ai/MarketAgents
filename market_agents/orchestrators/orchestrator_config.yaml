@@ -1,29 +1,19 @@
 # orchestrator_config.yaml
 
-num_agents: 5
-max_rounds: 2
+num_agents: 4
+max_rounds: 1
 environment_order:
   - group_chat
-#  - auction
+  - research
 tool_mode: true
 agent_config:
-#  knowledge_base: "hamlet_kb"
-  num_units: 10
-  buyer_base_value: 120.0
-  seller_base_value: 80.0
+  knowledge_base: "shakespeare_kb"
   use_llm: true
-  buyer_initial_cash: 1000.0
-  buyer_initial_goods: 0
-  seller_initial_cash: 0.0
-  seller_initial_goods: 10
-  good_name: "strawberry"
-  noise_factor: 0.05
-  max_relative_spread: 0.2
 llm_configs:
-    - name: "gpt-4o-mini"
-      model: "gpt-4o-mini"
+    - name: "gpt-4o"
+      model: "gpt-4o"
       client: "openai"
-      max_tokens: 2048
+      max_tokens: 4096
       temperature: 0.5
       use_cache: true
 #    - name: "qwen"
@@ -83,17 +73,21 @@ llm_configs:
 environment_configs:
   group_chat:
     name: "group_chat"
-    address: "localhost:8001"
+    address: "http://localhost:8001"
     max_rounds: 5
-    initial_topic: "Initial Market Discussion"
-  #  initial_topic: "Hamlet's famous 'To be or not to be' soliloquy"
-    sub_rounds: 3
+  #  initial_topic: "Initial Market Discussion"
+    initial_topic: "Hamlet's famous 'To be or not to be' soliloquy"
+    sub_rounds: 2
     group_size: 4
-  auction:
-    name: "auction"
-    address: ""
+  research:
+    name: "literary_research"
+    address: "http://localhost:8002"
     max_rounds: 5
-    good_name: "strawberry"
+#    initial_topic: "Market Analysis"
+    initial_topic: "Hamlet's famous 'To be or not to be' soliloquy"
+    sub_rounds: 2
+    group_size: 4
+    schema_model: "LiteraryAnalysis" 
 protocol: "acl_message"
 database_config:
   db_host: "localhost"

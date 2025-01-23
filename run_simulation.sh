@@ -13,14 +13,15 @@ check_port() {
 }
 
 # File names for the Python scripts
-ORCHESTRATOR_SCRIPT="market_agents/orchestrators/meta_orchestrator.py"
+MAIN_SCRIPT="main.py"
+#ORCHESTRATOR_SCRIPT="market_agents/orchestrators/meta_orchestrator.py"
 DASHBOARD_SCRIPT="market_agents/agents/db/dashboard/dashboard.py"
 GROUPCHAT_API_SCRIPT="market_agents/orchestrators/group_chat/groupchat_api.py"
 DASHBOARD_PORT=8000
 GROUPCHAT_API_PORT=8001
 
 # Check if the Python scripts exist
-for script in "$ORCHESTRATOR_SCRIPT" "$DASHBOARD_SCRIPT" "$GROUPCHAT_API_SCRIPT"; do
+for script in "$MAIN_SCRIPT" "$DASHBOARD_SCRIPT" "$GROUPCHAT_API_SCRIPT"; do
     if [ ! -f "$script" ]; then
         echo "Error: $script not found!"
         exit 1
@@ -80,7 +81,7 @@ start_time=$(date +%s)
 
 # Run the orchestrator script
 echo "Starting market simulation with parallel orchestration..."
-python3 "$ORCHESTRATOR_SCRIPT" 2>&1 | tee simulation_output.log
+python3 "$MAIN_SCRIPT" 2>&1 | tee simulation_output.log
 
 orchestrator_exit_code=${PIPESTATUS[0]}
 

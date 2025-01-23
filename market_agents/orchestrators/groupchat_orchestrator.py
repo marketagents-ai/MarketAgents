@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
-from market_agents.environments.environment import MultiAgentEnvironment
+from market_agents.environments.environment import LocalEnvironmentStep, MultiAgentEnvironment
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.environments.mechanisms.group_chat import GroupChat, GroupChatActionSpace, GroupChatObservationSpace
 from market_agents.orchestrators.config import GroupChatConfig, OrchestratorConfig
@@ -50,7 +50,7 @@ class GroupChatOrchestrator:
         self.logger = logger or logging.getLogger(__name__)
 
         # Initialize API utils
-        self.api_utils = GroupChatAPIUtils(self.config.groupchat_api_url, self.logger)
+        self.api_utils = GroupChatAPIUtils(self.config.api_url, self.logger)
 
         # Initialize cognitive processor
         self.cognitive_processor = AgentCognitiveProcessor(ai_utils, data_inserter, self.logger, self.orchestrator_config.tool_mode)

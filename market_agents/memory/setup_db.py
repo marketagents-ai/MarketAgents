@@ -7,6 +7,7 @@ class DatabaseConnection:
         self.config = config
         self.conn = None
         self.cursor = None
+        self._ensure_database_exists()
 
     def connect(self):
         """Establish a new connection if needed"""

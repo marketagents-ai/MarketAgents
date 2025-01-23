@@ -1,7 +1,7 @@
 # group_chat.py
 
 import random
-from typing import List, Dict, Any, Union, Type, Literal
+from typing import List, Dict, Any, Optional, Union, Type, Literal
 from pydantic import BaseModel, Field
 from market_agents.environments.environment import (
     Mechanism, LocalAction, GlobalAction, LocalObservation, GlobalObservation,
@@ -58,6 +58,7 @@ class GroupChat(Mechanism):
     topics: Dict[str, str] = Field(default_factory=dict)
     current_topic: str = Field(default="")
     sequential: bool = Field(default=False, description="Whether the mechanism is sequential")
+    last_step: Optional[Union[LocalEnvironmentStep, EnvironmentStep]] = None
 
     def step(self, action: Union[GroupChatAction, GroupChatGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
         logger.debug(f"Received action of type: {type(action).__name__}")
@@ -100,16 +101,17 @@ class GroupChat(Mechanism):
 
             local_step = LocalEnvironmentStep(
                 observation=observation,
-                reward=0,
+                reward=1.0,
                 done=done,
                 info={
+                    'agent_rewards': {action.agent_id: 1.0},
                     "current_round": self.current_round,
                     "current_topic": self.current_topic,
                     "all_messages": [message.dict() for message in self.messages],
                     "speaker_order": self.speaker_order
                 }
             )
-
+            self.last_step = local_step
             return local_step
         else:
             # Non-sequential mode: expect a GlobalAction
@@ -152,11 +154,12 @@ class GroupChat(Mechanism):
                 global_observation=global_observation,
                 done=done,
                 info={
+                    'agent_rewards': {agent_id: 1.0 for agent_id in action.actions.keys()},
                     "current_round": self.current_round,
                     "all_messages": [message.dict() for message in self.messages],
                 }
             )
-
+            self.last_step = env_step
             return env_step
 
     def _process_actions(self, global_action: GroupChatGlobalAction) -> List[GroupChatMessage]:

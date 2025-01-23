@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Any, List
 import json
 import pyfiglet
 from rich.console import Console
@@ -99,6 +99,24 @@ def log_reflection(logger: logging.Logger, agent_id: int, reflection: str):
     except Exception as e:
         console.print(f"[bold magenta]💭 Agent {agent_id} reflects:[/bold magenta]\n[magenta]{reflection}[/magenta]")
 
+def log_action(logger: logging.Logger, agent_id: int, action: Any):
+    """Log an agent's action in a consistent format using rich formatting"""
+    try:
+        action_dict = json.loads(action) if isinstance(action, str) else action
+        markdown = json_to_markdown(action_dict)
+        header = f"[bold green]🎯 Agent {agent_id:02d} action:[/bold green]\n"
+        text = Text.from_markup(header)
+        text.append(markdown)
+        panel = Panel(
+            Align.left(text),
+            border_style="green",
+            box=HEAVY,
+            width=80
+        )
+        console.print(panel)
+    except Exception as e:
+        console.print(f"[bold green]🎯 Agent {agent_id} action:[/bold green]\n[green]{action}[/green]")
+
 def log_section(logger: logging.Logger, message: str):
     border = "=" * 70
     logger.info(f"[magenta]{border}[/magenta]")
@@ -131,24 +149,6 @@ def log_running(logger: logging.Logger, env_name: str):
 def log_raw_action(logger: logging.Logger, agent_id: int, action: dict):
     logger.info(f"[black on yellow]🔧 Agent {agent_id} executes: [/black on yellow]")
     logger.info(f"[yellow]{action}[/yellow]")
-
-def log_action(logger: logging.Logger, agent_id: int, action: str):
-    if "Bid" in action:
-        emoji = "💰"
-        color = "green"
-    elif "Ask" in action:
-        emoji = "💵"
-        color = "yellow"
-    elif "reflects" in action.lower():
-        emoji = "💭"
-        color = "magenta"
-    elif "perceives" in action.lower():
-        emoji = "👁️"
-        color = "cyan"
-    else:
-        emoji = "🔧"
-        color = "white"
-    logger.info(f"[{color}]{emoji} Agent {agent_id:02d} executes: {action}[/{color}]")
 
 def log_market_update(logger: logging.Logger, update: str):
     logger.info(f"[black on cyan]📢 MARKET INSIGHT:[/black on cyan]")

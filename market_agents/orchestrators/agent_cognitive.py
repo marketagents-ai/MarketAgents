@@ -24,8 +24,8 @@ class AgentCognitiveProcessor:
         def serialize_value(v):
             if isinstance(v, datetime):
                 return v.isoformat()
-            if hasattr(v, 'serialize_json'):
-                return json.loads(v.serialize_json())
+            if hasattr(v, 'dict'):
+                return v.dict()
             if hasattr(v, 'model_dump'):
                 return v.model_dump()
             if isinstance(v, dict):
@@ -35,10 +35,10 @@ class AgentCognitiveProcessor:
             return v
 
         try:
-            if hasattr(content, 'serialize_json'):
-                return content.serialize_json()
+            if hasattr(content, 'dict'):
+                return json.dumps(content.dict())
             elif hasattr(content, 'model_dump'):
-                return json.dumps(content.model_dump(), default=serialize_value)
+                return json.dumps(content.model_dump())
             elif isinstance(content, dict):
                 return json.dumps({k: serialize_value(v) for k, v in content.items()})
             elif isinstance(content, list):
@@ -54,7 +54,7 @@ class AgentCognitiveProcessor:
             perception_prompt = await agent.perceive(environment_name, return_prompt=True, structured_tool=self.tool_mode)
             perception_prompts.append(perception_prompt)
         
-        perceptions = await self.ai_utils.run_parallel_ai_completion(perception_prompts, update_history=False)
+        perceptions = await self.ai_utils.run_parallel_ai_completion(perception_prompts, update_history=True)
         self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
         
         # Log personas and perceptions, and store in memory
@@ -87,7 +87,7 @@ class AgentCognitiveProcessor:
             action_prompt = await agent.generate_action(environment_name, agent.last_perception, return_prompt=True, structured_tool=self.tool_mode)
             action_prompts.append(action_prompt)
             
-        actions = await self.ai_utils.run_parallel_ai_completion(action_prompts, update_history=False)
+        actions = await self.ai_utils.run_parallel_ai_completion(action_prompts, update_history=True)
         self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
         
         # Store actions in memory
@@ -120,7 +120,7 @@ class AgentCognitiveProcessor:
                 agents_with_observations.append(agent)
                 
         if reflection_prompts:
-            reflections = await self.ai_utils.run_parallel_ai_completion(reflection_prompts, update_history=False)
+            reflections = await self.ai_utils.run_parallel_ai_completion(reflection_prompts, update_history=True)
             self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
             
             for agent, reflection in zip(agents_with_observations, reflections):
@@ -133,7 +133,14 @@ class AgentCognitiveProcessor:
                     log_reflection(self.logger, agent.index, reflection_content)
                     
                     # Calculate rewards
-                    environment_reward = agent.last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if agent.last_step else None
+                    environment = agent.environments.get(environment_name)
+                    if environment and environment.mechanism:
+                        last_step = environment.mechanism.last_step
+                        environment_reward = last_step.info.get('agent_rewards', {}).get(agent.id, 0.0) if last_step else None
+                    else:
+                        environment_reward = None
+                        self.logger.warning(f"Could not get environment step for agent {agent.id}")
+
                     self_reward = reflection_content.get("self_reward", 0.0)
                     
                     total_reward = None
@@ -148,9 +155,16 @@ class AgentCognitiveProcessor:
                             f"Total: {total_reward}"
                         )
 
-                    # Store reflection in memory
-                    observation_data = self._serialize_content(agent.last_observation) if agent.last_observation else None
-                            
+                    # Serialize the observation before storing
+                    try:
+                        if agent.last_observation:
+                            observation_data = agent.last_observation.dict() if hasattr(agent.last_observation, 'dict') else str(agent.last_observation)
+                        else:
+                            observation_data = None
+                    except Exception as e:
+                        self.logger.warning(f"Failed to serialize observation: {e}")
+                        observation_data = str(agent.last_observation)
+
                     memory_obj = MemoryObject(
                         agent_id=agent.id,
                         cognitive_step="reflection",
@@ -172,15 +186,18 @@ class AgentCognitiveProcessor:
                     env_state_str = f"Environment state: {str(agent.environments[environment_name].get_global_state())}"
                     query_str = (task_str + "\n" + env_state_str).strip()
                     
+                    # Ensure metadata is JSON serializable
+                    serializable_metadata = {
+                        "environment": environment_name,
+                        "observation": observation_data
+                    }
+                    
                     await agent.long_term_memory.store_episodic_memory(
                         agent_id=agent.id,
                         task_query=query_str,
                         steps=self.episode_steps[safe_id],
                         total_reward=total_reward,
                         strategy_update=reflection_content.get("strategy_update", []),
-                        metadata={
-                            "environment": environment_name,
-                            "observation": agent.last_observation
-                        }
+                        metadata=serializable_metadata
                     )
                     self.episode_steps[safe_id].clear()
