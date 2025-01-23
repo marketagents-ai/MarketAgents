@@ -129,11 +129,21 @@ async def main():
     # Create Agents
     agents = create_agents(config, memory_config, db_conn)
 
-    # Build orchestrator registry
-    orchestrator_registry = {
-        #"group_chat": GroupChatOrchestrator,
+    orchestrator_registry = {}
+    orchestrator_map = {
+        "group_chat": GroupChatOrchestrator,
         "research": ResearchOrchestrator
     }
+    
+    # If environment_order exists in config, use it to build registry
+    if hasattr(config, 'environment_order'):
+        for env_name in config.environment_order:
+            if env_name in orchestrator_map:
+                orchestrator_registry[env_name] = orchestrator_map[env_name]
+
+    # If no environments specified, default to group_chat
+    if not orchestrator_registry:
+        orchestrator_registry["group_chat"] = GroupChatOrchestrator
 
     # Instantiate MetaOrchestrator with loaded config, your agents, and registry
     meta_orch = MetaOrchestrator(

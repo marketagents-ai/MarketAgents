@@ -50,7 +50,7 @@ class GroupChatOrchestrator:
         self.logger = logger or logging.getLogger(__name__)
 
         # Initialize API utils
-        self.api_utils = GroupChatAPIUtils(self.config.groupchat_api_url, self.logger)
+        self.api_utils = GroupChatAPIUtils(self.config.api_url, self.logger)
 
         # Initialize cognitive processor
         self.cognitive_processor = AgentCognitiveProcessor(ai_utils, data_inserter, self.logger, self.orchestrator_config.tool_mode)
