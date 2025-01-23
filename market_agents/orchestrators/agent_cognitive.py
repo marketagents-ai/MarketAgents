@@ -54,7 +54,7 @@ class AgentCognitiveProcessor:
             perception_prompt = await agent.perceive(environment_name, return_prompt=True, structured_tool=self.tool_mode)
             perception_prompts.append(perception_prompt)
         
-        perceptions = await self.ai_utils.run_parallel_ai_completion(perception_prompts, update_history=False)
+        perceptions = await self.ai_utils.run_parallel_ai_completion(perception_prompts, update_history=True)
         self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
         
         # Log personas and perceptions, and store in memory
@@ -87,7 +87,7 @@ class AgentCognitiveProcessor:
             action_prompt = await agent.generate_action(environment_name, agent.last_perception, return_prompt=True, structured_tool=self.tool_mode)
             action_prompts.append(action_prompt)
             
-        actions = await self.ai_utils.run_parallel_ai_completion(action_prompts, update_history=False)
+        actions = await self.ai_utils.run_parallel_ai_completion(action_prompts, update_history=True)
         self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
         
         # Store actions in memory
@@ -120,7 +120,7 @@ class AgentCognitiveProcessor:
                 agents_with_observations.append(agent)
                 
         if reflection_prompts:
-            reflections = await self.ai_utils.run_parallel_ai_completion(reflection_prompts, update_history=False)
+            reflections = await self.ai_utils.run_parallel_ai_completion(reflection_prompts, update_history=True)
             self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
             
             for agent, reflection in zip(agents_with_observations, reflections):
