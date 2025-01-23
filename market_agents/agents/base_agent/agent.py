@@ -54,6 +54,7 @@ class Agent(BaseModel):
     tools: Optional[List[Callable]] = None
     output_format: Optional[Union[Dict[str, Any], str]] = None
     llm_config: LLMConfig = Field(default_factory=LLMConfig)
+    prompt_context: Optional[LLMPromptContext] = None 
     max_retries: int = 2
     metadata: Optional[Dict[str, Any]] = None
     interactions: List[Dict[str, Any]] = Field(default_factory=list)
@@ -84,16 +85,18 @@ class Agent(BaseModel):
             self.llm_config.response_format = "structured_output"
             execution_output_format = self._load_output_schema(execution_output_format)
 
-        prompt_context = self._prepare_prompt_context(
+        self._prepare_prompt_context(
             execution_task,
             execution_output_format if isinstance(execution_output_format, dict) else None
         )
+        
         #agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
         if return_prompt:
-            return prompt_context
+            return self.prompt_context
 
-        result = await self._run_ai_inference(prompt_context)
-        self._log_interaction(prompt_context, result)
+        result = await self._run_ai_inference(self.prompt_context)
+        self._log_interaction(self.prompt_context, result)
+        
         return result
 
     def _load_output_schema(self, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None) -> Optional[Dict[str, Any]]:
@@ -139,15 +142,23 @@ class Agent(BaseModel):
         if output_format and isinstance(output_format, dict):
             structured_output = StructuredTool(json_schema=output_format, strict_schema=False)
 
-        return LLMPromptContext(
-            id=self.id,
-            system_string=system_message,
-            new_message=user_message,
-            llm_config=self.llm_config,
-            structured_output=structured_output,
-            tools=self.tools,
-            update_history=True
-        )
+        # If prompt_context exists, update it
+        if self.prompt_context:
+            self.prompt_context.system_string = system_message
+            self.prompt_context.new_message = user_message
+            self.prompt_context.llm_config = self.llm_config
+            self.prompt_context.structured_output = structured_output
+            self.prompt_context.tools = self.tools
+        else:          
+            self.prompt_context = LLMPromptContext(
+                id=self.id,
+                system_string=system_message,
+                new_message=user_message,
+                llm_config=self.llm_config,
+                structured_output=structured_output,
+                tools=self.tools,
+                use_history=True
+            )
     
     @retry(
         wait=wait_random_exponential(multiplier=1, max=30),
@@ -162,6 +173,10 @@ class Agent(BaseModel):
                 raise ValueError("No output received from AI inference")
             
             llm_output = llm_output[0]
+
+            # Add chat turn history before converting LLMOutput
+            #if prompt_context.use_history:
+            #    prompt_context.add_chat_turn_history(llm_output)
             
             if prompt_context.llm_config.response_format == "text":
                 return llm_output.str_content or str(llm_output.raw_result)
