@@ -359,32 +359,34 @@ class MemoryService:
 
             knowledge_id = uuid.uuid4()
 
-            # Insert knowledge object
-            await self.db.execute(
-                f"""
-                INSERT INTO {table_prefix}_knowledge_objects 
-                (knowledge_id, content, metadata)
-                VALUES ($1, $2, $3)
-                """,
-                str(knowledge_id),
-                text,
-                json.dumps(metadata or {})
-            )
+            async with self.db.safe_transaction() as conn:
 
-            # Insert chunks
-            for chunk, embedding in zip(chunks, embeddings):
-                await self.db.execute(
+                # Insert knowledge object
+                await conn.execute(
                     f"""
-                    INSERT INTO {table_prefix}_knowledge_chunks
-                    (knowledge_id, text, start_pos, end_pos, embedding)
-                    VALUES ($1, $2, $3, $4, $5)
+                    INSERT INTO {table_prefix}_knowledge_objects 
+                    (knowledge_id, content, metadata)
+                    VALUES ($1, $2, $3)
                     """,
                     str(knowledge_id),
-                    chunk.text,
-                    chunk.start,
-                    chunk.end,
-                    embedding
+                    text,
+                    json.dumps(metadata or {})
                 )
+
+                # Insert chunks
+                for chunk, embedding in zip(chunks, embeddings):
+                    await conn.execute(
+                        f"""
+                        INSERT INTO {table_prefix}_knowledge_chunks
+                        (knowledge_id, text, start_pos, end_pos, embedding)
+                        VALUES ($1, $2, $3, $4, $5)
+                        """,
+                        str(knowledge_id),
+                        chunk.text,
+                        chunk.start,
+                        chunk.end,
+                        embedding
+                    )
 
             return knowledge_id
         except Exception as e:
