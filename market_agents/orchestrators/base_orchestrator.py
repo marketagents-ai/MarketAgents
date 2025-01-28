@@ -1,9 +1,8 @@
-# base_environment_orchestrator.py
-from typing import List, Union, Dict
+from typing import List
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.inference.parallel_inference import ParallelAIUtilities
 from market_agents.orchestrators.config import OrchestratorConfig
-from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
+from market_agents.memory.agent_storage.storage_service import StorageService
 from pydantic import BaseModel, Field
 from abc import ABC, abstractmethod
 import logging
@@ -13,7 +12,7 @@ class BaseEnvironmentOrchestrator(BaseModel, ABC):
     orchestrator_config: OrchestratorConfig
     agents: List['MarketAgent']
     ai_utils: 'ParallelAIUtilities'
-    data_inserter: 'SimulationDataInserter'
+    storage_service: 'StorageService'
     logger: logging.Logger = Field(default=None)
     environment_name: str = Field(default="")
 
@@ -43,9 +42,7 @@ class BaseEnvironmentOrchestrator(BaseModel, ABC):
         pass
 
     async def process_round_results(self, round_num: int):
-        # Implement common result processing logic if any
         pass
 
     async def run(self):
-        # Implement common run logic if any
         pass

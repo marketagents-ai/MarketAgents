@@ -1,6 +1,9 @@
 import os
 import pytest
-from market_agents.memory.setup_db import DatabaseConnection
+import pytest_asyncio
+from asyncpg import PostgresError
+
+from market_agents.memory.agent_storage.setup_db import AsyncDatabase
 from market_agents.memory.config import load_config_from_yaml
 
 @pytest.fixture
@@ -11,76 +14,106 @@ def db_config():
     )
     return load_config_from_yaml(yaml_path)
 
-@pytest.fixture
-def db_connection(db_config):
-    db = DatabaseConnection(db_config)
+@pytest_asyncio.fixture
+async def db_connection(db_config):
+    db = AsyncDatabase(db_config)
+    await db.initialize()
     yield db
-    # Cleanup after tests
-    db.close()
+    await db.close()
 
-def test_database_creation(db_connection):
-    """Test basic database creation and connection"""
-    try:
-        db_connection._ensure_database_exists()
-        db_connection.connect()
-        # Simple test query
-        db_connection.cursor.execute("SELECT 1")
-        result = db_connection.cursor.fetchone()
-        assert result[0] == 1
-    except Exception as e:
-        pytest.fail(f"Database creation failed: {e}")
 
-def test_knowledge_base_tables(db_connection):
-    """Test creation of knowledge base tables"""
-    test_base_name = "test_market_knowledge"
+@pytest.mark.asyncio
+async def test_database_connection(db_connection):
+    """Test basic database connectivity and simple query execution"""
     try:
-        db_connection.create_knowledge_base_tables(test_base_name)
-        # Verify tables exist
-        db_connection.cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = %s
-            );
-        """, (f"{test_base_name}_knowledge_objects",))
-        assert db_connection.cursor.fetchone()[0] is True
+        # Test simple query execution
+        result = await db_connection.fetch("SELECT 1")
+        assert len(result) == 1, "Should return one row"
+        assert result[0][0] == 1, "Should return value 1"
     except Exception as e:
-        pytest.fail(f"Knowledge base table creation failed: {e}")
+        pytest.fail(f"Database connection test failed: {e}")
 
-def test_agent_memory_tables(db_connection):
-    """Test creation of agent memory tables"""
-    test_agent_id = "market_agent_123"
-    try:
-        # Test cognitive memory
-        db_connection.create_agent_cognitive_memory_table(test_agent_id)
-        # Test episodic memory
-        db_connection.create_agent_episodic_memory_table(test_agent_id)
-        
-        # Verify tables exist
-        for table_type in ['cognitive', 'episodic']:
-            table_name = f"agent_{test_agent_id}_{table_type}"
-            db_connection.cursor.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = %s
-                );
-            """, (table_name,))
-            assert db_connection.cursor.fetchone()[0] is True
-    except Exception as e:
-        pytest.fail(f"Agent memory table creation failed: {e}")
+@pytest.mark.asyncio
+async def test_extension_verification(db_connection):
+    """Verify required PostgreSQL extensions are installed"""
+    result = await db_connection.fetch(
+        "SELECT * FROM pg_extension WHERE extname = 'vector'"
+    )
+    assert len(result) == 1, "Vector extension should be installed"
 
-def test_memory_clearing(db_connection):
-    """Test clearing agent memory tables"""
-    test_agent_id = "test_market_agent_123"
+
+@pytest.mark.asyncio
+async def test_transaction_rollback(db_connection):
+    """Test transaction rollback on error"""
+    await db_connection.execute(
+        "CREATE TEMPORARY TABLE test_table (id SERIAL PRIMARY KEY, data TEXT)"
+    )
+
     try:
-        # Initialize tables
-        db_connection.init_agent_cognitive_memory([test_agent_id])
-        db_connection.init_agent_episodic_memory([test_agent_id])
-        
-        # Test clearing
-        db_connection.clear_agent_cognitive_memory(test_agent_id)
-        db_connection.clear_agent_episodic_memory(test_agent_id)
-    except Exception as e:
-        pytest.fail(f"Memory clearing operations failed: {e}")
+        async with db_connection.transaction() as conn:
+            await conn.execute("INSERT INTO test_table (data) VALUES ('test')")
+            raise Exception("Simulated error for rollback")
+    except Exception:
+        pass
+
+    # Verify rollback occurred
+    result = await db_connection.fetch("SELECT * FROM test_table")
+    assert len(result) == 0, "Transaction should have rolled back"
+
+
+@pytest.mark.asyncio
+async def test_transaction_commit(db, setup_test_tables):
+    """Test successful transaction commit"""
+    async with db.transaction() as conn:
+        await conn.execute(
+            "INSERT INTO users (name, email) VALUES ($1, $2)",
+            "Test User", "test@example.com"
+        )
+
+    result = await db.fetch("SELECT * FROM users WHERE email = $1", "test@example.com")
+    assert len(result) == 1
+    assert result[0]['name'] == "Test User"
+
+@pytest.mark.asyncio
+async def test_execute_in_transaction(db_connection):
+    """Test atomic execution of multiple queries in a transaction"""
+    await db_connection.execute(
+        "CREATE TEMPORARY TABLE test_table (id SERIAL PRIMARY KEY, data TEXT)"
+    )
+
+    queries = [
+        ("INSERT INTO test_table (data) VALUES ($1)", ("first",)),
+        ("INSERT INTO test_table (data) VALUES ($1)", ("second",)),
+    ]
+
+    await db_connection.execute_in_transaction(queries)
+
+    result = await db_connection.fetch("SELECT * FROM test_table")
+    assert len(result) == 2, "Both inserts should be committed"
+
+
+@pytest.mark.asyncio
+async def test_safe_transaction_retry(db, setup_test_tables):
+    """Test transaction retry mechanism"""
+    retry_count = 0
+
+    async def insert_with_retry():
+        nonlocal retry_count
+        async with db.safe_transaction(max_retries=3) as conn:
+            retry_count += 1
+            if retry_count < 2:  # Fail first attempt
+                raise PostgresError("Simulated deadlock")
+            await conn.execute(
+                "INSERT INTO users (name, email) VALUES ($1, $2)",
+                "Retry User", "retry@example.com"
+            )
+
+    await insert_with_retry()
+    assert retry_count == 2, "Should have retried once"
+
+    result = await db.fetch("SELECT * FROM users WHERE email = $1", "retry@example.com")
+    assert len(result) == 1, "Insert should have succeeded after retry"
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

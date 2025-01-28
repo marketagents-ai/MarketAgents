@@ -1,9 +1,10 @@
-import os
-import requests
-import time
-import tiktoken
+import asyncio
 import logging
+import os
+import aiohttp
 from dotenv import load_dotenv
+import tiktoken
+
 
 class MemoryEmbedder:
     """
@@ -24,7 +25,7 @@ class MemoryEmbedder:
             text = self.encoding.decode(tokens)
         return text
 
-    def get_embeddings(self, texts):
+    async def get_embeddings(self, texts):
         """Get embeddings with retry logic and batch processing."""
         single_input = isinstance(texts, str)
         texts = [texts] if single_input else texts
@@ -32,9 +33,9 @@ class MemoryEmbedder:
         texts = [self._truncate_text(text) for text in texts]
 
         if self.config.embedding_provider == "openai":
-            all_embeddings = self._get_openai_embeddings(texts)
+            all_embeddings = await self._get_openai_embeddings(texts)
         elif self.config.embedding_provider == "tei":
-            all_embeddings = self._get_tei_embeddings(texts)
+            all_embeddings = await self._get_tei_embeddings(texts)
         else:
             raise NotImplementedError(
                 f"Unknown embedding provider: {self.config.embedding_provider}"
@@ -42,7 +43,9 @@ class MemoryEmbedder:
 
         return all_embeddings[0] if single_input else all_embeddings
 
-    def _get_openai_embeddings(self, texts):
+    async def _get_openai_embeddings(self, texts):
+        print("DEBUG: Actually inside the real get_embeddings in MemoryEmbedder:", self)
+
         """Embeddings from OpenAI API."""
         load_dotenv()
         self.openai_key = os.getenv("OPENAI_KEY")
@@ -58,15 +61,13 @@ class MemoryEmbedder:
                 "input": batch,
                 "model": self.config.model
             }
-            # Reuse the _send_embedding_request method
-            response = self._send_embedding_request(payload, headers)
-            response_json = response.json()
+            response_json = await self._send_embedding_request(payload, headers)
             batch_embeddings = [item["embedding"] for item in response_json.get("data", [])]
             all_embeddings.extend(batch_embeddings)
 
         return all_embeddings
 
-    def _get_tei_embeddings(self, texts):
+    async def _get_tei_embeddings(self, texts):
         """Embeddings for local embedding model (TEI)."""
         headers = {"Content-Type": "application/json"}
         all_embeddings = []
@@ -77,36 +78,27 @@ class MemoryEmbedder:
                 "inputs": batch,
                 "model": self.config.model
             }
-            # Reuse the _send_embedding_request method
-            response = self._send_embedding_request(payload, headers)
-            all_embeddings.extend(response.json())
+            response_json = await self._send_embedding_request(payload, headers)
+            all_embeddings.extend(response_json)
 
         return all_embeddings
 
-    def _send_embedding_request(self, payload, headers):
-        """
-        Sends POST request to the embedding API with retry logic. 
-        """
+    async def _send_embedding_request(self, payload, headers):
+        """Sends POST request to the embedding API with retry logic."""
         for attempt in range(self.config.retry_attempts):
             try:
-                response = requests.post(
-                    self.config.embedding_api_url,
-                    headers=headers,
-                    json=payload,
-                    timeout=self.config.timeout
-                )
-                response.raise_for_status()
-                return response
-            except requests.exceptions.HTTPError as http_err:
-                print(f"HTTP error occurred: {http_err}")
-                if response is not None:
-                    print(f"Response content: {response.content}")
-                if attempt == self.config.retry_attempts - 1:
-                    raise
-                time.sleep(self.config.retry_delay)
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        self.config.embedding_api_url,
+                        headers=headers,
+                        json=payload,
+                        timeout=self.config.timeout
+                    ) as response:
+                        response.raise_for_status()
+                        return await response.json()
             except Exception as e:
                 if attempt == self.config.retry_attempts - 1:
                     raise e
-                time.sleep(self.config.retry_delay)
+                await asyncio.sleep(self.config.retry_delay)
 
         raise RuntimeError("Unexpected error in _send_embedding_request")

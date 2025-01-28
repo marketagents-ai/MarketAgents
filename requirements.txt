@@ -11,4 +11,15 @@ fastapi==0.115.6
 pyfiglet==1.0.2
 uvicorn==0.34.0
 rich==13.9.4
-aiohttp
+aiohttp~=3.11.11
+asyncio~=3.4.3
+setuptools~=75.1.0
+numpy~=2.2.1
+requests~=2.32.3
+pyyaml~=6.0.2
+pandas~=2.2.2
+tenacity~=9.0.0
+asyncpg~=0.29.0
+matplotlib~=3.9.2
+pytest~=7.4.4
+pytest-asyncio~=0.21.2

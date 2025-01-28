@@ -1,23 +1,35 @@
+import asyncio
 from datetime import datetime, timezone
 import json
 import logging
 from typing import Any, List
 from market_agents.agents.market_agent import MarketAgent
-from market_agents.memory.memory import MemoryObject, BaseMemory
+from market_agents.memory.agent_storage.storage_service import StorageService
+from market_agents.memory.memory import MemoryObject
 from market_agents.orchestrators.logger_utils import log_perception, log_persona, log_reflection
 
 
 class AgentCognitiveProcessor:
-    def __init__(self, ai_utils, data_inserter, logger: logging.Logger, tool_mode=False):
+    def __init__(self, ai_utils, storage_service: StorageService, logger: logging.Logger, tool_mode=False):
         self.ai_utils = ai_utils
-        self.data_inserter = data_inserter
+        self.storage_service = storage_service
         self.logger = logger
         self.tool_mode = tool_mode
         self.episode_steps = {}
+        
+        # Ensure AI requests table exists
+        asyncio.create_task(self._ensure_ai_requests_table())
+        
+    async def _ensure_ai_requests_table(self):
+        """Ensure the AI requests table exists."""
+        try:
+            await self.storage_service.create_tables(table_type="ai_requests")
+        except Exception as e:
+            self.logger.error(f"Failed to create AI requests table: {e}")
 
     def _get_safe_id(self, agent_id: str) -> str:
-        """Get sanitized agent ID consistent with memory storage"""
-        return BaseMemory._sanitize_id(agent_id)
+        """Get sanitized agent ID using AsyncDatabase's method"""
+        return self.storage_service.db._sanitize_table_name(str(agent_id))
     
     def _serialize_content(self, content: Any) -> str:
         """Serialize content to JSON string, handling Pydantic models and datetimes"""
@@ -55,7 +67,7 @@ class AgentCognitiveProcessor:
             perception_prompts.append(perception_prompt)
         
         perceptions = await self.ai_utils.run_parallel_ai_completion(perception_prompts, update_history=True)
-        self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
+        await self.storage_service.store_ai_requests(self.ai_utils.get_all_requests())
         
         # Log personas and perceptions, and store in memory
         for agent, perception in zip(agents, perceptions):
@@ -88,7 +100,7 @@ class AgentCognitiveProcessor:
             action_prompts.append(action_prompt)
             
         actions = await self.ai_utils.run_parallel_ai_completion(action_prompts, update_history=True)
-        self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
+        await self.storage_service.store_ai_requests(self.ai_utils.get_all_requests())
         
         # Store actions in memory
         for agent, action in zip(agents, actions):
@@ -121,7 +133,7 @@ class AgentCognitiveProcessor:
                 
         if reflection_prompts:
             reflections = await self.ai_utils.run_parallel_ai_completion(reflection_prompts, update_history=True)
-            self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
+            await self.storage_service.store_ai_requests(self.ai_utils.get_all_requests())
             
             for agent, reflection in zip(agents_with_observations, reflections):
                 safe_id = self._get_safe_id(agent.id)
@@ -192,8 +204,7 @@ class AgentCognitiveProcessor:
                         "observation": observation_data
                     }
                     
-                    await agent.long_term_memory.store_episodic_memory(
-                        agent_id=agent.id,
+                    await agent.long_term_memory.store_episode(
                         task_query=query_str,
                         steps=self.episode_steps[safe_id],
                         total_reward=total_reward,

@@ -32,7 +32,7 @@ from market_agents.orchestrators.logger_utils import (
     log_action,
     log_round
 )
-from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
+from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
 from market_agents.orchestrators.agent_cognitive import AgentCognitiveProcessor
 
 # Define AuctionTracker for tracking auction-specific data
@@ -90,7 +90,7 @@ class AuctionOrchestrator(BaseEnvironmentOrchestrator):
         orchestrator_config: OrchestratorConfig, 
         agents: List[MarketAgent],
         ai_utils,
-        data_inserter: SimulationDataInserter,
+        data_inserter: OrchestrationDataInserter,
         logger=None
     ):
         super().__init__(

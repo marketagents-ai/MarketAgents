@@ -5,55 +5,52 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
-from market_agents.environments.environment import LocalEnvironmentStep, MultiAgentEnvironment
+
+from market_agents.environments.environment import MultiAgentEnvironment
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.environments.mechanisms.group_chat import GroupChat, GroupChatActionSpace, GroupChatObservationSpace
 from market_agents.orchestrators.config import GroupChatConfig, OrchestratorConfig
 from market_agents.orchestrators.logger_utils import (
-    log_perception,
-    log_persona,
-    log_section,
-    log_round,
-    log_cohort_formation,
-    log_topic_proposal,
-    log_sub_round_start,
+    log_perception, log_persona, log_section, log_round,
+    log_cohort_formation, log_topic_proposal, log_sub_round_start,
     log_group_message
 )
-from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
-
+from market_agents.memory.agent_storage.storage_service import StorageService
+from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
 from market_agents.orchestrators.group_chat.groupchat_api_utils import GroupChatAPIUtils
 from market_agents.orchestrators.agent_cognitive import AgentCognitiveProcessor
 
-
 class GroupChatOrchestrator:
-    """
-    Orchestrator for the Group Chat simulation.
-
-    Manages the overall flow, including setting up the environment,
-    running rounds and sub-rounds, and coordinating agent actions.
-    """
-
     def __init__(
         self,
         config: GroupChatConfig,
         orchestrator_config: OrchestratorConfig,
         agents: List[MarketAgent],
         ai_utils,
-        data_inserter: SimulationDataInserter,
-        logger=None
+        storage_service: StorageService,
+        logger=None,
+        **kwargs
     ):
         self.config = config
         self.orchestrator_config = orchestrator_config
         self.agents = agents
         self.ai_utils = ai_utils
-        self.data_inserter = data_inserter
         self.logger = logger or logging.getLogger(__name__)
 
-        # Initialize API utils
+        # Initialize storage components
+        self.storage_service = storage_service
+        self.data_inserter = OrchestrationDataInserter(storage_service=storage_service)
+        
+        # Initialize API utils with the correct URL from config
         self.api_utils = GroupChatAPIUtils(self.config.api_url, self.logger)
 
-        # Initialize cognitive processor
-        self.cognitive_processor = AgentCognitiveProcessor(ai_utils, data_inserter, self.logger, self.orchestrator_config.tool_mode)
+        # Initialize cognitive processor with storage service
+        self.cognitive_processor = AgentCognitiveProcessor(
+            ai_utils=ai_utils,
+            storage_service=storage_service,
+            logger=self.logger,
+            tool_mode=self.orchestrator_config.tool_mode
+        )
 
         # Agent dictionary for quick lookup
         self.agent_dict = {agent.id: agent for agent in agents}
@@ -69,6 +66,8 @@ class GroupChatOrchestrator:
 
         # Sub-rounds per round
         self.sub_rounds_per_round = config.sub_rounds
+
+        self.logger.info(f"Initialized GroupChatOrchestrator")
 
     async def setup_environment(self):
         """
@@ -233,7 +232,7 @@ class GroupChatOrchestrator:
 
         # Run prompts in parallel
         proposals = await self.ai_utils.run_parallel_ai_completion(proposer_prompts, update_history=False)
-        self.data_inserter.insert_ai_requests(self.ai_utils.get_all_requests())
+        self.storage_service.store_ai_requests(self.ai_utils.get_all_requests())
 
         tasks = []
         for (cohort_id, proposer_agent), proposal in zip(proposer_agents, proposals):
@@ -417,25 +416,20 @@ class GroupChatOrchestrator:
             return None
 
     async def process_round_results(self, round_num: int):
-        """
-        Process and store the results of a round in the database.
-        
-        Args:
-            round_num (int): The current round number
-        """
+        """Process and store the results of a round in the database."""
         try:
-            # For each cohort, we need to process its environment
+            # For each cohort, process its environment
             for cohort_id, cohort_agents in self.cohorts.items():
                 # Get the cohort-specific environment name
                 cohort_env_name = f"group_chat_{cohort_id}"
                 environment = cohort_agents[0].environments['group_chat']
                 
-                self.data_inserter.insert_round_data(
+                # Insert round data using data inserter
+                await self.data_inserter.insert_round_data(
                     round_num=round_num,
                     agents=cohort_agents,
                     environment=environment,
                     config=self.orchestrator_config,
-                    tracker=None,
                     environment_name=cohort_env_name
                 )
                 self.logger.info(f"Data for round {round_num}, cohort {cohort_id} inserted successfully.")

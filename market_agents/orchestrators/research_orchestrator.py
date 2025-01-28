@@ -4,42 +4,34 @@ import asyncio
 import importlib
 import json
 import logging
-from typing import List, Dict, Any, Optional, Type
-from datetime import datetime
+from typing import List, Dict, Any, Type
+
 
 from market_agents.orchestrators.logger_utils import log_action, log_perception, log_persona, log_reflection
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from market_agents.orchestrators.base_orchestrator import BaseEnvironmentOrchestrator
 from market_agents.orchestrators.config import OrchestratorConfig, ResearchConfig
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.inference.parallel_inference import ParallelAIUtilities
-from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
+from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
 from market_agents.orchestrators.agent_cognitive import AgentCognitiveProcessor
-from market_agents.environments.environment import MultiAgentEnvironment, EnvironmentStep
+from market_agents.environments.environment import EnvironmentStep
 from market_agents.environments.mechanisms.research import (
     ResearchEnvironment,
     ResearchGlobalAction,
     ResearchAction
 )
 
+from market_agents.memory.agent_storage.storage_service import StorageService
 
 class ResearchOrchestrator(BaseEnvironmentOrchestrator):
-    """
-    Orchestrator for the Research Environment.
-    """
-    config: ResearchConfig
-    orchestrator_config: OrchestratorConfig
-    environment: ResearchEnvironment = Field(default=None)
-    cognitive_processor: Optional[AgentCognitiveProcessor] = None
-    summary_model: Type[BaseModel] = Field(default=None)
-
     def __init__(
         self,
         config: ResearchConfig,
         agents: List[MarketAgent],
         ai_utils: ParallelAIUtilities,
-        data_inserter: SimulationDataInserter,
+        storage_service: StorageService,
         orchestrator_config: OrchestratorConfig,
         logger=None,
         **kwargs
@@ -49,17 +41,20 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
             orchestrator_config=orchestrator_config,
             agents=agents,
             ai_utils=ai_utils,
-            data_inserter=data_inserter,
+            storage_service=storage_service,
             logger=logger,
             environment_name=config.name
         )
         
-        self.orchestrator_config = orchestrator_config
-
-        # Get schema model directly from config
+        self.data_inserter = OrchestrationDataInserter(storage_service=storage_service)
+        self.cognitive_processor = AgentCognitiveProcessor(
+            ai_utils=self.ai_utils,
+            storage_service=storage_service,
+            logger=self.logger,
+            tool_mode=self.orchestrator_config.tool_mode
+        )
+        
         self.summary_model = self.get_schema_model(self.config.schema_model)
-
-        # Initialize environment with the schema model
         self.environment = ResearchEnvironment(
             summary_model=self.summary_model,
             name=self.config.name,
@@ -67,17 +62,8 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
             max_steps=self.config.max_rounds
         )
 
-        # Attach environment to all agents
         for agent in self.agents:
             agent.environments[self.config.name] = self.environment
-
-        # Initialize a cognitive processor for parallel agent perceptions/actions
-        self.cognitive_processor = AgentCognitiveProcessor(
-            ai_utils=self.ai_utils,
-            data_inserter=self.data_inserter,
-            logger=self.logger,
-            tool_mode=self.orchestrator_config.tool_mode
-        )
 
         self.logger.info(f"Initialized ResearchOrchestrator for environment: {self.config.name}")
 
@@ -253,13 +239,12 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
         """
         self.logger.info(f"Processing results for round {round_num}...")
 
-        # Insert environment step data
-        self.data_inserter.insert_round_data(
+        # Insert environment step data - removed 'tracker' parameter
+        await self.data_inserter.insert_round_data(
             round_num=round_num,
             agents=self.agents,
             environment=self.environment,
             config=self.orchestrator_config,
-            tracker=None,
             environment_name=self.config.name
         )
         self.logger.info(f"Results for round {round_num} saved.")

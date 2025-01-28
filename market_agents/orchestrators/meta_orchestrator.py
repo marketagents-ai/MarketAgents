@@ -3,11 +3,14 @@
 import asyncio
 import logging
 import warnings
-from typing import List, Dict, Type
+from typing import List, Dict, Optional, Type
 
+from market_agents.memory.agent_storage.setup_db import AsyncDatabase
+from market_agents.memory.agent_storage.storage_service import StorageService
+from market_agents.memory.embedding import MemoryEmbedder
 from market_agents.orchestrators.base_orchestrator import BaseEnvironmentOrchestrator
 from market_agents.orchestrators.config import OrchestratorConfig
-from market_agents.orchestrators.insert_simulation_data import SimulationDataInserter
+from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
 from market_agents.orchestrators.logger_utils import (
     orchestration_logger,
     log_round,
@@ -17,9 +20,8 @@ from market_agents.orchestrators.logger_utils import (
     log_environment_setup,
 )
 from market_agents.inference.parallel_inference import ParallelAIUtilities, RequestLimits
-from market_agents.memory.setup_db import DatabaseConnection
-from market_agents.memory.embedding import MemoryEmbedder
-from market_agents.memory.config import MarketMemoryConfig, load_config_from_yaml
+from market_agents.memory.config import AgentStorageConfig, load_config_from_yaml
+from market_agents.orchestrators.setup_orchestrator_db import setup_orchestrator_tables
 
 
 warnings.filterwarnings("ignore", module="pydantic")
@@ -32,7 +34,6 @@ class MetaOrchestrator:
       - Sets up environment orchestrators using environment_order from the config.
       - Runs multiple simulation rounds across these environments.
     """
-
     def __init__(
         self,
         config: OrchestratorConfig,
@@ -43,28 +44,28 @@ class MetaOrchestrator:
         self.config = config
         self.agents = agents
         self.logger = logger or orchestration_logger
-
         self.environment_order = config.environment_order
         self.orchestrator_registry = orchestrator_registry
-
-        # If you want to keep references to memory/DB for logging, do so:
-        self.memory_config = self._initialize_memory_config()
-        self.db_conn = self._initialize_database()
-        self.embedder = MemoryEmbedder(config=self.memory_config)
         self.ai_utils = self._initialize_ai_utils()
-        self.data_inserter = self._initialize_data_inserter()
 
+        # Initialize storage components
+        self.storage_config = self._initialize_storage_config()
+        self.db = AsyncDatabase(self.storage_config)
+        self.embedder = MemoryEmbedder(self.storage_config)
+        self.storage_service = StorageService(
+            db=self.db,
+            embedding_service=self.embedder,
+            config=self.storage_config
+        )
+        self.data_inserter = OrchestrationDataInserter(storage_service=self.storage_service)
         self.environment_orchestrators: Dict[str, BaseEnvironmentOrchestrator] = {}
 
-    def _initialize_memory_config(self) -> MarketMemoryConfig:
-        # Load from your memory_config.yaml
-        config_path = "market_agents/memory/memory_config.yaml"
-        return load_config_from_yaml(config_path)
 
-    def _initialize_database(self) -> DatabaseConnection:
-        db_conn = DatabaseConnection(self.memory_config)
-        db_conn._ensure_database_exists()
-        return db_conn
+
+    def _initialize_storage_config(self) -> AgentStorageConfig:
+        # Load from your storage_config.yaml
+        config_path = "market_agents/memory/storage_config.yaml"
+        return load_config_from_yaml(config_path)
 
     def _initialize_ai_utils(self) -> ParallelAIUtilities:
         # Just an example with default large request limits
@@ -74,17 +75,6 @@ class MetaOrchestrator:
             oai_request_limits=oai_request_limits,
             anthropic_request_limits=anthropic_request_limits
         )
-
-    def _initialize_data_inserter(self) -> SimulationDataInserter:
-        db_config = self.config.database_config
-        db_params = {
-            "dbname": db_config.db_name,
-            "user": db_config.db_user,
-            "password": db_config.db_password,
-            "host": db_config.db_host,
-            "port": db_config.db_port
-        }
-        return SimulationDataInserter(db_params)
 
     def _initialize_environment_orchestrators(self):
         for env_name in self.environment_order:
@@ -103,6 +93,7 @@ class MetaOrchestrator:
                 "orchestrator_config": self.config,
                 "agents": self.agents,
                 "ai_utils": self.ai_utils,
+                "storage_service": self.storage_service,
                 "data_inserter": self.data_inserter,
                 "logger": self.logger
             }
@@ -147,11 +138,25 @@ class MetaOrchestrator:
             if orch:
                 await orch.print_summary()
 
+    async def _setup_tables(self):
+        """Initialize database tables"""
+        try:
+            async with self.db.pool.acquire() as conn:
+                await setup_orchestrator_tables(conn)
+        except Exception as e:
+            self.logger.error(f"Error setting up tables: {e}")
+            raise
+
     async def start(self):
         print_ascii_art()
         log_section(self.logger, "Simulation Starting")
         try:
+            # Initialize database and create tables
+            await self.db.initialize()
+            await self._setup_tables()
+            
+            # Run simulation
             await self.run_simulation()
             log_completion(self.logger, "Simulation completed successfully")
         finally:
-            self.db_conn.close()
+            await self.db.close()

@@ -2,7 +2,8 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any, Union
+from datetime import datetime
 import uvicorn
 import random
 import logging
@@ -16,7 +17,10 @@ cohorts: Dict[str, List[str]] = {}
 topics: Dict[str, str] = {}
 messages: Dict[str, List[Dict]] = {}
 agents: Dict[str, Dict] = {}
-proposers: Dict[str, str] = {} 
+proposers: Dict[str, str] = {}
+cognitive_memory: Dict[str, List[Dict]] = {}
+episodic_memory: Dict[str, List[Dict]] = {}
+knowledge_base: Dict[str, Dict] = {}
 
 # Pydantic models
 class Agent(BaseModel):
@@ -59,6 +63,23 @@ class GetMessagesResponse(BaseModel):
 class GetTopicResponse(BaseModel):
     cohort_id: str
     topic: str
+
+class CognitiveMemoryParams(BaseModel):
+    limit: Optional[int] = 10
+    cognitive_step: Optional[Union[str, List[str]]] = None
+    metadata_filters: Optional[Dict[str, Any]] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+
+class EpisodicMemoryParams(BaseModel):
+    agent_id: str
+    query: str
+    top_k: Optional[int] = 5
+
+class KnowledgeQueryParams(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
+    table_prefix: Optional[str] = None
 
 # Endpoint to register agents (optional)
 @app.post("/register_agent")
@@ -173,4 +194,4 @@ def health_check():
 
 # Run the FastAPI application
 if __name__ == "__main__":
-    uvicorn.run("groupchat_api:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("groupchat_api:app", host="0.0.0.0", port=8002, reload=True)
