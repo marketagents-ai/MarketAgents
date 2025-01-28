@@ -1,29 +1,75 @@
-from abc import ABC, abstractmethod
-import uuid
-import re
-
-from uuid import UUID
-from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from abc import ABC, abstractmethod
+import re
+from uuid import UUID
 
-class KnowledgeObject(BaseModel):
-    knowledge_id: UUID = Field(default_factory=uuid.uuid4)
-    content: str
-    created_at: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = None
-
-class KnowledgeChunk(BaseModel):
-    text: str
-    start: int
-    end: int
-    embedding: Optional[List[float]] = None
-    knowledge_id: Optional[UUID] = None
+from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
+from market_agents.memory.memory_models import (
+    CreateTablesRequest,
+    IngestKnowledgeRequest,
+    KnowledgeQueryParams,
+    RetrievedMemory,
+    KnowledgeChunk
+)
+from market_agents.memory.config import AgentStorageConfig
 
 class KnowledgeChunker(ABC):
     @abstractmethod
     def chunk(self, text: str) -> List[KnowledgeChunk]:
         pass
+
+class MarketKnowledgeBase:
+    """
+    A base class for agent knowledge bases built with embeddings for semantic search.
+    Uses AgentStorageAPIUtils for all storage operations.
+    """
+
+    def __init__(self, 
+                 config: AgentStorageConfig,
+                 table_prefix: str,
+                 chunking_method: Optional[KnowledgeChunker] = None):
+        self.config = config
+        self.agent_storage_utils = AgentStorageAPIUtils(config)
+        self.chunking_method = chunking_method
+        self.table_prefix = table_prefix
+
+    async def initialize(self):
+        """Initialize knowledge base tables"""
+        await self.agent_storage_utils.create_tables(
+            CreateTablesRequest(
+                table_type="knowledge",
+                table_prefix=self.table_prefix
+            )
+        )
+
+    async def ingest_knowledge(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> UUID:
+        """Process and store a document in the knowledge base."""
+        response = await self.agent_storage_utils.ingest_knowledge(
+            IngestKnowledgeRequest(
+                text=text,
+                metadata=metadata,
+                table_prefix=self.table_prefix
+            )
+        )
+        return UUID(response["knowledge_id"])
+
+    async def search(self, query: str, top_k: int = 5) -> List[RetrievedMemory]:
+        """Search the knowledge base using semantic similarity."""
+        results = await self.agent_storage_utils.search_knowledge(
+            KnowledgeQueryParams(
+                query=query,
+                top_k=top_k,
+                table_prefix=self.table_prefix
+            )
+        )
+        return [RetrievedMemory(**match) for match in results["matches"]]
+
+    async def clear(self):
+        """Clear all knowledge entries."""
+        await self.agent_storage_utils.clear_agent_memory(
+            self.table_prefix,
+            "knowledge"
+        )
 
 class SemanticChunker(KnowledgeChunker):
     def __init__(self, min_size: int, max_size: int):

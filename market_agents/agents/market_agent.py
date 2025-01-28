@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Type, Union, List
 
+from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from pydantic import Field
 
 from market_agents.agents.base_agent.agent import Agent as LLMAgent
@@ -14,7 +15,6 @@ from market_agents.agents.protocols.protocol import Protocol
 from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.environments.environment import MultiAgentEnvironment, LocalObservation
 from market_agents.inference.message_models import LLMConfig, LLMPromptContext
-from market_agents.memory.config import MarketMemoryConfig
 from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
 from market_agents.memory.memory import MemoryObject, ShortTermMemory, LongTermMemory
 
@@ -31,12 +31,11 @@ class MarketAgent(LLMAgent):
     prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
     economic_agent: Optional[EconomicAgent] = None
     knowledge_agent: Optional[KnowledgeBaseAgent] = None
-
+    
     @classmethod
-    def create(
+    async def create(
         cls,
-        memory_config: MarketMemoryConfig,
-        db_conn,
+        storage_utils: AgentStorageAPIUtils,
         agent_id: str,
         use_llm: bool,
         llm_config: Optional[LLMConfig] = None,
@@ -46,10 +45,26 @@ class MarketAgent(LLMAgent):
         econ_agent: Optional[EconomicAgent] = None,
         knowledge_agent: Optional[KnowledgeBaseAgent] = None
     ) -> 'MarketAgent':
+        """Create a new MarketAgent instance with initialized memory components."""
+        
+        # Initialize short and long term memory with the storage utils
+        stm = ShortTermMemory(
+            agent_id=agent_id,
+            agent_storage_utils=storage_utils
+        )
+        await stm.initialize()
+        
+        ltm = LongTermMemory(
+            agent_id=agent_id,
+            agent_storage_utils=storage_utils
+        )
+        await ltm.initialize()
+
+        # Create the agent instance
         agent = cls(
             id=agent_id,
-            short_term_memory=ShortTermMemory(memory_config, db_conn, agent_id),
-            long_term_memory=LongTermMemory(memory_config, db_conn, agent_id),
+            short_term_memory=stm,
+            long_term_memory=ltm,
             role=persona.role if persona else "agent",
             persona=persona.persona if persona else None,
             objectives=persona.objectives if persona else None,
@@ -61,6 +76,7 @@ class MarketAgent(LLMAgent):
             economic_agent=econ_agent,
             knowledge_agent=knowledge_agent
         )
+
         return agent
 
     async def perceive(
@@ -96,10 +112,8 @@ class MarketAgent(LLMAgent):
         )
         retrieved_documents = []
         if self.knowledge_agent:
-            kb_table_prefix = self.knowledge_agent.market_kb.table_prefix
-            retrieved_documents = self.knowledge_agent.retrieve(
-                query_str, 
-                kb_table_prefix)
+            retrieved_documents = await self.knowledge_agent.retrieve(
+                query_str)
 
         print("\nEpisodic Memory Results:")
         memory_strings = [f"Memory {i+1}:\n{mem.model_dump()}" for i, mem in enumerate(ltm_episodes)]
@@ -325,8 +339,7 @@ class MarketAgent(LLMAgent):
             task_str = f"Task: {self.task}" if self.task else ""
             env_state_str = f"Environment state: {str(environment_info)}" if environment_info else ""
             query_str = (task_str + "\n" + env_state_str).strip()
-            await self.long_term_memory.store_episodic_memory(
-                agent_id=self.id,
+            await self.long_term_memory.store_episode(
                 task_query=query_str,
                 steps=self.episode_steps,
                 total_reward=round(total_reward_val),

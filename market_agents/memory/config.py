@@ -2,8 +2,9 @@ import yaml
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
-class MarketMemoryConfig(BaseSettings):
-    dbname: str = Field(default="market_agents")
+class AgentStorageConfig(BaseSettings):
+    storage_api_url: str = Field(default="http://localhost:8001")
+    db_name: str = Field(default="market_agents")
     user: str = Field(default="db_user")
     password: str = Field(default="db_pwd@123")
     host: str = Field(default="localhost")
@@ -30,7 +31,7 @@ class MarketMemoryConfig(BaseSettings):
     encoding_format: str = Field(default="float")
     embedding_provider: str = Field(default="tei", description="Options: tei, openai, etc.")
 
-def load_config_from_yaml(yaml_path: str = "config.yaml") -> MarketMemoryConfig:
+def load_config_from_yaml(yaml_path: str = "config.yaml") -> AgentStorageConfig:
     with open(yaml_path, 'r') as f:
         data = yaml.safe_load(f)
-    return MarketMemoryConfig(**data)
+    return AgentStorageConfig(**data)

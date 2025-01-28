@@ -37,7 +37,7 @@ class AsyncDatabase:
                         port=self.config.port,
                         user=self.config.user,
                         password=self.config.password,
-                        database=self.config.dbname,
+                        database=self.config.db_name,
                         timeout=30,
                         command_timeout=60,
                     )
@@ -58,17 +58,20 @@ class AsyncDatabase:
 
     @asynccontextmanager
     async def safe_transaction(self, max_retries: int = 3) -> AsyncIterator[asyncpg.Connection]:
-        """Retryable transaction with error classification"""
+        """Retryable transaction with error classification."""
+        last_error = None
         for attempt in range(max_retries):
             try:
                 async with self.transaction() as conn:
                     yield conn
                     return
             except Exception as e:
-                self.logger.error(f"Transaction failed: {e}")
-                if attempt == max_retries - 1:
-                    raise
-                await asyncio.sleep(self._calculate_backoff(attempt))
+                last_error = e
+                self.logger.error(f"Transaction failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(self._calculate_backoff(attempt))
+                else:
+                    raise last_error
 
     async def execute_in_transaction(self, queries: list[tuple[str, tuple]]):
         """Execute multiple queries in single transaction"""
@@ -90,9 +93,9 @@ class AsyncDatabase:
 
             try:
                 await temp_conn.execute(
-                    f"CREATE DATABASE {self.config.dbname}"
+                    f"CREATE DATABASE {self.config.db_name}"
                 )
-                self.logger.info(f"Created database {self.config.dbname}")
+                self.logger.info(f"Created database {self.config.db_name}")
             except DuplicateDatabaseError:
                 pass
             finally:
@@ -116,10 +119,6 @@ class AsyncDatabase:
         async with self.pool.acquire() as conn:
             return await conn.fetch(query, *args)
 
-    async def _sanitize_table_name(self, name: str) -> str:
-        """Safely sanitize table names using regex"""
-        return re.sub(r'[^a-zA-Z0-9_]', '_', name)
-
     async def ensure_connection(self):
         """Verify database connectivity"""
         try:
@@ -140,3 +139,7 @@ class AsyncDatabase:
 
         # Enforce bounds
         return max(0, min(next_delay, self.retry_config['max_delay']))
+    
+    def _sanitize_table_name(self, name: str) -> str:
+        """Safely sanitize table names using regex"""
+        return re.sub(r'[^a-zA-Z0-9_]', '_', name)

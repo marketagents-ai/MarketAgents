@@ -1,4 +1,5 @@
-dbname: "market_agents"
+db_name: "market_simulation"
+storage_api_url: "http://localhost:8001"
 user: "db_user"
 password: "db_pwd@123"
 host: "localhost"

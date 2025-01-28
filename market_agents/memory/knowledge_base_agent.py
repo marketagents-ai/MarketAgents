@@ -1,20 +1,18 @@
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 
-from market_agents.memory.agent_storage.agent_storage_api import IngestKnowledgeRequest, KnowledgeQueryParams
-from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from market_agents.memory.memory_models import RetrievedMemory
-
+from market_agents.memory.knowledge_base import MarketKnowledgeBase
 
 class KnowledgeBaseAgent(BaseModel):
-    agent_storage_utils: AgentStorageAPIUtils
+    market_kb: MarketKnowledgeBase
     retrieved_knowledge: List[RetrievedMemory] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True
 
     async def store(self, text: str, metadata: Optional[Dict[str, Any]] = None):
-        return await self.agent_storage_utils.ingest_knowledge(IngestKnowledgeRequest(metadata=metadata, text=text))
+        return await self.market_kb.ingest_knowledge(text=text, metadata=metadata)
 
-    async def retrieve(self, query: str, table_prefix: str):
-        return await self.agent_storage_utils.search_knowledge(KnowledgeQueryParams(query=query, table_prefix=table_prefix))
+    async def retrieve(self, query: str):
+        return await self.market_kb.search(query=query)

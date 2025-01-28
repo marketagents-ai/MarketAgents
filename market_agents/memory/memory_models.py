@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -69,3 +69,51 @@ class EpisodicMemoryObject(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     metadata: Optional[Dict[str, Any]] = None
     similarity: Optional[float] = None
+
+class KnowledgeObject(BaseModel):
+    knowledge_id: UUID = Field(default_factory=uuid.uuid4)
+    content: str
+    created_at: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class KnowledgeChunk(BaseModel):
+    text: str
+    start: int
+    end: int
+    embedding: Optional[List[float]] = None
+    knowledge_id: Optional[UUID] = None
+
+class CognitiveMemoryParams(BaseModel):
+    """Parameters for querying cognitive memory."""
+    limit: Optional[int] = Field(default=10, description="Maximum number of memories to return")
+    cognitive_step: Optional[Union[str, List[str]]] = Field(default=None, description="Filter by cognitive step type(s)")
+    metadata_filters: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata filters")
+    start_time: Optional[datetime] = Field(default=None, description="Start time for temporal filtering")
+    end_time: Optional[datetime] = Field(default=None, description="End time for temporal filtering")
+
+class EpisodicMemoryParams(BaseModel):
+    """Parameters for querying episodic memory."""
+    limit: Optional[int] = Field(default=5, description="Maximum number of memories to return")
+    metadata_filters: Optional[Dict] = Field(default=None, description="Additional metadata filters")
+    start_time: Optional[datetime] = Field(default=None, description="Start time for temporal filtering")
+    end_time: Optional[datetime] = Field(default=None, description="End time for temporal filtering")
+    query: Optional[str] = Field(default=None, description="Search query string")
+    top_k: Optional[int] = Field(default=5, description="Number of top results to return")
+
+class KnowledgeQueryParams(BaseModel):
+    """Parameters for querying knowledge base."""
+    query: str = Field(..., description="Search query string")
+    top_k: Optional[int] = Field(default=5, description="Number of top results to return")
+    table_prefix: Optional[str] = Field(default=None, description="Optional table prefix for multi-tenant setups")
+
+class IngestKnowledgeRequest(BaseModel):
+    """Request model for knowledge ingestion."""
+    text: str = Field(..., description="Text content to ingest")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata for the knowledge entry")
+    table_prefix: Optional[str] = Field(default=None, description="Optional table prefix for multi-tenant setups")
+
+class CreateTablesRequest(BaseModel):
+    """Request model for table creation."""
+    table_type: str = Field(..., description="Type of tables to create (cognitive/episodic/knowledge)")
+    agent_id: Optional[str] = Field(default=None, description="Agent ID for memory tables")
+    table_prefix: Optional[str] = Field(default=None, description="Optional table prefix for multi-tenant setups")

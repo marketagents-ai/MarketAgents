@@ -1,24 +1,27 @@
-import uuid
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Union, Any
-from uuid import UUID
 import json
 import logging
+from typing import List, Optional, Dict, Any, Union
+from uuid import UUID
+from datetime import datetime, timezone
+import uuid
 
 from market_agents.memory.agent_storage.setup_db import AsyncDatabase
-from market_agents.memory.config import MarketMemoryConfig
+from market_agents.memory.config import AgentStorageConfig
 from market_agents.memory.embedding import MemoryEmbedder
 from market_agents.memory.knowledge_base import KnowledgeChunk, SemanticChunker
-from market_agents.memory.memory import EpisodicMemoryObject, MemoryObject, CognitiveStep
-from market_agents.memory.memory_models import RetrievedMemory
+from market_agents.memory.memory_models import (
+    EpisodicMemoryObject,
+    MemoryObject,
+    CognitiveStep,
+    RetrievedMemory
+)
 
-
-class MemoryService:
-    def __init__(self, db: AsyncDatabase, embedding_service: MemoryEmbedder, config: MarketMemoryConfig):
+class StorageService:
+    def __init__(self, db: AsyncDatabase, embedding_service: MemoryEmbedder, config: AgentStorageConfig):
         self.db = db
         self.embedder = embedding_service
         self.config = config
-        self.logger = logging.getLogger("memory_service")
+        self.logger = logging.getLogger("storage_service")
 
     async def create_tables(self, table_type: str, agent_id: Optional[str] = None, table_prefix: Optional[str] = None):
         """
@@ -90,8 +93,10 @@ class MemoryService:
         This can store single-step or short-horizon items (akin to 'STM').
         """
         try:
+            # Sanitize the agent_id to create a valid table name
             sanitized_agent_id = self.db._sanitize_table_name(agent_id)
             cognitive_table = f"agent_{sanitized_agent_id}_cognitive"
+            index_name = f"agent_{sanitized_agent_id}_cognitive_index"
 
             # Use a transaction to ensure atomic execution
             async with self.db.safe_transaction() as conn:
@@ -109,7 +114,7 @@ class MemoryService:
 
                 # Create index for cognitive memory table
                 await conn.execute(f"""
-                    CREATE INDEX IF NOT EXISTS agent_{sanitized_agent_id}_cognitive_index
+                    CREATE INDEX IF NOT EXISTS {index_name}
                     ON {cognitive_table} USING ivfflat (embedding vector_cosine_ops)
                     WITH (lists = {self.config.lists});
                 """)
@@ -125,8 +130,10 @@ class MemoryService:
         plus other relevant episodic info (task_query, total_reward, etc.).
         """
         try:
+            # Sanitize the agent_id to create a valid table name
             sanitized_agent_id = self.db._sanitize_table_name(agent_id)
             episodic_table = f"agent_{sanitized_agent_id}_episodic"
+            index_name = f"agent_{sanitized_agent_id}_episodic_index"
 
             # Use a transaction to ensure atomic execution
             async with self.db.safe_transaction() as conn:
@@ -146,7 +153,7 @@ class MemoryService:
 
                 # Create index for episodic memory table
                 await conn.execute(f"""
-                    CREATE INDEX IF NOT EXISTS agent_{sanitized_agent_id}_episodic_index
+                    CREATE INDEX IF NOT EXISTS {index_name}
                     ON {episodic_table} USING ivfflat (embedding vector_cosine_ops)
                     WITH (lists = {self.config.lists});
                 """)
@@ -160,6 +167,9 @@ class MemoryService:
         try:
             if memory_object.embedding is None:
                 memory_object.embedding = await self.embedder.get_embeddings(memory_object.content)
+            
+            # Convert embedding list to PostgreSQL vector string format
+            vector_str = f"[{','.join(map(str, memory_object.embedding))}]"
 
             cognitive_table = f"agent_{memory_object.agent_id}_cognitive"
             now = datetime.now(timezone.utc)
@@ -168,13 +178,13 @@ class MemoryService:
                 f"""
                 INSERT INTO {cognitive_table}
                 (memory_id, cognitive_step, content, embedding, created_at, metadata)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                VALUES ($1, $2, $3, $4::vector, $5, $6)
                 RETURNING created_at
                 """,
                 str(memory_object.memory_id),
                 memory_object.cognitive_step,
                 memory_object.content,
-                memory_object.embedding,
+                vector_str,
                 now,
                 json.dumps(memory_object.metadata)
             )
@@ -190,6 +200,9 @@ class MemoryService:
             if episode.embedding is None:
                 concat_str = f"Task:{episode.task_query} + Steps:{episode.cognitive_steps}"
                 episode.embedding = await self.embedder.get_embeddings(concat_str)
+            
+            # Convert embedding list to PostgreSQL vector string format
+            vector_str = f"[{','.join(map(str, episode.embedding))}]"
 
             episodic_table = f"agent_{episode.agent_id}_episodic"
 
@@ -198,14 +211,14 @@ class MemoryService:
                 INSERT INTO {episodic_table}
                 (memory_id, task_query, cognitive_steps, total_reward,
                  strategy_update, embedding, created_at, metadata)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                VALUES ($1, $2, $3, $4, $5, $6::vector, $7, $8)
                 """,
                 str(episode.memory_id),
                 episode.task_query,
                 json.dumps([step.model_dump() for step in episode.cognitive_steps]),
                 episode.total_reward,
                 json.dumps(episode.strategy_update or []),
-                episode.embedding,
+                vector_str,
                 episode.created_at or datetime.now(timezone.utc),
                 json.dumps(episode.metadata or {})
             )
@@ -234,15 +247,76 @@ class MemoryService:
                     conditions.append("cognitive_step = $" + str(len(params) + 1))
                     params.append(cognitive_step)
                 else:
-                    placeholders = [f"${i + 1}" for i in range(len(params), len(params) + len(cognitive_step))]
-                    conditions.append(f"cognitive_step = ANY(ARRAY[{','.join(placeholders)}])")
+                    placeholders = ", ".join([f"${i + 1}" for i in range(len(params), len(params) + len(cognitive_step))])
+                    conditions.append(f"cognitive_step IN ({placeholders})")
                     params.extend(cognitive_step)
 
-            # Add time and metadata filters...
-            query = self._build_memory_query(cognitive_table, conditions, params, limit)
+            if metadata_filters:
+                for k, v in metadata_filters.items():
+                    conditions.append(f"metadata->>{k} = ${len(params) + 1}")
+                    params.append(str(v))
+
+            if start_time:
+                conditions.append(f"created_at >= ${len(params) + 1}")
+                params.append(start_time)
+
+            if end_time:
+                conditions.append(f"created_at <= ${len(params) + 1}")
+                params.append(end_time)
+
+            where_clause = " AND ".join(conditions) if conditions else "TRUE"
+            params.append(limit)
+
+            query = f"""
+                WITH recent_memories AS (
+                    SELECT 
+                        memory_id::text,
+                        cognitive_step,
+                        content,
+                        embedding, 
+                        created_at, 
+                        metadata
+                    FROM {cognitive_table}
+                    WHERE {where_clause}
+                    ORDER BY created_at DESC
+                    LIMIT ${len(params)}
+                )
+                SELECT * FROM recent_memories
+                ORDER BY created_at ASC;
+            """
 
             rows = await self.db.fetch(query, *params)
-            return [self._build_memory_object(row, agent_id) for row in rows]
+            
+            items = []
+            for row in rows:
+                mem_id, step, content, embedding, created_at, meta = row
+                
+                # Parse embedding if it's a string
+                if isinstance(embedding, str):
+                    embedding = [float(x) for x in embedding.strip('[]').split(',')]
+
+                # Parse metadata if it's a string
+                if isinstance(meta, str):
+                    try:
+                        metadata = json.loads(meta)
+                    except json.JSONDecodeError:
+                        metadata = {}
+                else:
+                    metadata = meta if meta else {}
+
+                # Create MemoryObject instance
+                mo = MemoryObject(
+                    memory_id=UUID(mem_id),
+                    agent_id=agent_id,
+                    cognitive_step=step,
+                    content=content,
+                    embedding=embedding,
+                    created_at=created_at,
+                    metadata=metadata
+                )
+                items.append(mo)
+            return items
+
         except Exception as e:
             self.logger.error(f"Error retrieving cognitive memory: {str(e)}")
             raise
@@ -261,21 +335,21 @@ class MemoryService:
             conditions = []
             params = []
 
-            # Build query conditions based on filters
             if metadata_filters:
-                for key, value in metadata_filters.items():
-                    conditions.append(f"metadata->>{key} = ${len(params) + 1}")
-                    params.append(str(value))
+                for k, v in metadata_filters.items():
+                    conditions.append(f"metadata->>{k} = ${len(params) + 1}")
+                    params.append(str(v))
 
             if start_time:
-                conditions.append("created_at >= $" + str(len(params) + 1))
+                conditions.append(f"created_at >= ${len(params) + 1}")
                 params.append(start_time)
 
             if end_time:
-                conditions.append("created_at <= $" + str(len(params) + 1))
+                conditions.append(f"created_at <= ${len(params) + 1}")
                 params.append(end_time)
 
             where_clause = " AND ".join(conditions) if conditions else "TRUE"
+            params.append(limit)
 
             query = f"""
                 SELECT 
@@ -290,31 +364,26 @@ class MemoryService:
                 FROM {episodic_table}
                 WHERE {where_clause}
                 ORDER BY created_at DESC
-                LIMIT ${len(params) + 1};
+                LIMIT ${len(params)};
             """
-            params.append(limit)
 
-            # Fetch the rows from the database
             rows = await self.db.fetch(query, *params)
-
-            # Process each row and convert to EpisodicMemoryObject
             episodes = []
+            
             for row in rows:
-                (mem_id, task_query, steps_json, reward, strategy_json,
-                 embedding, created_at, meta) = row
+                mem_id, task_query, steps_json, reward, strategy_json, embedding, created_at, meta = row
 
-                # Parsing the JSON fields for cognitive_steps and strategy_update
+                # Parse JSON fields
                 steps_list = json.loads(steps_json) if isinstance(steps_json, str) else steps_json or []
                 strategy_list = json.loads(strategy_json) if isinstance(strategy_json, str) else strategy_json or []
 
-                # Parse embedding from string (assuming it's a list of floats)
-                embedding = [float(x) for x in embedding.strip('[]').split(',')] if isinstance(embedding,
-                                                                                               str) else embedding
+                # Parse embedding if it's a string
+                if isinstance(embedding, str):
+                    embedding = [float(x) for x in embedding.strip('[]').split(',')]
 
                 # Convert cognitive steps to CognitiveStep objects
                 csteps = [CognitiveStep(**step) for step in steps_list]
 
-                # Create the EpisodicMemoryObject
                 episode_obj = EpisodicMemoryObject(
                     memory_id=UUID(mem_id),
                     agent_id=agent_id,
@@ -329,6 +398,7 @@ class MemoryService:
                 episodes.append(episode_obj)
 
             return episodes
+
         except Exception as e:
             self.logger.error(f"Error retrieving episodic memory: {str(e)}")
             raise
@@ -354,13 +424,30 @@ class MemoryService:
     async def ingest_knowledge(self, text: str, metadata: Optional[Dict] = None, table_prefix: str = "default") -> UUID:
         """Ingest knowledge into the specified knowledge base."""
         try:
+            self.logger.debug("Starting knowledge ingestion...")
+            # Get chunks
             chunks = self._chunk_text(text)
-            embeddings = await self.embedder.get_embeddings([c.text for c in chunks])
+            chunk_texts = [c.text for c in chunks]
+            
+            # Get embeddings in batches and assign to chunks
+            all_embeddings = []
+            all_embeddings = await self.embedder.get_embeddings(chunk_texts)
+
+            #for i in range(0, len(chunk_texts), self.config.batch_size):
+            #    batch = chunk_texts[i:i + self.config.batch_size]
+            #    print("DEBUG: about to call get_embeddings")
+            #    batch_embeddings = await self.embedder.get_embeddings(batch)
+            #    print("DEBUG: done with get_embeddings. type:", type(batch_embeddings))
+            #    all_embeddings.extend(batch_embeddings)
+            #
+            # Assign embeddings to chunks
+            for chunk, embedding in zip(chunks, all_embeddings):
+                chunk.embedding = embedding
 
             knowledge_id = uuid.uuid4()
 
+            # Use a transaction for database operations
             async with self.db.safe_transaction() as conn:
-
                 # Insert knowledge object
                 await conn.execute(
                     f"""
@@ -373,75 +460,84 @@ class MemoryService:
                     json.dumps(metadata or {})
                 )
 
-                # Insert chunks
-                for chunk, embedding in zip(chunks, embeddings):
+                # Insert chunks with their embeddings
+                for chunk in chunks:
+                    # Convert embedding list to PostgreSQL vector format
+                    vector_str = f"[{','.join(map(str, chunk.embedding))}]"
                     await conn.execute(
                         f"""
                         INSERT INTO {table_prefix}_knowledge_chunks
                         (knowledge_id, text, start_pos, end_pos, embedding)
-                        VALUES ($1, $2, $3, $4, $5)
+                        VALUES ($1, $2, $3, $4, $5::vector)
                         """,
                         str(knowledge_id),
                         chunk.text,
                         chunk.start,
                         chunk.end,
-                        embedding
+                        vector_str
                     )
 
             return knowledge_id
         except Exception as e:
-            self.logger.error(f"Error ingesting knowledge: {str(e)}")
+            self.logger.error(f"Error in ingest_knowledge: {str(e)}", exc_info=True)
             raise
-
+    
     def _chunk_text(self, text: str) -> List[KnowledgeChunk]:
         """Internal method to chunk text using configured chunking method."""
         chunker = SemanticChunker(
             min_size=self.config.min_chunk_size,
             max_size=self.config.max_chunk_size
         )
-        return chunker.chunk(text)
+        result = chunker.chunk(text)
+        print("DEBUG: type(result)=", type(result))
+        return result
+        #return chunker.chunk(text)
 
     async def search_knowledge(
             self,
             query: str,
-            top_k: int = 5,
-            table_prefix: Optional[str] = None
+            table_prefix: str = "default",
+            top_k: int = 5
     ) -> List[RetrievedMemory]:
-        """
-        Search the knowledge base using semantic similarity.
-        """
+        """Search knowledge base using semantic similarity."""
         try:
-            prefix = table_prefix or "default"
-            chunks_table = f"{prefix}_knowledge_chunks"
-            objects_table = f"{prefix}_knowledge_objects"
-
-            # Get embedding for the query
+            # Get query embedding
             query_embedding = await self.embedder.get_embeddings(query)
+            vector_str = f"[{','.join(map(str, query_embedding))}]"
 
-            # Perform vector similarity search
+            chunks_table = f"{table_prefix}_knowledge_chunks"
+            objects_table = f"{table_prefix}_knowledge_objects"
+
             rows = await self.db.fetch(f"""
                 WITH ranked_chunks AS (
                     SELECT DISTINCT ON (c.text)
-                        c.id, c.text, c.start_pos, c.end_pos, k.content,
-                        (1 - (c.embedding <=> %s::vector)) AS similarity
+                        c.text, 
+                        c.start_pos, 
+                        c.end_pos, 
+                        k.content,
+                        (1 - (c.embedding <=> $1::vector)) AS similarity
                     FROM {chunks_table} c
                     JOIN {objects_table} k ON c.knowledge_id = k.knowledge_id
-                    WHERE (1 - (c.embedding <=> %s::vector)) >= %s
+                    WHERE (1 - (c.embedding <=> $1::vector)) >= $2
                     ORDER BY c.text, similarity DESC
                 )
                 SELECT * FROM ranked_chunks
                 ORDER BY similarity DESC
-                LIMIT %s;
-            """, query_embedding, query_embedding, self.config.similarity_threshold, top_k)
+                LIMIT $3;
+            """, vector_str, self.config.similarity_threshold, top_k)
 
             results = []
             for row in rows:
-                _, text, start_pos, end_pos, full_content, sim = row
-                self.full_text = full_content
-                context = self._get_context(start_pos, end_pos, full_content)
-                results.append(RetrievedMemory(text=text, similarity=sim, context=context))
+                # Create RetrievedMemory object with proper fields
+                retrieved = RetrievedMemory(
+                    text=row['text'],
+                    similarity=float(row['similarity']),
+                    context=self._get_context(row['start_pos'], row['end_pos'], row['content'])
+                )
+                results.append(retrieved)
 
             return results
+
         except Exception as e:
             self.logger.error(f"Error searching knowledge base: {str(e)}")
             raise
@@ -455,7 +551,7 @@ class MemoryService:
         query_embedding = self.embedding_service.get_embeddings(query)
         top_k = top_k or self.config.top_k
 
-        safe_id = self._sanitize_id(agent_id)
+        safe_id = self.db._sanitize_table_name(agent_id)
         agent_cognitive_table = f"agent_{safe_id}_cognitive"
 
         rows = await self.db.fetch(f"""
@@ -473,46 +569,58 @@ class MemoryService:
         return results
 
     async def search_episodic_memory(
-            self,
-            query: str,
-            agent_id: str,
-            top_k: int = 5
-    ) -> List[RetrievedMemory]:
-        query_embedding = self.embedder.get_embeddings(query)
-        top_k = top_k or self.config.top_k
+        self,
+        agent_id: str,
+        query: str,
+        top_k: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Search episodic memory (vector/embedding mode)."""
+        try:
+            # Get query embedding first
+            query_embedding = await self.embedder.get_embeddings(query)
+            
+            # Format the embedding vector for PostgreSQL
+            vector_str = f"[{','.join(map(str, query_embedding))}]"
+            
+            safe_id = self.db._sanitize_table_name(agent_id)
+            episodic_table = f"agent_{safe_id}_episodic"
 
-        safe_id = self._sanitize_id(agent_id)
-        agent_episodic_table = f"agent_{safe_id}_episodic"
+            # Use the vector_str in the query
+            results = await self.db.fetch(f"""
+                SELECT 
+                    memory_id,
+                    task_query,
+                    cognitive_steps,
+                    total_reward,
+                    strategy_update,
+                    metadata,
+                    created_at,
+                    (1 - (embedding <=> $1::vector)) as similarity
+                FROM {episodic_table}
+                WHERE (1 - (embedding <=> $1::vector)) > $2
+                ORDER BY similarity DESC
+                LIMIT $3;
+            """, vector_str, self.config.similarity_threshold, top_k)
 
-        rows = await self.db.fetch(f"""
-            SELECT 
-                memory_id, 
-                task_query, 
-                cognitive_steps,
-                total_reward, 
-                strategy_update, 
-                metadata,
-                created_at,
-                (1 - (embedding <=> %s::vector)) AS similarity
-            FROM {agent_episodic_table}
-            ORDER BY similarity DESC
-            LIMIT %s;
-        """, query_embedding, top_k)
+            return [
+                {
+                    "text": json.dumps({
+                        "memory_id": str(row["memory_id"]),
+                        "task_query": row["task_query"],
+                        "cognitive_steps": row["cognitive_steps"],
+                        "total_reward": row["total_reward"],
+                        "strategy_update": row["strategy_update"],
+                        "metadata": row["metadata"],
+                        "created_at": row["created_at"].isoformat()
+                    }),
+                    "similarity": float(row["similarity"])
+                }
+                for row in results
+            ]
 
-        results = []
-        for (mem_id, task_query, steps_json, total_reward, strategy_update, meta, created_at, sim) in rows:
-            content_dict = {
-                "memory_id": str(mem_id),
-                "task_query": task_query,
-                "cognitive_steps": steps_json,
-                "total_reward": total_reward,
-                "strategy_update": strategy_update,
-                "metadata": meta,
-                "created_at": created_at.isoformat()
-            }
-            content_str = json.dumps(content_dict)
-            results.append(RetrievedMemory(text=content_str, similarity=sim, context=""))
-        return results
+        except Exception as e:
+            self.logger.error(f"Error searching episodic memory: {str(e)}")
+            raise
 
 
     async def delete_knowledge(
@@ -633,6 +741,3 @@ class MemoryService:
             context = context + "..."
         return context
 
-    def _sanitize_id(self, agent_id: str) -> str:
-        """Sanitize agent ID for table names"""
-        return agent_id.replace('-', '_')
