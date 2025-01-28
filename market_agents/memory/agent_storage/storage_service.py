@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from typing import List, Optional, Dict, Any, Union
 from uuid import UUID
 from datetime import datetime, timezone
@@ -9,7 +10,7 @@ from market_agents.memory.agent_storage.setup_db import AsyncDatabase
 from market_agents.memory.config import AgentStorageConfig
 from market_agents.memory.embedding import MemoryEmbedder
 from market_agents.memory.knowledge_base import KnowledgeChunk, SemanticChunker
-from market_agents.memory.memory_models import (
+from market_agents.memory.storage_models import (
     EpisodicMemoryObject,
     MemoryObject,
     CognitiveStep,
@@ -24,25 +25,68 @@ class StorageService:
         self.logger = logging.getLogger("storage_service")
 
     async def create_tables(self, table_type: str, agent_id: Optional[str] = None, table_prefix: Optional[str] = None):
-        """
-        Creates tables based on the specified type.
-
-        Args:
-            table_type: One of 'cognitive', 'episodic', or 'knowledge'
-            agent_id: Required for cognitive/episodic tables
-            table_prefix: Required for knowledge tables
-        """
+        """Creates tables based on the specified type."""
         try:
+            # Verify database connection
+            if not self.db.pool:
+                await self.db.initialize()
+
+            # Add validation
+            if table_type in ["cognitive", "episodic"] and not agent_id:
+                raise ValueError(f"agent_id is required for {table_type} tables")
+            if table_type == "knowledge" and not table_prefix:
+                raise ValueError("table_prefix is required for knowledge tables")
+
+            self.logger.info(f"Creating {table_type} tables with agent_id={agent_id}, prefix={table_prefix}")
+
+            # Create pgvector extension first
+            async with self.db.safe_transaction() as conn:
+                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                self.logger.info("Created pgvector extension")
+
+            # Then create the specific tables
             if table_type == "cognitive":
                 await self.create_agent_cognitive_memory_table(agent_id)
             elif table_type == "episodic":
                 await self.create_agent_episodic_memory_table(agent_id)
             elif table_type == "knowledge":
                 await self.create_knowledge_base_tables(table_prefix)
+            elif table_type == "ai_requests":
+                await self.create_ai_requests_table()
             else:
                 raise ValueError(f"Invalid table type: {table_type}")
+                
+            self.logger.info(f"Successfully created {table_type} tables")
         except Exception as e:
             self.logger.error(f"Error creating {table_type} tables: {str(e)}")
+            raise
+
+    async def create_ai_requests_table(self) -> None:
+        """Create the AI requests table."""
+        try:
+            async with self.db.safe_transaction() as conn:
+                # Create AI requests table
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_requests (
+                        id SERIAL PRIMARY KEY,
+                        request_id TEXT NOT NULL,
+                        agent_id TEXT,
+                        prompt TEXT NOT NULL,
+                        response JSONB,
+                        metadata JSONB DEFAULT '{}',
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(request_id)
+                    )
+                """)
+                
+                # Create indexes
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_ai_requests_request_id ON ai_requests(request_id);
+                    CREATE INDEX IF NOT EXISTS idx_ai_requests_agent_id ON ai_requests(agent_id);
+                    CREATE INDEX IF NOT EXISTS idx_ai_requests_created_at ON ai_requests(created_at);
+                """)
+        except Exception as e:
+            self.logger.error(f"Error creating AI requests table: {str(e)}")
             raise
 
     async def create_knowledge_base_tables(self, table_prefix: str) -> None:
@@ -433,14 +477,6 @@ class StorageService:
             all_embeddings = []
             all_embeddings = await self.embedder.get_embeddings(chunk_texts)
 
-            #for i in range(0, len(chunk_texts), self.config.batch_size):
-            #    batch = chunk_texts[i:i + self.config.batch_size]
-            #    print("DEBUG: about to call get_embeddings")
-            #    batch_embeddings = await self.embedder.get_embeddings(batch)
-            #    print("DEBUG: done with get_embeddings. type:", type(batch_embeddings))
-            #    all_embeddings.extend(batch_embeddings)
-            #
-            # Assign embeddings to chunks
             for chunk, embedding in zip(chunks, all_embeddings):
                 chunk.embedding = embedding
 
@@ -489,9 +525,7 @@ class StorageService:
             max_size=self.config.max_chunk_size
         )
         result = chunker.chunk(text)
-        print("DEBUG: type(result)=", type(result))
         return result
-        #return chunker.chunk(text)
 
     async def search_knowledge(
             self,
@@ -637,9 +671,7 @@ class StorageService:
             chunks_table = f"{prefix}_knowledge_chunks"
             objects_table = f"{prefix}_knowledge_objects"
 
-            # Use the safe_transaction to ensure retryable, atomic behavior
             async with self.db.safe_transaction() as conn:
-                # Delete chunks first due to foreign key constraint
                 await conn.execute(
                     f"DELETE FROM {chunks_table} WHERE knowledge_id = $1",
                     str(knowledge_id)
@@ -677,7 +709,7 @@ class StorageService:
             memory_id = UUID(row["memory_id"])
             cognitive_step = row["cognitive_step"]
             content = row["content"]
-            embedding = row["embedding"]  # This would typically be a vector, or a string representation
+            embedding = row["embedding"]
             created_at = row["created_at"]
             metadata = json.loads(row["metadata"]) if row["metadata"] else {}
 
@@ -702,7 +734,7 @@ class StorageService:
         try:
             memory_id = UUID(row["memory_id"])
             task_query = row["task_query"]
-            cognitive_steps = json.loads(row["cognitive_steps"])  # Assuming it's stored as JSON in the DB
+            cognitive_steps = json.loads(row["cognitive_steps"])
             total_reward = row["total_reward"]
             strategy_update = json.loads(row["strategy_update"]) if row["strategy_update"] else []
             embedding = row["embedding"]
@@ -714,7 +746,7 @@ class StorageService:
                 memory_id=memory_id,
                 agent_id=agent_id,
                 task_query=task_query,
-                cognitive_steps=cognitive_steps,  # List of cognitive steps
+                cognitive_steps=cognitive_steps,
                 total_reward=total_reward,
                 strategy_update=strategy_update,
                 embedding=embedding,
@@ -741,3 +773,61 @@ class StorageService:
             context = context + "..."
         return context
 
+    async def store_ai_requests(self, requests: List[Dict[str, Any]]):
+        """Store AI requests in the database."""
+        try:
+            values = []
+            for req in requests:
+                if hasattr(req, 'model_dump'):
+                    req_dict = req.model_dump()
+                    request_data = (
+                        str(uuid.uuid4()),
+                        None,
+                        json.dumps(req_dict.get('messages', [])),
+                        json.dumps(req_dict.get('raw_result')),
+                        json.dumps({
+                            'model': req_dict.get('raw_result', {}).get('model'),
+                            'client': req_dict.get('client'),
+                            'provider': req_dict.get('result_provider'),
+                            'start_time': req_dict.get('start_time'),
+                            'end_time': req_dict.get('end_time'),
+                            'time_taken': req_dict.get('time_taken'),
+                            'completion_kwargs': req_dict.get('completion_kwargs')
+                        }),
+                        datetime.fromtimestamp(req_dict.get('start_time', time.time()), tz=timezone.utc)
+                    )
+                # Handle dictionary requests
+                elif isinstance(req, dict):
+                    request_data = (
+                        req.get('request_id', str(uuid.uuid4())),
+                        req.get('agent_id'),
+                        json.dumps(req.get('messages', [])),
+                        json.dumps(req.get('raw_result')),
+                        json.dumps({
+                            'model': req.get('raw_result', {}).get('model'),
+                            'client': req.get('client'),
+                            'provider': req.get('result_provider'),
+                            'start_time': req.get('start_time'),
+                            'end_time': req.get('end_time'),
+                            'time_taken': req.get('end_time', 0) - req.get('start_time', 0),
+                            'completion_kwargs': req.get('completion_kwargs')
+                        }),
+                        datetime.fromtimestamp(req.get('start_time', time.time()), tz=timezone.utc)
+                    )
+
+                values.append(request_data)
+
+            if not values:
+                return
+
+            async with self.db.safe_transaction() as conn:
+                await conn.executemany("""
+                    INSERT INTO ai_requests 
+                    (request_id, agent_id, prompt, response, metadata, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    ON CONFLICT (request_id) DO NOTHING
+                """, values)
+
+        except Exception as e:
+            self.logger.error(f"Failed to store AI requests: {e}")
+            raise

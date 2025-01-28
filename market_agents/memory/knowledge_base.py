@@ -4,7 +4,7 @@ import re
 from uuid import UUID
 
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
-from market_agents.memory.memory_models import (
+from market_agents.memory.storage_models import (
     CreateTablesRequest,
     IngestKnowledgeRequest,
     KnowledgeQueryParams,
@@ -70,6 +70,24 @@ class MarketKnowledgeBase:
             self.table_prefix,
             "knowledge"
         )
+
+    async def check_table_exists(self) -> bool:
+        """Check if knowledge base tables exist."""
+        try:
+            is_healthy = await self.agent_storage_utils.check_api_health()
+            if not is_healthy:
+                return False
+                
+            await self.agent_storage_utils.search_knowledge(
+                KnowledgeQueryParams(
+                    query="test",
+                    top_k=1,
+                    table_prefix=self.table_prefix
+                )
+            )
+            return True
+        except Exception:
+            return False
 
 class SemanticChunker(KnowledgeChunker):
     def __init__(self, min_size: int, max_size: int):

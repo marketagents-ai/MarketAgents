@@ -7,7 +7,7 @@ from uuid import UUID
 import logging
 
 from market_agents.memory.agent_storage.storage_service import StorageService
-from market_agents.memory.memory_models import (
+from market_agents.memory.storage_models import (
     MemoryObject,
     EpisodicMemoryObject,
     CognitiveMemoryParams,
@@ -26,6 +26,34 @@ class AgentStorageAPI:
         self._register_routes()
 
     def _register_routes(self):
+        @self.router.get("/api/health")
+        async def health_check():
+            """Check API health status."""
+            try:
+                # First check if database is initialized
+                if not self.storage_service.db.pool:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Database not initialized"
+                    )
+                
+                # Then check connection
+                is_connected = await self.storage_service.db.is_connected()
+                if not is_connected:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Database connection failed"
+                    )
+                return {"status": "healthy", "database": "connected"}
+            except HTTPException:
+                raise
+            except Exception as e:
+                self.logger.error(f"Health check failed: {str(e)}")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Service unhealthy: {str(e)}"
+                )
+
         @self.router.post("/memory/cognitive")
         async def store_cognitive_memory(memory: MemoryObject):
             """Store a single-step (cognitive) memory item."""
@@ -201,13 +229,27 @@ class AgentStorageAPI:
 
         @self.router.post("/tables/create")
         async def create_tables(request: CreateTablesRequest):
-            """Create memory or knowledge base tables."""
+            """Create database tables."""
             try:
+                if request.table_type in ["cognitive", "episodic"] and not request.agent_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"agent_id is required for {request.table_type} tables"
+                    )
+                if request.table_type == "knowledge" and not request.table_prefix:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="table_prefix is required for knowledge tables"
+                    )
+
+                self.logger.info(f"Creating tables with params: {request.model_dump()}")
+                
                 await self.storage_service.create_tables(
                     table_type=request.table_type,
                     agent_id=request.agent_id,
                     table_prefix=request.table_prefix
                 )
+                
                 return {
                     "status": "success",
                     "table_type": request.table_type,
@@ -223,7 +265,10 @@ class AgentStorageAPI:
 async def lifespan(app: FastAPI):
     """Lifespan context manager for database connection."""
     # Startup: initialize database
-    await app.state.storage_service.db.initialize()
+    try:
+        await app.state.storage_service.db.initialize()
+    except Exception as e:
+        raise
     yield
     # Shutdown: cleanup
     await app.state.storage_service.db.close()
@@ -249,7 +294,7 @@ if __name__ == "__main__":
     from pathlib import Path
 
     # Load config
-    config_path = Path(__file__).parent.parent / "memory_config.yaml"
+    config_path = Path(__file__).parent.parent / "storage_config.yaml"
     config = load_config_from_yaml(str(config_path))
 
     # Initialize embedding service

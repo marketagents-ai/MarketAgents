@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 
 from market_agents.memory.agent_storage.agent_storage_api import CognitiveMemoryParams
-from market_agents.memory.memory_models import (
+from market_agents.memory.storage_models import (
     CreateTablesRequest,
     MemoryObject, 
     EpisodicMemoryObject, 

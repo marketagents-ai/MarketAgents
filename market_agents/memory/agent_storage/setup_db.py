@@ -43,6 +43,19 @@ class AsyncDatabase:
                     )
                     await self._verify_extensions()
                     self._is_initialized = True
+    
+    async def is_connected(self) -> bool:
+        """Check if database connection is alive."""
+        try:
+            if not self.pool:
+                return False
+            
+            async with self.pool.acquire() as conn:
+                await conn.execute("SELECT 1")
+                return True
+        except Exception as e:
+            self.logger.error(f"Database connection check failed: {e}")
+            return False
 
     async def close(self):
         """Close all connections in the pool"""
@@ -143,3 +156,8 @@ class AsyncDatabase:
     def _sanitize_table_name(self, name: str) -> str:
         """Safely sanitize table names using regex"""
         return re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    
+    async def fetch_one(self, query: str, *args) -> Optional[asyncpg.Record]:
+        """Execute a query and return a single result"""
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(query, *args)

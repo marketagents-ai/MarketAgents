@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 
-from market_agents.memory.memory_models import RetrievedMemory
+from market_agents.memory.storage_models import RetrievedMemory
 from market_agents.memory.knowledge_base import MarketKnowledgeBase
 
 class KnowledgeBaseAgent(BaseModel):

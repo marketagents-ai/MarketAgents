@@ -1,11 +1,13 @@
 import json
+import uuid
 import aiohttp
 import logging
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
-from market_agents.memory.memory_models import (
+from market_agents.memory.storage_models import (
+    AIRequest,
     CognitiveMemoryParams,
     EpisodicMemoryParams,
     KnowledgeQueryParams,
@@ -45,9 +47,9 @@ class AgentStorageAPIUtils:
     async def check_api_health(self) -> bool:
         """Check if the Agent Storage API is healthy."""
         try:
-            self.logger.info(f"Checking Agent Storage API health at {self.api_url}/health")
+            self.logger.info(f"Checking Agent Storage API health at {self.api_url}/api/health")
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.api_url}/health", timeout=5) as resp:
+                async with session.get(f"{self.api_url}/api/health", timeout=5) as resp:
                     if resp.status == 200:
                         self.logger.info("Agent Storage API is healthy")
                         return True
@@ -215,16 +217,26 @@ class AgentStorageAPIUtils:
             raise
 
     async def create_tables(self, request: CreateTablesRequest) -> Dict[str, Any]:
+        """Create database tables."""
         try:
+            payload = request.model_dump()
+            self.logger.info(f"Sending create tables request with payload: {payload}")
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.api_url}/tables/create",
-                    json=request.model_dump()
+                    json=payload
                 ) as resp:
-                    resp.raise_for_status()
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        self.logger.error(f"Failed to create tables. Status: {resp.status}, Response: {error_text}")
+                        resp.raise_for_status()
                     return await resp.json()
+        except aiohttp.ClientError as e:
+            self.logger.error(f"HTTP error creating tables: {str(e)}")
+            raise
         except Exception as e:
-            self.logger.error(f"Error creating tables: {e}")
+            self.logger.error(f"Error creating tables: {str(e)}")
             raise
 
     async def clear_agent_memory(self, agent_id: str, memory_type: Optional[str] = None) -> Dict[str, Any]:
@@ -240,3 +252,30 @@ class AgentStorageAPIUtils:
         except Exception as e:
             self.logger.error(f"Error clearing agent memory: {e}")
             raise
+    
+    async def store_ai_requests(self, requests: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Store AI requests in the database."""
+        try:
+            # Convert requests to AIRequest models
+            ai_requests = [
+                AIRequest(
+                    request_id=req.get('request_id', str(uuid.uuid4())),
+                    agent_id=req.get('agent_id'),
+                    prompt=req.get('prompt', ''),
+                    response=req.get('response'),
+                    metadata=req.get('metadata', {}),
+                    created_at=req.get('created_at', datetime.now(timezone.utc))
+                ) for req in requests
+            ]
+            
+            async with aiohttp.ClientSession(json_serialize=lambda x: json.dumps(x, cls=self.json_encoder)) as session:
+                async with session.post(
+                    f"{self.api_url}/ai/requests",
+                    json=[req.model_dump(exclude_none=True) for req in ai_requests]
+                ) as resp:
+                    resp.raise_for_status()
+                    return await resp.json()
+        except Exception as e:
+            self.logger.error(f"Error storing AI requests: {e}")
+            raise
+    

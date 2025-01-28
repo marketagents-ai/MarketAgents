@@ -117,3 +117,11 @@ class CreateTablesRequest(BaseModel):
     table_type: str = Field(..., description="Type of tables to create (cognitive/episodic/knowledge)")
     agent_id: Optional[str] = Field(default=None, description="Agent ID for memory tables")
     table_prefix: Optional[str] = Field(default=None, description="Optional table prefix for multi-tenant setups")
+
+class AIRequest(BaseModel):
+    request_id: str
+    agent_id: Optional[str] = None
+    prompt: str
+    response: Any
+    metadata: Dict[str, Any] = {}
+    created_at: datetime
