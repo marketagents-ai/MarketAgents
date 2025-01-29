@@ -10,11 +10,11 @@ pool_max: 10
 #port: "5434"
 index_method: "ivfflat"
 lists: 100
-#embedding_api_url: "https://api.openai.com/v1/embeddings"
-#model: "text-embedding-ada-002"
+embedding_api_url: "https://api.openai.com/v1/embeddings"
+model: "text-embedding-ada-002"
 #embedding_api_url: "http://localhost:8080/embed"
-embedding_api_url: "http://38.128.232.35:8080/embed"
-model: "jinaai/jina-embeddings-v2-base-en"
+#embedding_api_url: "http://38.128.232.35:8080/embed"
+#model: "jinaai/jina-embeddings-v2-base-en"
 batch_size: 32
 timeout: 10
 retry_attempts: 3
@@ -24,11 +24,11 @@ retry_backoff_factor: 2
 retry_jitter: 0.1
 min_chunk_size: 512
 max_chunk_size: 1024
-# vector_dim: 1536 #openai embed dim
-vector_dim: 768
+vector_dim: 1536 #openai embed dim
+#vector_dim: 768
 max_input: 4096
 top_k: 3
 similarity_threshold: 0.7
 encoding_format: "float"
-embedding_provider: "tei"
-#embedding_provider: "openai"
+embedding_provider: "openai"
+#embedding_provider: "tei"
