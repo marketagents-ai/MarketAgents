@@ -65,7 +65,7 @@ class MarketAgent(LLMAgent):
             id=agent_id,
             short_term_memory=stm,
             long_term_memory=ltm,
-            role=persona.role if persona else "agent",
+            role=persona.role if persona else "AI agent",
             persona=persona.persona if persona else None,
             objectives=persona.objectives if persona else None,
             llm_config=llm_config or LLMConfig(),
@@ -76,6 +76,9 @@ class MarketAgent(LLMAgent):
             economic_agent=econ_agent,
             knowledge_agent=knowledge_agent
         )
+
+        if agent.economic_agent:
+            agent.economic_agent.id = agent_id
 
         return agent
 

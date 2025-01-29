@@ -13,6 +13,7 @@ async def setup_orchestrator_tables(conn: asyncpg.Connection):
                 is_llm BOOLEAN,
                 max_iter INTEGER,
                 llm_config JSONB,
+                economic_agent JSONB,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)

@@ -1,9 +1,9 @@
 # orchestrator_config.yaml
 
-num_agents: 4
-max_rounds: 1
+num_agents: 2
+max_rounds: 2
 environment_order:
-  - group_chat
+#  - group_chat
   - research
 tool_mode: true
 agent_config:

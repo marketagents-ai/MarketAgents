@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import List, Optional, Type
 
 from market_agents.agents.market_agent import MarketAgent
-from market_agents.agents.personas.persona import generate_persona
+from market_agents.agents.personas.persona import Persona, generate_persona, load_persona_from_file, save_persona_to_file
+from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.memory.knowledge_base import MarketKnowledgeBase
 from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
 from market_agents.memory.config import AgentStorageConfig, load_config_from_yaml
@@ -70,15 +71,7 @@ async def create_agents(
     config,
     storage_config: AgentStorageConfig,
 ) -> List[MarketAgent]:
-    """Create market agents with specified configurations.
-    
-    Args:
-        config: Orchestrator configuration
-        storage_config (AgentStorageConfig): Storage configuration
-        
-    Returns:
-        List[MarketAgent]: List of initialized market agents
-    """
+    """Create market agents with specified configurations."""
     agents = []
     num_agents = config.num_agents
 
@@ -89,15 +82,27 @@ async def create_agents(
     if not kb_agent and config.agent_config.knowledge_base:
         logger.warning("Failed to initialize knowledge base agent, continuing without it")
 
+    # Load or generate personas
+    personas_dir = Path("./market_agents/agents/personas/generated_personas")
+    personas = load_or_generate_personas(personas_dir, num_agents)
+
     # Create agents with random LLM configs
     llm_confs = config.llm_configs
     if not llm_confs:
         raise ValueError("No LLM configurations found in config")
 
-    for i in range(num_agents):
+    for i, persona in enumerate(personas):
+        # Use simple string ID format
         agent_id = f"agent_{i}"
         llm_c = random.choice(llm_confs)
-        persona = generate_persona()
+
+        econ_agent = EconomicAgent(
+            generate_wallet=True,
+            initial_holdings={
+                "ETH": 1.0,
+                "USDC": 1000.0
+            }
+        )
 
         try:
             agent = await MarketAgent.create(
@@ -114,13 +119,13 @@ async def create_agents(
                 environments={},
                 protocol=ACLMessage,
                 persona=persona,
-                econ_agent=None,
+                econ_agent=econ_agent,
                 knowledge_agent=kb_agent
             )
 
             agent.index = i
             agents.append(agent)
-            logger.info(f"Created agent {agent_id} with LLM {llm_c.name}")
+            logger.info(f"Created agent {agent_id} with LLM {llm_c.name}, persona {persona.role} and economic agent")
             
         except Exception as e:
             logger.error(f"Failed to create agent {agent_id}: {str(e)}")
@@ -130,6 +135,31 @@ async def create_agents(
         raise RuntimeError("Failed to create any agents")
 
     return agents
+
+def load_or_generate_personas(personas_dir: Path, num_needed: int) -> List[Persona]:
+    """Load existing personas or generate new ones if needed."""
+    personas = []
+    
+    # Create directory if it doesn't exist
+    personas_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Load existing personas
+    if personas_dir.exists():
+        for file_path in personas_dir.glob("*.yaml"):
+            if len(personas) < num_needed:
+                try:
+                    persona = load_persona_from_file(file_path)
+                    personas.append(persona)
+                except Exception as e:
+                    logger.warning(f"Failed to load persona from {file_path}: {e}")
+    
+    while len(personas) < num_needed:
+        new_persona = generate_persona()
+        save_persona_to_file(new_persona, personas_dir)
+        personas.append(new_persona)
+        logger.info(f"Generated new persona: {new_persona.name}")
+    
+    return personas[:num_needed]
 
 async def main():
     logging.basicConfig(level=logging.INFO)

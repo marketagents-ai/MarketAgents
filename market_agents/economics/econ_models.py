@@ -1,233 +1,107 @@
-from pydantic import BaseModel, Field, computed_field, model_validator
-from functools import cached_property
-from typing import List, Dict, Self
-import random
-from copy import deepcopy
-from datetime import datetime
-import uuid
-import os
-from pathlib import Path
-import json
-import tempfile
+from abc import ABC, abstractmethod
+import logging
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
 
-class SavableBaseModel(BaseModel):
-    name:str
-    def save_to_json(self, folder_path: str) -> str:
-        # Create folder if it doesn't exist
-        Path(folder_path).mkdir(parents=True, exist_ok=True)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+from eth_account import Account
 
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.name.replace(' ', '_')}_{timestamp}.json"
-        file_path = os.path.join(folder_path, filename)
+class BaseWallet(BaseModel, ABC):
+    """
+    Abstract wallet class for a chain identity:
+      - chain: e.g. 'ethereum', 'solana'
+      - address, private_key: user-supplied or auto-generated
+    """
+    chain: Optional[str] = None
+    address: Optional[str] = None
+    private_key: Optional[str] = None
 
-        try:
-            # Convert to dict
-            data = self.model_dump(mode='json')
-            
-            # Write to a temporary file first
-            with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
-                json.dump(data, temp_file, indent=2)
-            
-            # If the write was successful, move the temporary file to the final location
-            os.replace(temp_file.name, file_path)
-            
-            print(f"State saved to {file_path}")
-        except Exception as e:
-            print(f"Error saving state to {file_path}")
-            print(f"Error message: {str(e)}")
-            if os.path.exists(temp_file.name):
-                os.unlink(temp_file.name)
-            raise
-        
-        return file_path
+    @abstractmethod
+    def ensure_valid_wallet(self) -> None:
+        """
+        Subclasses handle auto-generation or validation.
+        """
+        pass
 
-    @classmethod
-    def load_from_json(cls, file_path: str) -> Self:
-        try:
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-            return cls.model_validate(data)
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON from {file_path}")
-            print(f"Error message: {str(e)}")
-            with open(file_path, 'r') as f:
-                print(f"File contents:\n{f.read()}")
-            raise
-    
-class MarketAction(BaseModel):
-    price: float = Field(..., description="Price of the order")
-    quantity: int = Field(default=1, ge=1,le=1, description="Quantity of the order")
+    @abstractmethod
+    def sign_transaction(self, tx_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Subclasses handle real chain transaction signing.
+        """
+        pass
 
-class Bid(MarketAction):
-    @computed_field
-    @property
-    def is_buyer(self) -> bool:
-        return True
 
-class Ask(MarketAction):
-    @computed_field
-    @property
-    def is_buyer(self) -> bool:
-        return False
+class AgentWallet(BaseWallet):
+    """
+    Agent wallet that auto-generates an Ethereum address/private_key if
+    chain='ethereum' and none is provided.
+    """
+    def ensure_valid_wallet(self) -> None:
+        if self.chain and self.chain.lower() == "ethereum":
+            if not self.address or not self.private_key:
+                logger.info("[AgentWallet] Auto-generating Ethereum wallet.")
+                self._generate_ethereum_wallet()
 
-class Trade(BaseModel):
-    trade_id: int = Field(..., description="Unique identifier for the trade")
-    buyer_id: str = Field(..., description="ID of the buyer")
-    seller_id: str = Field(..., description="ID of the seller")
-    price: float = Field(..., description="The price at which the trade was executed")
-    ask_price: float = Field(ge=0, description="The price at which the ask was executed")
-    bid_price: float = Field(ge=0, description="The price at which the bid was executed")
-    quantity: int = Field(default=1, description="The quantity traded")
-    good_name: str = Field(default="consumption_good", description="The name of the good traded")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp of the trade")
+    def _generate_ethereum_wallet(self):
+        Account.enable_unaudited_hdwallet_features()
+        acct = Account.create()
+        self.address = acct.address
+        self.private_key = acct.key.hex()
+        logger.info(f"[AgentWallet] Generated Ethereum wallet: {self.address}")
 
-    @model_validator(mode='after')
-    def rational_trade(self):
-        if self.ask_price > self.bid_price:
-            raise ValueError(f"Ask price {self.ask_price} is more than bid price {self.bid_price}")
-        return self
-    
-class Good(BaseModel):
-    name: str
-    quantity: float
+    def sign_transaction(self, tx_data: Dict[str, Any]) -> Dict[str, Any]:
+        logger.info(f"[AgentWallet] sign_transaction with tx_data={tx_data}")
+        return {"signed_tx": "dummy_signature", "tx_data": tx_data}
 
-class Basket(BaseModel):
-    cash: float
-    goods: List[Good]
 
-    @computed_field
-    @cached_property
-    def goods_dict(self) -> Dict[str, int]:
-        return {good.name: int(good.quantity) for good in self.goods}
+class BaseHoldings(BaseModel, ABC):
+    """
+    Abstract holdings class
+    """
+    @abstractmethod
+    def record_transaction(self, tx: Dict[str, Any]) -> None:
+        pass
 
-    def update_good(self, name: str, quantity: float):
-        for good in self.goods:
-            if good.name == name:
-                good.quantity = quantity
-                return
-        self.goods.append(Good(name=name, quantity=quantity))
+    @abstractmethod
+    def get_total_value(
+        self, price_feeds: Optional[Dict[str, float]] = None, default_price: float = 0.0
+    ) -> float:
+        pass
 
-    def get_good_quantity(self, name: str) -> int:
-        return int(next((good.quantity for good in self.goods if good.name == name), 0))
 
-class Endowment(BaseModel):
-    initial_basket: Basket
-    trades: List[Trade] = Field(default_factory=list)
-    agent_id: str
+class Portfolio(BaseHoldings):
+    """
+    A multi-token dictionary-based portfolio:
+      token_balances = {'ETH': 2.0, 'USDC': 500.0, ...}
+      transaction_history logs local deposit/trade events, etc.
+    """
+    token_balances: Dict[str, float] = Field(default_factory=dict)
+    transaction_history: List[Dict[str, Any]] = Field(default_factory=list)
 
-    @computed_field
-    @property
-    def current_basket(self) -> Basket:
-        temp_basket = deepcopy(self.initial_basket)
+    def record_transaction(self, tx: Dict[str, Any]) -> None:
+        self.transaction_history.append(tx)
+        logger.info(f"[Portfolio] Recorded transaction: {tx}")
 
-        for trade in self.trades:
-            # print(f"trade: {trade} updating basket")
-            if trade.buyer_id == self.agent_id:
-                # print(f"buyer {trade.buyer_id} == {self.agent_id}")
-                temp_basket.cash -= trade.price * trade.quantity
-                temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) + trade.quantity)
-            elif trade.seller_id == self.agent_id:
-                # print(f"seller {trade.seller_id} == {self.agent_id}")
-                temp_basket.cash += trade.price * trade.quantity
-                temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) - trade.quantity)
-            else:
-                raise ValueError(f"Trade {trade} not for agent {self.agent_id}")
-        # Create a new Basket instance with the calculated values
-        return Basket(
-            cash=temp_basket.cash,
-            goods=[Good(name=good.name, quantity=good.quantity) for good in temp_basket.goods]
-        )
+    def get_token_balance(self, symbol: str) -> float:
+        """Get the balance of a specific token. Returns 0.0 if token not found."""
+        return self.token_balances.get(symbol, 0.0)
 
-    def add_trade(self, trade: Trade):
-        self.trades.append(trade)
-        # Clear the cached property to ensure it's recalculated
-        if 'current_basket' in self.__dict__:
-            del self.__dict__['current_basket']
+    def get_total_value(
+        self, 
+        price_feeds: Optional[Dict[str, float]] = None, 
+        default_price: float = 0.0
+    ) -> float:
+        if not price_feeds:
+            return 0.0
+        total = 0.0
+        for symbol, qty in self.token_balances.items():
+            price = price_feeds.get(symbol, default_price)
+            total += qty * price
+        return total
 
-    def simulate_trade(self, trade: Trade) -> Basket:
-        temp_basket = deepcopy(self.current_basket)
-
-        if trade.buyer_id == self.agent_id:
-            temp_basket.cash -= trade.price * trade.quantity
-            temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) + trade.quantity)
-        elif trade.seller_id == self.agent_id:
-            temp_basket.cash += trade.price * trade.quantity
-            temp_basket.update_good(trade.good_name, temp_basket.get_good_quantity(trade.good_name) - trade.quantity)
-
-        return temp_basket
-
-class PreferenceSchedule(BaseModel):
-    num_units: int = Field(..., description="Number of units")
-    base_value: float = Field(..., description="Base value for the first unit")
-    noise_factor: float = Field(default=0.1, description="Noise factor for value generation")
-    is_buyer: bool = Field(default=True, description="Whether the agent is a buyer")
-
-    @computed_field
-    @cached_property
-    def values(self) -> Dict[int, float]:
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @computed_field
-    @cached_property
-    def initial_endowment(self) -> float:
-        raise NotImplementedError("Subclasses must implement this method")
-
-    def get_value(self, quantity: int) -> float:
-        return self.values.get(quantity, 0.0)
-
-    def plot_schedule(self, block=False):
-        quantities = list(self.values.keys())
-        values = list(self.values.values())
-        
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(10, 6))
-        plt.plot(quantities, values, marker='o')
-        plt.title(f"{'Demand' if self.is_buyer else 'Supply'} Schedule")
-        plt.xlabel("Quantity")
-        plt.ylabel("Value/Cost")
-        plt.grid(True)
-        plt.show(block=block)
-
-class BuyerPreferenceSchedule(PreferenceSchedule):
-    endowment_factor: float = Field(default=1.2, description="Factor to calculate initial endowment")
-    is_buyer: bool = Field(default=True, description="Whether the agent is a buyer")
-
-    @computed_field
-    @cached_property
-    def values(self) -> Dict[int, float]:
-        values = {}
-        current_value = self.base_value
-        for i in range(1, self.num_units + 1):
-            # Decrease current_value by 2% to 5% plus noise
-            decrement = current_value * random.uniform(0.02, self.noise_factor)
-            
-            new_value = current_value-decrement
-            values[i] = new_value
-            current_value = new_value
-        return values
-
-    @computed_field
-    @cached_property
-    def initial_endowment(self) -> float:
-        return sum(self.values.values()) * self.endowment_factor
-
-class SellerPreferenceSchedule(PreferenceSchedule):
-    is_buyer: bool = Field(default=False, description="Whether the agent is a buyer")
-    @computed_field
-    @cached_property
-    def values(self) -> Dict[int, float]:
-        values = {}
-        current_value = self.base_value
-        for i in range(1, self.num_units + 1):
-            # Increase current_value by 2% to 5% plus noise
-            increment = current_value * random.uniform(0.02, self.noise_factor)
-            new_value = current_value+increment
-            values[i] = new_value
-            current_value = new_value
-        return values
-
-    @computed_field
-    @cached_property
-    def initial_endowment(self) -> float:
-        return sum(self.values.values())
+    def adjust_token_balance(self, symbol: str, delta: float) -> None:
+        old_balance = self.token_balances.get(symbol, 0.0)
+        new_balance = old_balance + delta
+        self.token_balances[symbol] = new_balance
+        logger.info(f"[Portfolio] {symbol} balance changed: {old_balance} -> {new_balance}")

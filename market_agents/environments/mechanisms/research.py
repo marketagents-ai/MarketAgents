@@ -40,6 +40,7 @@ class ResearchGlobalAction(GlobalAction):
 
 class ResearchObservation(BaseModel):
     """Individual observation containing research summary data"""
+    current_topic: str = ""
     own_summary: Optional[BaseModel] = None
     aggregator_notes: str = ""
 
@@ -69,6 +70,7 @@ class ResearchGlobalObservation(GlobalObservation):
     observations: Dict[str, ResearchLocalObservation]
     all_actions_this_round: Optional[Dict[str, Any]] = None
     final_all_summaries: Optional[List[Dict[str, Any]]] = None
+    current_topic: str = ""
     aggregator_notes: str = ""
 
     def dict(self, *args, **kwargs):
@@ -115,17 +117,19 @@ class ResearchObservationSpace(ObservationSpace):
 
 
 class ResearchMechanism(Mechanism):
+    """Mechanism that manages research rounds and agent summaries."""
     sequential: bool = Field(
         default=False,
         description="Whether the mechanism is sequential (one agent at a time)."
     )
     max_rounds: int = Field(default=3, description="Number of research steps allowed.")
     current_round: int = Field(default=0, description="Current step or round.")
-    
-    round_summaries: List[Dict[str, Any]] = Field(default_factory=list)
+    current_topic: str = Field(default="", description="Current research topic")
+    round_summaries: List[Dict[str, Any]] = Field(default_factory=list, description="History of all round summaries")
     last_step: Optional[EnvironmentStep] = Field(default=None, description="Last environment step")
 
     def step(self, action: Union[ResearchAction, ResearchGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
+        """Process agent actions and return the next state with observations."""
         logger.debug(f"ResearchMechanism step: {action}")
         self.current_round += 1
         done = (self.current_round >= self.max_rounds)
@@ -146,6 +150,7 @@ class ResearchMechanism(Mechanism):
 
             # Build local observation
             obs = ResearchObservation(
+                current_topic=self.current_topic,
                 own_summary=action.action,
                 aggregator_notes=f"Round {self.current_round}, single-agent action."
             )
@@ -161,14 +166,14 @@ class ResearchMechanism(Mechanism):
                 info={
                     "round": self.current_round,
                     "note": "Sequential step",
-                    "agent_rewards": {action.agent_id: 1.0}
+                    "agent_rewards": {action.agent_id: 1.0},
+                    "current_topic": self.current_topic
                 }
             )
             self.last_step = local_step
             return local_step
 
         else:
-            # Batched mode: parse a GlobalAction with many local actions
             if isinstance(action, dict):
                 try:
                     action = ResearchGlobalAction.parse_obj(action)
@@ -178,7 +183,7 @@ class ResearchMechanism(Mechanism):
             if not isinstance(action, ResearchGlobalAction):
                 raise TypeError(f"Expected ResearchGlobalAction, got {type(action).__name__}")
 
-            # Convert each local action to dict for easy storing
+            # Extract and store current round summaries
             round_actions = {
                 agent_id: local_action.action.dict()
                 for agent_id, local_action in action.actions.items()
@@ -193,6 +198,7 @@ class ResearchMechanism(Mechanism):
                 local_obs = ResearchLocalObservation(
                     agent_id=agent_id,
                     observation=ResearchObservation(
+                        current_topic=self.current_topic,
                         own_summary=local_action.action,
                         aggregator_notes=f"Round {self.current_round}, agent {agent_id}"
                     )
@@ -200,29 +206,28 @@ class ResearchMechanism(Mechanism):
                 local_observations[agent_id] = local_obs
                 agent_rewards[agent_id] = 1.0
 
-            # If final round, gather all data
-            final_data = None
-            aggregator_notes = f"End of round {self.current_round}."
-            if done:
-                final_data = []
-                for r_i, entry in enumerate(self.round_summaries, start=1):
-                    final_data.append({
-                        "round_index": r_i,
-                        "summaries": entry,
-                    })
-                aggregator_notes += " (Final) returning all collected summaries."
-
+            # Create global observation
             global_obs = ResearchGlobalObservation(
                 observations=local_observations,
-                all_actions_this_round=round_actions,
-                final_all_summaries=final_data,
-                aggregator_notes=aggregator_notes
+                all_actions_this_round=round_actions,  # Current round summaries
+                current_topic=self.current_topic,
+                aggregator_notes=f"End of round {self.current_round}"
             )
+
+            # Add historical data only on final round
+            if done:
+                global_obs.final_all_summaries = [
+                    {"round_index": i + 1, "summaries": summaries}
+                    for i, summaries in enumerate(self.round_summaries)
+                ]
+                global_obs.aggregator_notes += " (Final) returning all collected summaries."
+
             env_step = EnvironmentStep(
                 global_observation=global_obs,
                 done=done,
                 info={
                     "round": self.current_round,
+                    "current_topic": self.current_topic,
                     "agent_rewards": agent_rewards
                 }
             )
@@ -230,26 +235,22 @@ class ResearchMechanism(Mechanism):
             return env_step
 
     def get_global_state(self) -> Dict[str, Any]:
-        """
-        Return the mechanism's overall state, e.g. how many rounds have been done,
-        or any other state you'd like to expose to agents or orchestrators.
-        """
+        """Return the mechanism's overall state, including the current topic and summaries."""
         return {
             "current_round": self.current_round,
             "max_rounds": self.max_rounds,
+            "round_summaries": self.round_summaries,
             "round_summaries_count": len(self.round_summaries),
-            "last_step": self.last_step.dict() if self.last_step else None
+            "last_step": self.last_step.dict() if self.last_step else None,
+            "current_topic": self.current_topic
         }
 
     def reset(self) -> None:
-        """
-        Reset mechanism for a new run.
-        """
+        """Reset mechanism for a new run."""
         self.current_round = 0
         self.round_summaries.clear()
-        self.last_step = None  # Reset last step
+        self.last_step = None
         logger.info("ResearchMechanism reset complete.")
-
 
 class ResearchEnvironment(MultiAgentEnvironment):
     """
@@ -266,10 +267,13 @@ class ResearchEnvironment(MultiAgentEnvironment):
         description="Observation space"
     )
     mechanism: ResearchMechanism = Field(default_factory=ResearchMechanism)
+    initial_topic: Optional[str] = Field(default=None, description="Initial research topic")
+
 
     def __init__(
         self,
         summary_model: Type[BaseModel],
+        initial_topic: Optional[str] = None,
         **data
     ):
         """
@@ -278,21 +282,17 @@ class ResearchEnvironment(MultiAgentEnvironment):
         """
         action_space = ResearchActionSpace(summary_model=summary_model)
         mechanism = ResearchMechanism()
+        
+        if initial_topic:
+            mechanism.current_topic = initial_topic
+            
         super().__init__(
             action_space=action_space,
             mechanism=mechanism,
+            initial_topic=initial_topic,
             **data
         )
-        # Initialize our own state tracking
         self._global_state: Dict[str, Any] = {}
-
-    def reset(self) -> GlobalObservation:
-        """Override reset to handle our own state management"""
-        self.current_step = 0
-        self._global_state = {}
-        self.history = EnvironmentHistory()
-        self.mechanism.reset()
-        return GlobalObservation(observations={})
 
     def get_global_state(self) -> Any:
         """Expose both mechanism state and our internal state."""
@@ -301,5 +301,18 @@ class ResearchEnvironment(MultiAgentEnvironment):
             **self._global_state,
             **mechanism_state,
             "current_step": self.current_step,
-            "max_steps": self.max_steps
+            "max_steps": self.max_steps,
+            "current_topic": self.mechanism.current_topic
         }
+
+    def reset(self) -> GlobalObservation:
+        """Override reset to handle our own state management"""
+        self.current_step = 0
+        self._global_state = {}
+        self.history = EnvironmentHistory()
+        self.mechanism.reset()
+        
+        if self.initial_topic:
+            self.mechanism.current_topic = self.initial_topic
+            
+        return GlobalObservation(observations={})
