@@ -85,6 +85,15 @@ class EconomicAgent(BaseModel):
             logger.warning("[EconomicAgent] No wallet => cannot sign transaction.")
             return {}
         return self.wallet.sign_transaction(tx_data)
+    
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'rewards': self.rewards,
+            'total_reward': self.total_reward,
+            'wallet': self.wallet.dict() if self.wallet else None,
+            'holdings': self.holdings.dict() if self.holdings else None
+        }
 
     def __str__(self):
         w_str = "No wallet"
