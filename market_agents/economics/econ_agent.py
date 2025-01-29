@@ -9,21 +9,24 @@ logger.setLevel(logging.INFO)
 
 
 class EconomicAgent(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: Optional[str] = None 
     rewards: List[float] = Field(default_factory=list)
     total_reward: float = 0.0
     wallet: Optional[BaseWallet] = None
     holdings: Optional[BaseHoldings] = None
     generate_wallet: bool = Field(default=False, exclude=True)
 
-    def __init__(self, **data):
+    def __init__(self, initial_holdings: Optional[Dict[str, float]] = None, **data):
         super().__init__(**data)
         if self.wallet is not None or self.generate_wallet:
             if self.wallet is None:
                 self.wallet = AgentWallet(chain="ethereum")
             self.wallet.ensure_valid_wallet()
             if self.holdings is None:
-                self.holdings = Portfolio()
+                self.holdings = Portfolio(token_balances=initial_holdings or {})
+            else:
+                if initial_holdings and isinstance(self.holdings, Portfolio):
+                    self.holdings.token_balances.update(initial_holdings)
         else:
             self.wallet = None
             self.holdings = None

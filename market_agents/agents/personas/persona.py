@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Union
 import yaml
 import random
 from pathlib import Path
@@ -335,6 +335,12 @@ def generate_and_save_personas(num_personas: int, output_dir: Path):
     for _ in range(num_personas):
         persona = generate_persona()
         save_persona_to_file(persona, output_dir)
+
+def load_persona_from_file(filepath: Union[str, Path]) -> Persona:
+    """Load a persona from a YAML file."""
+    with open(filepath, 'r') as file:
+        persona_data = yaml.safe_load(file)
+        return Persona(**persona_data)
 
 if __name__ == "__main__":
     output_dir = Path("./market_agents/agents/personas/generated_personas")
