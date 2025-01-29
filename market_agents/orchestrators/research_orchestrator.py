@@ -20,7 +20,8 @@ from market_agents.environments.environment import EnvironmentStep
 from market_agents.environments.mechanisms.research import (
     ResearchEnvironment,
     ResearchGlobalAction,
-    ResearchAction
+    ResearchAction,
+    ResearchObservation
 )
 
 from market_agents.memory.agent_storage.storage_service import StorageService
@@ -59,7 +60,8 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
             summary_model=self.summary_model,
             name=self.config.name,
             api_url=self.config.api_url,
-            max_steps=self.config.max_rounds
+            max_steps=self.config.max_rounds,
+            initial_topic=self.config.initial_topic
         )
 
         for agent in self.agents:
@@ -90,12 +92,12 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
         Run the environment for N rounds. If round_num is provided, run only that round.
         """
         if round_num is not None:
-            await self.run_round(round_num)
+            await self.run_research_round(round_num)
         else:
             for r in range(1, self.config.max_rounds + 1):
-                await self.run_round(r)
+                await self.run_research_round(r)
 
-    async def run_round(self, round_num: int):
+    async def run_research_round(self, round_num: int):
         """Orchestrates a single round of research steps among all agents."""
         self.logger.info(f"=== Running Research Round {round_num} ===")
 
@@ -117,6 +119,9 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
             self.logger.info(f"Round {round_num}: Gathering agent research summaries...")
             actions = await self.cognitive_processor.run_parallel_action(self.agents, self.config.name)
             
+            # Track all agent summaries for global observation
+            agent_summaries = {}
+            
             # Log actions and store them in agent state
             for agent, action in zip(self.agents, actions or []):
                 try:
@@ -126,10 +131,11 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
                     elif action and hasattr(action, 'str_content'):
                         content = action.str_content
 
-                    # Store the action in agent's state
+                    # Store the action in agent's state and summaries collection
                     agent.last_action = content
+                    if content:
+                        agent_summaries[agent.id] = content
                     
-                    # Log the action using the same format as perception/reflection
                     log_action(self.logger, agent.index, content)
 
                 except Exception as e:
@@ -159,70 +165,84 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
                     local_action = ResearchAction(agent_id=agent.id, action=summary_instance)
                     global_actions[agent.id] = local_action
 
-                research_global_action = ResearchGlobalAction(actions=global_actions)
-                step_result = self.environment.step(research_global_action)
+            research_global_action = ResearchGlobalAction(actions=global_actions)
+            step_result = self.environment.step(research_global_action)
 
-                # After environment step, store the observation in agent state
+            # Update observations
+            if step_result and step_result.global_observation:
+                # Add all agent summaries to global observation only
+                step_result.global_observation.all_actions_this_round = agent_summaries
+                
+                # Update each agent's local observation with only their own summary
                 for agent in self.agents:
-                    if (step_result and 
-                        step_result.global_observation and 
-                        step_result.global_observation.observations):
-                        # Access observations through global_observation
-                        agent.last_observation = step_result.global_observation.observations.get(agent.id)
+                    if (step_result.global_observation and 
+                        step_result.global_observation.observations and 
+                        agent.id in step_result.global_observation.observations):
+                        
+                        local_obs = step_result.global_observation.observations[agent.id]
+                        if not local_obs.observation:
+                            local_obs.observation = ResearchObservation()
+                        
+                        # Only set own summary and current topic in local observation
+                        local_obs.observation.own_summary = agent_summaries.get(agent.id)
+                        local_obs.observation.current_topic = self.environment.mechanism.current_topic
+                        
+                        # Store observation in agent state
+                        agent.last_observation = local_obs
                     else:
                         agent.last_observation = None
 
-                # Agents reflect on new environment observation
-                self.logger.info(f"Round {round_num}: Agents reflecting on environment changes...")
-                try:
-                    reflection_prompts = []
-                    agents_with_observations = []
-                    
-                    for agent in self.agents:
-                        if agent.last_observation and agent.last_observation.observation:
-                            reflect_prompt = await agent.reflect(
-                                self.config.name, 
-                                return_prompt=True, 
-                                structured_tool=self.orchestrator_config.tool_mode
-                            )
-                            reflection_prompts.append(reflect_prompt)
-                            agents_with_observations.append(agent)
-                    
-                    if reflection_prompts:
-                        reflections = await self.cognitive_processor.run_parallel_reflect(
-                            agents_with_observations, 
-                            self.config.name
+            # Agents reflect on new environment observation
+            self.logger.info(f"Round {round_num}: Agents reflecting on environment changes...")
+            try:
+                reflection_prompts = []
+                agents_with_observations = []
+                
+                for agent in self.agents:
+                    if agent.last_observation and agent.last_observation.observation:
+                        reflect_prompt = await agent.reflect(
+                            self.config.name, 
+                            return_prompt=True, 
+                            structured_tool=self.orchestrator_config.tool_mode
                         )
-                        
-                        # Log reflections
-                        if reflections:
-                            for agent, reflection in zip(agents_with_observations, reflections):
-                                try:
-                                    content = None
-                                    if reflection and reflection.json_object and reflection.json_object.object:
-                                        content = reflection.json_object.object
-                                    elif reflection and hasattr(reflection, 'str_content'):
-                                        content = reflection.str_content
+                        reflection_prompts.append(reflect_prompt)
+                        agents_with_observations.append(agent)
+                
+                if reflection_prompts:
+                    reflections = await self.cognitive_processor.run_parallel_reflect(
+                        agents_with_observations, 
+                        self.config.name
+                    )
+                    
+                    # Log reflections
+                    if reflections:
+                        for agent, reflection in zip(agents_with_observations, reflections):
+                            try:
+                                content = None
+                                if reflection and reflection.json_object and reflection.json_object.object:
+                                    content = reflection.json_object.object
+                                elif reflection and hasattr(reflection, 'str_content'):
+                                    content = reflection.str_content
 
-                                    if content:
-                                        # Store reflection in agent's state
-                                        agent.last_reflection = content
-                                        # Log the reflection
-                                        log_reflection(self.logger, agent.index, content)
-                                    else:
-                                        self.logger.warning(f"No reflection content for agent {agent.index}")
-                                except Exception as e:
-                                    self.logger.error(f"Error processing reflection for agent {agent.id}: {str(e)}")
-                        else:
-                            self.logger.warning("No reflections received from agents")
+                                if content:
+                                    # Store reflection in agent's state
+                                    agent.last_reflection = content
+                                    # Log the reflection
+                                    log_reflection(self.logger, agent.index, content)
+                                else:
+                                    self.logger.warning(f"No reflection content for agent {agent.index}")
+                            except Exception as e:
+                                self.logger.error(f"Error processing reflection for agent {agent.id}: {str(e)}")
                     else:
-                        self.logger.warning("No agents had observations to reflect on")
+                        self.logger.warning("No reflections received from agents")
+                else:
+                    self.logger.warning("No agents had observations to reflect on")
 
-                except Exception as e:
-                    self.logger.error(f"Error during reflection step: {str(e)}", exc_info=True)
-                    self.logger.exception("Reflection step failed but continuing...")
+            except Exception as e:
+                self.logger.error(f"Error during reflection step: {str(e)}", exc_info=True)
+                self.logger.exception("Reflection step failed but continuing...")
 
-                self.logger.info(f"Round {round_num} complete.\n")
+            self.logger.info(f"Round {round_num} complete.\n")
 
             # Process results and store in database
             await self.process_round_results(round_num, step_result)
@@ -239,7 +259,7 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
         """
         self.logger.info(f"Processing results for round {round_num}...")
 
-        # Insert environment step data - removed 'tracker' parameter
+        # Insert environment step data
         await self.data_inserter.insert_round_data(
             round_num=round_num,
             agents=self.agents,

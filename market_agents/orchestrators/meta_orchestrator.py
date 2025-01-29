@@ -102,14 +102,17 @@ class MetaOrchestrator:
             self.environment_orchestrators[env_name] = orchestrator
             self.logger.info(f"Initialized {orchestrator_class.__name__} for environment '{env_name}'")
 
-    async def run_simulation(self):
+    async def run_orchestration(self):
         """
         Main simulation loop:
-         - Setup environments
-         - For each round: run each environment in order
-         - Print summaries
+        - Setup environments
+        - For each round: run each environment in order
+        - Print summaries
         """
         self._initialize_environment_orchestrators()
+
+        # Store initial agent states once at the beginning
+        await self._store_agent_states()
 
         # Setup step
         for env_name, orch in self.environment_orchestrators.items():
@@ -138,6 +141,31 @@ class MetaOrchestrator:
             if orch:
                 await orch.print_summary()
 
+    async def _store_agent_states(self):
+        """Store or update agent states including economic data."""
+        try:
+            agents_data = []
+            for agent in self.agents:
+                agent_data = {
+                    'id': agent.id,
+                    'role': getattr(agent, 'role', 'default'),
+                    'persona': getattr(agent, 'persona', {}),
+                    'is_llm': getattr(agent, 'use_llm', True),
+                    'max_iter': getattr(agent, 'max_iter', 0),
+                    'llm_config': agent.llm_config.model_dump() if hasattr(agent.llm_config, 'model_dump') 
+                                else agent.llm_config,
+                    'economic_agent': agent.economic_agent.serialize() if agent.economic_agent else {}
+                }
+                agents_data.append(agent_data)
+
+            await self.data_inserter.insert_agents(agents_data)
+            self.logger.info(f"Stored states for {len(agents_data)} agents")
+
+        except Exception as e:
+            self.logger.error(f"Error storing agent states: {e}")
+            self.logger.exception("Exception details:")
+            raise
+
     async def _setup_tables(self):
         """Initialize database tables"""
         try:
@@ -156,7 +184,7 @@ class MetaOrchestrator:
             await self._setup_tables()
             
             # Run simulation
-            await self.run_simulation()
+            await self.run_orchestration()
             log_completion(self.logger, "Simulation completed successfully")
         finally:
             await self.db.close()

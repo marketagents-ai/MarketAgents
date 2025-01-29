@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from market_agents.environments.environment import MultiAgentEnvironment
@@ -353,14 +353,16 @@ class GroupChatOrchestrator:
                     api_tasks.append(api_task)
 
                     messages_to_insert.append({
-                        'message_id': str(uuid.uuid4()),
-                        'agent_id': str(agent.id),
+                        'agent_id': agent.id,
+                        'environment_name': self.config.name,
                         'round': round_num,
                         'sub_round': sub_round_num,
                         'cohort_id': cohort_id,
                         'content': content,
-                        'timestamp': datetime.now(),
-                        'topic': topic
+                        'timestamp': datetime.now(timezone.utc),
+                        'topic': topic,
+                        'message_id': str(uuid.uuid4()),
+                        'type': 'group_chat_message'
                     })
 
                     # Update agent state and log
@@ -371,22 +373,12 @@ class GroupChatOrchestrator:
 
             # Execute API posts in parallel
             await asyncio.gather(*api_tasks)
-            agents_data = [
-                {
-                    'id': str(agent.id),
-                    'role': agent.role,
-                    'is_llm': agent.use_llm,
-                    'max_iter': self.config.max_rounds,
-                    'llm_config': agent.llm_config if isinstance(agent.llm_config, dict) else agent.llm_config.dict()
-                }
-                for agent in cohort_agents
-            ]
-            
-            # Get agent ID mappings
-            agent_id_map = self.data_inserter.insert_agents(agents_data)
             # Insert messages into database
             if messages_to_insert:
-                self.data_inserter.insert_groupchat_messages(messages_to_insert, round_num, agent_id_map)
+                await self.data_inserter.insert_actions(
+                    actions_data=messages_to_insert,
+                    agent_id_map={str(agent.id): agent.id for agent in cohort_agents}
+                )
 
         except Exception as e:
             self.logger.warning(f"Error during data insertion in sub-round {sub_round_num} for cohort {cohort_id}: {e}")
