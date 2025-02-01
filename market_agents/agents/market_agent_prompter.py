@@ -1,103 +1,87 @@
-import json
-from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional, Union
-import yaml
-import os
+from typing import Dict, Any, Optional, List
+from pydantic import Field
+from pathlib import Path
 
-class AgentPromptVariables(BaseModel):
-    environment_name: str
-    environment_info: Any
-    short_term_memory: Optional[List[Dict[str, Any]]] = None
-    long_term_memory: Optional[List[Dict[str, Any]]] = None
-    documents: Optional[List[Dict[str, Any]]] = None
-    perception: Optional[Any] = None
-    observation: Optional[Any] = None
-    action_space: Dict[str, Any] = Field(default_factory=dict)
-    last_action: Optional[Any] = None
-    reward: Optional[float] = None
-    previous_strategy: Optional[str] = None
+from market_agents.agents.base_agent.prompter import (
+    BasePromptVariables,
+    BasePromptTemplate,
+    PromptManager
+)
 
-class MarketAgentPromptManager(BaseModel):
-    prompts: Dict[str, str] = Field(default_factory=dict)
-    prompt_file: str = Field(default="market_agents/agents/configs/prompts/market_agent_prompt.yaml")
+class MarketAgentPromptVariables(BasePromptVariables):
+    """Variables specific to market agent prompts."""
+    environment_name: str = Field(
+        ...,
+        description="Name of the market environment")
+    environment_info: Any = Field(
+        ...,
+        description="Information about the market environment")
+    short_term_memory: Optional[List[Dict[str, Any]]] = Field(
+        default=None, 
+        description="Recent observations and actions"
+    )
+    long_term_memory: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Historical market data and patterns"
+    )
+    documents: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Reference documents and market analysis"
+    )
+    perception: Optional[Any] = Field(
+        default=None,
+        description="Current market perception"
+    )
+    observation: Optional[Any] = Field(
+        default=None,
+        description="Latest market observation"
+    )
+    action_space: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Available market actions"
+    )
+    last_action: Optional[Any] = Field(
+        default=None,
+        description="Previously taken action"
+    )
+    reward: Optional[float] = Field(
+        default=None,
+        description="Reward from last action"
+    )
+    previous_strategy: Optional[str] = Field(
+        default=None,
+        description="Previously used trading strategy"
+    )
 
-    def __init__(self, **data: Any):
-        super().__init__(**data)
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(script_dir))
-        full_path = os.path.join(project_root, self.prompt_file)
-        
-        try:
-            with open(full_path, 'r') as file:
-                self.prompts = yaml.safe_load(file)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Prompt file not found: {full_path}")
-        
-    def format_prompt(self, prompt_type: str, variables: Dict[str, Any]) -> str:
-        if prompt_type not in self.prompts:
-            raise ValueError(f"Unknown prompt type: {prompt_type}")
-        
-        # Convert empty values to N/A and format JSON/dict values as markdown
-        formatted_vars = {}
-        for key, value in variables.items():
-            if value is None:
-                formatted_vars[key] = "N/A"
-            elif isinstance(value, (dict, list)):
-                # Always format collections, even if empty
-                formatted = self.json_to_markdown(value).strip()
-                formatted_vars[key] = formatted if formatted else "No entries"
-            else:
-                formatted_vars[key] = str(value) if value else "N/A"
-        
-        try:
-            return self.prompts[prompt_type].format(**formatted_vars)
-        except KeyError as e:
-            raise KeyError(f"Missing required variable in prompt: {e}")
-        except Exception as e:
-            raise ValueError(f"Error formatting prompt: {e}")
+    class Config:
+        arbitrary_types_allowed = True
+
+class MarketAgentPromptTemplate(BasePromptTemplate):
+    """Template loader for market agent prompts."""
+    template_path: Path = Field(
+        default=Path("configs/prompts/market_agent_prompt.yaml"),
+        description="Path to market agent prompt templates"
+    )
+
+class MarketAgentPromptManager(PromptManager):
+    """Manages prompts for market agents with specialized template handling."""
+    
+    def __init__(self, template_path: Optional[Path] = None):
+        self.template = MarketAgentPromptTemplate(
+            template_path=template_path if template_path else Path("configs/prompts/market_agent_prompt.yaml")
+        )
 
     def get_perception_prompt(self, variables: Dict[str, Any]) -> str:
-        return self.format_prompt('perception', variables)
+        """Generate perception analysis prompt."""
+        vars_model = MarketAgentPromptVariables(**variables)
+        return self.template.format_prompt('perception', vars_model)
 
     def get_action_prompt(self, variables: Dict[str, Any]) -> str:
-        return self.format_prompt('action', variables)
+        """Generate action selection prompt."""
+        vars_model = MarketAgentPromptVariables(**variables)
+        return self.template.format_prompt('action', vars_model)
 
     def get_reflection_prompt(self, variables: Dict[str, Any]) -> str:
-        return self.format_prompt('reflection', variables)
-    
-    def json_to_markdown(self, data: Union[Dict, List, Any], indent: int = 0) -> str:
-        """Convert JSON/dict data to a markdown formatted string."""
-        if data is None:
-            return "None"
-        
-        if isinstance(data, str):
-            # Clean up newlines and escape characters for markdown compatibility
-            return data.replace('\\n', '\n').replace('\\', '')
-        
-        if isinstance(data, (int, float, bool)):
-            return str(data)
-        
-        indent_str = "  " * indent
-        if isinstance(data, list):
-            if not data:
-                return "None"
-            markdown = ""
-            for item in data:
-                item_str = self.json_to_markdown(item, indent + 1)
-                markdown += f"{indent_str}- {item_str}\n"
-            return markdown.rstrip()
-        
-        if isinstance(data, dict):
-            if not data:
-                return "None"
-            markdown = ""
-            for key, value in data.items():
-                value_str = self.json_to_markdown(value, indent + 1)
-                if isinstance(value, (dict, list)) and value:
-                    markdown += f"{indent_str}{key}:\n{value_str}\n"
-                else:
-                    markdown += f"{indent_str}{key}: {value_str}\n"
-            return markdown.rstrip()
-        
-        # For any other types, convert to string
-        return str(data)
+        """Generate strategy reflection prompt."""
+        vars_model = MarketAgentPromptVariables(**variables)
+        return self.template.format_prompt('reflection', vars_model)
