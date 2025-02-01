@@ -1,7 +1,7 @@
 pydantic==2.8.2
 pydantic-settings==2.5.2
 psycopg2==2.9.10
-anthropic==0.34.1
+anthropic==0.45.2
 openai==1.42.0
 python-dotenv==1.0.1
 colorama==0.4.6
@@ -23,3 +23,4 @@ asyncpg~=0.29.0
 matplotlib~=3.9.2
 pytest~=7.4.4
 pytest-asyncio~=0.21.2
+jsonschema==4.23.0
