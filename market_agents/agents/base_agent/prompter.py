@@ -55,9 +55,9 @@ class TaskPromptVariables(BasePromptVariables):
 class BasePromptTemplate(BaseSettings):
     """Base class for loading and managing prompt templates."""
     
-    template_path: Path = Field(
-        default=Path("configs/prompts/default_prompt.yaml"),
-        description="Path to the YAML template file."
+    template_paths: List[Path] = Field(
+        default_factory=lambda: [Path("market_agents/agents/configs/prompts/default_prompt.yaml")],
+        description="Paths to the YAML template files."
     )
     templates: Dict[str, str] = Field(
         default_factory=dict,
@@ -70,34 +70,41 @@ class BasePromptTemplate(BaseSettings):
     )
     
     def model_post_init(self, _) -> None:
-        """Load templates after initialization."""
-        try:
-            with open(self.template_path) as f:
-                self.templates = yaml.safe_load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Prompt template file not found: {self.template_path}")
+        """Load and merge templates from all template paths."""
+        self.templates = {}
+        for path in self.template_paths:
+            try:
+                with open(path) as f:
+                    new_templates = yaml.safe_load(f)
+                    if new_templates:
+                        self.templates.update(new_templates)
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Prompt template file not found: {path}")
 
     def format_prompt(self, prompt_type: str, variables: BasePromptVariables) -> str:
         """Format a specific prompt type with variables."""
+        if not self.templates:
+            raise ValueError("No templates loaded. Check template file path and contents.")
+            
         if prompt_type not in self.templates:
-            raise ValueError(f"Unknown prompt type: {prompt_type}")
+            raise ValueError(f"Unknown prompt type: {prompt_type}. Available types: {list(self.templates.keys())}")
         
         template = self.templates[prompt_type]
         return template.format(**variables.get_template_vars())
 
 class PromptTemplate(BasePromptTemplate):
     """Template loader for default agent prompts."""
-    template_path: Path = Field(
-        default=Path("configs/prompts/default_prompt.yaml"),
+    template_paths: List[Path] = Field(
+        default_factory=lambda: [Path("market_agents/agents/configs/prompts/default_prompt.yaml")],
         description="Default path to prompt template file."
     )
     
 class PromptManager:
     """Manages prompts for agents with template-based generation."""
     
-    def __init__(self, template_path: Optional[Path] = None):
+    def __init__(self, template_paths: Optional[List[Path]] = None):
         self.template = PromptTemplate(
-            template_path=template_path if template_path else Path("market_agents/agents/configs/prompts/default_prompt.yaml")
+            template_paths=template_paths if template_paths else [Path("market_agents/agents/configs/prompts/default_prompt.yaml")]
         )
 
     def get_system_prompt(self, variables: Dict[str, Any]) -> str:

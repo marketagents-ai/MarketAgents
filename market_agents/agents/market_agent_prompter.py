@@ -59,17 +59,19 @@ class MarketAgentPromptVariables(BasePromptVariables):
 class MarketAgentPromptTemplate(BasePromptTemplate):
     """Template loader for market agent prompts."""
     template_path: Path = Field(
-        default=Path("configs/prompts/market_agent_prompt.yaml"),
+        default=Path("market_agents/agents/configs/prompts/market_agent_prompt.yaml"),
         description="Path to market agent prompt templates"
     )
 
 class MarketAgentPromptManager(PromptManager):
     """Manages prompts for market agents with specialized template handling."""
     
-    def __init__(self, template_path: Optional[Path] = None):
-        self.template = MarketAgentPromptTemplate(
-            template_path=template_path if template_path else Path("configs/prompts/market_agent_prompt.yaml")
-        )
+    def __init__(self, template_paths: Optional[List[Path]] = None):
+        default_paths = [
+            Path("market_agents/agents/configs/prompts/default_prompt.yaml"),
+            Path("market_agents/agents/configs/prompts/market_agent_prompt.yaml")
+        ]
+        super().__init__(template_paths=template_paths if template_paths else default_paths)
 
     def get_perception_prompt(self, variables: Dict[str, Any]) -> str:
         """Generate perception analysis prompt."""
