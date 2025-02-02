@@ -24,3 +24,5 @@ matplotlib~=3.9.2
 pytest~=7.4.4
 pytest-asyncio~=0.21.2
 jsonschema==4.23.0
+asyncpg==0.30.0
+eth_account==0.13.4
