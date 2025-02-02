@@ -13,12 +13,14 @@ from market_agents.agents.cognitive_steps import (
 from market_agents.agents.market_agent_prompter import MarketAgentPromptManager
 from market_agents.agents.personas.persona import Persona
 from market_agents.economics.econ_agent import EconomicAgent
-from market_agents.inference.message_models import LLMConfig
+from minference.lite.models import LLMConfig
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
 from market_agents.memory.memory import LongTermMemory, MemoryObject, ShortTermMemory
 from market_agents.environments.environment import LocalObservation, MultiAgentEnvironment
 from market_agents.agents.protocols.protocol import Protocol
+from market_agents.verbal_rl.rl_agent import VerbalRLAgent
+from market_agents.verbal_rl.rl_models import BaseRewardFunction
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +67,17 @@ class MarketAgent(Agent):
         default="",
         description="Agent's address for communication purposes"
     )
+    knowledge_agent: Optional[KnowledgeBaseAgent] = Field(
+        default=None,
+        description="Knowledge base agent for accessing external information"
+    )
     economic_agent: Optional[EconomicAgent] = Field(
         default=None,
         description="Economic agent component for market interactions"
     )
-    knowledge_agent: Optional[KnowledgeBaseAgent] = Field(
-        default=None,
-        description="Knowledge base agent for accessing external information"
+    rl_agent: VerbalRLAgent = Field(
+        default_factory=VerbalRLAgent,
+        description="Verbal RL subsystem for learning & adaption"
     )
     prompt_manager: MarketAgentPromptManager = Field(
         default_factory=MarketAgentPromptManager,
@@ -89,7 +95,8 @@ class MarketAgent(Agent):
         protocol: Optional[Type[Protocol]] = None,
         persona: Optional[Persona] = None,
         econ_agent: Optional[EconomicAgent] = None,
-        knowledge_agent: Optional[KnowledgeBaseAgent] = None
+        knowledge_agent: Optional[KnowledgeBaseAgent] = None,
+        reward_function: Optional[BaseRewardFunction] = None,
     ) -> 'MarketAgent':
         stm = ShortTermMemory(
             agent_id=agent_id,
@@ -116,7 +123,8 @@ class MarketAgent(Agent):
             address=f"agent_{agent_id}_address",
             use_llm=use_llm,
             economic_agent=econ_agent,
-            knowledge_agent=knowledge_agent
+            knowledge_agent=knowledge_agent,
+            rl_agent=VerbalRLAgent(reward_function=reward_function) if reward_function else VerbalRLAgent()
         )
 
         if agent.economic_agent:
@@ -125,11 +133,9 @@ class MarketAgent(Agent):
         if agent.knowledge_agent:
             agent.knowledge_agent.id = agent_id
 
-        await agent._init_chat_thread()
-
         return agent
     
-    async def cognitive_step(
+    async def run_step(
         self,
         step: Optional[Union[CognitiveStep, Type[CognitiveStep]]] = None,
         environment_name: Optional[str] = None,
@@ -181,7 +187,7 @@ class MarketAgent(Agent):
         Run a complete cognitive episode.
         
         Args:
-            episode: CognitiveEpisode instance (defaults to Perception->Action->Reflection)
+            episode: CognitiveEpisode instance (defaults to Perception->Action[Observation]->Reflection)
             environment_name: Optional environment to use
             **kwargs: Additional parameters passed to each step
         """
@@ -195,7 +201,7 @@ class MarketAgent(Agent):
 
         results = []
         for step_class in episode.steps:
-            result = await self.cognitive_step(
+            result = await self.run_step(
                 step=step_class,
                 environment_name=episode.environment_name,
                 **kwargs
