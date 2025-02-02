@@ -6,9 +6,9 @@ import asyncio
 from pydantic import BaseModel, Field
 
 from market_agents.agents.cognitive_schemas import PerceptionSchema, ReflectionSchema
-from market_agents.agents.market_agent import MarketAgent
 from market_agents.memory.memory import MemoryObject
 from market_agents.agents.market_agent_prompter import MarketAgentPromptVariables
+from market_agents.verbal_rl.rl_models import RLExperience
 
 class CognitiveStep(BaseModel):
     """Base class for cognitive steps in the market agent's cognitive cycle."""
@@ -38,7 +38,7 @@ class CognitiveStep(BaseModel):
         description="Whether to return the prompt instead of executing"
     )
 
-    async def execute(self, agent: 'MarketAgent') -> Union[str, Dict[str, Any]]:
+    async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
         """Execute the cognitive step and return the result."""
         raise NotImplementedError
 
@@ -79,7 +79,7 @@ class CognitiveEpisode(BaseModel):
 class PerceptionStep(CognitiveStep):
     step_name: str = "perception"
 
-    async def execute(self, agent: 'MarketAgent') -> Union[str, Dict[str, Any]]:
+    async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
         stm_cognitive = await agent.short_term_memory.retrieve_recent_memories(limit=10)
         short_term_memories = [
             {"cognitive_step": mem.cognitive_step, "content": mem.content, "metadata": mem.metadata}
@@ -149,7 +149,7 @@ class ActionStep(CognitiveStep):
         description="Schema for structured action output"
     )
 
-    async def execute(self, agent: 'MarketAgent') -> Union[str, Dict[str, Any]]:
+    async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
         environment = agent.environments[self.environment_name]
         action_space = environment.action_space
         
@@ -164,7 +164,7 @@ class ActionStep(CognitiveStep):
         variables = MarketAgentPromptVariables(
             environment_name=self.environment_name,
             environment_info=self.environment_info,
-            perception=agent.last_perception,  # Using stored perception
+            perception=agent.last_perception,
             action_space=serialized_action_space,
             last_action=agent.last_action,
             observation=agent.last_observation
@@ -201,33 +201,18 @@ class ActionStep(CognitiveStep):
 
 class ReflectionStep(CognitiveStep):
     step_name: str = "reflection"
-    environment_reward_weight: float = Field(
-        default=0.5,
-        description="Weight for environment reward in total reward calculation"
-    )
-    self_reward_weight: float = Field(
-        default=0.5,
-        description="Weight for self-assigned reward in total reward calculation"
-    )
 
-    async def execute(self, agent: 'MarketAgent') -> Union[str, Dict[str, Any]]:
-        total_weight = self.environment_reward_weight + self.self_reward_weight
-        if total_weight == 0:
-            raise ValueError("Sum of weights must not be zero.")
-        
-        environment_reward_weight = self.environment_reward_weight / total_weight
-        self_reward_weight = self.self_reward_weight / total_weight
-
+    async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
         environment = agent.environments[self.environment_name]
         last_step = environment.history.steps[-1][1] if environment.history.steps else None
 
         if last_step:
-            reward = last_step.info.get('agent_rewards', {}).get(self.agent_id, 0.0) or 0.0
+            environment_reward = last_step.info.get('agent_rewards', {}).get(self.agent_id, 0.0) or 0.0
             local_observation = last_step.global_observation.observations.get(self.agent_id)
             observation = local_observation.observation if local_observation else {}
         else:
             observation = {}
-            reward = 0.0
+            environment_reward = 0.0
 
         previous_strategy = "No previous strategy available"
         try:
@@ -248,7 +233,7 @@ class ReflectionStep(CognitiveStep):
             environment_info=self.environment_info,
             observation=observation,
             last_action=agent.last_action,
-            reward=reward,
+            reward=environment_reward,
             previous_strategy=previous_strategy,
             perception=agent.last_perception
         )
@@ -266,48 +251,52 @@ class ReflectionStep(CognitiveStep):
         result = await agent.execute()
         
         if isinstance(result, dict):
-            self_reward = result.get("self_reward", 0.0)
-            environment_reward = reward
-            normalized_environment_reward = max(
-                0.0,
-                min(environment_reward / (1 + abs(environment_reward)), 1.0)
+            reward_data = await agent.rl_agent.reward_function.compute(
+                environment_reward=environment_reward,
+                reflection_data=result,
+                economic_value=agent.economic_agent.get_portfolio_value() if agent.economic_agent else None
             )
-
-            total_reward_val = (
-                normalized_environment_reward * environment_reward_weight +
-                self_reward * self_reward_weight
+            
+            await agent.rl_agent.store_experience(
+                market_agent=agent,
+                state=agent._current_state_representation(),
+                action=agent.last_action,
+                reward=reward_data["total_reward"],
+                next_state=agent._next_state_representation()
             )
+            
+            agent.rl_agent.update_policy(reward_data["total_reward"])
 
             await self.store_memory(
                 agent,
                 content=result.get("reflection", ""),
                 metadata={
-                    "total_reward": round(total_reward_val, 4),
-                    "self_reward": round(self_reward, 4),
-                    "observation": observation,
+                    **reward_data,
+                    "last_action": agent.last_action,
+                    "observation": agent.last_observation,
+                    "self_critique": result.get("self_critique", []),
                     "strategy_update": result.get("strategy_update", ""),
-                    "environment_reward": round(environment_reward, 4),
-                    "environment_name": self.environment_name,
-                    "environment_info": self.environment_info,
-                    "perception": agent.last_perception
+                    "self_reward": result.get("self_reward", 0.0)
                 }
             )
 
-            task_str = f"Task: {agent.task}" if agent.task else ""
-            env_state_str = f"Environment state: {str(self.environment_info)}"
-            agent_state = f"Agent state: {str(agent.last_action)} {str(agent.last_observation)}"
-            query_str = (task_str + "\n" + env_state_str + "\n" + agent_state).strip()
+            agent.rl_agent.last_experience = RLExperience(
+                state=agent.last_perception,
+                action=agent.last_action,
+                next_state=agent.last_observation,
+                reward_data=reward_data,
+                exploration_rate=agent.rl_agent.policy["exploration_rate"],
+                timestamp=datetime.now(timezone.utc)
+            )
             
             await agent.long_term_memory.store_episode(
-                task_query=query_str,
+                task_query=self._create_task_query(agent),
                 steps=agent.episode_steps,
-                total_reward=round(total_reward_val, 4),
+                total_reward=reward_data["total_reward"],
                 strategy_update=result.get("strategy_update", ""),
                 metadata={
-                    "environment_name": self.environment_name,
-                    "final_observation": observation,
-                    "final_action": agent.last_action,
-                    "final_perception": agent.last_perception
+                    "environemnt_state": self.environment_info,
+                    "environment_name": self.environment_name
                 }
             )
             agent.episode_steps.clear()
