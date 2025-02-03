@@ -34,7 +34,7 @@ class Agent(BaseModel):
         default=None,
         description="Additional persona or background info for the agent."
     )
-    objectives: Optional[str] = Field(
+    objectives: Optional[List[str]] = Field(
         default=None,
         description="High-level goals or objectives for the agent."
     )
@@ -137,8 +137,6 @@ class Agent(BaseModel):
         Returns either plain text (if LLM not forced to structured output)
         or a JSON object if the LLM yields a parsed structure.
         """
-        self._refresh_prompts()
-
         if not self.chat_thread:
             raise RuntimeError("No ChatThread is available to run inference.")
 
