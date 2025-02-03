@@ -175,7 +175,11 @@ class MarketAgent(Agent):
             step.agent_id = self.id
         
         logger.info(f"Executing cognitive step: {step.step_name}")
-        return await step.execute(self)
+        result = await step.execute(self)
+
+        self._refresh_prompts()
+
+        return result
 
     async def run_episode(
         self,
@@ -191,6 +195,8 @@ class MarketAgent(Agent):
             environment_name: Optional environment to use
             **kwargs: Additional parameters passed to each step
         """
+        self._refresh_prompts()
+        
         if episode is None:
             episode = CognitiveEpisode(
                 steps=[PerceptionStep, ActionStep, ReflectionStep],
