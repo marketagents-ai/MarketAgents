@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional, List
+import importlib.resources as ires
 from pydantic import Field
 from pathlib import Path
 
@@ -59,7 +60,7 @@ class MarketAgentPromptVariables(BasePromptVariables):
 class MarketAgentPromptTemplate(BasePromptTemplate):
     """Template loader for market agent prompts."""
     template_path: Path = Field(
-        default=Path("market_agents/agents/configs/prompts/market_agent_prompt.yaml"),
+        default_factory=lambda: Path(ires.files("market_agents.agents.configs.prompts") / "market_agent_prompt.yaml"),
         description="Path to market agent prompt templates"
     )
 
@@ -68,8 +69,8 @@ class MarketAgentPromptManager(PromptManager):
     
     def __init__(self, template_paths: Optional[List[Path]] = None):
         default_paths = [
-            Path("market_agents/agents/configs/prompts/default_prompt.yaml"),
-            Path("market_agents/agents/configs/prompts/market_agent_prompt.yaml")
+            Path(ires.files("market_agents.agents.configs.prompts") / "default_prompt.yaml"),
+            Path(ires.files("market_agents.agents.configs.prompts") / "market_agent_prompt.yaml")
         ]
         super().__init__(template_paths=template_paths if template_paths else default_paths)
 

@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import yaml
+import importlib.resources as ires
 
 class BasePromptVariables(BaseModel):
     """Base class for prompt variables with common utility methods."""
@@ -31,7 +32,7 @@ class SystemPromptVariables(BasePromptVariables):
     persona: Optional[str] = Field(
         default=None,
         description="Agent's persona")
-    objectives: Optional[str] = Field(
+    objectives: Optional[List[str]] = Field(
         default=None,
         description="Agent's objectives")
     datetime: str = Field(
@@ -56,7 +57,9 @@ class BasePromptTemplate(BaseSettings):
     """Base class for loading and managing prompt templates."""
     
     template_paths: List[Path] = Field(
-        default_factory=lambda: [Path("market_agents/agents/configs/prompts/default_prompt.yaml")],
+        default_factory=lambda: [
+            Path(ires.files("market_agents.agents.configs.prompts") / "default_prompt.yaml")
+        ],
         description="Paths to the YAML template files."
     )
     templates: Dict[str, str] = Field(
@@ -95,7 +98,9 @@ class BasePromptTemplate(BaseSettings):
 class PromptTemplate(BasePromptTemplate):
     """Template loader for default agent prompts."""
     template_paths: List[Path] = Field(
-        default_factory=lambda: [Path("market_agents/agents/configs/prompts/default_prompt.yaml")],
+        default_factory=lambda: [
+            Path(ires.files("market_agents.agents.configs.prompts") / "default_prompt.yaml")
+        ],
         description="Default path to prompt template file."
     )
     
@@ -104,7 +109,9 @@ class PromptManager:
     
     def __init__(self, template_paths: Optional[List[Path]] = None):
         self.template = PromptTemplate(
-            template_paths=template_paths if template_paths else [Path("market_agents/agents/configs/prompts/default_prompt.yaml")]
+            template_paths=template_paths if template_paths else [
+                Path(ires.files("market_agents.agents.configs.prompts") / "default_prompt.yaml")
+            ]
         )
 
     def get_system_prompt(self, variables: Dict[str, Any]) -> str:
