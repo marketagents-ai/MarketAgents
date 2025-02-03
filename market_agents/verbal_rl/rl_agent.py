@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Dict, Optional, Any
 from pydantic import BaseModel, Field, ConfigDict
 import logging
@@ -32,15 +33,18 @@ class VerbalRLAgent(BaseModel):
         self,
         state: Dict[str, Any],
         action: Dict[str, Any],
-        reward: float,
-        next_state: Dict[str, Any]
+        reward_data: Dict[str, Any],
+        next_state: Dict[str, Any],
+        exploration_rate: float,
+        created_at: datetime
     ) -> None:
         """Store experience in both short-term and long-term memory"""
         experience = RLExperience(
             state=state,
             action=action,
-            reward=reward,
+            reward_data=reward_data,
             next_state=next_state,
-            metadata={}
+            exploration_rate=exploration_rate,
+            timestamp=created_at
         )           
         self.last_experience = experience

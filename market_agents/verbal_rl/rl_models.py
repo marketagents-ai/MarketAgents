@@ -40,7 +40,7 @@ class BaseRewardFunction(BaseModel):
         
         composite = (
             (environment_reward or 0.0) * self.environment_weight +
-            self_reward * self.self_assessment_weight
+            self_reward * self.self_eval_weight
         )
         
         if economic_value is not None:
