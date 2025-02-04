@@ -53,8 +53,8 @@ def json_to_markdown(data: dict) -> str:
         markdown += "\n"
     return markdown
 
-def log_persona(logger: logging.Logger, agent_index: int, persona: str):
-    header = f"[bold yellow]🎭 Agent {agent_index:02d} persona:[/bold yellow]\n"
+def log_persona(logger: logging.Logger, agent_id: int, persona: str):
+    header = f"[bold yellow]🎭 Agent {agent_id} persona:[/bold yellow]\n"
     text = Text.from_markup(header)
     text.append(persona)
     panel = Panel(
@@ -123,9 +123,9 @@ def log_section(logger: logging.Logger, message: str):
     logger.info(f"[yellow]🔥 {message.upper()} 🔥[/yellow]")
     logger.info(f"[magenta]{border}[/magenta]")
 
-def log_round(logger: logging.Logger, round_num: int):
+def log_round(logger: logging.Logger, round_num: int, environment_name: str):
     logger.info(f"[green]🔔 ROUND {round_num:02d} BEGINS 🔔[/green]")
-    logger.info(f"[cyan]🎲 Let the market dynamics unfold! 🎲[/cyan]")
+    logger.info(f"[cyan]🎲 Environment: {environment_name}. Let the market dynamics unfold! 🎲[/cyan]")
 
 def log_agent_init(logger: logging.Logger, agent_id: int, is_buyer: bool, persona):
     agent_type = "🛒 Buyer" if is_buyer else "💼 Seller"

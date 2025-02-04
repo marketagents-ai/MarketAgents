@@ -2,11 +2,11 @@
 set -e
 
 # Print ASCII art from logger_utils
-echo "Printing ASCII art..."
+echo "MarketAgents Swarm Initializing..."
 python -c "from market_agents.orchestrators.logger_utils import print_ascii_art; print_ascii_art()"
 
 # Start the Dashboard API
-echo "Starting Dashboard API..."
+echo "Starting MarketAgents Dashboard API..."
 python market_agents/agents/db/dashboard/dashboard.py &
 
 # Build and start the Docker containers for PostgreSQL

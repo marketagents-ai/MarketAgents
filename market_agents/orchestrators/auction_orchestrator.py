@@ -33,7 +33,7 @@ from market_agents.orchestrators.logger_utils import (
     log_round
 )
 from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
-from market_agents.orchestrators.agent_cognitive import AgentCognitiveProcessor
+from market_agents.orchestrators.parallel_cognitive_steps import AgentCognitiveProcessor
 
 # Define AuctionTracker for tracking auction-specific data
 class AuctionTracker:

@@ -18,7 +18,7 @@ from market_agents.orchestrators.logger_utils import (
 from market_agents.memory.agent_storage.storage_service import StorageService
 from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
 from market_agents.orchestrators.group_chat.groupchat_api_utils import GroupChatAPIUtils
-from market_agents.orchestrators.agent_cognitive import AgentCognitiveProcessor
+from market_agents.orchestrators.parallel_cognitive_steps import ParallelCognitiveProcessor
 
 class GroupChatOrchestrator:
     def __init__(
@@ -45,7 +45,7 @@ class GroupChatOrchestrator:
         self.api_utils = GroupChatAPIUtils(self.config.api_url, self.logger)
 
         # Initialize cognitive processor with storage service
-        self.cognitive_processor = AgentCognitiveProcessor(
+        self.cognitive_processor = ParallelCognitiveProcessor(
             ai_utils=ai_utils,
             storage_service=storage_service,
             logger=self.logger,
