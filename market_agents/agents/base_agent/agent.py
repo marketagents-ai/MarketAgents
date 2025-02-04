@@ -1,223 +1,153 @@
 import uuid
-import json
 import logging
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Type, Union
-
-from market_agents.agents.tool_caller.engine import Engine
+from typing import Optional, List, Union, Dict, Any
 from pydantic import BaseModel, Field
-from tenacity import retry, stop_after_attempt, wait_random_exponential
 
-from market_agents.inference.parallel_inference import ParallelAIUtilities
-from market_agents.inference.message_models import StructuredTool, LLMConfig, LLMPromptContext, LLMOutput
+from minference.lite.models import (
+    ChatThread,
+    SystemPrompt,
+    LLMConfig,
+    ProcessedOutput,
+    CallableTool,
+    StructuredTool
+)
+from minference.lite.inference import InferenceOrchestrator
+
 from market_agents.agents.base_agent.prompter import PromptManager
-from market_agents.agents.base_agent.utils import extract_json_from_response
-from market_agents.agents.base_agent.schemas import *
 
 agent_logger = logging.getLogger(__name__)
 
-
 class Agent(BaseModel):
-    """Base class for all agents in the multi-agent system.
-
-    Attributes:
-        id (str): Unique identifier for the agent.
-        role (str): Role of the agent in the system.
-        persona(str): Personal characteristics of the agent.
-        system (Optional[str]): System instructions for the agent.
-        task (Optional[str]): Current task assigned to the agent.
-        tools (Optional[Dict[str, Any]]): Tools available to the agent.
-        output_format (Optional[Union[Dict[str, Any], str]]): Expected output format.
-        llm_config (LLMConfig): Configuration for the language model.
-        max_retries (int): Maximum number of retry attempts for AI inference.
-        metadata (Optional[Dict[str, Any]]): Additional metadata for the agent.
-        interactions (List[Dict[str, Any]]): History of agent interactions.
-
-    Methods:
-        execute(task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str]] = None, return_prompt: bool = False) -> Union[str, Dict[str, Any], LLMPromptContext]:
-            Execute a task and return the result or the prompt context.
-        _load_output_schema(output_format: Optional[Union[Dict[str, Any], str]]) -> Optional[Dict[str, Any]]:
-            Load the output schema based on the output_format.
-        _prepare_prompt_context(task: Optional[str], output_format: Optional[Dict[str, Any]]) -> LLMPromptContext:
-            Prepare LLMPromptContext for AI inference.
-        _run_ai_inference(prompt_context: LLMPromptContext) -> Union[str, Dict[str, Any]]:
-            Run AI inference with retry logic.
-        _log_interaction(prompt: LLMPromptContext, response: Union[str, Dict[str, Any]]) -> None:
-            Log an interaction between the agent and the AI.
+    """
+    Base LLM-driven agent using ChatThread-based inference.
     """
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    role: str
-    persona: Optional[str] = None
-    system: Optional[str] = None
-    task: Optional[str] = None
-    tools: Optional[List[Callable]] = None
-    output_format: Optional[Union[Dict[str, Any], str]] = None
-    llm_config: LLMConfig = Field(default_factory=LLMConfig)
-    prompt_context: Optional[LLMPromptContext] = None 
-    max_retries: int = 2
-    metadata: Optional[Dict[str, Any]] = None
-    interactions: List[Dict[str, Any]] = Field(default_factory=list)
+    id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique string identifier for the agent instance."
+    )
+    role: str = Field(
+        ...,
+        description="Functional role of the agent (e.g., 'financial analyst')."
+    )
+    persona: Optional[str] = Field(
+        default=None,
+        description="Additional persona or background info for the agent."
+    )
+    objectives: Optional[List[str]] = Field(
+        default=None,
+        description="High-level goals or objectives for the agent."
+    )
+    task: Optional[str] = Field(
+        default=None,
+        description="Primary tasks or instructions for the agent."
+    )
+    tools: List[Union[CallableTool, StructuredTool]] = Field(
+        default_factory=list,
+        description="List of callable or structured tools the agent can invoke."
+    )
+    llm_config: Optional[LLMConfig] = Field(
+        default=None,
+        description="LLM configuration (model, client, response format, etc.)."
+    )
+    orchestrator: InferenceOrchestrator = Field(
+        default_factory=InferenceOrchestrator,
+        description="Inference orchestrator for parallel LLM requests."
+    )
+    prompt_manager: Optional[PromptManager] = Field(
+        default=None,
+        description="Manages YAML-based prompt assembly for system/user messages."
+    )
+    chat_thread: Optional[ChatThread] = Field(
+        default=None,
+        description="Holds conversation state, system prompt, and message history."
+    )
 
     class Config:
-        extra = "allow"
+        arbitrary_types_allowed = True
 
-    def __init__(self, **data: Any):
+    def __init__(self, **data: Any) -> None:
+        """Initialize the agent and set up ChatThread from the prompt manager."""
         super().__init__(**data)
-        self.ai_utilities = ParallelAIUtilities()
 
-    async def execute(self, task: Optional[str] = None, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None, json_tool: bool = False, return_prompt: bool = False) -> Union[str, Dict[str, Any], LLMPromptContext]:
-        """Execute a task and return the result or the prompt context."""
-        execution_task = task if task is not None else self.task
-        if execution_task is None:
-            raise ValueError("No task provided. Agent needs a task to execute.")
-        
-        execution_output_format = output_format if output_format is not None else self.output_format
-        
-        if execution_output_format == "plain_text":
-            self.llm_config.response_format = "text"
-        elif execution_output_format == "tool":
-            self.llm_config.response_format = "tool"
-        elif json_tool:
-            self.llm_config.response_format = "tool"
-            execution_output_format = self._load_output_schema(execution_output_format)
-        else:
-            self.llm_config.response_format = "structured_output"
-            execution_output_format = self._load_output_schema(execution_output_format)
-
-        self._prepare_prompt_context(
-            execution_task,
-            execution_output_format if isinstance(execution_output_format, dict) else None
-        )
-        
-        #agent_logger.debug(f"Prepared LLMPromptContext:\n{json.dumps(prompt_context.model_dump(), indent=2)}")
-        if return_prompt:
-            return self.prompt_context
-
-        result = await self._run_ai_inference(self.prompt_context)
-        self._log_interaction(self.prompt_context, result)
-        
-        return result
-
-    def _load_output_schema(self, output_format: Optional[Union[Dict[str, Any], str, Type[BaseModel]]] = None) -> Optional[Dict[str, Any]]:
-        """Load the output schema based on the output_format."""
-        if output_format is None:
-            output_format = self.output_format
-
-        if isinstance(output_format, str):
-            try:
-                schema_class = globals().get(output_format)
-                if schema_class and issubclass(schema_class, BaseModel):
-                    return schema_class.model_json_schema()
-                else:
-                    raise ValueError(f"Invalid schema: {output_format}")
-            except (AttributeError, ValueError) as e:
-                agent_logger.warning(f"Could not load schema: {output_format}. Error: {str(e)}")
-                return None
-        elif isinstance(output_format, dict):
-            return output_format
-        elif isinstance(output_format, type) and issubclass(output_format, BaseModel):
-            return output_format.model_json_schema()
-        else:
-            return None
-
-    def _prepare_prompt_context(self, task: Optional[str], output_format: Optional[Dict[str, Any]] = None) -> LLMPromptContext:
-        """Prepare LLMPromptContext for AI inference."""
-        prompt_manager = PromptManager(
-            role=self.role,
-            persona=self.persona,
-            task=task if task is not None else [],
-            resources=None,
-            output_schema=output_format,
-            char_limit=1000
-        )
-
-        prompt_messages = prompt_manager.generate_prompt_messages()
-        system_message = prompt_messages["messages"][0]["content"]
-        if self.system:
-            system_message += f"\n{self.system}"
-        user_message = prompt_messages["messages"][1]["content"]
-       
-        structured_output = None
-        if output_format and isinstance(output_format, dict):
-            structured_output = StructuredTool(json_schema=output_format, strict_schema=False)
-
-        # If prompt_context exists, update it
-        if self.prompt_context:
-            self.prompt_context.system_string = system_message
-            self.prompt_context.new_message = user_message
-            self.prompt_context.llm_config = self.llm_config
-            self.prompt_context.structured_output = structured_output
-            self.prompt_context.tools = self.tools
-        else:          
-            self.prompt_context = LLMPromptContext(
-                id=self.id,
-                system_string=system_message,
-                new_message=user_message,
-                llm_config=self.llm_config,
-                structured_output=structured_output,
-                tools=self.tools,
-                use_history=True
+        if not self.llm_config:
+            raise ValueError(
+                "Agent requires an `llm_config` to specify which model/client to use."
             )
-    
-    @retry(
-        wait=wait_random_exponential(multiplier=1, max=30),
-        stop=stop_after_attempt(2),
-        reraise=True
-    )
-    async def _run_ai_inference(self, prompt_context: LLMPromptContext) -> Any:
-        try:
-            llm_output = await self.ai_utilities.run_parallel_ai_completion([prompt_context])
-            
-            if not llm_output:
-                raise ValueError("No output received from AI inference")
-            
-            llm_output = llm_output[0]
 
-            # Add chat turn history before converting LLMOutput
-            #if prompt_context.use_history:
-            #    prompt_context.add_chat_turn_history(llm_output)
-            
-            if prompt_context.llm_config.response_format == "text":
-                return llm_output.str_content or str(llm_output.raw_result)
-            elif prompt_context.llm_config.response_format in ["json_beg", "json_object", "structured_output"]:
-                if llm_output.json_object:
-                    return llm_output.json_object.object
-                elif llm_output.str_content:
-                    try:
-                        return json.loads(llm_output.str_content)
-                    except json.JSONDecodeError:
-                        return extract_json_from_response(llm_output.str_content)
-            elif prompt_context.llm_config.response_format == "tool" and prompt_context.structured_output:
-                if llm_output.json_object:
-                    return llm_output.json_object.object
-                elif llm_output.str_content:
-                    try:
-                        return json.loads(llm_output.str_content)
-                    except json.JSONDecodeError:
-                        return extract_json_from_response(llm_output.str_content)
-            elif prompt_context.llm_config.response_format == "tool" and llm_output.tool_calls:
-                print(str(llm_output.raw_result))
-                engine = Engine(tools=prompt_context.tools)
-                return engine.execute_tool_calls(llm_output.tool_calls)
-            
-            # If no specific handling or parsing failed, return the raw output
-            agent_logger.warning(f"No parsing logic for response format '{prompt_context.llm_config.response_format}'. Returning raw output.")
-            return llm_output.raw_result
-        
-        except Exception as e:
-            agent_logger.error(f"Error during AI inference: {e}")
-            raise
+        if not self.prompt_manager:
+            self.prompt_manager = PromptManager()
 
-    def _log_interaction(self, prompt: LLMPromptContext, response: Union[str, Dict[str, Any]]) -> None:
-        """Log an interaction between the agent and the AI."""
-        interaction = {
-            "id": self.id,
-            "name": self.role,
-            "system": prompt.system_message,
-            "task": prompt.new_message,
-            "response": response,
-            "timestamp": datetime.now().isoformat()
-        }
-        self.interactions.append(interaction)
-        agent_logger.debug(f"Agent Interaction logged:\n{json.dumps(interaction, indent=2)}")
+        system_str = self.prompt_manager.get_system_prompt({
+            "role": self.role,
+            "persona": self.persona,
+            "objectives": self.objectives
+        })
+        system_prompt = SystemPrompt(
+            name=f"SystemPrompt_{self.id}",
+            content=system_str
+        )
+
+        initial_message = None
+        if self.task:
+            initial_message = self.prompt_manager.get_task_prompt({
+                "task": self.task,
+                "output_schema": None,
+                "output_format": "text"
+            })
+
+        self.chat_thread = ChatThread(
+            name=f"ChatThread_{self.id}",
+            system_prompt=system_prompt,
+            llm_config=self.llm_config,
+            tools=self.tools,
+            new_message=initial_message
+        )
+
+    def _refresh_prompts(self) -> None:
+        """
+        Re-generate system and user prompts from PromptManager,
+        and place the user prompt into `chat_thread.new_message`.
+        """
+        agent_logger.debug("Refreshing prompts via PromptManager.")
+
+        if not self.prompt_manager or not self.chat_thread:
+            agent_logger.warning("PromptManager or ChatThread not properly initialized.")
+            return
+
+        system_str = self.prompt_manager.get_system_prompt({
+            "role": self.role,
+            "persona": self.persona,
+            "objectives": self.objectives
+        })
+        if self.chat_thread.system_prompt:
+            self.chat_thread.system_prompt.content = system_str
+
+        if self.task:
+            task_str = self.prompt_manager.get_task_prompt({
+                "task": self.task,
+                "output_schema": None,
+                "output_format": "text"
+            })
+            self.chat_thread.new_message = task_str
+
+    async def execute(self) -> Union[str, Dict[str, Any]]:
+        """
+        Generate a new user prompt from tasks/persona and run an LLM completion.
+        Returns either plain text (if LLM not forced to structured output)
+        or a JSON object if the LLM yields a parsed structure.
+        """
+        if not self.chat_thread:
+            raise RuntimeError("No ChatThread is available to run inference.")
+
+        results = await self.orchestrator.run_parallel_ai_completion([self.chat_thread])
+        if not results:
+            raise RuntimeError("No LLM outputs returned from orchestrator.")
+
+        last_output: ProcessedOutput = results[-1]
+        agent_logger.info(f"Agent {self.id} received LLM output from {self.llm_config.client}.")
+
+        if last_output.json_object:
+            return last_output.json_object.object
+        else:
+            return last_output.content or ""

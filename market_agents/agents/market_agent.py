@@ -1,53 +1,103 @@
-import json
-import asyncio
+from typing import Type, List, Union, Dict, Any, Optional
+from pydantic import Field, validator
+import logging
 
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional, Type, Union, List
-
-from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
-from pydantic import Field
-
-from market_agents.agents.base_agent.agent import Agent as LLMAgent
-from market_agents.agents.market_agent_prompter import MarketAgentPromptManager, AgentPromptVariables
-from market_agents.agents.market_schemas import PerceptionSchema, ReflectionSchema
+from market_agents.agents.base_agent.agent import Agent
+from market_agents.agents.cognitive_steps import (
+    CognitiveEpisode,
+    CognitiveStep,
+    PerceptionStep,
+    ActionStep,
+    ReflectionStep
+)
+from market_agents.agents.market_agent_prompter import MarketAgentPromptManager
 from market_agents.agents.personas.persona import Persona
-from market_agents.agents.protocols.protocol import Protocol
 from market_agents.economics.econ_agent import EconomicAgent
-from market_agents.environments.environment import MultiAgentEnvironment, LocalObservation
-from market_agents.inference.message_models import LLMConfig, LLMPromptContext
+from minference.lite.models import LLMConfig
+from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
-from market_agents.memory.memory import MemoryObject, ShortTermMemory, LongTermMemory
+from market_agents.memory.memory import LongTermMemory, MemoryObject, ShortTermMemory
+from market_agents.environments.environment import LocalObservation, MultiAgentEnvironment
+from market_agents.agents.protocols.protocol import Protocol
+from market_agents.verbal_rl.rl_agent import VerbalRLAgent
+from market_agents.verbal_rl.rl_models import BaseRewardFunction
 
-class MarketAgent(LLMAgent):
-    short_term_memory: ShortTermMemory = None
-    long_term_memory: LongTermMemory = None
-    environments: Dict[str, MultiAgentEnvironment] = Field(default_factory=dict)
-    last_perception: Optional[Dict[str, Any]] = None
-    last_action: Optional[Dict[str, Any]] = None
-    last_observation: Optional[LocalObservation] = Field(default_factory=dict)
-    episode_steps: List[MemoryObject] = Field(default_factory=list)
-    protocol: Optional[Type[Protocol]] = None
-    address: str = Field(default="", description="Agent's address")
-    prompt_manager: MarketAgentPromptManager = Field(default_factory=lambda: MarketAgentPromptManager())
-    economic_agent: Optional[EconomicAgent] = None
-    knowledge_agent: Optional[KnowledgeBaseAgent] = None
+logger = logging.getLogger(__name__)
+
+class MarketAgent(Agent):
+    """Market agent with cognitive capabilities and memory management."""
     
+    short_term_memory: ShortTermMemory = Field(
+        default=None,
+        description="Short-term memory storage for recent cognitive stps"
+    )
+    long_term_memory: LongTermMemory = Field(
+        default=None,
+        description="Long-term memory storage for episodic memories"
+    )
+    environments: Dict[str, MultiAgentEnvironment] = Field(
+        default_factory=dict,
+        description="Dictionary of environments the agent can interact with"
+    )
+    last_perception: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Most recent perception output from cognitive episode"
+    )
+    last_action: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Most recent action taken by the agent"
+    )
+    last_observation: Optional[LocalObservation] = Field(
+        default_factory=dict,
+        description="Most recent observation received from environment"
+    )
+    episode_steps: List[MemoryObject] = Field(
+        default_factory=list,
+        description="List of memory objects from current cognitive episode"
+    )
+    current_episode: Optional[CognitiveEpisode] = Field(
+        default=None,
+        description="Currently executing cognitive episode"
+    )
+    protocol: Optional[Type[Protocol]] = Field(
+        default=None,
+        description="Communication protocol used by the agent"
+    )
+    address: str = Field(
+        default="",
+        description="Agent's address for communication purposes"
+    )
+    knowledge_agent: Optional[KnowledgeBaseAgent] = Field(
+        default=None,
+        description="Knowledge base agent for accessing external information"
+    )
+    economic_agent: Optional[EconomicAgent] = Field(
+        default=None,
+        description="Economic agent component for market interactions"
+    )
+    rl_agent: VerbalRLAgent = Field(
+        default_factory=VerbalRLAgent,
+        description="Verbal RL subsystem for learning & adaption"
+    )
+    prompt_manager: MarketAgentPromptManager = Field(
+        default_factory=MarketAgentPromptManager,
+        description="Manager for handling agent prompts and templates"
+    )
+
     @classmethod
     async def create(
         cls,
         storage_utils: AgentStorageAPIUtils,
         agent_id: str,
-        use_llm: bool,
+        use_llm: bool = True,
         llm_config: Optional[LLMConfig] = None,
         environments: Optional[Dict[str, MultiAgentEnvironment]] = None,
         protocol: Optional[Type[Protocol]] = None,
         persona: Optional[Persona] = None,
         econ_agent: Optional[EconomicAgent] = None,
-        knowledge_agent: Optional[KnowledgeBaseAgent] = None
+        knowledge_agent: Optional[KnowledgeBaseAgent] = None,
+        reward_function: Optional[BaseRewardFunction] = None,
     ) -> 'MarketAgent':
-        """Create a new MarketAgent instance with initialized memory components."""
-        
-        # Initialize short and long term memory with the storage utils
         stm = ShortTermMemory(
             agent_id=agent_id,
             agent_storage_utils=storage_utils
@@ -60,7 +110,6 @@ class MarketAgent(LLMAgent):
         )
         await ltm.initialize()
 
-        # Create the agent instance
         agent = cls(
             id=agent_id,
             short_term_memory=stm,
@@ -74,280 +123,94 @@ class MarketAgent(LLMAgent):
             address=f"agent_{agent_id}_address",
             use_llm=use_llm,
             economic_agent=econ_agent,
-            knowledge_agent=knowledge_agent
+            knowledge_agent=knowledge_agent,
+            rl_agent=VerbalRLAgent(reward_function=reward_function) if reward_function else VerbalRLAgent()
         )
 
         if agent.economic_agent:
             agent.economic_agent.id = agent_id
 
+        if agent.knowledge_agent:
+            agent.knowledge_agent.id = agent_id
+
         return agent
-
-    async def perceive(
+    
+    async def run_step(
         self,
-        environment_name: str,
-        return_prompt: bool = False,
-        structured_tool: bool = False
-    ) -> Union[str, LLMPromptContext]:
-        if environment_name not in self.environments:
+        step: Optional[Union[CognitiveStep, Type[CognitiveStep]]] = None,
+        environment_name: Optional[str] = None,
+        **kwargs
+    ) -> Union[str, Dict[str, Any]]:
+        """
+        Execute a single cognitive step.
+        
+        Args:
+            step: CognitiveStep instance or class (defaults to ActionStep)
+            environment_name: Optional environment context
+            **kwargs: Additional parameters for step initialization
+        """
+        if environment_name and environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
-
-        environment_info = self.environments[environment_name].get_global_state()
-        stm_cognitive = await self.short_term_memory.retrieve_recent_memories(limit=5)
-        short_term_memories = []
-        for mem in stm_cognitive:
-            short_term_memories.append({
-                "cognitive_step": mem.cognitive_step,
-                "content": mem.content
-            })
-
-        print("\nCognitive Memory Results:")
-        memory_strings = [f"Memory {i+1}:\n{mem}" for i, mem in enumerate(short_term_memories)]
-        print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
-
-        task_str = f"Task: {self.task}" if self.task else ""
-        env_state_str = f"Environment state: {str(environment_info)}" if environment_info else ""
-        query_str = (task_str + "\n" + env_state_str).strip()
-
-        ltm_episodes = await self.long_term_memory.retrieve_episodic_memories(
-             agent_id=self.id,
-             query=query_str,
-             top_k=2
-        )
-        retrieved_documents = []
-        if self.knowledge_agent:
-            retrieved_documents = await self.knowledge_agent.retrieve(
-                query_str)
-
-        print("\nEpisodic Memory Results:")
-        memory_strings = [f"Memory {i+1}:\n{mem.model_dump()}" for i, mem in enumerate(ltm_episodes)]
-        print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
-
-        if retrieved_documents:
-            print("\nRetrieved Documents:")
-            doc_strings = [f"Document {i+1}:\n{doc.model_dump()}" for i, doc in enumerate(retrieved_documents)]
-            print("\033[95m" + "\n\n".join(doc_strings) + "\033[0m")
-
-        variables = AgentPromptVariables(
-            environment_name=environment_name,
-            environment_info=environment_info,
-            short_term_memory=short_term_memories,
-            long_term_memory=[episode.model_dump() for episode in ltm_episodes],
-            documents=[doc.model_dump() for doc in retrieved_documents]
-        )
-
-        prompt = self.prompt_manager.get_perception_prompt(variables.model_dump())
-        response = await self.execute(
-            prompt,
-            output_format=PerceptionSchema.model_json_schema(),
-            json_tool=structured_tool,
-            return_prompt=return_prompt,
-        )
-
-        if not return_prompt:
-            perception_mem = MemoryObject(
+        
+        env_name = environment_name or next(iter(self.environments.keys()))
+        environment = self.environments[env_name]
+        
+        if step is None:
+            step = ActionStep(
                 agent_id=self.id,
-                cognitive_step="perception",
-                metadata={
-                    "environment_name": environment_name,
-                    "environment_info": environment_info
-                },
-                content=json.dumps(response),
-                created_at=datetime.now(timezone.utc),
+                environment_name=env_name,
+                environment_info=environment.get_global_state(),
+                **kwargs
             )
-
-            self.episode_steps.append(perception_mem)
-            task = asyncio.create_task(self.short_term_memory.store_memory(perception_mem))
-
-            self.last_perception = response
-        return response
-
-    async def generate_action(
-        self,
-        environment_name: str,
-        perception: Optional[str] = None,
-        return_prompt: bool = False,
-        structured_tool: bool = False,
-        action_schema: Dict = None
-    ) -> Union[Dict[str, Any], LLMPromptContext]:
-        if environment_name not in self.environments:
-            raise ValueError(f"Environment {environment_name} not found")
-
-        environment = self.environments[environment_name]
-        #if perception is None and not return_prompt:
-        #    perception = await self.perceive(environment_name)
-        environment_info = environment.get_global_state()
-
-        action_space = environment.action_space
-        serialized_action_space = {
-            "allowed_actions": [action_type.__name__ for action_type in action_space.allowed_actions]
-        }
-
-        variables = AgentPromptVariables(
-            environment_name=environment_name,
-            environment_info=environment_info,
-            perception=perception,
-            action_space=serialized_action_space,
-            last_action=self.last_action,
-            observation=self.last_observation
-        )
-
-        prompt = self.prompt_manager.get_action_prompt(variables.model_dump())
-
-        if not action_schema:
-            action_schema = action_space.get_action_schema()
-
-        response = await self.execute(
-            prompt,
-            output_format=action_schema,
-            json_tool=structured_tool,
-            return_prompt=return_prompt
-        )
-
-        if not return_prompt:
-            action = {"sender": self.id, "content": response}
-            self.last_action = response
-
-            action_mem = MemoryObject(
+        elif isinstance(step, type):
+            step = step(
                 agent_id=self.id,
-                cognitive_step="action",
-                metadata={
-                    "action_space": serialized_action_space,
-                    "last_action": self.last_action,
-                    "observation": self.last_observation,
-                    "perception": perception,
-                    "environment_name": environment_name,
-                    "environment_info": environment_info
-                },
-                content=json.dumps(response),
-                created_at=datetime.now(timezone.utc),
+                environment_name=env_name,
+                environment_info=environment.get_global_state(),
+                **kwargs
             )
-
-            self.episode_steps.append(action_mem)
-            task = asyncio.create_task(self.short_term_memory.store_memory(action_mem))
-
-            return action
         else:
-            return response
+            step.environment_name = env_name
+            step.environment_info = environment.get_global_state()
+            step.agent_id = self.id
+        
+        logger.info(f"Executing cognitive step: {step.step_name}")
+        
+        result = await step.execute(self)
 
-    async def reflect(
+        return result
+
+    async def run_episode(
         self,
-        environment_name: str,
-        environment_reward_weight: float = 0.5,
-        self_reward_weight: float = 0.5,
-        return_prompt: bool = False,
-        structured_tool: bool = False,
-    ) -> Union[str, LLMPromptContext]:
-        if environment_name not in self.environments:
-            raise ValueError(f"Environment {environment_name} not found")
-
-        total_weight = environment_reward_weight + self_reward_weight
-        if total_weight == 0:
-            raise ValueError("Sum of weights must not be zero.")
-
-        environment_reward_weight /= total_weight
-        self_reward_weight /= total_weight
-
-        environment = self.environments[environment_name]
-        last_step = environment.history.steps[-1][1] if environment.history.steps else None
-
-        if last_step:
-            reward = last_step.info.get('agent_rewards', {}).get(self.id, 0.0) or 0.0
-            local_observation = last_step.global_observation.observations.get(self.id)
-            observation = local_observation.observation if local_observation else {}
-        else:
-            observation = {}
-            reward = 0.0
-
-        environment_info = environment.get_global_state()
-
-        if observation:
-            # Pre-serialize observation data
-            if hasattr(observation, 'serialize_json'):
-                observation_content = json.loads(observation.serialize_json())
-            elif hasattr(observation, 'model_dump'):
-                observation_content = observation.model_dump()
-            else:
-                observation_content = str(observation)
-
-            observation_mem = MemoryObject(
-                agent_id=self.id,
-                cognitive_step="observation",
-                metadata={
-                    "environment_name": environment_name,
-                    "environment_info": environment_info,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                },
-                content=json.dumps(observation_content),
-                created_at=datetime.now(timezone.utc)
+        episode: Optional[CognitiveEpisode] = None,
+        environment_name: Optional[str] = None,
+        **kwargs
+    ) -> List[Union[str, Dict[str, Any]]]:
+        """
+        Run a complete cognitive episode.
+        
+        Args:
+            episode: CognitiveEpisode instance (defaults to Perception->Action[Observation]->Reflection)
+            environment_name: Optional environment to use
+            **kwargs: Additional parameters passed to each step
+        """
+        self._refresh_prompts()
+        
+        if episode is None:
+            episode = CognitiveEpisode(
+                steps=[PerceptionStep, ActionStep, ReflectionStep],
+                environment_name=environment_name or next(iter(self.environments.keys()))
             )
+        elif environment_name:
+            episode.environment_name = environment_name
 
-            self.episode_steps.append(observation_mem)
-            task = asyncio.create_task(self.short_term_memory.store_memory(observation_mem))
-
-        previous_strategy = "No previous strategy available"
-        previous_reflection = await self.short_term_memory.retrieve_recent_memories(cognitive_step='reflection', limit=1)
-        if previous_reflection:
-            last_reflection_obj = previous_reflection[0]
-            previous_strategy = last_reflection_obj.metadata.get("strategy_update", "")
-            if isinstance(previous_strategy, list):
-                previous_strategy = " ".join(previous_strategy)
-
-        variables = AgentPromptVariables(
-            environment_name=environment_name,
-            environment_info=environment_info,
-            observation=observation,
-            last_action=self.last_action,
-            reward=reward,
-            previous_strategy=previous_strategy
-        )
-
-        prompt = self.prompt_manager.get_reflection_prompt(variables.model_dump())
-
-        response = await self.execute(
-            prompt,
-            output_format=ReflectionSchema.model_json_schema(),
-            json_tool=structured_tool,
-            return_prompt=return_prompt
-        )
-
-        if not return_prompt and isinstance(response, dict):
-            self_reward = response.get("self_reward", 0.0)
-            environment_reward = reward
-            normalized_environment_reward = max(0.0, min(environment_reward / (1 + environment_reward), 1.0))
-
-            total_reward_val = (
-                normalized_environment_reward * environment_reward_weight +
-                self_reward * self_reward_weight
+        results = []
+        for step_class in episode.steps:
+            result = await self.run_step(
+                step=step_class,
+                environment_name=episode.environment_name,
+                **kwargs
             )
-
-            reflection_mem = MemoryObject(
-                agent_id=self.id,
-                cognitive_step="reflection",
-                metadata={
-                    "total_reward": round(total_reward_val, 4),
-                    "self_reward": round(self_reward, 4),
-                    "observation": observation,
-                    "strategy_update": response.get("strategy_update", ""),
-                    "environment_reward": round(environment_reward, 4),
-                    "environment_name": environment_name,
-                    "environment_info": environment_info
-                },
-                content=json.dumps(response.get("reflection", "")),
-                created_at=datetime.now(timezone.utc),
-            )
-
-            self.episode_steps.append(reflection_mem)
-            task = await self.short_term_memory.store_memory(reflection_mem)
-
-            task_str = f"Task: {self.task}" if self.task else ""
-            env_state_str = f"Environment state: {str(environment_info)}" if environment_info else ""
-            query_str = (task_str + "\n" + env_state_str).strip()
-            await self.long_term_memory.store_episode(
-                task_query=query_str,
-                steps=self.episode_steps,
-                total_reward=round(total_reward_val),
-                strategy_update=response.get("strategy_update", ""),
-                metadata=None
-            )
-            self.episode_steps.clear()
-        return response
+            results.append(result)
+            
+        return results

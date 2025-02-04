@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Dict, Any, List, Type
 from pydantic import BaseModel, Field
-from market_agents.agents.base_agent.schemas import ChainOfThoughtSchema, ThoughtStep
+from market_agents.agents.cognitive_schemas import ChainOfThoughtSchema, ThoughtStep
 from market_agents.environments.environment import (
     Mechanism, LocalAction, LocalObservation, ActionSpace, 
     ObservationSpace, MultiAgentEnvironment, LocalEnvironmentStep
