@@ -175,9 +175,8 @@ class MarketAgent(Agent):
             step.agent_id = self.id
         
         logger.info(f"Executing cognitive step: {step.step_name}")
+        
         result = await step.execute(self)
-
-        self._refresh_prompts()
 
         return result
 
