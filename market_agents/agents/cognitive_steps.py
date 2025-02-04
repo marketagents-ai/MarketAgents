@@ -93,7 +93,7 @@ class PerceptionStep(CognitiveStep):
     step_name: str = "perception"
 
     async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
-        stm_cognitive = await agent.short_term_memory.retrieve_recent_memories(limit=10)
+        stm_cognitive = await agent.short_term_memory.retrieve_recent_memories(limit=1)
         short_term_memories = [
             {
                 "cognitive_step": mem.cognitive_step,
@@ -103,8 +103,10 @@ class PerceptionStep(CognitiveStep):
             for mem in stm_cognitive
         ]
 
-        # Debug: Color print short-term memories
-        print("\033[94mShort-term Memories:\033[0m", short_term_memories)
+        # Debug: Color print short-term memories with content
+        print("\nShort-term Memory Results:")
+        memory_strings = [f"Memory {i+1}:\n{mem['content']}" for i, mem in enumerate(short_term_memories)]
+        print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
 
         task_str = f"Task: {agent.task}" if agent.task else ""
         env_state_str = f"Environment state: {str(self.environment_info)}"
@@ -114,21 +116,24 @@ class PerceptionStep(CognitiveStep):
         ltm_episodes = await agent.long_term_memory.retrieve_episodic_memories(
             agent_id=self.agent_id,
             query=query_str,
-            top_k=3
+            top_k=1
         )
 
-        # Debug: Color print long-term memories
-        print("\033[92mLong-term Memories:\033[0m", [episode.model_dump() for episode in ltm_episodes])
+        print("\nLong-term Memory Results:")
+        memory_strings = [f"Memory {i+1}:\n{episode.model_dump()}" for i, episode in enumerate(ltm_episodes)]
+        print("\033[92m" + "\n\n".join(memory_strings) + "\033[0m")
 
         retrieved_documents = []
         if agent.knowledge_agent:
             retrieved_documents = await agent.knowledge_agent.retrieve(
-                query_str,
-                top_k=5
+                query=query_str,
+                top_k=1
             )
 
-        # Debug: Color print retrieved documents
-        print("\033[93mRetrieved Documents:\033[0m", [doc.model_dump() for doc in retrieved_documents])
+        if retrieved_documents:
+            print("\nRetrieved Documents:")
+            doc_strings = [f"Document {i+1}:\n{doc.model_dump()}" for i, doc in enumerate(retrieved_documents)]
+            print("\033[93m" + "\n\n".join(doc_strings) + "\033[0m")
 
         variables = MarketAgentPromptVariables(
             environment_name=self.environment_name,
@@ -142,7 +147,6 @@ class PerceptionStep(CognitiveStep):
 
         perception_prompt = agent.prompt_manager.get_perception_prompt(variables.model_dump())
 
-
         if agent.chat_thread and self.structured_tool:
             agent.chat_thread.forced_output = perception_tool
 
@@ -150,8 +154,8 @@ class PerceptionStep(CognitiveStep):
             agent.chat_thread.new_message += perception_prompt
 
         if self.return_prompt:
-            return perception_prompt
-
+            return agent.chat_thread
+        
         result = await agent.execute()
         await self.store_memory(
             agent,
@@ -224,11 +228,16 @@ class ActionStep(CognitiveStep):
             )
             agent.chat_thread.forced_output = action_tool
 
+        if agent.chat_thread.new_message:
+            print(agent.chat_thread.new_message)
+        else:
+            print(f"NO NEW MESSAGE")
+
         if agent.chat_thread:
-            agent.chat_thread.new_message += action_prompt
+            agent.chat_thread.new_message = action_prompt
 
         if self.return_prompt:
-            return action_prompt
+            return agent.chat_thread
 
         result = await agent.execute()
 
@@ -301,10 +310,10 @@ class ReflectionStep(CognitiveStep):
             agent.chat_thread.forced_output = reflection_tool
 
         if agent.chat_thread:
-            agent.chat_thread.new_message += reflection_prompt
+            agent.chat_thread.new_message = reflection_prompt
 
         if self.return_prompt:
-            return reflection_prompt
+            return agent.chat_thread
 
         result = await agent.execute()
         
