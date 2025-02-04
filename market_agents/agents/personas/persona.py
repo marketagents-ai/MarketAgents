@@ -53,7 +53,7 @@ def generate_persona() -> Persona:
     }
 
     # Role
-    role = random.choice(["Buyer", "Seller"])
+    role = random.choice(["Researcher", "Speculator", "Trader", "Investor", "Analyst", "Entreprenuer"])
 
     # Occupation Mapping with Routines and Skills
     occupation_data = {
@@ -279,8 +279,11 @@ def generate_persona() -> Persona:
 
     # Objectives
     objectives = [
-        f"{'Purchase' if role == 'Buyer' else 'Sell'} goods at favorable prices",
-        f"Your goal is to {'maximize utility' if role == 'Buyer' else 'maximize profits'}"
+        #f"{'Purchase' if role == 'Buyer' else 'Sell'} goods at favorable prices",
+        #f"Your goal is to {'maximize utility' if role == 'Buyer' else 'maximize profits'}"
+        f"Your primary objective is to make rational decisions",
+        f"You are a utility maximizing agent", 
+        f"You will maximize rewards from environments"
     ]
 
     # Trader Type
@@ -341,6 +344,28 @@ def load_persona_from_file(filepath: Union[str, Path]) -> Persona:
     with open(filepath, 'r') as file:
         persona_data = yaml.safe_load(file)
         return Persona(**persona_data)
+    
+def load_or_generate_personas(personas_dir: Path, num: int) -> List[Persona]:
+    """
+    Load existing personas from 'personas_dir' or generate/generate new ones if needed.
+    """
+    personas_dir.mkdir(parents=True, exist_ok=True)
+    existing_personas = list(personas_dir.glob("*.yaml"))
+    personas = []
+    
+    for p_file in existing_personas:
+        if len(personas) >= num:
+            break
+        persona = load_persona_from_file(p_file)
+        personas.append(persona)
+
+    while len(personas) < num:
+        persona = generate_persona()
+        folder_name = f"{persona.role.replace(' ', '_')}"
+        save_persona_to_file(persona, personas_dir / folder_name)
+        personas.append(persona)
+
+    return personas[:num]
 
 if __name__ == "__main__":
     output_dir = Path("./market_agents/agents/personas/generated_personas")
