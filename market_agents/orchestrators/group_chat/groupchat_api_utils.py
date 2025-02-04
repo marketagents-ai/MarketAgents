@@ -9,14 +9,14 @@ class GroupChatAPIUtils:
     def __init__(self, api_url: str, logger: logging.Logger):
         self.api_url = api_url
         self.logger = logger
-        self.logger.info(f"Initializing GroupChat API Utils with URL: {api_url}")  # Add this line
+        self.logger.info(f"Initializing GroupChat API Utils with URL: {api_url}")
 
     async def check_api_health(self) -> bool:
         """Check if the GroupChat API is healthy."""
         try:
-            self.logger.info(f"Checking GroupChat API health at {self.api_url}/health")  # Add this line
+            self.logger.info(f"Checking GroupChat API health at {self.api_url}/health")
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.api_url}/health", timeout=5) as resp:  # Add timeout
+                async with session.get(f"{self.api_url}/health", timeout=5) as resp:
                     if resp.status == 200:
                         self.logger.info("GroupChat API is healthy")
                         return True
@@ -34,8 +34,11 @@ class GroupChatAPIUtils:
         """Register multiple agents with the GroupChat API."""
         async with aiohttp.ClientSession() as session:
             tasks = []
-            for agent in agents:
-                payload = {"id": agent.id, "index": agent.index}
+            for i, agent in enumerate(agents):
+                payload = {
+                    "id": agent.id,
+                    "index": i
+                }
                 tasks.append(self._register_agent(session, payload))
             results = await asyncio.gather(*tasks)
             for success, agent_id in results:
