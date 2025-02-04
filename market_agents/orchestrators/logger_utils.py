@@ -178,7 +178,7 @@ def log_leaderboard(logger: logging.Logger, rankings: list):
 
 def log_topic_proposal(logger: logging.Logger, cohort_id: str, proposer_id: int, topic: str):
     header = f"[bold white on blue]📢 TOPIC PROPOSAL - {cohort_id.upper()} 📢[/bold white on blue]"
-    proposer_info = f"[bold]🎯 Proposer: Agent {proposer_id:02d}[/bold]"
+    proposer_info = f"[bold]🎯 Proposer: Agent {proposer_id}[/bold]"
     topic_info = f"[cyan]💬 Topic: {topic}[/cyan]"
     text = Text.from_markup(f"{proposer_info}\n\n{topic_info}")
     panel = Panel(

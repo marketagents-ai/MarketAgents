@@ -163,7 +163,7 @@ async def main():
     agents = await create_agents(config, storage_config)
 
     orchestrator_registry = {
-        "groupchat": GroupChatOrchestrator,
+        "group_chat": GroupChatOrchestrator,
         "research": ResearchOrchestrator
     }
 
