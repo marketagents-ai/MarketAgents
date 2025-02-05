@@ -12,7 +12,6 @@ class AgentConfig(BaseModel):
 
 class GroupChatConfig(BaseModel):
     name: str
-    max_rounds: int
     initial_topic: str
     sub_rounds: int = Field(default=3)
     group_size: int = Field(default=100)
@@ -20,7 +19,6 @@ class GroupChatConfig(BaseModel):
 
 class ResearchConfig(BaseModel):
     name: str
-    max_rounds: int
     initial_topic: str
     sub_rounds: int = Field(default=3)
     group_size: int = Field(default=100)

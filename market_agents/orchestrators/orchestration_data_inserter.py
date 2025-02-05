@@ -64,10 +64,12 @@ class OrchestrationDataInserter:
         async with self.db.transaction() as txn:
             for action in actions_data:
                 try:
-                    agent_id = action['agent_id']
-                    if not isinstance(agent_id, uuid.UUID):
-                        self.logger.error(f"Invalid agent_id type: {type(agent_id)}")
+                    agent_id_str = str(action['agent_id'])
+                    if agent_id_str not in agent_id_map:
+                        self.logger.error(f"No UUID mapping found for agent_id: {agent_id_str}")
                         continue
+
+                    real_agent_uuid = agent_id_map[agent_id_str]
 
                     action_data = {
                         'content': action.get('content') or action.get('action'),
@@ -79,15 +81,18 @@ class OrchestrationDataInserter:
                     metadata = {
                         'timestamp': action.get('timestamp', datetime.now(timezone.utc).isoformat()),
                         'message_id': str(action.get('message_id', uuid.uuid4())),
-                        **{k: v for k, v in action.items() if k not in [
-                            'agent_id', 'environment_name', 'round', 'sub_round', 
-                            'content', 'action'
-                        ]}
+                        **{
+                            k: v for k, v in action.items()
+                            if k not in [
+                                'agent_id', 'environment_name', 'round',
+                                'sub_round', 'content', 'action'
+                            ]
+                        }
                     }
 
                     await self.db.execute(
                         query,
-                        agent_id,
+                        real_agent_uuid,
                         action['environment_name'],
                         action['round'],
                         action.get('sub_round'),

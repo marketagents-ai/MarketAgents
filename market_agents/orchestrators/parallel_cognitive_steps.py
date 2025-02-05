@@ -66,8 +66,6 @@ class ParallelCognitiveProcessor:
                 return_prompt=True
             )
             prompt_thread = await agent.run_step(step=step)
-
-            print(f"HERE IS THE PERCEPTION PROMPT\n###\n###\n###\n")
             print(agent.chat_thread.new_message)
 
             perception_prompts.append(prompt_thread)
@@ -106,8 +104,6 @@ class ParallelCognitiveProcessor:
                 return_prompt=True
             )
             prompt_thread = await agent.run_step(step=step)
-            
-            print(f"HERE IS THE ACTION PROMPT\n###\n###\n###\n")
             print(agent.chat_thread.new_message)
 
             action_prompts.append(prompt_thread)
@@ -167,7 +163,7 @@ class ParallelCognitiveProcessor:
                                   if output and output.json_object
                                   else output.str_content)
 
-            log_reflection(self.logger, getattr(agent, "index", agent.id), reflection_content)
+            log_reflection(self.logger, agent.id, reflection_content)
 
             environment = agent.environments.get(environment_name)
             if hasattr(environment, "mechanism") and environment.mechanism and hasattr(environment.mechanism, "last_step"):
