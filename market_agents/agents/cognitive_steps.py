@@ -150,8 +150,13 @@ class PerceptionStep(CognitiveStep):
         if agent.chat_thread and self.structured_tool:
             agent.chat_thread.forced_output = perception_tool
 
-        if agent.chat_thread:
+        if agent.task:
+            agent._refresh_prompts()
+
+        if agent.chat_thread.new_message:
             agent.chat_thread.new_message += perception_prompt
+        else:
+            agent.chat_thread.new_message = perception_prompt
 
         if self.return_prompt:
             return agent.chat_thread
