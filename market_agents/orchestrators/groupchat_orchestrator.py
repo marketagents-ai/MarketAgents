@@ -16,6 +16,7 @@ from market_agents.orchestrators.config import GroupChatConfig, OrchestratorConf
 from market_agents.orchestrators.logger_utils import (
     log_perception,
     log_persona,
+    log_reflection,
     log_section,
     log_round,
     log_cohort_formation,
@@ -91,13 +92,13 @@ class GroupChatOrchestrator:
                 self.agent_cohort_map[a.id] = cohort_id
 
             group_chat = GroupChat(
-                max_rounds=self.config.max_rounds,
+                max_rounds=self.config.sub_rounds,
                 sequential=False,
             )
             group_chat_env = MultiAgentEnvironment(
                 name=f"group_chat_{cohort_id}",
                 address=f"group_chat_{cohort_id}",
-                max_steps=self.config.max_rounds,
+                max_steps=self.config.sub_rounds,
                 action_space=GroupChatActionSpace(),
                 observation_space=GroupChatObservationSpace(),
                 mechanism=group_chat
@@ -139,7 +140,7 @@ class GroupChatOrchestrator:
         if round_num is not None:
             await self.run_round(round_num)
         else:
-            for rn in range(1, self.config.max_rounds + 1):
+            for rn in range(1, self.orchestrator_config.max_rounds + 1):
                 await self.run_round(rn)
 
     async def run_round(self, round_num: int):
@@ -169,13 +170,6 @@ class GroupChatOrchestrator:
                 )
                 tasks.append(task)
             await asyncio.gather(*tasks)
-
-        log_section(self.logger, "AGENT REFLECTIONS")
-
-        await self.cognitive_processor.run_parallel_reflection(
-            self.agents,
-            self.config.name
-        )
 
         await self.process_round_results(round_num)
 
@@ -281,6 +275,18 @@ class GroupChatOrchestrator:
         Runs a single sub-round of group chat for the given cohort.
         """
         try:
+            agents_data = []
+            for ag in cohort_agents:
+                agents_data.append({
+                    "id": ag.id,
+                    "role": getattr(ag, "role", "Participant"),
+                    "persona": getattr(ag, "persona", {}),
+                    "is_llm": True,
+                    "llm_config": {},
+                    "economic_agent": {}
+                })
+            agent_id_map = await self.data_inserter.insert_agents(agents_data)
+
             topic = await self.api_utils.get_topic(cohort_id)
             messages = await self.api_utils.get_messages(cohort_id)
 
@@ -289,39 +295,28 @@ class GroupChatOrchestrator:
                 return
 
             environment = cohort_agents[0].environments["group_chat"]
-            environment.mechanism._update_topic(topic, round_num)
+            environment.mechanism._update_topic(topic)
 
             for agent in cohort_agents:
                 agent_messages = [m for m in messages if m.get("agent_id") == agent.id]
-                agent.last_observation = (
-                    agent_messages[-1] if agent_messages else None
-                )
+                agent.last_observation = agent_messages[-1] if agent_messages else None
 
             perceptions = await self.cognitive_processor.run_parallel_perception(
-                cohort_agents,
-                environment_name="group_chat"
+                cohort_agents, environment_name="group_chat"
             )
-
             for agent, perc in zip(cohort_agents, perceptions):
-                agent_idx = getattr(agent, "index", agent.id)
-                log_persona(self.logger, agent_idx, agent.persona)
-                text = perc.json_object.object if perc and perc.json_object else perc.str_content
-                log_perception(self.logger, agent_idx, text)
+                idx_str = getattr(agent, "index", agent.id)
+                log_persona(self.logger, idx_str, agent.persona)
+                text = perc.json_object.object if (perc and perc.json_object) else perc.str_content
+                log_perception(self.logger, idx_str, text)
                 agent.last_perception = text
 
             actions = await self.cognitive_processor.run_parallel_action(
-                cohort_agents,
-                environment_name="group_chat"
+                cohort_agents, environment_name="group_chat"
             )
 
-        except Exception as e:
-            self.logger.error(f"Error in sub-round {round_num}.{sub_round_num}: {e}")
-            return
-
-        try:
             messages_to_insert = []
             api_tasks = []
-
             for agent, action in zip(cohort_agents, actions):
                 content = self.extract_message_content(action)
                 if content:
@@ -355,23 +350,48 @@ class GroupChatOrchestrator:
                         cohort_id,
                         getattr(agent, "index", agent.id),
                         content,
-                        sub_round_num=sub_round_num
+                        sub_round=sub_round_num
                     )
                 else:
-                    self.logger.warning(
-                        f"Could not extract message content for agent {agent.id}"
-                    )
+                    self.logger.warning(f"No content for agent {agent.id}")
 
             await asyncio.gather(*api_tasks)
-            if messages_to_insert:
-                await self.data_inserter.insert_actions(
-                    actions_data=messages_to_insert,
-                    agent_id_map={a.id: a.id for a in cohort_agents}
-                )
+
+            #if messages_to_insert:
+            #    for m in messages_to_insert:
+            #        if isinstance(m["timestamp"], datetime):
+            #            m["timestamp"] = m["timestamp"].isoformat()
+#
+            #    await self.data_inserter.insert_actions(messages_to_insert, agent_id_map)
+
         except Exception as e:
-            self.logger.warning(
-                f"Error storing data in sub-round {sub_round_num} for cohort {cohort_id}: {e}"
-            )
+            self.logger.error(f"Error in sub-round {round_num}.{sub_round_num}: {e}")
+            return
+
+        try:
+            agents_with_observation = [a for a in cohort_agents if a.last_observation]
+            if agents_with_observation:
+                reflections = await self.cognitive_processor.run_parallel_reflection(
+                    agents_with_observation,
+                    environment_name="group_chat"
+                )
+                if reflections:
+                    for agent, reflection_output in zip(agents_with_observation, reflections):
+                        reflection_content = None
+                        if reflection_output and reflection_output.json_object:
+                            reflection_content = reflection_output.json_object.object
+                        elif reflection_output:
+                            reflection_content = reflection_output.str_content
+
+                        if reflection_content:
+                            log_reflection(self.logger, getattr(agent, "index", agent.id), reflection_content)
+                            agent.last_reflection = reflection_content
+                        else:
+                            self.logger.warning(f"No reflection content for agent {agent.id}")
+            else:
+                self.logger.info("No new observations to reflect on this sub-round.")
+        except Exception as e:
+            self.logger.error(f"Error in reflection step for sub-round {sub_round_num}: {e}", exc_info=True)
 
     def extract_message_content(self, action) -> Optional[str]:
         """Extract the 'content' from the agent's action output."""
@@ -462,12 +482,7 @@ class GroupChatOrchestrator:
             print()
 
     async def run(self):
-        """
-        Entry point for orchestrating the entire multi-agent conversation:
-          1) setup_environment
-          2) run_environment
-          3) print_summary
-        """
+        """Entry point for orchestrating the entire multi-agent conversation"""
         await self.setup_environment()
         await self.run_environment()
         await self.print_summary()
