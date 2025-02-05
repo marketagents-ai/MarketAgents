@@ -28,7 +28,8 @@ from minference.lite.models import LLMConfig, ResponseFormat
 import logging
 
 logger = logging.getLogger(__name__)
-
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("EntityRegistry").setLevel(logging.CRITICAL)
 
 async def create_kb_agent(
     config: AgentStorageConfig,
