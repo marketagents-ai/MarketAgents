@@ -140,6 +140,9 @@ class TestMarketAgent(IsolatedAsyncioTestCase):
         """Test running default cognitive episode"""
         self.chat_env.current_step = 2
 
+        self.agent.task = "Discuss the current topic in group chat"
+        self.agent._refresh_prompts()
+
         results = await self.agent.run_episode(environment_name="chat")
         
         print(f"{Fore.CYAN}Default Episode Results:{Style.RESET_ALL}")
@@ -152,6 +155,9 @@ class TestMarketAgent(IsolatedAsyncioTestCase):
     async def test_custom_schema_episode(self):
         """Test running episode with custom schemas"""
         self.chat_env.current_step = 2
+
+        self.agent.task = "Discuss current topic in group chat"
+        self.agent._refresh_prompts()
 
         custom_episode = CognitiveEpisode(
             steps=[PerceptionStep, ActionStep, ReflectionStep],
