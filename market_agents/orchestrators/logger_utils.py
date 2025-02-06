@@ -213,16 +213,10 @@ def log_topic_proposal(logger: logging.Logger, cohort_id: str, proposer_id: int,
     )
     console.print(panel)
 
-def log_group_message(logger: logging.Logger, cohort_id: str, agent_id: Any, message: str, sub_round: int):
+def log_group_message(logger: logging.Logger, cohort_id: str, agent_id: Any, message: str, sub_round: int, model_name: str = None):
     """Logs a group chat message in a Rich-styled box."""
     agent_colors = [
-        "green",
-        "yellow",
-        "blue",
-        "magenta",
-        "cyan",
-        "red",
-        "white"
+        "green", "yellow", "blue", "magenta", "cyan", "red", "white"
     ]
     try:
         numeric_id = int(agent_id)
@@ -230,7 +224,6 @@ def log_group_message(logger: logging.Logger, cohort_id: str, agent_id: Any, mes
         numeric_id = 0
 
     color = agent_colors[numeric_id % len(agent_colors)]
-
     header = f"[bold black on white]💬 {cohort_id.upper()} - Round {sub_round}[/bold black on white]"
 
     if isinstance(agent_id, int):
@@ -238,7 +231,8 @@ def log_group_message(logger: logging.Logger, cohort_id: str, agent_id: Any, mes
     else:
         agent_label = str(agent_id)
 
-    agent_info = f"[bold {color}]🤖 Agent {agent_label} says:[/bold {color}]"
+    model_info = f" [{model_name}]" if model_name else ""
+    agent_info = f"[bold {color}]🤖 Agent {agent_label}{model_info} says:[/bold {color}]"
 
     text = Text.from_markup(f"{agent_info}\n\n{message}")
     panel = Panel(

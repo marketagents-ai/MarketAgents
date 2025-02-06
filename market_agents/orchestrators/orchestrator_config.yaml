@@ -1,6 +1,6 @@
 # orchestrator_config.yaml
 
-num_agents: 2
+num_agents: 8
 max_rounds: 1
 environment_order:
   - group_chat
@@ -16,55 +16,43 @@ llm_configs:
 #      max_tokens: 1024
 #      temperature: 0.5
 #      use_cache: true
+#    - name: "hermes"
+#      model: "openai/hermes-testing/Hermes-3-Pro-RC2-e4"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
     - name: "hermes"
-      model: "hermes-testing/Hermes-3-Pro-RC2-e4"
+      model: "openai/NousResearch/Hermes-3-Llama-3.1-8B"
       client: "litellm"
       max_tokens: 4096
       temperature: 0.5
       use_cache: true
-#    - name: "hermes"
-#      model: "NousResearch/Hermes-3-Llama-3.1-8B"
-#      client: "litellm"
-#      max_tokens: 4096
-#      temperature: 0.5
-#      use_cache: true
-#    - name: "qwen"
-#      model: "Qwen/Qwen2.5-7B-Instruct"
-#      client: "litellm"
-#      max_tokens: 4096
-#      temperature: 0.5
-#      use_cache: true
-#    - name: "internlm"
-#      model: "internlm/internlm2_5-7b-chat"
-#      client: "litellm"
-#      max_tokens: 4096
-#      temperature: 0.5
-#      use_cache: true
-#    - name: "mistral"
-#      model: "mistralai/Mistral-7B-Instruct-v0.3"
-#      client: "litellm"
-#      max_tokens: 4096
-#      temperature: 0.0
-#      use_cache: true
-#    - name: "llama"
-#      model: "meta-llama/Llama-3.1-8B-Instruct"
-#      client: "litellm"
-#      max_tokens: 4096
-#      temperature: 0.5
-#      use_cache: true
-#    - name: "functionary"
-#      model: "meetkai/functionary-small-v3.1"
-#      client: "litellm"
-#      max_tokens: 4096
-#      temperature: 0.5
-#      use_cache: true
+    - name: "deepseek"
+      model: "openai/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+      client: "litellm"
+      max_tokens: 4096
+      temperature: 0.5
+      use_cache: true
+    - name: "qwq"
+      model: "openai/Qwen/QwQ-32B-Preview"
+      client: "litellm"
+      max_tokens: 4096
+      temperature: 0.5
+      use_cache: true
+    - name: "qwen"
+      model: "openai/Qwen/Qwen2.5-7B-Instruct"
+      client: "litellm"
+      max_tokens: 4096
+      temperature: 0.5
+      use_cache: true
 
 environment_configs:
   group_chat:
     name: "group_chat"
     api_url: "http://localhost:8002"
   #  initial_topic: "Initial Market Discussion"
-    initial_topic: "Hamlet's famous 'To be or not to be' soliloquy"
+    initial_topic: "Hamlet's famous 'To be or not to be' soliloquy. Use emoji's and colloquial language for discussion"
     sub_rounds: 1
     group_size: 4
   research:

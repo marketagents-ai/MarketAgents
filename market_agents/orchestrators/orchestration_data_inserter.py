@@ -11,6 +11,7 @@ class OrchestrationDataInserter:
         self.storage_service = storage_service
         self.db = storage_service.db
         self.logger = logging.getLogger("orchestration_data_inserter")
+        self.NAMESPACE_AGENTS = uuid.uuid5(uuid.NAMESPACE_DNS, 'market_agents.agents')
 
     async def insert_agents(self, agents_data: List[Dict[str, Any]]) -> Dict[str, uuid.UUID]:
         """Insert agent data and return mapping of agent IDs."""
@@ -27,20 +28,16 @@ class OrchestrationDataInserter:
             RETURNING id
         """
         agent_id_map = {}
-        NAMESPACE_AGENTS = uuid.uuid5(uuid.NAMESPACE_DNS, 'market_agents.agents')
         
         async with self.db.transaction() as txn:
             for agent in agents_data:
                 try:
                     string_id = str(agent['id'])
-                    if not string_id.startswith('agent_'):
-                        agent_id = uuid.UUID(string_id)
-                    else:
-                        agent_id = uuid.uuid5(NAMESPACE_AGENTS, string_id)
+                    agent_uuid = self._get_agent_uuid(string_id)
 
                     result = await self.db.fetch_one(
                         query,
-                        agent_id,
+                        agent_uuid,
                         agent['role'],
                         json.dumps(agent.get('persona', {})),
                         agent.get('is_llm', True),
@@ -55,7 +52,7 @@ class OrchestrationDataInserter:
                     raise
         return agent_id_map
 
-    async def insert_actions(self, actions_data: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
+    async def insert_actions(self, actions_data: List[Dict[str, Any]], agent_id_map: Optional[Dict[str, uuid.UUID]] = None):
         """Insert actions (both group chat messages and research actions)."""
         query = """
             INSERT INTO actions (agent_id, environment_name, round, sub_round, action_data, metadata)
@@ -65,11 +62,12 @@ class OrchestrationDataInserter:
             for action in actions_data:
                 try:
                     agent_id_str = str(action['agent_id'])
-                    if agent_id_str not in agent_id_map:
-                        self.logger.error(f"No UUID mapping found for agent_id: {agent_id_str}")
-                        continue
-
-                    real_agent_uuid = agent_id_map[agent_id_str]
+                    
+                    # Use existing mapping or generate new UUID
+                    if agent_id_map and agent_id_str in agent_id_map:
+                        agent_uuid = agent_id_map[agent_id_str]
+                    else:
+                        agent_uuid = self._get_agent_uuid(agent_id_str)
 
                     action_data = {
                         'content': action.get('content') or action.get('action'),
@@ -92,7 +90,7 @@ class OrchestrationDataInserter:
 
                     await self.db.execute(
                         query,
-                        real_agent_uuid,
+                        agent_uuid,
                         action['environment_name'],
                         action['round'],
                         action.get('sub_round'),
@@ -166,4 +164,18 @@ class OrchestrationDataInserter:
 
         except Exception as e:
             self.logger.error(f"Error inserting round data: {e}")
+            raise
+
+    def _get_agent_uuid(self, agent_id: str) -> uuid.UUID:
+        """Convert string agent ID to UUID consistently."""
+        try:
+            if isinstance(agent_id, uuid.UUID):
+                return agent_id
+            string_id = str(agent_id)
+            try:
+                return uuid.UUID(string_id)
+            except ValueError:
+                return uuid.uuid5(self.NAMESPACE_AGENTS, string_id)
+        except Exception as e:
+            self.logger.error(f"Error converting agent ID {agent_id} to UUID: {e}")
             raise

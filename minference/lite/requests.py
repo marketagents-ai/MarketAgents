@@ -234,7 +234,7 @@ def get_openai_request(chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
         if chat_thread.workflow_step is None:
             raise ValueError("Workflow step is None")
         EntityRegistry._logger.info(f"Detected workflow mode for ChatThread({chat_thread.id}) with workflow step {chat_thread.workflow_step}")
-        if chat_thread.workflow_step > len(chat_thread.tools):
+        if chat_thread.workflow_step >= len(chat_thread.tools):
             raise ValueError(f"Workflow step {chat_thread.workflow_step} is out of range for tools: {chat_thread.tools}")
         tool = chat_thread.tools[chat_thread.workflow_step]
         if tool:
