@@ -53,7 +53,6 @@ class OrchestrationDataInserter:
         return agent_id_map
 
     async def insert_actions(self, actions_data: List[Dict[str, Any]], agent_id_map: Optional[Dict[str, uuid.UUID]] = None):
-        """Insert actions (both group chat messages and research actions)."""
         query = """
             INSERT INTO actions (agent_id, environment_name, round, sub_round, action_data, metadata)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -63,11 +62,7 @@ class OrchestrationDataInserter:
                 try:
                     agent_id_str = str(action['agent_id'])
                     
-                    # Use existing mapping or generate new UUID
-                    if agent_id_map and agent_id_str in agent_id_map:
-                        agent_uuid = agent_id_map[agent_id_str]
-                    else:
-                        agent_uuid = self._get_agent_uuid(agent_id_str)
+                    agent_uuid = self._get_agent_uuid(agent_id_str)
 
                     action_data = {
                         'content': action.get('content') or action.get('action'),
@@ -79,13 +74,7 @@ class OrchestrationDataInserter:
                     metadata = {
                         'timestamp': action.get('timestamp', datetime.now(timezone.utc).isoformat()),
                         'message_id': str(action.get('message_id', uuid.uuid4())),
-                        **{
-                            k: v for k, v in action.items()
-                            if k not in [
-                                'agent_id', 'environment_name', 'round',
-                                'sub_round', 'content', 'action'
-                            ]
-                        }
+                        **{k: v for k, v in action.items() if k not in ['agent_id', 'environment_name', 'round', 'sub_round', 'content', 'action']}
                     }
 
                     await self.db.execute(
@@ -171,11 +160,9 @@ class OrchestrationDataInserter:
         try:
             if isinstance(agent_id, uuid.UUID):
                 return agent_id
-            string_id = str(agent_id)
-            try:
-                return uuid.UUID(string_id)
-            except ValueError:
-                return uuid.uuid5(self.NAMESPACE_AGENTS, string_id)
+                
+            namespace_uuid = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')
+            return uuid.uuid5(namespace_uuid, str(agent_id))
         except Exception as e:
             self.logger.error(f"Error converting agent ID {agent_id} to UUID: {e}")
             raise
