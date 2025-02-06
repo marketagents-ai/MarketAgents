@@ -176,8 +176,8 @@ class InferenceOrchestrator:
         self.openai_key = os.getenv("OPENAI_KEY", "")  # Default to empty string if None
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
         self.vllm_key = os.getenv("VLLM_API_KEY", "")
-        self.vllm_endpoint = os.getenv("VLLM_ENDPOINT", "http://localhost:8000/v1/chat/completions")
-        self.litellm_endpoint = os.getenv("LITELLM_ENDPOINT", "http://localhost:8000/v1/chat/completions")
+        self.default_vllm_endpoint = os.getenv("VLLM_ENDPOINT", "http://localhost:8000/v1/chat/completions")
+        self.default_litellm_endpoint = os.getenv("LITELLM_ENDPOINT", "http://localhost:8000/v1/chat/completions")
         self.litellm_key = os.getenv("LITELLM_API_KEY", "")
         
         # Request Limits
@@ -289,7 +289,7 @@ class InferenceOrchestrator:
             chat_thread=chat_threads[0], 
             requests_file=requests_file, 
             results_file=results_file,
-            vllm_endpoint=self.vllm_endpoint,
+            vllm_endpoint=self.default_vllm_endpoint,
             vllm_key=self.vllm_key,
             max_requests_per_minute=self.vllm_request_limits.max_requests_per_minute,
             max_tokens_per_minute=self.vllm_request_limits.max_tokens_per_minute
@@ -314,7 +314,7 @@ class InferenceOrchestrator:
             chat_thread=chat_threads[0], 
             requests_file=requests_file, 
             results_file=results_file,
-            litellm_endpoint=self.litellm_endpoint,
+            litellm_endpoint=self.default_litellm_endpoint,
             litellm_key=self.litellm_key,
             max_requests_per_minute=self.litellm_request_limits.max_requests_per_minute,
             max_tokens_per_minute=self.litellm_request_limits.max_tokens_per_minute

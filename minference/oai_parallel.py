@@ -41,8 +41,9 @@ from dataclasses import (
     dataclass,
     field,
 )  # for storing API inputs, outputs, and metadata
-from typing import List  # for type hints in functions
+from typing import List, Literal  # for type hints in functions
 from pydantic import BaseModel, Field
+
 
 class OAIApiFromFileConfig(BaseModel):
  requests_filepath: str
@@ -392,9 +393,10 @@ class APIRequest:
 # functions
 
 
-def api_endpoint_from_url(request_url: str) -> str:
+def api_endpoint_from_url(request_url: str) -> Literal["completions", "embeddings", "chat", "messages"]:
     """
     Extracts the API endpoint from a given request URL.
+
 
     This function applies a regular expression search to find the API endpoint pattern within the provided URL.
     It supports extracting endpoints from standard OpenAI API URLs, custom Azure OpenAI deployment URLs,
@@ -423,8 +425,20 @@ def api_endpoint_from_url(request_url: str) -> str:
             # for vLLM endpoints
             match = re.search(r"^http://localhost:8000/v\d+/(.+)$", request_url)
             if match is None:
-                raise ValueError(f"Invalid URL: {request_url}")
-    return match[1]
+                if "v1/chat/completions" in request_url:
+                    match = [None,"chat"]
+                else:
+                    raise ValueError(f"Invalid URL: {request_url}")
+    if "anthropic" in match[1]:
+        return "messages"
+
+    elif "chat" in match[1]:
+        return "chat"
+    elif "embeddings" in match[1]:
+        return "embeddings"
+    else:
+        return "completions"
+
 
 
 def append_to_jsonl(data, filename: str) -> None:
@@ -449,21 +463,23 @@ def append_to_jsonl(data, filename: str) -> None:
 
 def num_tokens_consumed_from_request(
     request_json: dict,
-    api_endpoint: str,
+    api_endpoint: Literal["completions", "embeddings", "chat", "messages"],
     token_encoding_name: str,
 ):
     """Count the number of tokens in the request. Supports completion, embedding, and Anthropic message requests."""
     encoding = tiktoken.get_encoding(token_encoding_name)
     
-    if api_endpoint.endswith("completions"):
+    if api_endpoint in ["completions", "chat"]:
         max_tokens = request_json.get("max_tokens", 15)
         n = request_json.get("n", 1)
         completion_tokens = n * max_tokens
 
+
         # chat completions
-        if api_endpoint.startswith("chat/"):
+        if api_endpoint == "chat":
             num_tokens = 0
             for message in request_json["messages"]:
+
                 num_tokens += 4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
                 for key, value in message.items():
                     if key == "tool_calls":

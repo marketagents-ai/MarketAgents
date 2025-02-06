@@ -19,39 +19,41 @@ def setup_logger(name: str = "MarketSimulation", level: int = logging.INFO) -> l
     logger = logging.getLogger(name)
     logger.setLevel(level)
     
-    # Clear existing handlers
     logger.handlers = []
     
-    # Add RichHandler to log to console with rich formatting and enable markup
     handler = RichHandler(
         console=console,
         show_time=True,
         show_level=True,
         show_path=False,
-        markup=True  # Enable markup interpretation
+        markup=True
     )
     logger.addHandler(handler)
     
-    # Prevent propagation to avoid double logging
     logger.propagate = False
     
     return logger
 
-# Create a single, centralized logger instance
 orchestration_logger = setup_logger()
 
-def json_to_markdown(data: dict) -> str:
-    """Convert a JSON object to markdown format"""
-    markdown = ""
-    for key, value in data.items():
-        markdown += f"### {key.title()}\n"
-        if isinstance(value, list):
-            for item in value:
-                markdown += f"- {item}\n"
-        else:
-            markdown += f"{value}\n"
-        markdown += "\n"
-    return markdown
+def json_to_markdown(data: Any, indent_level: int = 0) -> str:
+    """
+    Recursively converts JSON-like data (dict, list, or primitive) to markdown.
+    - indent_level controls how far to indent sub-entries.
+    """
+    markdown_lines = []
+    prefix = "  " * indent_level
+    if isinstance(data, dict):
+        for key, value in data.items():
+            markdown_lines.append(f"{prefix}### {key.title()}")
+            markdown_lines.append(json_to_markdown(value, indent_level + 1))
+    elif isinstance(data, list):
+        for item in data:
+            markdown_lines.append(f"{prefix}- {json_to_markdown(item, indent_level + 1).strip()}")
+    else:
+        markdown_lines.append(f"{prefix}{data}")
+
+    return "\n".join(markdown_lines) + "\n\n"
 
 def log_persona(logger: logging.Logger, agent_id: int, persona: str):
     header = f"[bold yellow]🎭 Agent {agent_id} persona:[/bold yellow]\n"
@@ -66,10 +68,15 @@ def log_persona(logger: logging.Logger, agent_id: int, persona: str):
     console.print(panel)
 
 def log_perception(logger: logging.Logger, agent_id: int, perception: str):
+    """
+    Logs an agent's perception as nested markdown if possible; 
+    else prints raw content with a fallback.
+    """
     try:
         perception_dict = json.loads(perception) if isinstance(perception, str) else perception
         markdown = json_to_markdown(perception_dict)
-        header = f"[bold cyan]👁️  Agent {agent_id:02d} perceives:[/bold cyan]\n"
+
+        header = f"[bold cyan]👁️  Agent {agent_id} perceives:[/bold cyan]\n"
         text = Text.from_markup(header)
         text.append(markdown)
         panel = Panel(
@@ -80,31 +87,14 @@ def log_perception(logger: logging.Logger, agent_id: int, perception: str):
         )
         console.print(panel)
     except Exception as e:
+        logger.warning(f"Failed to convert perception to markdown: {e}")
         console.print(f"[bold blue]👁️ Agent {agent_id} perceives:[/bold blue]\n[cyan]{perception}[/cyan]")
 
-def log_reflection(logger: logging.Logger, agent_id: int, reflection: str):
-    try:
-        reflection_dict = json.loads(reflection) if isinstance(reflection, str) else reflection
-        markdown = json_to_markdown(reflection_dict)
-        header = f"[bold magenta]💭 Agent {agent_id:02d} reflects:[/bold magenta]\n"
-        text = Text.from_markup(header)
-        text.append(markdown)
-        panel = Panel(
-            Align.left(text),
-            border_style="magenta",
-            box=HEAVY,
-            width=80
-        )
-        console.print(panel)
-    except Exception as e:
-        console.print(f"[bold magenta]💭 Agent {agent_id} reflects:[/bold magenta]\n[magenta]{reflection}[/magenta]")
-
 def log_action(logger: logging.Logger, agent_id: int, action: Any):
-    """Log an agent's action in a consistent format using rich formatting"""
     try:
         action_dict = json.loads(action) if isinstance(action, str) else action
         markdown = json_to_markdown(action_dict)
-        header = f"[bold green]🎯 Agent {agent_id:02d} action:[/bold green]\n"
+        header = f"[bold green]🎯 Agent {agent_id} action:[/bold green]\n"
         text = Text.from_markup(header)
         text.append(markdown)
         panel = Panel(
@@ -115,7 +105,39 @@ def log_action(logger: logging.Logger, agent_id: int, action: Any):
         )
         console.print(panel)
     except Exception as e:
+        logger.warning(f"Failed to convert action to markdown: {e}")
         console.print(f"[bold green]🎯 Agent {agent_id} action:[/bold green]\n[green]{action}[/green]")
+
+def log_reflection(logger: logging.Logger, agent_id: Any, reflection: str):
+    """
+    Logs an agent's reflection in a Rich-styled box.
+    agent_id may be an int or a string like 'agent_1'.
+    """
+    try:
+        numeric_id = int(agent_id)
+    except (ValueError, TypeError):
+        numeric_id = 0
+    
+    try:
+        reflection_dict = json.loads(reflection) if isinstance(reflection, str) else reflection
+        markdown = json_to_markdown(reflection_dict)
+        
+        header = f"[bold magenta]💭 Agent {numeric_id if isinstance(agent_id, int) else agent_id} reflects:[/bold magenta]\n"
+        text = Text.from_markup(header)
+        text.append(markdown)
+        panel = Panel(
+            Align.left(text),
+            border_style="magenta",
+            box=HEAVY,
+            width=80
+        )
+        console.print(panel)
+    except Exception as e:
+        logger.warning(f"Failed to convert reflection to markdown: {e}")
+        console.print(
+            f"[bold magenta]💭 Agent {numeric_id if isinstance(agent_id, int) else agent_id} reflects:"
+            f"[/bold magenta]\n[magenta]{reflection}[/magenta]"
+        )
 
 def log_section(logger: logging.Logger, message: str):
     border = "=" * 70
@@ -191,19 +213,27 @@ def log_topic_proposal(logger: logging.Logger, cohort_id: str, proposer_id: int,
     )
     console.print(panel)
 
-def log_group_message(logger: logging.Logger, cohort_id: str, agent_id: int, message: str, sub_round: int):
+def log_group_message(logger: logging.Logger, cohort_id: str, agent_id: Any, message: str, sub_round: int, model_name: str = None):
+    """Logs a group chat message in a Rich-styled box."""
     agent_colors = [
-        "green",
-        "yellow",
-        "blue",
-        "magenta",
-        "cyan",
-        "red",
-        "white"
+        "green", "yellow", "blue", "magenta", "cyan", "red", "white"
     ]
-    color = agent_colors[agent_id % len(agent_colors)]
+    try:
+        numeric_id = int(agent_id)
+    except (ValueError, TypeError):
+        numeric_id = 0
+
+    color = agent_colors[numeric_id % len(agent_colors)]
     header = f"[bold black on white]💬 {cohort_id.upper()} - Round {sub_round}[/bold black on white]"
-    agent_info = f"[bold {color}]🤖 Agent {agent_id:02d} says:[/bold {color}]"
+
+    if isinstance(agent_id, int):
+        agent_label = f"{agent_id:02d}"
+    else:
+        agent_label = str(agent_id)
+
+    model_info = f" [{model_name}]" if model_name else ""
+    agent_info = f"[bold {color}]🤖 Agent {agent_label}{model_info} says:[/bold {color}]"
+
     text = Text.from_markup(f"{agent_info}\n\n{message}")
     panel = Panel(
         Align.left(text),

@@ -88,13 +88,11 @@ class Agent(BaseModel):
             content=system_str
         )
 
-        initial_message = None
-        if self.task:
-            initial_message = self.prompt_manager.get_task_prompt({
-                "task": self.task,
-                "output_schema": None,
-                "output_format": "text"
-            })
+        initial_message = self.prompt_manager.get_task_prompt({
+            "task": self.task or "observe environment",
+            "output_schema": None,
+            "output_format": "text"
+        })
 
         self.chat_thread = ChatThread(
             name=f"ChatThread_{self.id}",

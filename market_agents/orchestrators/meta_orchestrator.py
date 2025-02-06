@@ -1,5 +1,7 @@
+from datetime import datetime
 from typing import Dict, Type
 import logging
+import uuid
 import warnings
 
 from market_agents.memory.agent_storage.setup_db import AsyncDatabase
@@ -119,8 +121,32 @@ class MetaOrchestrator:
         await self.db.close()
 
     async def _store_agent_states(self):
-        """Optional method to store or update your agent states before environment simulation."""
-        pass
+        """Store all agent states in the database before environment simulation."""
+        agents_data = []
+        for agent in self.agents:
+            llm_config = agent.llm_config.model_dump() if agent.llm_config else {}
+            llm_config = {
+                k: str(v) if isinstance(v, (uuid.UUID, datetime)) else v 
+                for k, v in llm_config.items()
+            }
+
+            agent_data = {
+                'id': agent.id,
+                'role': getattr(agent, 'role', 'participant'),
+                'persona': agent.persona,
+                'is_llm': True,
+                'max_iter': 0,
+                'llm_config': llm_config,
+                'economic_agent': {}
+            }
+            agents_data.append(agent_data)
+        
+        try:
+            await self.data_inserter.insert_agents(agents_data)
+            self.logger.info(f"Successfully inserted {len(agents_data)} agents into database")
+        except Exception as e:
+            self.logger.error(f"Error inserting agents into database: {e}")
+            raise
 
     async def _setup_tables(self):
         """Initialize orchestrator DB tables, if needed."""

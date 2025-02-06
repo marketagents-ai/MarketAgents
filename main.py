@@ -24,11 +24,15 @@ from market_agents.orchestrators.research_orchestrator import ResearchOrchestrat
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 
 from minference.lite.models import LLMConfig, ResponseFormat
+from dotenv import load_dotenv
 
 import logging
 
-logger = logging.getLogger(__name__)
+load_dotenv()
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("EntityRegistry").setLevel(logging.CRITICAL)
 
 async def create_kb_agent(
     config: AgentStorageConfig,
@@ -86,6 +90,7 @@ async def create_agents(
     """
     Create market agents using the updated MarketAgent framework.
     Optionally associates a single KnowledgeBaseAgent with all agents if specified.
+    Evenly distributes LLM configs across agents using rotation.
     """
     agents = []
     num_agents = config.num_agents
@@ -109,7 +114,7 @@ async def create_agents(
 
     for i, persona in enumerate(personas):
         agent_id = f"agent_{i}"
-        llm_c = random.choice(llm_confs)
+        llm_c = llm_confs[i % len(llm_confs)]
 
         econ_agent = EconomicAgent(
             generate_wallet=True,

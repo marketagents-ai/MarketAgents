@@ -11,6 +11,7 @@ class OrchestrationDataInserter:
         self.storage_service = storage_service
         self.db = storage_service.db
         self.logger = logging.getLogger("orchestration_data_inserter")
+        self.NAMESPACE_AGENTS = uuid.uuid5(uuid.NAMESPACE_DNS, 'market_agents.agents')
 
     async def insert_agents(self, agents_data: List[Dict[str, Any]]) -> Dict[str, uuid.UUID]:
         """Insert agent data and return mapping of agent IDs."""
@@ -27,20 +28,16 @@ class OrchestrationDataInserter:
             RETURNING id
         """
         agent_id_map = {}
-        NAMESPACE_AGENTS = uuid.uuid5(uuid.NAMESPACE_DNS, 'market_agents.agents')
         
         async with self.db.transaction() as txn:
             for agent in agents_data:
                 try:
                     string_id = str(agent['id'])
-                    if not string_id.startswith('agent_'):
-                        agent_id = uuid.UUID(string_id)
-                    else:
-                        agent_id = uuid.uuid5(NAMESPACE_AGENTS, string_id)
+                    agent_uuid = self._get_agent_uuid(string_id)
 
                     result = await self.db.fetch_one(
                         query,
-                        agent_id,
+                        agent_uuid,
                         agent['role'],
                         json.dumps(agent.get('persona', {})),
                         agent.get('is_llm', True),
@@ -55,8 +52,7 @@ class OrchestrationDataInserter:
                     raise
         return agent_id_map
 
-    async def insert_actions(self, actions_data: List[Dict[str, Any]], agent_id_map: Dict[str, uuid.UUID]):
-        """Insert actions (both group chat messages and research actions)."""
+    async def insert_actions(self, actions_data: List[Dict[str, Any]], agent_id_map: Optional[Dict[str, uuid.UUID]] = None):
         query = """
             INSERT INTO actions (agent_id, environment_name, round, sub_round, action_data, metadata)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -64,10 +60,9 @@ class OrchestrationDataInserter:
         async with self.db.transaction() as txn:
             for action in actions_data:
                 try:
-                    agent_id = action['agent_id']
-                    if not isinstance(agent_id, uuid.UUID):
-                        self.logger.error(f"Invalid agent_id type: {type(agent_id)}")
-                        continue
+                    agent_id_str = str(action['agent_id'])
+                    
+                    agent_uuid = self._get_agent_uuid(agent_id_str)
 
                     action_data = {
                         'content': action.get('content') or action.get('action'),
@@ -79,15 +74,12 @@ class OrchestrationDataInserter:
                     metadata = {
                         'timestamp': action.get('timestamp', datetime.now(timezone.utc).isoformat()),
                         'message_id': str(action.get('message_id', uuid.uuid4())),
-                        **{k: v for k, v in action.items() if k not in [
-                            'agent_id', 'environment_name', 'round', 'sub_round', 
-                            'content', 'action'
-                        ]}
+                        **{k: v for k, v in action.items() if k not in ['agent_id', 'environment_name', 'round', 'sub_round', 'content', 'action']}
                     }
 
                     await self.db.execute(
                         query,
-                        agent_id,
+                        agent_uuid,
                         action['environment_name'],
                         action['round'],
                         action.get('sub_round'),
@@ -161,4 +153,16 @@ class OrchestrationDataInserter:
 
         except Exception as e:
             self.logger.error(f"Error inserting round data: {e}")
+            raise
+
+    def _get_agent_uuid(self, agent_id: str) -> uuid.UUID:
+        """Convert string agent ID to UUID consistently."""
+        try:
+            if isinstance(agent_id, uuid.UUID):
+                return agent_id
+                
+            namespace_uuid = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')
+            return uuid.uuid5(namespace_uuid, str(agent_id))
+        except Exception as e:
+            self.logger.error(f"Error converting agent ID {agent_id} to UUID: {e}")
             raise
