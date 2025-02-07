@@ -3,25 +3,25 @@
 num_agents: 4
 max_rounds: 1
 environment_order:
-#  - group_chat
+  - group_chat
   - research
 tool_mode: true
 agent_config:
   knowledge_base: "hamlet_kb"
   use_llm: true
 llm_configs:
-#    - name: "gpt-4o"
-#      model: "gpt-4o-mini"
-#      client: "openai"
-#      max_tokens: 1024
-#      temperature: 0.5
-#      use_cache: true
-#    - name: "hermes"
-#      model: "openai/hermes-testing/Hermes-3-Pro-RC2-e4"
-#      client: "litellm"
-#      max_tokens: 4096
-#      temperature: 0.5
-#      use_cache: true
+    - name: "gpt-4o"
+      model: "gpt-4o-mini"
+      client: "openai"
+      max_tokens: 1024
+      temperature: 0.5
+      use_cache: true
+    - name: "claude"
+      model: "claude-3-5-sonnet-latest"
+      client: "anthropic"
+      max_tokens: 4096
+      temperature: 0.5
+      use_cache: true
     - name: "hermes"
       model: "openai/NousResearch/Hermes-3-Llama-3.1-8B"
       client: "litellm"
@@ -53,7 +53,7 @@ environment_configs:
     api_url: "http://localhost:8002"
   #  initial_topic: "Initial Market Discussion"
     initial_topic: "Hamlet's famous 'To be or not to be' soliloquy. Use emoji's and colloquial language for discussion"
-    sub_rounds: 1
+    sub_rounds: 2
     group_size: 4
   research:
     name: "literary_research"

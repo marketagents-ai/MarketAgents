@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional, Literal
 from pydantic import Field
 from dotenv import load_dotenv
 import time
-from uuid import UUID
+from uuid import UUID, uuid4
 
 # Internal imports - complete set
 from minference.lite.models import (
@@ -233,10 +233,13 @@ class InferenceOrchestrator:
 
     async def _run_openai_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        requests_file = os.path.join(self.cache_folder, f'openai_requests_{timestamp}.jsonl')
-        results_file = os.path.join(self.cache_folder, f'openai_results_{timestamp}.jsonl')
+        unique_uuid = str(uuid4())
+        requests_file = os.path.join(self.cache_folder, f'openai_requests_{unique_uuid}_{timestamp}.jsonl')
+
+        results_file = os.path.join(self.cache_folder, f'openai_results_{unique_uuid}_{timestamp}.jsonl')
         
         prepare_requests_file(chat_threads, "openai", requests_file)
+
         config = create_oai_completion_config(
             chat_thread=chat_threads[0], 
             requests_file=requests_file, 
@@ -257,9 +260,11 @@ class InferenceOrchestrator:
 
     async def _run_anthropic_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        requests_file = os.path.join(self.cache_folder, f'anthropic_requests_{timestamp}.jsonl')
-        results_file = os.path.join(self.cache_folder, f'anthropic_results_{timestamp}.jsonl')
+        unique_uuid = str(uuid4())
+        requests_file = os.path.join(self.cache_folder, f'anthropic_requests_{unique_uuid}_{timestamp}.jsonl')
+        results_file = os.path.join(self.cache_folder, f'anthropic_results_{unique_uuid}_{timestamp}.jsonl')
         
+
         prepare_requests_file(chat_threads, "anthropic", requests_file)
         config = create_anthropic_completion_config(
             chat_thread=chat_threads[0], 
@@ -281,9 +286,11 @@ class InferenceOrchestrator:
 
     async def _run_vllm_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        requests_file = os.path.join(self.cache_folder, f'vllm_requests_{timestamp}.jsonl')
-        results_file = os.path.join(self.cache_folder, f'vllm_results_{timestamp}.jsonl')
+        unique_uuid = str(uuid4())
+        requests_file = os.path.join(self.cache_folder, f'vllm_requests_{unique_uuid}_{timestamp}.jsonl')
+        results_file = os.path.join(self.cache_folder, f'vllm_results_{unique_uuid}_{timestamp}.jsonl')
         
+
         prepare_requests_file(chat_threads, "vllm", requests_file)
         config = create_vllm_completion_config(
             chat_thread=chat_threads[0], 
@@ -306,9 +313,11 @@ class InferenceOrchestrator:
 
     async def _run_litellm_completion(self, chat_threads: List[ChatThread]) -> List[ProcessedOutput]:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        requests_file = os.path.join(self.cache_folder, f'litellm_requests_{timestamp}.jsonl')
-        results_file = os.path.join(self.cache_folder, f'litellm_results_{timestamp}.jsonl')
+        unique_uuid = str(uuid4())
+        requests_file = os.path.join(self.cache_folder, f'litellm_requests_{unique_uuid}_{timestamp}.jsonl')
+        results_file = os.path.join(self.cache_folder, f'litellm_results_{unique_uuid}_{timestamp}.jsonl')
         
+
         prepare_requests_file(chat_threads, "litellm", requests_file)
         config = create_litellm_completion_config(
             chat_thread=chat_threads[0], 

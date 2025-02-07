@@ -4,6 +4,7 @@ from typing import Optional, List, Union, Dict, Any
 from pydantic import BaseModel, Field
 
 from minference.lite.models import (
+    EntityRegistry,
     ChatThread,
     SystemPrompt,
     LLMConfig,
@@ -15,6 +16,7 @@ from minference.lite.inference import InferenceOrchestrator
 
 from market_agents.agents.base_agent.prompter import PromptManager
 
+EntityRegistry()
 agent_logger = logging.getLogger(__name__)
 
 class Agent(BaseModel):

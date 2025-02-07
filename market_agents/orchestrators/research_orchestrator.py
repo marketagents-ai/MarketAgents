@@ -195,7 +195,8 @@ class ResearchOrchestrator(BaseEnvironmentOrchestrator):
                 if content:
                     agent_summaries[agent.id] = content
                 
-                log_action(self.logger, agent.id, content)
+                model_name = agent.llm_config.model if agent.llm_config else None
+                log_action(self.logger, agent.id, content, model_name=model_name)
 
             except Exception as e:
                 self.logger.error(f"Error processing action for agent {agent.id}: {str(e)}", exc_info=True)

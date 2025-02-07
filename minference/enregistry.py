@@ -11,7 +11,6 @@ Main components:
 - Entity Type Validation: Runtime type checking for entity instances
 - Entity Lineage Tracking: Functions for tracking entity versions
 """
-import logging
 from typing import Dict, Any, Optional, Type, TypeVar, List, Generic, Protocol, runtime_checkable
 from pydantic import BaseModel
 from uuid import UUID
@@ -19,9 +18,6 @@ import json
 from datetime import datetime
 
 from minference.base_registry import BaseRegistry
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 @runtime_checkable
 class HasID(Protocol):
@@ -40,7 +36,6 @@ class EntityRegistry(BaseRegistry[EntityType]):
     Type Args:
         EntityType: Type of Pydantic models to store
     """
-    _logger = logger
     _registry: Dict[UUID, EntityType] = {}
     _timestamps: Dict[UUID, datetime] = {}
 

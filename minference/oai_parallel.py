@@ -429,7 +429,9 @@ def api_endpoint_from_url(request_url: str) -> Literal["completions", "embedding
                     match = [None,"chat"]
                 else:
                     raise ValueError(f"Invalid URL: {request_url}")
-    if "anthropic" in match[1]:
+
+                
+    if "messages" in match[1]:
         return "messages"
 
     elif "chat" in match[1]:
@@ -470,6 +472,7 @@ def num_tokens_consumed_from_request(
     encoding = tiktoken.get_encoding(token_encoding_name)
     
     if api_endpoint in ["completions", "chat"]:
+
         max_tokens = request_json.get("max_tokens", 15)
         n = request_json.get("n", 1)
         completion_tokens = n * max_tokens

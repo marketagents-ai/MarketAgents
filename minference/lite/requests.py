@@ -181,30 +181,42 @@ def prepare_requests_file(chat_threads: List[ChatThread], client: str, filename:
 
 def validate_anthropic_request(request: Dict[str, Any]) -> bool:
     """Validate an Anthropic API request."""
+
     try:
         anthropic_request = AnthropicRequest(**request)
         return True
+    except ValidationError as e:
+        EntityRegistry._logger.error(f"Error validating Anthropic request: {e}")
+        # Re-raise the original ValidationError instead of creating a new one
+        raise e
     except Exception as e:
         EntityRegistry._logger.error(f"Error validating Anthropic request: {e}")
-        raise ValidationError(f"Error validating Anthropic request: {e} with request: {request}")
+        # For other types of errors, raise a ValueError instead
+        raise ValueError(f"Error validating Anthropic request: {e} with request: {request}")
 
 def validate_openai_request(request: Dict[str, Any]) -> bool:
     """Validate an OpenAI API request."""
     try:
         openai_request = OpenAIRequest(**request)
         return True
+    except ValidationError as e:
+        EntityRegistry._logger.error(f"Error validating OpenAI request: {e}")
+        raise e
     except Exception as e:
         EntityRegistry._logger.error(f"Error validating OpenAI request: {e}")
-        raise ValidationError(f"Error validating OpenAI request: {e} with request: {request}")
+        raise ValueError(f"Error validating OpenAI request: {e} with request: {request}")
 
 def validate_vllm_request(request: Dict[str, Any]) -> bool:
     """Validate a vLLM API request."""
     try:
         vllm_request = VLLMRequest(**request)
         return True
+    except ValidationError as e:
+        EntityRegistry._logger.error(f"Error validating VLLM request: {e}")
+        raise e
     except Exception as e:
         EntityRegistry._logger.error(f"Error validating VLLM request: {e}")
-        raise ValidationError(f"Error validating VLLM request: {e} with request: {request}")
+        raise ValueError(f"Error validating VLLM request: {e} with request: {request}")
 
 def get_openai_request(chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
     """Get OpenAI format request from chat thread."""
@@ -244,7 +256,7 @@ def get_openai_request(chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
             chat_thread.workflow_step += 1
         else:
             EntityRegistry._logger.error(f"Tool not found for workflow step {chat_thread.workflow_step}")
-    else:
+    elif chat_thread.llm_config.response_format != ResponseFormat.text:
         raise ValueError(f"Invalid response format: {chat_thread.llm_config.response_format}")
         
     if validate_openai_request(request):
@@ -272,7 +284,7 @@ def get_anthropic_request(chat_thread: ChatThread) -> Optional[Dict[str, Any]]:
     elif chat_thread.llm_config.response_format == "auto_tools":
         tools = chat_thread.tools
         if tools:
-            request["tools"] = [t.get_anthropic_tool() for t in tools]
+            request["tools"] =  chat_thread.get_tools_for_llm()
             request["tool_choice"] = ToolChoiceToolChoiceAuto(type="auto")
     elif chat_thread.llm_config.response_format == ResponseFormat.workflow:
         if chat_thread.workflow_step is None:
