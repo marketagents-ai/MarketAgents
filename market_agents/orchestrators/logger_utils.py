@@ -90,11 +90,12 @@ def log_perception(logger: logging.Logger, agent_id: int, perception: str):
         logger.warning(f"Failed to convert perception to markdown: {e}")
         console.print(f"[bold blue]👁️ Agent {agent_id} perceives:[/bold blue]\n[cyan]{perception}[/cyan]")
 
-def log_action(logger: logging.Logger, agent_id: int, action: Any):
+def log_action(logger: logging.Logger, agent_id: int, action: Any, model_name: str = None):
     try:
         action_dict = json.loads(action) if isinstance(action, str) else action
         markdown = json_to_markdown(action_dict)
-        header = f"[bold green]🎯 Agent {agent_id} action:[/bold green]\n"
+        model_info = f" [{model_name}]" if model_name else ""
+        header = f"[bold green]🎯 Agent {agent_id}{model_info} action:[/bold green]\n"
         text = Text.from_markup(header)
         text.append(markdown)
         panel = Panel(
@@ -106,7 +107,7 @@ def log_action(logger: logging.Logger, agent_id: int, action: Any):
         console.print(panel)
     except Exception as e:
         logger.warning(f"Failed to convert action to markdown: {e}")
-        console.print(f"[bold green]🎯 Agent {agent_id} action:[/bold green]\n[green]{action}[/green]")
+        console.print(f"[bold green]🎯 Agent {agent_id}{model_info} action:[/bold green]\n[green]{action}[/green]")
 
 def log_reflection(logger: logging.Logger, agent_id: Any, reflection: str):
     """

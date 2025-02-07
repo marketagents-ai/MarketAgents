@@ -1,10 +1,11 @@
 import os
 from openai.types.chat import ChatCompletionMessageParam
 
-from anthropic.types import MessageParam
 from anthropic.types import CacheControlEphemeralParam
 from anthropic.types import TextBlockParam
 from anthropic.types import MessageParam
+from anthropic.types import ToolResultBlockParam,ToolUseBlockParam
+
 from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
@@ -71,7 +72,6 @@ def msg_dict_to_oai(messages: List[Dict[str, Any]]) -> List[ChatCompletionMessag
                 if "function_call" in msg:
                     assistant_msg["function_call"] = msg["function_call"]
                 if "tool_calls" in msg:
-                    print(f"validating tool_calls during conversion: {[ChatCompletionMessageToolCallParam(**tool_call) for tool_call in msg["tool_calls"]]}")
                     assistant_msg["tool_calls"] = [ChatCompletionMessageToolCallParam(**tool_call) for tool_call in msg["tool_calls"]]
                 return assistant_msg
             elif role == "tool":
@@ -96,10 +96,51 @@ def msg_dict_to_anthropic(messages: List[Dict[str, Any]],use_cache:bool=True,use
         def convert_message(msg: Dict[str, Any],use_cache:bool=False) -> Union[MessageParam, None]:
             role = msg["role"]
             content = msg["content"]
+            tool_calls=msg.get("tool_calls",None)
+
             if role == "system":
                 return None
-            
-            if isinstance(content, str):
+            elif role == "tool":
+                role = "user"
+                if not use_cache:
+                    content = [ToolResultBlockParam(
+                        type="tool_result",
+                        tool_use_id=msg["tool_call_id"],
+                        content=content,
+                        is_error=False
+                    )]
+                else:
+                    content = [ToolResultBlockParam(
+                        type="tool_result",
+                        tool_use_id=msg["tool_call_id"],
+                        content=content,
+                        cache_control=CacheControlEphemeralParam(type="ephemeral"),
+                        is_error=False
+                    )]
+
+            elif role == "assistant" and tool_calls:
+               
+                if not use_cache:
+                
+                    content = [ToolUseBlockParam(
+                        type="tool_use",
+                        id = tool_calls[0]["id"],
+                        input = json.loads(tool_calls[0]["function"]["arguments"]),  # Parse the JSON string
+                        name = tool_calls[0]["function"]["name"]
+                    )]
+                else:
+                    content = [ToolUseBlockParam(
+                        type="tool_use",
+                        id = tool_calls[0]["id"],
+                        input = json.loads(tool_calls[0]["function"]["arguments"]),  # Parse the JSON string
+                        name = tool_calls[0]["function"]["name"],
+                        cache_control=CacheControlEphemeralParam(type="ephemeral")
+                    )]
+                        
+
+
+
+            elif isinstance(content, str):
                 if not use_cache:
                     content = [TextBlockParam(type="text", text=content)]
                 else:

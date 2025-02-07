@@ -48,6 +48,7 @@ from anthropic.types import (
     ToolUseBlock,
     ToolParam,
     TextBlockParam,
+    ToolResultBlockParam,
     Message as AnthropicMessage
 )
 T = TypeVar('T', bound='Entity')
@@ -507,14 +508,21 @@ class CallableTool(Entity):
             )
         return None
 
-    def get_anthropic_tool(self) -> Optional[ToolParam]:
+    def get_anthropic_tool(self, use_cache:bool=True) -> Optional[ToolParam]:
         """Get Anthropic tool format using the callable's schema."""
         if self.input_schema:
-            return ToolParam(
-                name=self.name,
-                description=self.docstring or f"Execute {self.name} function",
-                input_schema=self.input_schema,
-                cache_control=CacheControlEphemeralParam(type='ephemeral')
+            if use_cache:
+                return ToolParam(
+                    name=self.name,
+                    description=self.docstring or f"Execute {self.name} function",
+                    input_schema=self.input_schema,
+                    cache_control=CacheControlEphemeralParam(type='ephemeral')
+                )
+            else:
+                return ToolParam(
+                    name=self.name,
+                    description=self.docstring or f"Execute {self.name} function",
+                    input_schema=self.input_schema,
             )
         return None
         
@@ -606,14 +614,21 @@ class StructuredTool(Entity):
             )
         return None
 
-    def get_anthropic_tool(self) -> Optional[ToolParam]:
+    def get_anthropic_tool(self,use_cache:bool=True) -> Optional[ToolParam]:
         """Get Anthropic tool format."""
         if self.json_schema:
-            return ToolParam(
-                name=self.name,
-                description=self.description,
-                input_schema=self.json_schema,
-                cache_control=CacheControlEphemeralParam(type='ephemeral')
+            if use_cache:
+                return ToolParam(
+                    name=self.name,
+                    description=self.description,
+                    input_schema=self.json_schema,
+                    cache_control=CacheControlEphemeralParam(type='ephemeral')
+                )
+            else:
+                return ToolParam(
+                    name=self.name,
+                    description=self.description,
+                    input_schema=self.json_schema,
             )
         return None
 
@@ -1098,7 +1113,6 @@ class RawOutput(Entity):
 
         # Extract usage information
         if chat_completion.usage:
-            print("current format for chat completion usage",chat_completion.usage)
 
             usage = Usage(
                 prompt_tokens=chat_completion.usage.prompt_tokens,
@@ -1122,32 +1136,43 @@ class RawOutput(Entity):
         usage = None
 
         if message.content:
-            first_content = message.content[0]
+            text_block = next((block for block in message.content 
+                          if isinstance(block, TextBlock) and block.text.strip()), None)
+            
+
+            tool_block = next((block for block in message.content 
+                          if isinstance(block, ToolUseBlock)), None)
             # Check if it's a TextBlock
-            if isinstance(first_content, TextBlock):
-                content = first_content.text
+            if isinstance(text_block, TextBlock):
+                content = text_block.text
+
                 parsed_json = self._parse_json_string(content)
                 if parsed_json:
                     json_object = GeneratedJsonObject(
                         name="parsed_content", 
                         object=parsed_json
                     )
-                    content = None
+                    content = content
             # Check if it's a ToolUseBlock
-            elif isinstance(first_content, ToolUseBlock):
-                tool_use = first_content
+            if isinstance(tool_block, ToolUseBlock):
+               
+                tool_call_id = tool_block.id
                 # Cast tool_use.input to Dict[str, Any]
-                if isinstance(tool_use.input, dict):
+                if isinstance(tool_block.input, dict):
                     json_object = GeneratedJsonObject(
-                        name=tool_use.name,
-                        object=tool_use.input
+                        name=tool_block.name,
+                        object=tool_block.input,
+                        tool_call_id=tool_call_id
                     )
                 else:
                     # Handle non-dict input by wrapping it
+
                     json_object = GeneratedJsonObject(
-                        name=tool_use.name,
-                        object={"value": tool_use.input}
+                        name=tool_block.name,
+                        object={"value": tool_block.input},
+                        tool_call_id=tool_call_id
                     )
+
 
         if hasattr(message, 'usage'):
             usage = Usage(
@@ -1382,6 +1407,7 @@ class ChatThread(Entity):
     @property
     def anthropic_messages(self) -> Tuple[List[TextBlockParam], List[MessageParam]]:
         """Get messages in Anthropic format."""
+        
         return msg_dict_to_anthropic(self.messages, use_cache=self.llm_config.use_cache)
 
     @property
@@ -1501,18 +1527,24 @@ class ChatThread(Entity):
                     EntityRegistry._logger.info(f"Added error message({error_message.id}) for failed tool operation")
         
         return parent_message, assistant_message
+    
     def get_tools_for_llm(self) -> Optional[List[Union[ChatCompletionToolParam, ToolParam]]]:
         """Get tools in format appropriate for current LLM."""
         if not self.tools:
             return None
             
         tools = []
-        for tool in self.tools:
+        for idx,tool in enumerate(self.tools):
             if self.llm_config.client in [LLMClient.openai, LLMClient.vllm, LLMClient.litellm]:
                 tools.append(tool.get_openai_tool())
             elif self.llm_config.client == LLMClient.anthropic:
-                tools.append(tool.get_anthropic_tool())
+                if idx == 0 and self.llm_config.use_cache:
+                    use_cache = True
+                else:
+                    use_cache = False
+                tools.append(tool.get_anthropic_tool(use_cache=use_cache))
         return tools if tools else None
+
 
     @model_validator(mode='after')
     def validate_workflow(self) -> Self:
