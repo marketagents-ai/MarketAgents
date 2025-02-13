@@ -350,7 +350,7 @@ def load_or_generate_personas(personas_dir: Path, num: int) -> List[Persona]:
     Load existing personas from 'personas_dir' or generate/generate new ones if needed.
     """
     personas_dir.mkdir(parents=True, exist_ok=True)
-    existing_personas = list(personas_dir.glob("*.yaml"))
+    existing_personas = list(personas_dir.rglob("*.yaml"))
     personas = []
     
     for p_file in existing_personas:
