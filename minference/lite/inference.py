@@ -124,6 +124,15 @@ async def run_parallel_ai_completion(
     
     EntityRegistry._logger.info(f"Processing {len(llm_outputs)} LLM outputs")
     processed_outputs = await process_outputs_and_execute_tools(chat_threads, llm_outputs)
+
+    for thread, output in zip(chat_threads, processed_outputs):
+        orchestrator.all_requests.append({
+            'chat_thread': thread,
+            'output': output,
+            'timestamp': time.time()
+        })
+    
+    print(f"Total AI Requests: {len(orchestrator.all_requests)}")
     
     return processed_outputs
 
