@@ -47,10 +47,14 @@ class MetaOrchestrator:
             embedding_service=self.embedder,
             config=self.storage_config
         )
-        self.data_inserter = OrchestrationDataInserter(storage_service=self.storage_service)
-        self.environment_orchestrators: Dict[str, BaseEnvironmentOrchestrator] = {}
 
         self.ai_utils = self._initialize_ai_utils()
+
+        for agent in self.agents:
+            agent.llm_orchestrator = self.ai_utils
+            
+        self.data_inserter = OrchestrationDataInserter(storage_service=self.storage_service)
+        self.environment_orchestrators: Dict[str, BaseEnvironmentOrchestrator] = {}
 
     def _initialize_storage_config(self) -> AgentStorageConfig:
         config_path = "market_agents/memory/storage_config.yaml"
