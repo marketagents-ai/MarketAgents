@@ -57,9 +57,9 @@ class GroupChatObservation(BaseModel):
         default="",
         description="Current topic of discussion"
     )
-    round_messages: List[GroupChatMessage] = Field(
-        default_factory=list,
-        description="Messages from the current round only"
+    agent_message: Optional[GroupChatMessage] = Field(
+        default=None,
+        description="Agent's own message from this round"
     )
 
 class GroupChatLocalObservation(LocalObservation):
@@ -148,7 +148,7 @@ class GroupChat(Mechanism):
                 agent_id=action.agent_id,
                 observation=GroupChatObservation(
                     current_topic=self.current_topic,
-                    round_messages=[action.action]
+                    agent_message=action.action
                 )
             )
             
@@ -194,12 +194,12 @@ class GroupChat(Mechanism):
 
             # Create observations
             observations = {}
-            for agent_id in action.actions.keys():
+            for agent_id, local_action in action.actions.items():
                 observations[agent_id] = GroupChatLocalObservation(
                     agent_id=agent_id,
                     observation=GroupChatObservation(
                         current_topic=self.current_topic,
-                        round_messages=self.round_messages
+                        agent_message=local_action.action
                     )
                 )
 
