@@ -773,61 +773,100 @@ class StorageService:
             context = context + "..."
         return context
 
+    def uuid_encoder(self, obj):
+        """JSON encoder function for handling UUIDs and datetimes."""
+        if isinstance(obj, UUID):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        raise TypeError(f'Object of type {type(obj)} is not JSON serializable')
+
     async def store_ai_requests(self, requests: List[Dict[str, Any]]):
         """Store AI requests in the database."""
         try:
             values = []
+            self.logger.info(f"Processing {len(requests)} requests")
+            
             for req in requests:
-                if hasattr(req, 'model_dump'):
-                    req_dict = req.model_dump()
-                    request_data = (
-                        str(uuid.uuid4()),
-                        None,
-                        json.dumps(req_dict.get('messages', [])),
-                        json.dumps(req_dict.get('raw_result')),
-                        json.dumps({
-                            'model': req_dict.get('raw_result', {}).get('model'),
-                            'client': req_dict.get('client'),
-                            'provider': req_dict.get('result_provider'),
-                            'start_time': req_dict.get('start_time'),
-                            'end_time': req_dict.get('end_time'),
-                            'time_taken': req_dict.get('time_taken'),
-                            'completion_kwargs': req_dict.get('completion_kwargs')
-                        }),
-                        datetime.fromtimestamp(req_dict.get('start_time', time.time()), tz=timezone.utc)
-                    )
-                # Handle dictionary requests
-                elif isinstance(req, dict):
-                    request_data = (
-                        req.get('request_id', str(uuid.uuid4())),
-                        req.get('agent_id'),
-                        json.dumps(req.get('messages', [])),
-                        json.dumps(req.get('raw_result')),
-                        json.dumps({
-                            'model': req.get('raw_result', {}).get('model'),
-                            'client': req.get('client'),
-                            'provider': req.get('result_provider'),
-                            'start_time': req.get('start_time'),
-                            'end_time': req.get('end_time'),
-                            'time_taken': req.get('end_time', 0) - req.get('start_time', 0),
-                            'completion_kwargs': req.get('completion_kwargs')
-                        }),
-                        datetime.fromtimestamp(req.get('start_time', time.time()), tz=timezone.utc)
-                    )
+                try:
+                    self.logger.debug(f"Processing request: {req}")
+                    
+                    chat_thread = req.get('chat_thread')
+                    if not chat_thread:
+                        self.logger.warning("Skipping request - no chat thread found")
+                        continue
+                        
+                    output = req.get('output')
+                    if not output:
+                        self.logger.warning("Skipping request - no output found")
+                        continue
+                        
+                    timestamp = req.get('timestamp', time.time())
 
-                values.append(request_data)
+                    # Generate new unique request ID
+                    request_id = str(uuid.uuid4())
+                    self.logger.info(f"Generated new request ID: {request_id} for chat thread: {chat_thread.id}")
+
+                    messages = []
+                    #if chat_thread.system_prompt:
+                    #    messages.append({
+                    #        'role': 'system',
+                    #        'content': chat_thread.system_prompt.content
+                    #    })
+                    #for msg in chat_thread.messages:
+                    #    if isinstance(msg, dict):
+                    #        messages.append(msg)
+                    #    else:
+                    #        messages.append({
+                    #            'role': msg.role,
+                    #            'content': msg.content
+                    #        })
+                    #if chat_thread.new_message:
+                    #    messages.append({
+                    #        'role': 'user',
+                    #        'content': chat_thread.new_message
+                    #    })
+#
+                    response = output.raw_output.raw_result if output and output.raw_output else None
+                    
+                    request_data = (
+                        request_id,
+                        str(chat_thread.id),
+                        json.dumps(chat_thread.messages, default=self.uuid_encoder),
+                        json.dumps(response, default=self.uuid_encoder),
+                        json.dumps({
+                            'chat_thread_id': str(chat_thread.id),
+                            'model': chat_thread.llm_config.model if chat_thread.llm_config else None,
+                            'client': chat_thread.llm_config.client if chat_thread.llm_config else None,
+                            'start_time': output.raw_output.start_time if output and output.raw_output else None,
+                            'end_time': output.raw_output.end_time if output and output.raw_output else None,
+                            'completion_kwargs': chat_thread.llm_config.model_dump() if chat_thread.llm_config else None,
+                            'usage': response.get('usage') if response else None
+                        }, default=self.uuid_encoder),
+                        datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                    )
+                    values.append(request_data)
+                    self.logger.debug(f"Successfully processed request ID: {request_id} for chat thread: {chat_thread.id}")
+                    
+                except Exception as e:
+                    self.logger.error(f"Error processing request: {e}")
+                    self.logger.error(f"Problematic request: {req}")
+                    continue
 
             if not values:
+                self.logger.warning("No valid requests to insert")
                 return
 
+            self.logger.info(f"Attempting to store {len(values)} AI requests")
             async with self.db.safe_transaction() as conn:
                 await conn.executemany("""
                     INSERT INTO ai_requests 
                     (request_id, agent_id, prompt, response, metadata, created_at)
                     VALUES ($1, $2, $3, $4, $5, $6)
-                    ON CONFLICT (request_id) DO NOTHING
                 """, values)
+                self.logger.info(f"Successfully stored {len(values)} AI requests")
 
         except Exception as e:
             self.logger.error(f"Failed to store AI requests: {e}")
+            self.logger.error(f"Request data sample: {requests[0] if requests else None}")
             raise

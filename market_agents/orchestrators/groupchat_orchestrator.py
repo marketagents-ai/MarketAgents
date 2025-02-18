@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -283,103 +284,142 @@ class GroupChatOrchestrator:
                 self.logger.warning(f"No topic found for cohort {cohort_id}")
                 return
 
-            # Update topic in the GroupChat mechanism (not the environment wrapper)
+            # Update topic in the GroupChat mechanism
             if hasattr(environment, 'mechanism'):
                 environment.mechanism._update_topic(topic)
             else:
                 self.logger.error("Environment missing GroupChat mechanism")
                 return
 
-            # Run perception step
-            perceptions = await self.cognitive_processor.run_parallel_perception(
-                cohort_agents, 
-                environment_name="group_chat"
-            )
-            
-            for agent, perception in zip(cohort_agents, perceptions):
-                idx_str = getattr(agent, "index", agent.id)
-                parsed_perception = perception.json_object.object if perception and perception.json_object else perception.str_content
-                log_perception(self.logger, idx_str, parsed_perception)
-                agent.last_perception = parsed_perception
-
-            # Run action step
-            actions = await self.cognitive_processor.run_parallel_action(
-                cohort_agents, 
-                environment_name="group_chat"
-            )
-
-            # Create global action from individual actions
-            global_action = GroupChatGlobalAction(actions={})
-            for agent, action in zip(cohort_agents, actions):
-                if action:
-                    content = self.extract_message_content(action)
-                    if content:
-                        global_action.actions[agent.id] = GroupChatAction(
-                            agent_id=agent.id,
-                            action=GroupChatMessage(
-                                content=content,
-                                message_type="chat_message"
-                            )
-                        )
-                        agent.last_action = content
-
-                        model_name = agent.llm_config.model.split('/')[-1] if agent.llm_config else None
-                        log_group_message(
-                            self.logger,
-                            cohort_id,
-                            getattr(agent, "index", agent.id),
-                            content,
-                            sub_round=sub_round_num,
-                            model_name=model_name
-                        )
-
-            # Step environment and get observations
-            step_result = environment.step(global_action)
-            
-            # Update agent observations
-            if step_result and step_result.global_observation:
-                for agent in cohort_agents:
-                    if agent.id in step_result.global_observation.observations:
-                        agent.last_observation = step_result.global_observation.observations[agent.id]
-                        self.logger.debug(
-                            f"Updated observation for agent {agent.id}: {agent.last_observation}"
-                        )
-                    else:
-                        self.logger.warning(f"No observation for agent {agent.id}")
-
-            # Store messages in database
-            messages_to_insert = []
-            for agent_id, action in global_action.actions.items():
-                messages_to_insert.append({
-                    "message_id": str(uuid.uuid4()),
-                    "agent_id": agent_id,
-                    "environment_name": "group_chat",
-                    "round": round_num,
-                    "sub_round": sub_round_num,
-                    "cohort_id": cohort_id,
-                    "topic": topic,
-                    "content": action.action.content,
-                    "type": "group_chat_message",
-                    "timestamp": datetime.now(timezone.utc)
-                })
-
-            # Run reflections for agents with observations
-            agents_with_obs = [
-                agent for agent in cohort_agents 
-                if agent.last_observation and agent.last_observation.observation
-            ]
-            
-            if agents_with_obs:
-                self.logger.info(f"Running reflections for {len(agents_with_obs)} agents")
-                reflections = await self.cognitive_processor.run_parallel_reflection(
-                    agents_with_obs,
-                    environment_name="group_chat"
-                )
-            else:
-                self.logger.info("No agents with observations to reflect on")
+            # Run cognitive phases
+            perceptions = await self._run_perception_phase(cohort_agents)
+            step_result = await self._run_action_phase(cohort_agents, cohort_id, round_num, sub_round_num, topic)
+            await self._run_reflection_phase(cohort_agents)
 
         except Exception as e:
             self.logger.error(f"Error in sub-round {round_num}.{sub_round_num}: {e}", exc_info=True)
+
+    async def _run_perception_phase(self, cohort_agents: List[MarketAgent]):
+        """Handles the perception phase of the cognitive cycle."""
+        self.logger.info("Agents perceiving environment...")
+        
+        perceptions = await self.cognitive_processor.run_parallel_perception(
+            cohort_agents, 
+            environment_name="group_chat"
+        )
+        
+        for agent, perception in zip(cohort_agents, perceptions):
+            idx_str = getattr(agent, "index", agent.id)
+            parsed_perception = perception.json_object.object if perception and perception.json_object else perception.str_content
+            log_perception(self.logger, idx_str, parsed_perception)
+            agent.last_perception = parsed_perception
+            
+        return perceptions
+
+    async def _run_action_phase(
+        self,
+        cohort_agents: List[MarketAgent],
+        cohort_id: str,
+        round_num: int,
+        sub_round_num: int,
+        topic: str
+    ):
+        """Handles the action phase of the cognitive cycle."""
+        self.logger.info("Gathering agent messages...")
+        
+        # Get environment
+        environment = cohort_agents[0].environments["group_chat"]
+        
+        # Run actions
+        actions = await self.cognitive_processor.run_parallel_action(
+            cohort_agents, 
+            environment_name="group_chat"
+        )
+
+        # Create global action from individual actions
+        global_action = GroupChatGlobalAction(actions={})
+        messages_to_insert = []
+
+        for agent, action in zip(cohort_agents, actions):
+            if action:
+                content = self.extract_message_content(action)
+                if content:
+                    # Add to global action
+                    global_action.actions[agent.id] = GroupChatAction(
+                        agent_id=agent.id,
+                        action=GroupChatMessage(
+                            content=content,
+                            message_type="chat_message"
+                        )
+                    )
+                    agent.last_action = content
+
+                    # Log message
+                    model_name = agent.llm_config.model.split('/')[-1] if agent.llm_config else None
+                    log_group_message(
+                        self.logger,
+                        cohort_id,
+                        getattr(agent, "index", agent.id),
+                        content,
+                        sub_round=sub_round_num,
+                        model_name=model_name
+                    )
+
+                    # Prepare for database
+                    messages_to_insert.append({
+                        "message_id": str(uuid.uuid4()),
+                        "agent_id": agent.id,
+                        "environment_name": "group_chat",
+                        "round": round_num,
+                        "sub_round": sub_round_num,
+                        "cohort_id": cohort_id,
+                        "topic": topic,
+                        "content": content,
+                        "type": "group_chat_message",
+                        "timestamp": datetime.now(timezone.utc)
+                    })
+
+        # Step environment and get observations
+        step_result = environment.step(global_action)
+        
+        # Update agent observations
+        if step_result and step_result.global_observation:
+            for agent in cohort_agents:
+                if agent.id in step_result.global_observation.observations:
+                    agent.last_observation = step_result.global_observation.observations[agent.id]
+                    self.logger.debug(
+                        f"Updated observation for agent {agent.id}: {agent.last_observation}"
+                    )
+                else:
+                    self.logger.warning(f"No observation for agent {agent.id}")
+
+        return step_result
+
+    async def _run_reflection_phase(self, cohort_agents: List[MarketAgent]):
+        """Handles the reflection phase of the cognitive cycle."""
+        self.logger.info("Agents reflecting on conversation...")
+        try:
+            agents_with_observations = [
+                agent for agent in cohort_agents 
+                if agent.last_observation and hasattr(agent.last_observation, 'observation') and agent.last_observation.observation
+            ]
+
+            if not agents_with_observations:
+                self.logger.warning("No agents had observations to reflect on")
+                return
+
+            reflections = await self.cognitive_processor.run_parallel_reflection(
+                agents_with_observations,
+                environment_name="group_chat"
+            )
+            
+            if not reflections:
+                self.logger.warning("No reflections received from agents")
+                return
+
+        except Exception as e:
+            self.logger.error(f"Error during reflection step: {str(e)}", exc_info=True)
+            self.logger.exception("Reflection step failed but continuing...")
 
     def extract_message_content(self, action) -> Optional[str]:
         """Extract the 'content' from the agent's action output."""

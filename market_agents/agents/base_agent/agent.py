@@ -52,8 +52,8 @@ class Agent(BaseModel):
         default=None,
         description="LLM configuration (model, client, response format, etc.)."
     )
-    orchestrator: InferenceOrchestrator = Field(
-        default_factory=InferenceOrchestrator,
+    llm_orchestrator: InferenceOrchestrator = Field(
+        ...,
         description="Inference orchestrator for parallel LLM requests."
     )
     prompt_manager: Optional[PromptManager] = Field(

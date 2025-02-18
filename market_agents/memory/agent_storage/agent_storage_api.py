@@ -26,7 +26,7 @@ class AgentStorageAPI:
         self._register_routes()
 
     def _register_routes(self):
-        @self.router.get("/api/health")
+        @self.router.get("/health")
         async def health_check():
             """Check API health status."""
             try:
