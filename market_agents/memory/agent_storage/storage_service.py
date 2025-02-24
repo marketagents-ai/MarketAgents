@@ -288,10 +288,11 @@ class StorageService:
             # Build query conditions
             if cognitive_step:
                 if isinstance(cognitive_step, str):
-                    conditions.append("cognitive_step = $" + str(len(params) + 1))
+                    conditions.append("cognitive_step = $1")
                     params.append(cognitive_step)
-                else:
-                    placeholders = ", ".join([f"${i + 1}" for i in range(len(params), len(params) + len(cognitive_step))])
+                elif cognitive_step:
+                    placeholders = ", ".join(
+                        [f"${i + 1}" for i in range(len(params) + 1, len(params) + 1 + len(cognitive_step))])
                     conditions.append(f"cognitive_step IN ({placeholders})")
                     params.extend(cognitive_step)
 
@@ -312,22 +313,31 @@ class StorageService:
             params.append(limit)
 
             query = f"""
-                WITH recent_memories AS (
-                    SELECT 
-                        memory_id::text,
-                        cognitive_step,
-                        content,
-                        embedding, 
-                        created_at, 
-                        metadata
-                    FROM {cognitive_table}
-                    WHERE {where_clause}
-                    ORDER BY created_at DESC
-                    LIMIT ${len(params)}
-                )
-                SELECT * FROM recent_memories
-                ORDER BY created_at ASC;
-            """
+                    WITH recent_memories AS (
+                        SELECT
+                            memory_id::text,
+                            cognitive_step,
+                            content,
+                            embedding,
+                            created_at,
+                            metadata
+                        FROM (
+                            SELECT
+                                memory_id,
+                                cognitive_step,
+                                content,
+                                embedding,
+                                created_at,
+                                metadata
+                            FROM {cognitive_table}
+                            WHERE {where_clause}
+                            ORDER BY created_at DESC
+                        ) AS subquery
+                        LIMIT ${len(params)}
+                    )
+                    SELECT * FROM recent_memories
+                    ORDER BY created_at ASC;
+                """
 
             rows = await self.db.fetch(query, *params)
             

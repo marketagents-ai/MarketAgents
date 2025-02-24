@@ -51,7 +51,7 @@ class ShortTermMemory(BaseModel):
     async def retrieve_recent_memories(
         self,
         limit: int = 10,
-        cognitive_step: Optional[str] = None,
+        cognitive_step: Optional[Union[str, List[str]]] = None,
         metadata_filters: Optional[Dict] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None
