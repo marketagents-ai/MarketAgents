@@ -1,11 +1,13 @@
 # research.py
 
 from datetime import datetime
+from importlib import import_module
 import json
 import random
 from typing import Any, Dict, List, Optional, Type, Union
 from pydantic import BaseModel, Field
 
+from market_agents.environments.config import EnvironmentConfig
 from market_agents.environments.environment import (
     EnvironmentHistory,
     Mechanism,
@@ -127,6 +129,7 @@ class ResearchMechanism(Mechanism):
     current_topic: str = Field(default="", description="Current research topic")
     round_summaries: List[Dict[str, Any]] = Field(default_factory=list, description="History of all round summaries")
     last_step: Optional[EnvironmentStep] = Field(default=None, description="Last environment step")
+    summary_model: Type[BaseModel] = Field(default=BaseModel, description="Model for validating research summaries")
 
     def step(self, action: Union[ResearchAction, ResearchGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
         """Process agent actions and return the next state with observations."""
@@ -174,16 +177,28 @@ class ResearchMechanism(Mechanism):
             return local_step
 
         else:
-            if isinstance(action, dict):
+            if isinstance(action, GlobalAction):
+                research_actions = {}
+                for agent_id, local_action in action.actions.items():
+                    action_content = local_action.action
+                    if not isinstance(action_content, BaseModel):
+                        action_content = self.summary_model.model_validate(action_content)
+                    
+                    research_actions[agent_id] = ResearchAction(
+                        agent_id=agent_id,
+                        action=action_content
+                    )
+                action = ResearchGlobalAction(actions=research_actions)
+            elif isinstance(action, dict):
                 try:
                     action = ResearchGlobalAction.parse_obj(action)
                 except Exception as e:
                     logger.error(f"Failed to parse dict into ResearchGlobalAction: {e}")
                     raise
-            if not isinstance(action, ResearchGlobalAction):
-                raise TypeError(f"Expected ResearchGlobalAction, got {type(action).__name__}")
+            elif not isinstance(action, ResearchGlobalAction):
+                raise TypeError(f"Expected ResearchGlobalAction or GlobalAction, got {type(action).__name__}")
 
-            # Extract and store current round summaries
+            # Rest of batch mode remains the same
             round_actions = {
                 agent_id: local_action.action.dict()
                 for agent_id, local_action in action.actions.items()
@@ -252,12 +267,41 @@ class ResearchMechanism(Mechanism):
         self.last_step = None
         logger.info("ResearchMechanism reset complete.")
 
+class ResearchEnvironmentConfig(EnvironmentConfig):
+    """Configuration for research environment orchestration"""
+    name: str = Field(
+        default="research",
+        description="Name of the research environment"
+    )
+    api_url: str = Field(
+        default="http://localhost:8003",
+        description="API endpoint for research environment"
+    )
+    sub_rounds: int = Field(
+        default=2,
+        description="Number of sub-rounds within each main round"
+    )
+    initial_topic: str = Field(
+        default="Market Analysis",
+        description="Initial research topic"
+    )
+    group_size: int = Field(
+        default=4,
+        description="Number of agents in research group"
+    )
+    schema_model: str = Field(
+        default="LiteraryAnalysis",
+        description="Name of Pydantic model defining research output schema"
+    )
+
+    model_config = {"extra": "ignore"}
+
 class ResearchEnvironment(MultiAgentEnvironment):
     """
     Multi-agent environment that orchestrates a research session.
     It references a ResearchMechanism that collects agent actions.
     """
-    name: str = Field(default="Research Environment", description="Name of the environment")
+    name: str = Field(default="research", description="Name of the environment")
     action_space: ResearchActionSpace = Field(
         default_factory=lambda: ResearchActionSpace(summary_model=BaseModel),
         description="Defines the Pydantic model for agent's research summaries"
@@ -269,30 +313,57 @@ class ResearchEnvironment(MultiAgentEnvironment):
     mechanism: ResearchMechanism = Field(default_factory=ResearchMechanism)
     initial_topic: Optional[str] = Field(default=None, description="Initial research topic")
 
-
-    def __init__(
-        self,
-        summary_model: Type[BaseModel],
-        initial_topic: Optional[str] = None,
-        **data
-    ):
-        """
-        You can inject the user-defined summary_model (e.g. MarketResearch, AssetAnalysis, etc.)
-        at construction time. Then the action space references that model for JSON schema.
-        """
-        action_space = ResearchActionSpace(summary_model=summary_model)
-        mechanism = ResearchMechanism()
-        
-        if initial_topic:
-            mechanism.current_topic = initial_topic
+    def __init__(self, **config):
+        """Initialize environment with config parameters."""
+        try:
+            # Parse and validate config
+            env_config = ResearchEnvironmentConfig(**config)
             
-        super().__init__(
-            action_space=action_space,
-            mechanism=mechanism,
-            initial_topic=initial_topic,
-            **data
-        )
-        self._global_state: Dict[str, Any] = {}
+            # Get the schema model
+            summary_model = self._get_schema_model(env_config.schema_model)
+            
+            # Initialize action space with the schema model
+            action_space = ResearchActionSpace(summary_model=summary_model)
+            
+            # Initialize mechanism with relevant config
+            mechanism = ResearchMechanism(
+                max_rounds=env_config.sub_rounds,
+                initial_topic=env_config.initial_topic,
+                summary_model=summary_model
+            )
+
+            # Initialize parent class with processed config
+            super().__init__(
+                name=env_config.name,
+                action_space=action_space,
+                observation_space=ResearchObservationSpace(),
+                mechanism=mechanism,
+                initial_topic=env_config.initial_topic
+            )
+            self._global_state: Dict[str, Any] = {}
+            
+        except Exception as e:
+            raise ValueError(f"Failed to initialize ResearchEnvironment: {e}")
+
+    def _get_schema_model(self, schema_name: str) -> Type[BaseModel]:
+        """Dynamically import and return the schema model class."""
+        try:
+            # Update the import path to match your project structure
+            schemas_module = import_module('market_agents.orchestrators.research_schemas')
+            
+            if not hasattr(schemas_module, schema_name):
+                raise ValueError(f"Schema model '{schema_name}' not found in research_schemas")
+                
+            model_class = getattr(schemas_module, schema_name)
+            
+            if not issubclass(model_class, BaseModel):
+                raise ValueError(f"Schema model {schema_name} must be a Pydantic model")
+                
+            return model_class
+        except ImportError as e:
+            raise ValueError(f"Could not import research_schemas module: {e}")
+        except Exception as e:
+            raise ValueError(f"Could not load schema model '{schema_name}': {e}")
 
     def get_global_state(self) -> Any:
         """Expose both mechanism state and our internal state."""
