@@ -4,11 +4,11 @@ import logging
 import uuid
 import warnings
 
+from market_agents.orchestrators.orchestrator import MultiAgentOrchestrator
 from market_agents.memory.agent_storage.setup_db import AsyncDatabase
 from market_agents.memory.agent_storage.storage_service import StorageService
 from market_agents.memory.embedding import MemoryEmbedder
 from market_agents.memory.config import AgentStorageConfig, load_config_from_yaml
-from market_agents.orchestrators.base_orchestrator import BaseEnvironmentOrchestrator
 from market_agents.orchestrators.config import OrchestratorConfig
 from market_agents.orchestrators.requests_limits_config import OrchestratorRequestsLimits
 from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
@@ -30,14 +30,12 @@ class MetaOrchestrator:
         self,
         config: OrchestratorConfig,
         agents,
-        orchestrator_registry: Dict[str, Type[BaseEnvironmentOrchestrator]],
         logger: logging.Logger = None
     ):
         self.config = config
         self.agents = agents
         self.logger = logger or orchestration_logger
         self.environment_order = config.environment_order
-        self.orchestrator_registry = orchestrator_registry
 
         self.storage_config = self._initialize_storage_config()
         self.db = AsyncDatabase(self.storage_config)
@@ -54,7 +52,7 @@ class MetaOrchestrator:
             agent.llm_orchestrator = self.ai_utils
             
         self.data_inserter = OrchestrationDataInserter(storage_service=self.storage_service)
-        self.environment_orchestrators: Dict[str, BaseEnvironmentOrchestrator] = {}
+        self.environment_orchestrators: Dict[str, MultiAgentOrchestrator] = {}
 
     def _initialize_storage_config(self) -> AgentStorageConfig:
         config_path = "market_agents/memory/storage_config.yaml"
@@ -76,27 +74,28 @@ class MetaOrchestrator:
         )
 
     def _initialize_environment_orchestrators(self):
+        """Initialize generic orchestrators for each environment."""
         for env_name in self.environment_order:
             env_cfg = self.config.environment_configs.get(env_name)
             if not env_cfg:
                 self.logger.warning(f"No config found for environment '{env_name}'. Skipping.")
                 continue
 
-            orchestrator_class = self.orchestrator_registry.get(env_name)
-            if not orchestrator_class:
-                self.logger.warning(f"Unknown orchestrator registry entry for '{env_name}'. Skipping.")
+            try:
+                orchestrator = MultiAgentOrchestrator(
+                    config=env_cfg,
+                    orchestrator_config=self.config,
+                    agents=self.agents,
+                    storage_service=self.storage_service,
+                    environment_name=env_name,
+                    logger=self.logger,
+                    ai_utils=self.ai_utils,
+                )
+                self.environment_orchestrators[env_name] = orchestrator
+                self.logger.info(f"Initialized MultiAgentOrchestrator for environment '{env_name}'")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize orchestrator for environment '{env_name}': {e}")
                 continue
-
-            orchestrator = orchestrator_class(
-                config=env_cfg,
-                orchestrator_config=self.config,
-                agents=self.agents,
-                storage_service=self.storage_service,
-                logger=self.logger,
-                ai_utils=self.ai_utils,
-            )
-            self.environment_orchestrators[env_name] = orchestrator
-            self.logger.info(f"Initialized {orchestrator_class.__name__} for environment '{env_name}'")
 
     async def run_orchestration(self):
         print_ascii_art()
