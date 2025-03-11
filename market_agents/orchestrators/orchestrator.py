@@ -1,5 +1,6 @@
 # orchestrator.py
 
+import asyncio
 from datetime import datetime, timezone
 from importlib import import_module
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import List, Dict, Any, Optional, Type
 import logging
 import json
 
-from market_agents.orchestrators.logger_utils import log_action, log_perception, log_reflection, log_persona
+from market_agents.orchestrators.logger_utils import log_action, log_cohort_formation, log_perception, log_persona
 from market_agents.orchestrators.parallel_cognitive_steps import ParallelCognitiveProcessor
 from market_agents.orchestrators.orchestration_data_inserter import OrchestrationDataInserter
 from market_agents.environments.environment import EnvironmentStep, GlobalAction, LocalAction, MultiAgentEnvironment
@@ -101,7 +102,20 @@ class MultiAgentOrchestrator:
         """Set up or reset the environment."""
         self.logger.info("Setting up the Environment...")
         if self.environment:
-            self.environment.reset()
+            form_cohorts = (
+                hasattr(self.environment.mechanism, 'form_cohorts') and 
+                getattr(self.environment.mechanism, 'form_cohorts', False)
+            )
+            
+            if form_cohorts:
+                self.logger.info(f"Forming cohorts with {len(self.agents)} agents")
+                self.environment.mechanism.form_agent_cohorts(self.agents)
+                for cohort_id, cohort_agents in self.environment.mechanism.cohorts.items():
+                    log_cohort_formation(
+                        self.logger, 
+                        cohort_id, 
+                        [agent.id for agent in cohort_agents]
+                    )
         self.logger.info("Environment setup complete.")
 
     async def run_environment(self, round_num: Optional[int] = None):
@@ -116,15 +130,37 @@ class MultiAgentOrchestrator:
         """Execute one full round with multiple sub-rounds."""
         self.logger.info(f"=== Running Round {round_num} ===")
         self._initialize_agents_for_round()
+
+        # Simply check if we should use cohorts for execution
+        form_cohorts = (
+            hasattr(self.environment.mechanism, 'form_cohorts') and 
+            self.environment.mechanism.form_cohorts and
+            hasattr(self.environment.mechanism, 'cohorts') and
+            bool(self.environment.mechanism.cohorts)
+        )
+        
         for sub_round in range(1, self.config.sub_rounds + 1):
             self.logger.info(f"=== Starting Sub-round {sub_round}/{self.config.sub_rounds} of Round {round_num} ===")
-            try:
+            
+            if form_cohorts:
+                # Run each cohort's complete cycle in parallel
+                cohort_tasks = []
+                for cohort_id, cohort_agents in self.environment.mechanism.cohorts.items():
+                    task = asyncio.create_task(
+                        self._run_sub_round(
+                            round_num=round_num,
+                            sub_round=sub_round,
+                            cohort_agents=cohort_agents
+                        )
+                    )
+                    cohort_tasks.append(task)
+                
+                all_results = await asyncio.gather(*cohort_tasks)
+                
+            else:
+                # Regular single-cohort execution
                 step_result = await self._run_sub_round(round_num, sub_round)
-                await self.process_round_results(round_num, step_result, sub_round)
-            except Exception as e:
-                self.logger.error(f"Error in round {round_num}, sub-round {sub_round}: {e}", exc_info=True)
-                raise
-        self.logger.info(f"Round {round_num} complete with {self.config.sub_rounds} sub-rounds.\n")
+                await self.process_round_results(round_num, sub_round)
 
     def _initialize_agents_for_round(self):
         """Initialize agents for the round. Override this if environment-specific initialization is needed."""
@@ -140,25 +176,44 @@ class MultiAgentOrchestrator:
             if hasattr(agent, "_refresh_prompts"):
                 agent._refresh_prompts()
 
-    async def _run_sub_round(self, round_num: int, sub_round: int) -> EnvironmentStep:
+    async def _run_sub_round(
+        self, 
+        round_num: int, 
+        sub_round: int, 
+        cohort_agents: Optional[List[Any]] = None
+    ) -> EnvironmentStep:
         """Execute one sub-round by running perception, action, and reflection phases."""
         try:
             # Perception Phase
-            await self._run_perception_phase(round_num, sub_round)
+            await self._run_perception_phase(round_num, sub_round, cohort_agents)
+            
             # Action Phase
-            step_result = await self._run_action_phase(round_num, sub_round)
+            step_result = await self._run_action_phase(round_num, sub_round, cohort_agents)
+
+             # Process results immediately
+            if step_result:
+                await self.process_round_results(round_num, sub_round, cohort_agents)
+            
+            
             # Reflection Phase
-            await self._run_reflection_phase(round_num, sub_round)
+            await self._run_reflection_phase(round_num, sub_round, cohort_agents)
+            
             return step_result
         except Exception as e:
             self.logger.error(f"Error in sub-round {sub_round} of round {round_num}: {e}", exc_info=True)
             raise
 
-    async def _run_perception_phase(self, round_num: int, sub_round: int):
+    async def _run_perception_phase(self, round_num: int, sub_round: int, cohort_agents: Optional[List[Any]] = None):
         """Generic perception phase."""
+        agents = cohort_agents if cohort_agents is not None else self.agents
         self.logger.info(f"Round {round_num}.{sub_round}: Agents perceiving environment...")
-        perceptions = await self.cognitive_processor.run_parallel_perception(self.agents, self.environment_name)
-        for agent, perception in zip(self.agents, perceptions or []):
+        
+        perceptions = await self.cognitive_processor.run_parallel_perception(
+            agents, 
+            self.environment_name
+        )
+        
+        for agent, perception in zip(agents, perceptions or []):
             log_persona(self.logger, agent.id, agent.persona)
             content = None
             if perception and perception.json_object:
@@ -166,23 +221,37 @@ class MultiAgentOrchestrator:
             log_perception(self.logger, agent.id, content)
         return perceptions
 
-    async def _run_action_phase(self, round_num: int, sub_round: int) -> EnvironmentStep:
-        """Generic action phase that gathers agent actions and processes them."""
+    async def _run_action_phase(self, round_num: int, sub_round: int, cohort_agents: Optional[List[Any]] = None) -> EnvironmentStep:
+        """Generic action phase."""
+        agents = cohort_agents if cohort_agents is not None else self.agents
         self.logger.info(f"Round {round_num}.{sub_round}: Executing agent actions...")
-        actions = await self.cognitive_processor.run_parallel_action(self.agents, self.environment_name)
-        agent_summaries = await self._process_agent_actions(actions)
-        self.logger.info(f"Processed agent summaries: {agent_summaries}")
-        global_actions = await self._create_global_actions(actions)
-        # Assume the environment accepts a global action to perform a step.
+        
+        actions = await self.cognitive_processor.run_parallel_action(
+            agents,
+            self.environment_name
+        )
+        
+        agent_summaries = await self._process_agent_actions(actions, agents)
+        global_actions = await self._create_global_actions(actions, agents)
         step_result = self.environment.step(global_actions)
+        
         if step_result and getattr(step_result, "global_observation", None):
-            await self._update_agent_observations(step_result, agent_summaries)
+            await self._update_agent_observations(step_result, agent_summaries, agents)
+            
         return step_result
 
-    async def _process_agent_actions(self, actions) -> Dict[str, Any]:
-        """Process individual agent actions and create a summary."""
+    async def _process_agent_actions(self, actions: List[Any], cohort_agents: Optional[List[Any]] = None) -> Dict[str, Any]:
+        """Process individual agent actions and create a summary.
+        
+        Args:
+            actions: List of agent actions
+            agents: Optional list of agents (for cohort processing). If None, uses self.agents
+        """
         agent_summaries = {}
-        for agent, action in zip(self.agents, actions or []):
+        # Use provided agents list (for cohorts) or fall back to all agents
+        agents = cohort_agents if cohort_agents is not None else self.agents
+        
+        for agent, action in zip(agents, actions or []):
             try:
                 content = None
                 if action and hasattr(action, 'json_object') and action.json_object and getattr(action.json_object, 'object', None):
@@ -192,21 +261,31 @@ class MultiAgentOrchestrator:
                 agent.last_action = content
                 if content:
                     agent_summaries[agent.id] = content
-                log_action(self.logger, agent.id, content, model_name=getattr(agent, 'llm_config', {}).get('model') if hasattr(agent, 'llm_config') else None)
+                log_action(
+                    self.logger, 
+                    agent.id, 
+                    content, 
+                    model_name=getattr(agent, 'llm_config', {}).get('model') if hasattr(agent, 'llm_config') else None
+                )
             except Exception as e:
                 self.logger.error(f"Error processing action for agent {agent.id}: {e}", exc_info=True)
                 agent.last_action = None
         return agent_summaries
 
-    async def _create_global_actions(self, actions) -> GlobalAction:
+    async def _create_global_actions(self, actions, cohort_agents: Optional[List[Any]] = None) -> GlobalAction:
         """Create GlobalAction using orchestrator-specific LocalAction."""
         local_actions = {}
-        for agent, action in zip(self.agents, actions or []):
+        agents = cohort_agents if cohort_agents is not None else self.agents
+        
+        for agent, action in zip(agents, actions or []):
             try:
+                # Extract action content exactly like the old orchestrator
                 if action and hasattr(action, 'json_object') and action.json_object:
                     action_content = action.json_object.object
                 else:
                     action_content = {}
+                    
+                # Create LocalAction with raw dict content
                 local_actions[agent.id] = OrchestratorLocalAction(
                     agent_id=agent.id, 
                     action=action_content
@@ -217,47 +296,87 @@ class MultiAgentOrchestrator:
                     agent_id=agent.id, 
                     action={}
                 )
+        
         return GlobalAction(actions=local_actions)
 
-    async def _update_agent_observations(self, step_result: EnvironmentStep, agent_summaries: Dict[str, Any]):
+    async def _update_agent_observations(
+        self, 
+        step_result: EnvironmentStep, 
+        agent_summaries: Dict[str, Any],
+        agents: List[Any]
+    ):
         """Update agent observations based on the environment's step result."""
-        if hasattr(step_result.global_observation, 'all_actions_this_round'):
-            step_result.global_observation.all_actions_this_round = agent_summaries
-        for agent in self.agents:
-            if step_result.global_observation and hasattr(step_result.global_observation, 'observations') and agent.id in step_result.global_observation.observations:
-                agent.last_observation = step_result.global_observation.observations[agent.id]
-            else:
-                agent.last_observation = None
+        try:
+            # Update global observation with current round's actions
+            if (step_result.global_observation and 
+                hasattr(step_result.global_observation, 'all_actions_this_round')):
+                step_result.global_observation.all_actions_this_round = agent_summaries
 
-    async def _run_reflection_phase(self, round_num: int, sub_round: int):
-        """Generic reflection phase for agents to reflect on environment outcomes."""
+            # Update individual agent observations
+            if step_result.global_observation:
+                for agent in agents:
+                    if agent.id in step_result.global_observation.observations:
+                        agent.last_observation = step_result.global_observation.observations[agent.id]
+                        self.logger.debug(
+                            f"Updated observation for agent {agent.id}: {agent.last_observation}"
+                        )
+                    else:
+                        self.logger.warning(f"No observation for agent {agent.id}")
+                        agent.last_observation = None
+
+        except Exception as e:
+            self.logger.error(f"Error in _update_agent_observations: {e}")
+            raise
+
+    async def _run_reflection_phase(self, round_num: int, sub_round: int, cohort_agents: Optional[List[Any]] = None):
+        """Generic reflection phase."""
+        agents = cohort_agents if cohort_agents is not None else self.agents
         self.logger.info(f"Round {round_num}.{sub_round}: Agents reflecting...")
-        agents_with_observations = [agent for agent in self.agents if getattr(agent, 'last_observation', None)]
-        if not agents_with_observations:
-            self.logger.warning("No agents had observations to reflect on")
-            return
-        reflections = await self.cognitive_processor.run_parallel_reflection(
-            agents_with_observations,
-            environment_name=self.environment_name
-        )
-        if not reflections:
-            self.logger.warning("No reflections received from agents")
-            return
-        for agent, reflection_output in zip(agents_with_observations, reflections):
-            try:
-                content = reflection_output.json_object.object if reflection_output and hasattr(reflection_output, 'json_object') and reflection_output.json_object else reflection_output.str_content
-                if content:
-                    self.logger.info(f"Agent {agent.id} reflection: {content}")
-                else:
-                    self.logger.warning(f"No reflection content for agent {agent.id}")
-            except Exception as e:
-                self.logger.error(f"Error processing reflection for agent {agent.id}: {e}", exc_info=True)
+        
+        try:
+            # Debug log all agents' observations
+            self.logger.info("=== Agent Observations Before Reflection ===")
+            for agent in agents:
+                self.logger.info(
+                    f"Agent {agent.id}:"
+                    f"\nlast_observation: {agent.last_observation}"
+                )
 
-    async def process_round_results(self, round_num: int, step_result: Optional[EnvironmentStep] = None, sub_round: Optional[int] = None):
+            # Simplified filtering condition
+            agents_with_observations = [
+                agent for agent in agents 
+                if agent.last_observation is not None
+            ]
+
+            self.logger.info(f"Found {len(agents_with_observations)} agents with observations")
+
+            if not agents_with_observations:
+                self.logger.info("No agents had observations to reflect on")
+                self.logger.info("Agents without observations: " + 
+                                ", ".join(agent.id for agent in agents))
+                return
+                
+            self.logger.info(f"Running reflection for {len(agents_with_observations)} agents")
+            reflections = await self.cognitive_processor.run_parallel_reflection(
+                agents_with_observations,
+                self.environment_name
+            )
+            
+            if reflections:
+                self.logger.info(f"Received {len(reflections)} reflections")
+            else:
+                self.logger.info("No reflections received")
+                    
+        except Exception as e:
+            self.logger.error(f"Error during reflection step: {str(e)}", exc_info=True)
+            self.logger.exception("Reflection step failed but continuing...")
+
+    async def process_round_results(self, round_num: int, sub_round: int, cohort_agents: Optional[List[Any]] = None):
         """Process and store results for the round."""
         try:
             actions_data = []
-            for agent in self.agents:
+            agents = cohort_agents if cohort_agents else self.agents
+            for agent in agents:
                 if hasattr(agent, 'last_action') and agent.last_action:
                     actions_data.append({
                         'agent_id': agent.id,
@@ -275,7 +394,7 @@ class MultiAgentOrchestrator:
                 metadata = {
                     'config': config_dict,
                     'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'num_agents': len(self.agents),
+                    'num_agents': len(agents),
                     'sub_round': sub_round
                 }
                 await self.data_inserter.insert_environment_state(self.config.name, round_num, env_state, metadata)
@@ -329,32 +448,76 @@ class MultiAgentOrchestrator:
         PINK = "\033[95m"
         TEAL = "\033[96m"
         RESET = "\033[0m"
-        self.logger.info("=== SIMULATION SUMMARY ===")
+        self.logger.info("=== ORCHESTRATION SUMMARY ===")
+        
+        # Get environment state which includes cohort organization if enabled
         global_state = self.environment.get_global_state() if self.environment and hasattr(self.environment, 'get_global_state') else {}
         self.logger.info(f"Final Environment State: {global_state}")
-        print(f"\n{PINK}Final Agent States (JSONL):{RESET}")
-        for agent in self.agents:
-            if agent.last_action:
-                try:
-                    jsonl_entry = {
-                        "agent_index": agent.id,
-                        "last_action": agent.last_action if isinstance(agent.last_action, dict) else json.loads(agent.last_action)
-                    }
-                    print(f"{PINK}{json.dumps(jsonl_entry)}{RESET}")
-                except Exception as e:
-                    self.logger.error(f"Error creating JSONL for agent {agent.id}: {e}", exc_info=True)
-        print(f"\n{TEAL}Final Agent States (Pretty):{RESET}")
-        for agent in self.agents:
-            print(f"\n{TEAL}Agent {agent.id}:{RESET}")
-            if agent.last_action:
-                try:
-                    if isinstance(agent.last_action, dict):
-                        print(f"{TEAL}Last action = {json.dumps(agent.last_action, indent=2)}{RESET}")
+        
+        # Check if using cohorts
+        form_cohorts = (
+            hasattr(self.environment.mechanism, 'form_cohorts') and 
+            getattr(self.environment.mechanism, 'form_cohorts', False)
+        )
+
+        if form_cohorts:
+            print(f"\n{PINK}Final Cohort States:{RESET}")
+            for cohort_id, cohort_agents in self.environment.mechanism.cohorts.items():
+                print(f"\n{PINK}Cohort {cohort_id}:{RESET}")
+                for agent in cohort_agents:
+                    if agent.last_action:
+                        try:
+                            jsonl_entry = {
+                                "cohort": cohort_id,
+                                "agent_id": agent.id,
+                                "last_action": agent.last_action if isinstance(agent.last_action, dict) else json.loads(agent.last_action)
+                            }
+                            print(f"{PINK}{json.dumps(jsonl_entry)}{RESET}")
+                        except Exception as e:
+                            self.logger.error(f"Error creating JSONL for agent {agent.id}: {e}", exc_info=True)
+        else:
+            # Original non-cohort summary logic
+            print(f"\n{PINK}Final Agent States (JSONL):{RESET}")
+            for agent in self.agents:
+                if agent.last_action:
+                    try:
+                        jsonl_entry = {
+                            "agent_id": agent.id,
+                            "last_action": agent.last_action if isinstance(agent.last_action, dict) else json.loads(agent.last_action)
+                        }
+                        print(f"{PINK}{json.dumps(jsonl_entry)}{RESET}")
+                    except Exception as e:
+                        self.logger.error(f"Error creating JSONL for agent {agent.id}: {e}", exc_info=True)
+
+        # Pretty print section remains similar but organized by cohorts if enabled
+        print(f"\n{TEAL}Final States (Pretty):{RESET}")
+        if form_cohorts:
+            for cohort_id, cohort_agents in self.environment.mechanism.cohorts.items():
+                print(f"\n{TEAL}Cohort {cohort_id}:{RESET}")
+                for agent in cohort_agents:
+                    print(f"\n{TEAL}Agent {agent.id}:{RESET}")
+                    if agent.last_action:
+                        try:
+                            if isinstance(agent.last_action, dict):
+                                print(f"{TEAL}Last action = {json.dumps(agent.last_action, indent=2)}{RESET}")
+                            else:
+                                print(f"{TEAL}Last action = {agent.last_action}{RESET}")
+                        except Exception as e:
+                            print(f"{TEAL}Last action = {str(agent.last_action)}{RESET}")
                     else:
-                        print(f"{TEAL}Last action = {agent.last_action}{RESET}")
-                except Exception as e:
-                    print(f"{TEAL}Last action = {str(agent.last_action)}{RESET}")
-            else:
-                print(f"{TEAL}Last action = None{RESET}")
+                        print(f"{TEAL}Last action = None{RESET}")
+        else:
+            for agent in self.agents:
+                print(f"\n{TEAL}Agent {agent.id}:{RESET}")
+                if agent.last_action:
+                    try:
+                        if isinstance(agent.last_action, dict):
+                            print(f"{TEAL}Last action = {json.dumps(agent.last_action, indent=2)}{RESET}")
+                        else:
+                            print(f"{TEAL}Last action = {agent.last_action}{RESET}")
+                    except Exception as e:
+                        print(f"{TEAL}Last action = {str(agent.last_action)}{RESET}")
+                else:
+                    print(f"{TEAL}Last action = None{RESET}")
         print()
         self.logger.info("Finished printing summary.")

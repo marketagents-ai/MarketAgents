@@ -6,6 +6,7 @@ import json
 import random
 from typing import Any, Dict, List, Optional, Type, Union
 from pydantic import BaseModel, Field
+from pydantic_settings import SettingsConfigDict
 
 from market_agents.environments.config import EnvironmentConfig
 from market_agents.environments.environment import (
@@ -25,6 +26,40 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class ResearchEnvironmentConfig(EnvironmentConfig):
+    """Configuration for research environment orchestration"""
+    name: str = Field(
+        default="research",
+        description="Name of the research environment"
+    )
+    api_url: str = Field(
+        default="http://localhost:8003",
+        description="API endpoint for research environment"
+    )
+    sub_rounds: int = Field(
+        default=2,
+        description="Number of sub-rounds within each main round"
+    )
+    initial_topic: str = Field(
+        default="Market Analysis",
+        description="Initial research topic"
+    )
+    group_size: int = Field(
+        default=4,
+        description="Number of agents in research group"
+    )
+    schema_model: str = Field(
+        default="LiteraryAnalysis",
+        description="Name of Pydantic model defining research output schema"
+    )
+    form_cohorts: bool = Field(
+        default=False,
+        description="Whether to organize agents into cohorts"
+    )
+
+    model_config = SettingsConfigDict(
+        extra="allow"
+    )
 
 class ResearchAction(LocalAction):
     action: BaseModel
@@ -124,38 +159,96 @@ class ResearchMechanism(Mechanism):
         default=False,
         description="Whether the mechanism is sequential (one agent at a time)."
     )
-    max_rounds: int = Field(default=3, description="Number of research steps allowed.")
-    current_round: int = Field(default=0, description="Current step or round.")
-    current_topic: str = Field(default="", description="Current research topic")
-    round_summaries: List[Dict[str, Any]] = Field(default_factory=list, description="History of all round summaries")
-    last_step: Optional[EnvironmentStep] = Field(default=None, description="Last environment step")
-    summary_model: Type[BaseModel] = Field(default=BaseModel, description="Model for validating research summaries")
+    current_round: int = Field(
+        default=0, 
+        description="Current step or round."
+    )
+    max_rounds: int = Field(
+        default=0,
+        description="Max steps or rounds"
+    )
+    current_topic: str = Field(
+        default="", 
+        description="Current research topic"
+    )
+    round_summaries: List[Dict[str, Any]] = Field(
+        default_factory=list, 
+        description="History of all round summaries"
+    )
+    last_step: Optional[EnvironmentStep] = Field(
+        default=None, 
+        description="Last environment step"
+    )
+    summary_model: Type[BaseModel] = Field(
+        default=BaseModel, 
+        description="Model for validating research summaries"
+    )
+    form_cohorts: bool = Field(
+        default=False,
+        description="Whether to organize agents into cohorts"
+    )
+    group_size: Optional[int] = Field(
+        default=None,
+        description="Size of research cohorts when form_cohorts is True"
+    )
+    cohorts: Dict[str, List[Any]] = Field(
+        default_factory=dict,
+        description="Mapping of cohort IDs to lists of agents"
+    )
 
-    def step(self, action: Union[ResearchAction, ResearchGlobalAction, Dict[str, Any]]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
-        """Process agent actions and return the next state with observations."""
-        logger.debug(f"ResearchMechanism step: {action}")
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.__dict__.update(kwargs)
+        logger.info(f"Initialized ResearchMechanism with config: {kwargs}")
+
+    def form_agent_cohorts(self, agents: List[Any]) -> None:
+        """Form research cohorts based on group size from config."""
+        if not self.form_cohorts or not self.group_size:
+            return
+
+        self.cohorts.clear()
+        
+        current_cohort = []
+        cohort_count = 1
+
+        for agent in agents:
+            current_cohort.append(agent)
+            if len(current_cohort) >= self.group_size:
+                self.cohorts[f"research_cohort_{cohort_count}"] = current_cohort
+                current_cohort = []
+                cohort_count += 1
+
+        if current_cohort:
+            self.cohorts[f"research_cohort_{cohort_count}"] = current_cohort
+
+        logger.info(f"Formed {len(self.cohorts)} research cohorts")
+        for cohort_id, cohort_agents in self.cohorts.items():
+            logger.info(f"{cohort_id}: {[agent.id for agent in cohort_agents]}")
+
+    def step(self, action: Union[LocalAction, GlobalAction]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
+        """Execute one step of the research process."""
+        done = self.current_round >= self.max_rounds
         self.current_round += 1
-        done = (self.current_round >= self.max_rounds)
 
-        if self.sequential:
-            if isinstance(action, dict):
-                try:
-                    action = ResearchAction.parse_obj(action)
-                except Exception as e:
-                    logger.error(f"Failed to parse dict into ResearchAction: {e}")
-                    raise
-            if not isinstance(action, ResearchAction):
-                raise TypeError(f"Expected ResearchAction, got {type(action).__name__}")
+        # Handle single agent or cohort-based action
+        if isinstance(action, LocalAction):
+            # Get the dict from action and validate against summary_model
+            action_dict = action.action
+            try:
+                validated_content = self.summary_model.model_validate(action_dict)
+            except Exception as e:
+                logger.error(f"Failed to validate action content against {self.summary_model.__name__}: {e}")
+                raise
 
             # Store in round_summaries
-            round_actions = {action.agent_id: action.action.dict()}
+            round_actions = {action.agent_id: validated_content.model_dump()}
             self.round_summaries.append(round_actions)
 
             # Build local observation
             obs = ResearchObservation(
                 current_topic=self.current_topic,
-                own_summary=action.action,
-                aggregator_notes=f"Round {self.current_round}, single-agent action."
+                own_summary=validated_content,
+                aggregator_notes=f"Round {self.current_round}, {'cohort' if self.form_cohorts else 'single-agent'} action."
             )
             local_obs = ResearchLocalObservation(
                 agent_id=action.agent_id,
@@ -168,54 +261,50 @@ class ResearchMechanism(Mechanism):
                 done=done,
                 info={
                     "round": self.current_round,
-                    "note": "Sequential step",
+                    "note": "Cohort step" if self.form_cohorts else "Sequential step",
                     "agent_rewards": {action.agent_id: 1.0},
-                    "current_topic": self.current_topic
+                    "current_topic": self.current_topic,
+                    "cohort_id": next(
+                        (cid for cid, agents in self.cohorts.items() 
+                        if any(a.id == action.agent_id for a in agents)), 
+                        None
+                    ) if self.form_cohorts else None
                 }
             )
             self.last_step = local_step
             return local_step
 
+        # Handle global actions
         else:
             if isinstance(action, GlobalAction):
                 research_actions = {}
                 for agent_id, local_action in action.actions.items():
-                    action_content = local_action.action
-                    if not isinstance(action_content, BaseModel):
-                        action_content = self.summary_model.model_validate(action_content)
-                    
-                    research_actions[agent_id] = ResearchAction(
-                        agent_id=agent_id,
-                        action=action_content
-                    )
-                action = ResearchGlobalAction(actions=research_actions)
-            elif isinstance(action, dict):
-                try:
-                    action = ResearchGlobalAction.parse_obj(action)
-                except Exception as e:
-                    logger.error(f"Failed to parse dict into ResearchGlobalAction: {e}")
-                    raise
-            elif not isinstance(action, ResearchGlobalAction):
-                raise TypeError(f"Expected ResearchGlobalAction or GlobalAction, got {type(action).__name__}")
+                    action_dict = local_action.action
+                    try:
+                        validated_content = self.summary_model.model_validate(action_dict)
+                        research_actions[agent_id] = validated_content
+                    except Exception as e:
+                        logger.error(f"Failed to validate action content for agent {agent_id}: {e}")
+                        raise
 
-            # Rest of batch mode remains the same
-            round_actions = {
-                agent_id: local_action.action.dict()
-                for agent_id, local_action in action.actions.items()
-            }
-            self.round_summaries.append(round_actions)
+                # Process batch actions
+                round_actions = {
+                    agent_id: content.model_dump()
+                    for agent_id, content in research_actions.items()
+                }
+                self.round_summaries.append(round_actions)
 
-            # Build local observations for each agent
+            # Build observations for each agent
             local_observations: Dict[str, ResearchLocalObservation] = {}
             agent_rewards: Dict[str, float] = {}
             
-            for agent_id, local_action in action.actions.items():
+            for agent_id, action_content in research_actions.items():
                 local_obs = ResearchLocalObservation(
                     agent_id=agent_id,
                     observation=ResearchObservation(
                         current_topic=self.current_topic,
-                        own_summary=local_action.action,
-                        aggregator_notes=f"Round {self.current_round}, agent {agent_id}"
+                        own_summary=action_content,
+                        aggregator_notes=f"Round {self.current_round}, {'cohort-based' if self.form_cohorts else 'batch'} processing"
                     )
                 )
                 local_observations[agent_id] = local_obs
@@ -224,12 +313,11 @@ class ResearchMechanism(Mechanism):
             # Create global observation
             global_obs = ResearchGlobalObservation(
                 observations=local_observations,
-                all_actions_this_round=round_actions,  # Current round summaries
+                all_actions_this_round=round_actions,
                 current_topic=self.current_topic,
                 aggregator_notes=f"End of round {self.current_round}"
             )
 
-            # Add historical data only on final round
             if done:
                 global_obs.final_all_summaries = [
                     {"round_index": i + 1, "summaries": summaries}
@@ -237,64 +325,52 @@ class ResearchMechanism(Mechanism):
                 ]
                 global_obs.aggregator_notes += " (Final) returning all collected summaries."
 
+            cohort_info = {
+                cohort_id: [agent.id for agent in agents]
+                for cohort_id, agents in self.cohorts.items()
+            } if self.form_cohorts else None
+
             env_step = EnvironmentStep(
                 global_observation=global_obs,
                 done=done,
                 info={
                     "round": self.current_round,
                     "current_topic": self.current_topic,
-                    "agent_rewards": agent_rewards
+                    "agent_rewards": agent_rewards,
+                    "form_cohorts": self.form_cohorts,
+                    "cohorts": cohort_info
                 }
             )
             self.last_step = env_step
             return env_step
 
     def get_global_state(self) -> Dict[str, Any]:
-        """Return the mechanism's overall state, including the current topic and summaries."""
-        return {
+        """Return the mechanism's overall state."""
+        state = {
             "current_round": self.current_round,
             "max_rounds": self.max_rounds,
             "round_summaries": self.round_summaries,
             "round_summaries_count": len(self.round_summaries),
             "last_step": self.last_step.dict() if self.last_step else None,
-            "current_topic": self.current_topic
+            "current_topic": self.current_topic,
+            "form_cohorts": self.form_cohorts
         }
+        
+        if self.form_cohorts and self.cohorts:
+            state["cohorts"] = {
+                cohort_id: [agent.id for agent in agents]
+                for cohort_id, agents in self.cohorts.items()
+            }
+        
+        return state
 
     def reset(self) -> None:
         """Reset mechanism for a new run."""
         self.current_round = 0
         self.round_summaries.clear()
         self.last_step = None
+        self.cohorts.clear()
         logger.info("ResearchMechanism reset complete.")
-
-class ResearchEnvironmentConfig(EnvironmentConfig):
-    """Configuration for research environment orchestration"""
-    name: str = Field(
-        default="research",
-        description="Name of the research environment"
-    )
-    api_url: str = Field(
-        default="http://localhost:8003",
-        description="API endpoint for research environment"
-    )
-    sub_rounds: int = Field(
-        default=2,
-        description="Number of sub-rounds within each main round"
-    )
-    initial_topic: str = Field(
-        default="Market Analysis",
-        description="Initial research topic"
-    )
-    group_size: int = Field(
-        default=4,
-        description="Number of agents in research group"
-    )
-    schema_model: str = Field(
-        default="LiteraryAnalysis",
-        description="Name of Pydantic model defining research output schema"
-    )
-
-    model_config = {"extra": "ignore"}
 
 class ResearchEnvironment(MultiAgentEnvironment):
     """
@@ -327,9 +403,11 @@ class ResearchEnvironment(MultiAgentEnvironment):
             
             # Initialize mechanism with relevant config
             mechanism = ResearchMechanism(
-                max_rounds=env_config.sub_rounds,
                 initial_topic=env_config.initial_topic,
-                summary_model=summary_model
+                summary_model=summary_model,
+                form_cohorts=env_config.form_cohorts,
+                group_size=env_config.group_size,
+                max_rounds=env_config.sub_rounds
             )
 
             # Initialize parent class with processed config
@@ -342,13 +420,16 @@ class ResearchEnvironment(MultiAgentEnvironment):
             )
             self._global_state: Dict[str, Any] = {}
             
+            # Form cohorts during initialization if enabled
+            if env_config.form_cohorts and hasattr(self, 'agents'):
+                self.mechanism.form_agent_cohorts(self.agents)
+                
         except Exception as e:
             raise ValueError(f"Failed to initialize ResearchEnvironment: {e}")
 
     def _get_schema_model(self, schema_name: str) -> Type[BaseModel]:
         """Dynamically import and return the schema model class."""
         try:
-            # Update the import path to match your project structure
             schemas_module = import_module('market_agents.orchestrators.research_schemas')
             
             if not hasattr(schemas_module, schema_name):
@@ -365,15 +446,19 @@ class ResearchEnvironment(MultiAgentEnvironment):
         except Exception as e:
             raise ValueError(f"Could not load schema model '{schema_name}': {e}")
 
-    def get_global_state(self) -> Any:
-        """Expose both mechanism state and our internal state."""
+    def get_global_state(self) -> Dict[str, Any]:
+        """Return the environment's global state with filtered mechanism state."""
+        # Get the mechanism's state
         mechanism_state = self.mechanism.get_global_state()
+        
+        # Filter to include only the last round's summaries
+        if "round_summaries" in mechanism_state and mechanism_state["round_summaries"]:
+            mechanism_state["round_summaries"] = mechanism_state["round_summaries"][-1:]
+
         return {
-            **self._global_state,
             **mechanism_state,
-            "current_step": self.current_step,
-            "max_steps": self.max_steps,
-            "current_topic": self.mechanism.current_topic
+            "current_step": self.mechanism.current_round,
+            "max_steps": self.mechanism.max_rounds
         }
 
     def reset(self) -> GlobalObservation:
