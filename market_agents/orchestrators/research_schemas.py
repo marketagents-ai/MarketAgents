@@ -49,30 +49,77 @@ class MarketResearch(BaseModel):
     sector: Optional[SectorInfo] = Field(None, description="Sector-level details if 'sector' type.")
     macro: Optional[MacroTrends] = Field(None, description="Macro-level insights if 'macro' type.")
 
-class CharacterAnalysis(BaseModel):
-    """Schema for character analysis in literary works"""
-    name: str = Field(..., description="Character name")
-    role: str = Field(..., description="Character's role in the story")
-    motivation: Optional[str] = Field(None, description="Character's primary motivations")
-    key_quotes: List[str] = Field(default_factory=list, description="Notable quotes by or about the character")
-    relationships: List[str] = Field(default_factory=list, description="Key relationships with other characters")
-    character_arc: Optional[str] = Field(None, description="Character's development through the story")
-    themes: List[str] = Field(default_factory=list, description="Themes associated with this character")
-    interpretation: Optional[str] = Field(None, description="Critical interpretation of the character")
+class Severity(str, Enum):
+    """Classification of recession severity based on GDP decline"""
+    SEVERE = "severe"          # > 3% GDP decline
+    MODERATE = "moderate"      # 1-3% GDP decline
+    MILD = "mild"             # < 1% GDP decline
 
-class ThematicElement(BaseModel):
-    theme: str = Field(..., description="Name of the theme")
-    description: str = Field(..., description="Explanation of the theme")
-    examples: List[str] = Field(default_factory=list, description="Textual examples supporting this theme")
-    significance: Optional[str] = Field(None, description="Broader significance of this theme")
+class RecoveryType(str, Enum):
+    """Classification of economic recovery patterns"""
+    V_SHAPED = "v_shaped"      # Sharp decline, rapid recovery
+    U_SHAPED = "u_shaped"      # Prolonged bottom, gradual recovery
+    W_SHAPED = "w_shaped"      # Double-dip recession pattern
+    L_SHAPED = "l_shaped"      # Sharp decline, stagnant recovery
 
-class LiteraryAnalysis(BaseModel):
-    """Schema for comprehensive literary analysis"""
-    work_title: str = Field(default="Hamlet", description="Title of the literary work")
-    author: str = Field(default="William Shakespeare", description="Author of the work")
-    characters: List[CharacterAnalysis] = Field(default_factory=list, description="Analysis of key characters")
-    themes: List[ThematicElement] = Field(default_factory=list, description="Major themes in the work")
-    key_scenes: List[str] = Field(default_factory=list, description="Analysis of pivotal scenes")
-    literary_devices: List[str] = Field(default_factory=list, description="Notable literary devices used")
-    historical_context: Optional[str] = Field(None, description="Relevant historical background")
-    interpretation: Optional[str] = Field(None, description="Overall interpretation or analysis")
+class GreatRecessionAnalysis(BaseModel):
+    """Analysis of the 2007-2009 Financial Crisis/Great Recession"""
+    severity: Severity = Field(
+        ..., 
+        description="Severity classification based on GDP decline: SEVERE (>3%), MODERATE (1-3%), MILD (<1%)"
+    )
+    recovery_pattern: RecoveryType = Field(
+        ..., 
+        description="Shape of recovery: V (quick), U (gradual), W (double-dip), L (stagnant)"
+    )
+    gdp_decline_pct: float = Field(
+        ..., 
+        ge=0, 
+        le=20, 
+        description="Maximum GDP decline from peak to trough as a percentage"
+    )
+    peak_unemployment: float = Field(
+        ...,
+        ge=0,
+        le=15,
+        description="Peak unemployment rate during the recession (%)"
+    )
+
+    fed_funds_peak: float = Field(
+        ...,
+        ge=0,
+        le=10,
+        description="Federal Funds Rate at the start of recession (%)"
+    )
+    fed_funds_trough: float = Field(
+        ...,
+        ge=0,
+        le=10,
+        description="Federal Funds Rate at the end of recession (%)"
+    )
+    total_rate_cuts: float = Field(
+        ...,
+        ge=0,
+        le=10,
+        description="Total percentage points of Fed rate cuts during recession"
+    )
+    qe_program_size: float = Field(
+        ...,
+        ge=0,
+        le=5000,
+        description="Size of QE program in billions USD during recession period"
+    )
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "severity": "severe",
+                "recovery_pattern": "u_shaped",
+                "gdp_decline_pct": 4.3,
+                "peak_unemployment": 10.0,
+                "fed_funds_peak": 5.25,
+                "fed_funds_trough": 0.25,
+                "total_rate_cuts": 5.0,
+                "qe_program_size": 1750.0
+            }
+        }

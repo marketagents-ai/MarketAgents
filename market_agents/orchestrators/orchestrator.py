@@ -87,10 +87,13 @@ class MultiAgentOrchestrator:
             # Convert config to dict and ensure required fields
             env_params = env_config.dict() if hasattr(env_config, 'dict') else env_config
             
+            # Add ai_utils to the environment parameters
+            env_params['ai_utils'] = self.ai_utils
+            
             # Debug logging
             self.logger.debug(f"Initializing {self.environment_name} with params: {env_params}")
             
-            # Initialize environment with config parameters
+            # Initialize environment with config parameters and ai_utils
             environment = environment_class(**env_params)
             self.logger.info(f"Successfully initialized {self.environment_name} environment")
             return environment
@@ -109,7 +112,7 @@ class MultiAgentOrchestrator:
             
             if form_cohorts:
                 self.logger.info(f"Forming cohorts with {len(self.agents)} agents")
-                self.environment.mechanism.form_agent_cohorts(self.agents)
+                await self.environment.mechanism.form_agent_cohorts(self.agents)
                 for cohort_id, cohort_agents in self.environment.mechanism.cohorts.items():
                     log_cohort_formation(
                         self.logger, 
@@ -233,7 +236,18 @@ class MultiAgentOrchestrator:
         
         agent_summaries = await self._process_agent_actions(actions, agents)
         global_actions = await self._create_global_actions(actions, agents)
-        step_result = self.environment.step(global_actions)
+        
+        # Get cohort_id if using cohorts
+        cohort_id = None
+        if cohort_agents and hasattr(self.environment.mechanism, 'cohorts'):
+            cohort_id = next(
+                (cid for cid, cohort_agents in self.environment.mechanism.cohorts.items() 
+                if any(a.id == agents[0].id for a in cohort_agents)),
+                None
+            )
+        
+        # Pass cohort_id to environment step
+        step_result = self.environment.step(global_actions, cohort_id=cohort_id)
         
         if step_result and getattr(step_result, "global_observation", None):
             await self._update_agent_observations(step_result, agent_summaries, agents)
@@ -388,16 +402,20 @@ class MultiAgentOrchestrator:
                     })
             if actions_data:
                 await self.data_inserter.insert_actions(actions_data)
+            
+            # Get environment state for each agent in cohort
             if hasattr(self.environment, 'get_global_state'):
-                env_state = self.environment.get_global_state()
-                config_dict = self.orchestrator_config.model_dump() if hasattr(self.orchestrator_config, 'model_dump') else vars(self.orchestrator_config)
-                metadata = {
-                    'config': config_dict,
-                    'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'num_agents': len(agents),
-                    'sub_round': sub_round
-                }
-                await self.data_inserter.insert_environment_state(self.config.name, round_num, env_state, metadata)
+                for agent in agents:
+                    env_state = self.environment.get_global_state(agent_id=agent.id)
+                    config_dict = self.orchestrator_config.model_dump() if hasattr(self.orchestrator_config, 'model_dump') else vars(self.orchestrator_config)
+                    metadata = {
+                        'config': config_dict,
+                        'timestamp': datetime.now(timezone.utc).isoformat(),
+                        'num_agents': len(agents),
+                        'sub_round': sub_round,
+                        'agent_id': agent.id
+                    }
+                    await self.data_inserter.insert_environment_state(self.config.name, round_num, env_state, metadata)
             self.logger.info(f"Data for round {round_num}, sub-round {sub_round} inserted.")
         except Exception as e:
             self.logger.error(f"Error processing round {round_num} results: {e}", exc_info=True)

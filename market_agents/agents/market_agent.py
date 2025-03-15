@@ -162,19 +162,19 @@ class MarketAgent(Agent):
             step = ActionStep(
                 agent_id=self.id,
                 environment_name=env_name,
-                environment_info=environment.get_global_state(),
+                environment_info=environment.get_global_state(agent_id=self.id),
                 **kwargs
             )
         elif isinstance(step, type):
             step = step(
                 agent_id=self.id,
                 environment_name=env_name,
-                environment_info=environment.get_global_state(),
+                environment_info=environment.get_global_state(agent_id=self.id),
                 **kwargs
             )
         else:
             step.environment_name = env_name
-            step.environment_info = environment.get_global_state()
+            step.environment_info = environment.get_global_state(agent_id=self.id)
             step.agent_id = self.id
         
         logger.info(f"Executing cognitive step: {step.step_name}")
