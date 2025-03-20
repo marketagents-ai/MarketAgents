@@ -4,18 +4,25 @@ num_agents: 2
 max_rounds: 1
 environment_order:
 #  - group_chat
-  - research
+#  - research
+  - mcp_server
 tool_mode: true
 agent_config:
   knowledge_base: "hamlet_kb"
   use_llm: true
 llm_configs:
-    - name: "gpt-4.5"
-      model: "gpt-4.5-preview-2025-02-27"
+    - name: "gpt-4o"
+      model: "gpt-4o-mini"
       client: "openai"
       max_tokens: 1024
       temperature: 0.5
       use_cache: true
+#    - name: "deephermes"
+#      model: "DeepHermes-3-Mistral-24B-Preview"
+#      client: "vllm"
+#      max_tokens: 1024
+#      temperature: 0.6
+#      use_cache: true
 #    - name: "claude"
 #      model: "claude-3-5-sonnet-latest"
 #      client: "anthropic"
@@ -53,16 +60,25 @@ environment_configs:
     api_url: "http://localhost:8002"
     initial_topic: "Analyze the key macroeconomic metrics of the 2007-2009 Financial Crisis, focusing on unemployment, inflation, and Federal Funds Rate changes. Consider how these metrics interacted during the crisis."
     form_cohorts: true
-    sub_rounds: 1
+    sub_rounds: 2
     group_size: 2
   research:
     name: "research"
     api_url: "http://localhost:8003"
     initial_topic: "Analyze the 2007-2009 Financial Crisis focusing on: 1) Peak unemployment rate, 2) Inflation rate range (peak and lowest), 3) Federal Funds Rate range (peak to trough). Provide specific numerical values based on historical data."
     form_cohorts: false
-    sub_rounds: 2
+    sub_rounds: 1
     group_size: 2
     schema_model: "GreatRecessionAnalysis"
+  mcp_server:
+    name: "mcp_finance"
+    api_url: "local://mcp_server"
+    mcp_server_module: "market_agents.orchestrators.mcp_server.finance_mcp_server"
+    mcp_server_class: "mcp"
+    form_cohorts: false
+    sub_rounds: 2
+    task_prompt: "Analyze the current market conditions for NVIDIA stocks. What are their current prices, recent performance, and key financial metrics?"
+
 protocol: "acl_message"
 database_config:
   db_host: "localhost"
