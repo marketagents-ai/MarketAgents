@@ -105,6 +105,18 @@ class MultiAgentOrchestrator:
         """Set up or reset the environment."""
         self.logger.info("Setting up the Environment...")
         if self.environment:
+            # Add this line to properly initialize the environment
+            if hasattr(self.environment, 'initialize'):
+                self.logger.info("Initializing environment...")
+                await self.environment.initialize()
+                self.logger.info("Environment initialization complete")
+                
+            self._initialize_agents_for_environment()
+            
+            # Rest of the setup...
+            if hasattr(self.environment.mechanism, '_cognitive_processor'):
+                self.environment.mechanism._cognitive_processor = self.cognitive_processor
+            
             form_cohorts = (
                 hasattr(self.environment.mechanism, 'form_cohorts') and 
                 getattr(self.environment.mechanism, 'form_cohorts', False)
@@ -113,12 +125,7 @@ class MultiAgentOrchestrator:
             if form_cohorts:
                 self.logger.info(f"Forming cohorts with {len(self.agents)} agents")
                 await self.environment.mechanism.form_agent_cohorts(self.agents)
-                for cohort_id, cohort_agents in self.environment.mechanism.cohorts.items():
-                    log_cohort_formation(
-                        self.logger, 
-                        cohort_id, 
-                        [agent.id for agent in cohort_agents]
-                    )
+                
         self.logger.info("Environment setup complete.")
 
     async def run_environment(self, round_num: Optional[int] = None):
@@ -132,7 +139,6 @@ class MultiAgentOrchestrator:
     async def run_round(self, round_num: int):
         """Execute one full round with multiple sub-rounds."""
         self.logger.info(f"=== Running Round {round_num} ===")
-        self._initialize_agents_for_round()
 
         # Simply check if we should use cohorts for execution
         form_cohorts = (
@@ -165,7 +171,7 @@ class MultiAgentOrchestrator:
                 step_result = await self._run_sub_round(round_num, sub_round)
                 await self.process_round_results(round_num, sub_round)
 
-    def _initialize_agents_for_round(self):
+    def _initialize_agents_for_environment(self):
         """Initialize agents for the round. Override this if environment-specific initialization is needed."""
         for agent in self.agents:
             # Initialize environment for each agent
