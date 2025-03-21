@@ -135,6 +135,10 @@ class MCPServerMechanism(Mechanism):
         default_factory=dict,
         description="Mapping of cohort IDs to lists of agents"
     )
+    task_prompt: Optional[str] = Field(
+        default=None,
+        description="Initial task prompt"
+    )
 
     model_config = {
         "arbitrary_types_allowed": True,
@@ -494,49 +498,35 @@ class MCPServerMechanism(Mechanism):
             )
     
     def get_global_state(self, agent_id: Optional[str] = None) -> Dict[str, Any]:
-        """Get global state with cohort support"""
+        """Return the environment's global state from mechanism"""
         state = {
-            "current_round": self.current_round,
-            "max_rounds": self.max_rounds,
-            "available_tools": list(self.available_tools.keys()),
-            "form_cohorts": self.form_cohorts
+            "current_step": self.current_round,
+            "max_steps": self.max_rounds,
+            "task_prompt": self.task_prompt,
+            "available_tools": self.available_tools
         }
 
         if self.form_cohorts:
+            # Add cohort-specific information
             if agent_id:
-                # Get agent's specific cohort
                 cohort_id = next(
                     (cid for cid, agents in self.cohorts.items() 
                     if any(a.id == agent_id for a in agents)),
                     None
                 )
                 if cohort_id:
-                    # Filter tool history to only show entries from agent's cohort
-                    cohort_history = self.tool_history.get(cohort_id, [])
                     state.update({
-                        "tool_history": cohort_history,
+                        "tool_history": self.tool_history.get(cohort_id, []),
                         "cohort_id": cohort_id,
                         "cohort_agents": [a.id for a in self.cohorts[cohort_id]]
                     })
-                else:
-                    # Agent not found in any cohort, return default history
-                    state.update({
-                        "tool_history": self.tool_history.get("default", [])
-                    })
             else:
-                # Return all cohorts' data for system view
                 state.update({
-                    "cohorts": {
-                        cid: [a.id for a in agents] 
-                        for cid, agents in self.cohorts.items()
-                    },
+                    "cohorts": {cid: [a.id for a in agents] for cid, agents in self.cohorts.items()},
                     "tool_history": self.tool_history
                 })
         else:
-            # Not using cohorts, return default history
-            state.update({
-                "tool_history": self.tool_history.get("default", [])
-            })
+            state["tool_history"] = self.tool_history.get("default", [])
 
         return state
 
@@ -629,10 +619,6 @@ class MCPServerEnvironment(MultiAgentEnvironment):
         default_factory=ObservationSpace,
         description="Observation space for MCP server"
     )
-    task_prompt: Optional[str] = Field(
-        default=None,
-        description="Initial task prompt"
-    )
 
     model_config = {
         "arbitrary_types_allowed": True,
@@ -662,16 +648,15 @@ class MCPServerEnvironment(MultiAgentEnvironment):
                 server_path=server_path,
                 form_cohorts=env_config.form_cohorts,
                 group_size=env_config.group_size,
-                server_class=env_config.mcp_server_class
+                server_class=env_config.mcp_server_class,
+                task_prompt=env_config.task_prompt
             )
 
             # Create a base config dict for parent initialization
             base_config = {
                 "name": env_config.name,
                 "mechanism": mechanism,
-                "observation_space": ObservationSpace(),
-                "task_prompt": env_config.task_prompt
-            }
+                "observation_space": ObservationSpace()            }
 
             # Initialize parent class
             super().__init__(**base_config)
