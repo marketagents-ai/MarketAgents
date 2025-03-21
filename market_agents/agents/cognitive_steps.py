@@ -151,6 +151,7 @@ class PerceptionStep(CognitiveStep):
         perception_prompt = agent.prompt_manager.get_perception_prompt(variables.model_dump())
 
         if agent.chat_thread and self.structured_tool:
+            agent.chat_thread.tools = [perception_tool]
             agent.chat_thread.forced_output = perception_tool
 
         if agent.task:
@@ -352,6 +353,7 @@ class ReflectionStep(CognitiveStep):
         )
 
         if agent.chat_thread and self.structured_tool:
+            agent.chat_thread.tools = [reflection_tool]
             agent.chat_thread.forced_output = reflection_tool
 
         if agent.chat_thread:
