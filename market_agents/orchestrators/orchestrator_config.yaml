@@ -1,6 +1,6 @@
 # orchestrator_config.yaml
 
-num_agents: 2
+num_agents: 4
 max_rounds: 1
 environment_order:
 #  - group_chat
@@ -75,8 +75,9 @@ environment_configs:
     api_url: "local://mcp_server"
     mcp_server_module: "market_agents.orchestrators.mcp_server.finance_mcp_server"
     mcp_server_class: "mcp"
-    form_cohorts: false
+    form_cohorts: true
     sub_rounds: 2
+    group_size: 2
     task_prompt: "Analyze the current market conditions for NVIDIA stocks. What are their current prices, recent performance, and key financial metrics?"
 
 protocol: "acl_message"
