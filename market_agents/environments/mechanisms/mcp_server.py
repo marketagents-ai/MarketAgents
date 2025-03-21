@@ -261,7 +261,7 @@ class MCPServerMechanism(Mechanism):
             print(f"Error initializing client connection: {str(e)}")
             raise
 
-    async def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def execute_tool(self, tool_name: str, arguments: Dict[str, Any], chat_thread_id: Optional[str] = None) -> Any:
         """Execute a tool using a fresh MCP client session"""
         max_retries = 3
         retry_count = 0
@@ -269,43 +269,45 @@ class MCPServerMechanism(Mechanism):
         
         while retry_count < max_retries:
             try:
-                # Create a fresh session for each tool execution
                 async with asyncio.timeout(30):  # 30 second timeout
                     async with stdio_client(self.server_params) as (read, write):
                         async with ClientSession(read, write) as session:
                             await session.initialize()
                             result = await session.call_tool(tool_name, arguments=arguments)
                             
-                            # Convert CallToolResult to dict
+                            # Convert result if needed
                             if hasattr(result, 'model_dump'):
                                 result = result.model_dump()
                             elif hasattr(result, 'dict'):
                                 result = result.dict()
                             elif hasattr(result, '__dict__'):
                                 result = result.__dict__
-                            
-                            print(f"tool result:\n{result}")
-                            # Record successful execution
-                            self.tool_history.append({
-                                "tool_name": tool_name,
-                                "arguments": arguments,
-                                "result": result,
-                                "timestamp": datetime.now().isoformat()
-                            })
+
+                            logger.info(f"tool name: {tool_name}\ntool result:\n{result}")
+
+                            # Record tool execution history
+                            self.record_tool_history(
+                                tool_name=tool_name,
+                                arguments=arguments,
+                                result=result,
+                                chat_thread_id=chat_thread_id
+                            )
                             
                             return result
-                    
+
             except (asyncio.TimeoutError, asyncio.CancelledError) as e:
-                self.logger.error(f"Tool execution timed out or was cancelled: {str(e)}")
+                logger.error(f"Tool execution timed out or was cancelled: {str(e)}")
                 last_error = e
-                # Don't retry on explicit cancellation
                 if isinstance(e, asyncio.CancelledError):
                     break
             except Exception as e:
-                self.logger.error(f"Error executing tool {tool_name}: {str(e)}")
+                logger.error(f"Error executing tool {tool_name}: {str(e)}")
                 last_error = e
-            
-            # Increment retry counter and wait before retrying
+                if "unhandled errors in a TaskGroup" not in str(e):
+                    last_error = e
+                else:
+                    return None
+
             retry_count += 1
             if retry_count < max_retries:
                 await asyncio.sleep(1)
@@ -314,6 +316,56 @@ class MCPServerMechanism(Mechanism):
         if isinstance(last_error, asyncio.CancelledError):
             raise last_error
         raise last_error or Exception(f"Failed to execute tool {tool_name} after {max_retries} retries")
+
+    def record_tool_history(
+        self, 
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: Any,
+        chat_thread_id: Optional[str] = None
+    ) -> None:
+        """Record tool execution history in appropriate cohort."""
+        # Find agent from chat_thread_id
+        agent_id = None
+        cohort_id = None
+
+        # Find agent (and cohort if enabled)
+        if chat_thread_id:
+            for cid, agents in self.cohorts.items():
+                for agent in agents:
+                    if (hasattr(agent, 'chat_thread') and 
+                        agent.chat_thread and 
+                        str(agent.chat_thread.id) == str(chat_thread_id)):
+                        agent_id = agent.id
+                        if self.form_cohorts:
+                            cohort_id = cid
+                        break
+                if agent_id:
+                    break
+
+        if not agent_id:
+            raise ValueError(f"Could not find agent for chat_thread_id: {chat_thread_id}")
+
+        # Determine where to store the history
+        history_key = cohort_id if self.form_cohorts else "default"
+        if history_key not in self.tool_history:
+            self.tool_history[history_key] = []
+
+        # Create and record the history entry
+        history_entry = {
+            "agent_id": agent_id,
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "result": result,
+            "round": self.current_round,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        self.tool_history[history_key].append(history_entry)
+        log_msg = f"Recorded tool execution in round {self.current_round} for agent {agent_id}"
+        if self.form_cohorts:
+            log_msg += f" in cohort {cohort_id}"
+        logger.debug(log_msg)
 
     async def initialize(self):
         """Initialize the mechanism by extracting available tools"""
@@ -440,6 +492,7 @@ class MCPServerMechanism(Mechanism):
                     "available_tools": list(self.available_tools.keys())
                 }
             )
+    
     def get_global_state(self, agent_id: Optional[str] = None) -> Dict[str, Any]:
         """Get global state with cohort support"""
         state = {
@@ -458,13 +511,20 @@ class MCPServerMechanism(Mechanism):
                     None
                 )
                 if cohort_id:
+                    # Filter tool history to only show entries from agent's cohort
+                    cohort_history = self.tool_history.get(cohort_id, [])
                     state.update({
-                        "tool_history": self.tool_history.get(cohort_id, []),
+                        "tool_history": cohort_history,
                         "cohort_id": cohort_id,
                         "cohort_agents": [a.id for a in self.cohorts[cohort_id]]
                     })
+                else:
+                    # Agent not found in any cohort, return default history
+                    state.update({
+                        "tool_history": self.tool_history.get("default", [])
+                    })
             else:
-                # Return all cohorts' data
+                # Return all cohorts' data for system view
                 state.update({
                     "cohorts": {
                         cid: [a.id for a in agents] 
@@ -473,7 +533,7 @@ class MCPServerMechanism(Mechanism):
                     "tool_history": self.tool_history
                 })
         else:
-            # Not using cohorts, return all history from default cohort
+            # Not using cohorts, return default history
             state.update({
                 "tool_history": self.tool_history.get("default", [])
             })
