@@ -570,29 +570,55 @@ class CallableMCPTool(CallableTool):
 
         return tool
 
-    async def aexecute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Asynchronously execute the tool via the MCP server.
-        
-        Args:
-            input_data (Dict[str, Any]): Input arguments for the tool.
-            
-        Returns:
-            Dict[str, Any]: Result returned by the MCP server.
-        
-        Raises:
-            ValueError: If the mcp_mechanism instance is not set.
-            Exception: Propagates errors from the MCP server execution.
-        """
-        if not self.mcp_mechanism:
-            raise ValueError(f"CallableMCPTool({self.name}): MCP mechanism is not set.")
-        try:
-            # Delegate execution to the mechanism's execute_tool method
-            result = await self.mcp_mechanism.execute_tool(self.name, input_data)
-            return result
-        except Exception as e:
-            CallableRegistry._logger.error(f"CallableMCPTool({self.name}): Async execution failed: {e}")
-            raise
+    async def aexecute(self, chat_thread_id: str, input_data: Dict[str, Any]) -> Any:
+            """Execute the tool asynchronously"""
+            try:
+                # Execute the tool
+                result = await self.mcp_mechanism.execute_tool(
+                    tool_name=self.name, 
+                    arguments=input_data,
+                    chat_thread_id=chat_thread_id
+                )
+                EntityRegistry._logger.info(f"Raw MCP tool result: {result}")
+                
+                # Early return if result is None
+                if result is None:
+                    return None
+                    
+                # Handle MCP-specific response format
+                if isinstance(result, dict):
+                    # Check if it's an error response
+                    if result.get('isError', False):
+                        raise Exception(str(result.get('content', 'Unknown error')))
+                        
+                    # Extract content from MCP response
+                    if 'content' in result:
+                        for content_item in result['content']:
+                            if content_item.get('type') == 'text':
+                                text_content = content_item['text']
+                                try:
+                                    # Try to parse as JSON first
+                                    parsed_content = json.loads(text_content)
+                                    EntityRegistry._logger.info(f"Successfully parsed tool result: {parsed_content}")
+                                    return parsed_content
+                                except json.JSONDecodeError:
+                                    # Return as plain text if not JSON
+                                    EntityRegistry._logger.info(f"Returning text content: {text_content}")
+                                    return text_content
+                    
+                    # If we couldn't extract content, return the raw result
+                    EntityRegistry._logger.info(f"Returning raw result: {result}")
+                    return result
+                
+                # If result is not a dict, return as is
+                return result
+                
+            except Exception as e:
+                EntityRegistry._logger.error(f"{self.__class__.__name__}({self.name}): Async execution failed: {str(e)}")
+                # Don't raise TaskGroup errors if we have a result
+                if "unhandled errors in a TaskGroup" not in str(e):
+                    raise
+                return None
         
 class StructuredTool(Entity):
     """
@@ -1565,7 +1591,7 @@ class ChatThread(Entity):
                     elif isinstance(tool, CallableMCPTool):
                         # Handle MCP tool execution
                         EntityRegistry._logger.info(f"Executing MCP tool: {tool.name} with args: {output.json_object.object}")
-                        tool_result = await tool.aexecute(input_data=output.json_object.object)
+                        tool_result = await tool.aexecute(chat_thread_id=self.id, input_data=output.json_object.object)
                         EntityRegistry._logger.info(f"MCP tool result: {tool_result}")
                         
                         tool_message = ChatMessage(
