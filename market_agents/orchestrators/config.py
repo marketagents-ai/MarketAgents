@@ -1,7 +1,8 @@
 # config.py
 
-from pydantic import BaseModel, Field
-from typing import List, Dict, Union
+from enum import Enum
+from pydantic import BaseModel, Field, validator
+from typing import Any, List, Dict, Optional, Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import yaml
 from pathlib import Path
@@ -16,7 +17,20 @@ class AgentConfig(BaseModel):
         description="Flag to indicate if LLM should be used"
     )
 
-class GroupChatConfig(BaseModel):
+class EnvironmentConfig(BaseSettings):
+    name: str = Field(
+        ...,
+        description="Name of the group chat environment"
+    )
+    api_url: str = Field(
+        ...,
+        description="API endpoint for the environment"
+    )
+    model_config = {
+        "extra": "allow"
+    }
+
+class GroupChatConfig(EnvironmentConfig):
     name: str = Field(
         ...,
         description="Name of the group chat environment"
@@ -38,7 +52,7 @@ class GroupChatConfig(BaseModel):
         description="API endpoint for group chat environment"
     )
 
-class ResearchConfig(BaseModel):
+class ResearchConfig(EnvironmentConfig):
     """Configuration for research environment orchestration"""
     name: str = Field(
         default="research",
@@ -64,6 +78,52 @@ class ResearchConfig(BaseModel):
         default="LiteraryAnalysis",
         description="Name of Pydantic model defining research output schema"
     )
+
+class WebResearchConfig(BaseModel):
+    name: str
+    api_url: str
+    initial_query: str
+    sub_rounds: int = 2
+    search_config: Dict[str, Any]
+    schema_model: str = Field(
+        default="ResearchSummary",
+        description="Name of Pydantic model defining research output schema"
+    )
+
+class MCPServerConfig(EnvironmentConfig):
+    """Configuration for MCP Server environment"""
+    name: str = Field(
+        ..., 
+        description="Name of the MCP server environment"
+    )
+    mcp_server_module: str = Field(
+        ..., 
+        description="Module path to the MCP server"
+    )
+    mcp_server_class: str = Field(
+        default="mcp", 
+        description="Variable name of the MCP server instance"
+    )
+    max_rounds: int = Field(
+        default=3,
+        description="Maximum number of rounds for the MCP server"
+    )
+    sub_rounds: int = Field(
+        default=2, 
+        description="Number of sub-rounds per main round"
+    )
+    task_prompt: str = Field(
+        default="", 
+        description="Initial task prompt for the MCP server interaction"
+    )
+    api_url: str = Field(
+        default="local://mcp_server",
+        description="Placeholder API endpoint for MCP server (not used)"
+    )
+    
+    model_config = {
+        "extra": "allow"
+    }
 
 class LLMConfigModel(BaseModel):
     name: str = Field(
@@ -144,7 +204,7 @@ class OrchestratorConfig(BaseSettings):
         ...,
         description="List of LLM configurations"
     )
-    environment_configs: Dict[str, Union[GroupChatConfig, ResearchConfig]] = Field(
+    environment_configs: Dict[str, EnvironmentConfig] = Field(
         ...,
         description="Configurations for different environments"
     )
@@ -171,7 +231,35 @@ class OrchestratorConfig(BaseSettings):
         extra='ignore'
     )
 
-def load_config(config_path: Path) -> OrchestratorConfig:
+def deep_update(base_dict: dict, update_dict: dict) -> dict:
+    """Recursively update a dictionary."""
+    for key, value in update_dict.items():
+        if (
+            isinstance(value, dict) 
+            and key in base_dict 
+            and isinstance(base_dict[key], dict)
+        ):
+            deep_update(base_dict[key], value)
+        else:
+            base_dict[key] = value
+    return base_dict
+
+def load_config(config_path: Path, overrides: dict = None) -> OrchestratorConfig:
+    """
+    Load config from YAML and apply any overrides.
+    
+    Args:
+        config_path: Path to the YAML config file
+        overrides: Dictionary of overrides that can update any part of the config
+    """
     with open(config_path, 'r') as file:
         config_dict = yaml.safe_load(file)
-    return OrchestratorConfig(**config_dict)
+    
+    # Apply overrides if provided
+    if overrides:
+        config_dict = deep_update(config_dict, overrides)
+        
+    try:
+        return OrchestratorConfig(**config_dict)
+    except Exception as e:
+        raise

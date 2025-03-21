@@ -3,8 +3,9 @@
 num_agents: 4
 max_rounds: 1
 environment_order:
-  - group_chat
-  - research
+#  - group_chat
+#  - research
+  - mcp_server
 tool_mode: true
 agent_config:
   knowledge_base: "hamlet_kb"
@@ -16,53 +17,69 @@ llm_configs:
       max_tokens: 1024
       temperature: 0.5
       use_cache: true
-    - name: "claude"
-      model: "claude-3-5-sonnet-latest"
-      client: "anthropic"
-      max_tokens: 4096
-      temperature: 0.5
-      use_cache: true
-    - name: "hermes"
-      model: "openai/NousResearch/Hermes-3-Llama-3.1-8B"
-      client: "litellm"
-      max_tokens: 4096
-      temperature: 0.5
-      use_cache: true
-    - name: "deepseek"
-      model: "openai/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
-      client: "litellm"
-      max_tokens: 4096
-      temperature: 0.5
-      use_cache: true
-    - name: "qwq"
-      model: "openai/Qwen/QwQ-32B-Preview"
-      client: "litellm"
-      max_tokens: 4096
-      temperature: 0.5
-      use_cache: true
-    - name: "qwen"
-      model: "openai/Qwen/Qwen2.5-7B-Instruct"
-      client: "litellm"
-      max_tokens: 4096
-      temperature: 0.5
-      use_cache: true
+#    - name: "deephermes"
+#      model: "DeepHermes-3-Mistral-24B-Preview"
+#      client: "vllm"
+#      max_tokens: 1024
+#      temperature: 0.6
+#      use_cache: true
+#    - name: "claude"
+#      model: "claude-3-5-sonnet-latest"
+#      client: "anthropic"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "hermes"
+#      model: "openai/NousResearch/Hermes-3-Llama-3.1-8B"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "deepseek"
+#      model: "openai/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "qwq"
+#      model: "openai/Qwen/QwQ-32B-Preview"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
+#    - name: "qwen"
+#      model: "openai/Qwen/Qwen2.5-7B-Instruct"
+#      client: "litellm"
+#      max_tokens: 4096
+#      temperature: 0.5
+#      use_cache: true
 
 environment_configs:
   group_chat:
     name: "group_chat"
     api_url: "http://localhost:8002"
-  #  initial_topic: "Initial Market Discussion"
-    initial_topic: "Hamlet's famous 'To be or not to be' soliloquy. Use emoji's and colloquial language for discussion"
+    initial_topic: "Analyze the key macroeconomic metrics of the 2007-2009 Financial Crisis, focusing on unemployment, inflation, and Federal Funds Rate changes. Consider how these metrics interacted during the crisis."
+    form_cohorts: true
     sub_rounds: 2
-    group_size: 4
+    group_size: 2
   research:
-    name: "literary_research"
+    name: "research"
     api_url: "http://localhost:8003"
-#    initial_topic: "Market Analysis"
-    initial_topic: "Hamlet's famous 'To be or not to be' soliloquy', record your aha moments with emojis"
+    initial_topic: "Analyze the 2007-2009 Financial Crisis focusing on: 1) Peak unemployment rate, 2) Inflation rate range (peak and lowest), 3) Federal Funds Rate range (peak to trough). Provide specific numerical values based on historical data."
+    form_cohorts: false
+    sub_rounds: 1
+    group_size: 2
+    schema_model: "GreatRecessionAnalysis"
+  mcp_server:
+    name: "mcp_finance"
+    api_url: "local://mcp_server"
+    mcp_server_module: "market_agents.orchestrators.mcp_server.finance_mcp_server"
+    mcp_server_class: "mcp"
+    form_cohorts: true
     sub_rounds: 2
-    group_size: 4
-    schema_model: "LiteraryAnalysis" 
+    group_size: 2
+    task_prompt: "Analyze the current market conditions for NVIDIA stocks. What are their current prices, recent performance, and key financial metrics?"
+
 protocol: "acl_message"
 database_config:
   db_host: "localhost"

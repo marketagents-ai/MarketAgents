@@ -167,7 +167,7 @@ class ObservationSpace(BaseModel):
 class Mechanism(BaseModel, ABC):
     sequential: bool = Field(default=False, description="Whether the mechanism is sequential")
     @abstractmethod
-    def step(self, action: Union[LocalAction, GlobalAction]) -> Union[LocalEnvironmentStep, EnvironmentStep]:
+    def step(self, action: Union[LocalAction, GlobalAction], cohort_id: Optional[str] = None) -> Union[LocalEnvironmentStep, EnvironmentStep]:
         """Execute a step in the mechanism."""
         pass
 
@@ -226,27 +226,29 @@ class MultiAgentEnvironment(BaseModel):
     history: EnvironmentHistory = Field(default_factory=EnvironmentHistory, description="History of environment steps")
     mechanism: Mechanism = Field(default_factory=Notebook, description="Mechanism of the environment that determines the rules of the game P(s, a, s')")
 
-    def step(self, actions: GlobalAction) -> EnvironmentStep:
+    def step(self, actions: GlobalAction, cohort_id: Optional[str] = None) -> EnvironmentStep:
         """
         Run one timestep of the environment's dynamics using the batched agent actions.
         
         Args:
             actions (GlobalAction): A batched action containing actions for each agent.
+            cohort_id (Optional[str]): Identifier for the cohort when using cohort-based processing.
 
         Returns:
             EnvironmentStep: The result of taking a step in the environment.
         """
         if self.mechanism.sequential:
             # if it is sequential, we need to run the mechanism for each agent
-            local_steps: Dict[str, LocalEnvironmentStep] = {}  # Correct type annotation
+            local_steps: Dict[str, LocalEnvironmentStep] = {}
             for agent_id, local_action in actions.locals().items():
-                local_step = self.mechanism.step(local_action)
+                local_step = self.mechanism.step(local_action, cohort_id=cohort_id)
                 assert isinstance(local_step, LocalEnvironmentStep)
                 local_steps[agent_id] = local_step
             global_step = EnvironmentStep.from_local_steps(local_steps)
         else:
-            global_step = self.mechanism.step(actions)
+            global_step = self.mechanism.step(actions, cohort_id=cohort_id)
             assert isinstance(global_step, EnvironmentStep)
+        
         self.current_step += 1
         self.update_history(actions, global_step)
         return global_step

@@ -5,9 +5,10 @@ import asyncio
 
 from pydantic import BaseModel, Field
 
+from market_agents.environments.environment import StrAction
 from market_agents.memory.memory import MemoryObject
 from market_agents.agents.market_agent_prompter import MarketAgentPromptVariables
-from minference.lite.models import CallableTool, StructuredTool
+from minference.lite.models import CallableTool, ResponseFormat, StructuredTool
 from market_agents.agents.cognitive_tools import (
     perception_tool,
     reflection_tool
@@ -93,7 +94,10 @@ class PerceptionStep(CognitiveStep):
     step_name: str = "perception"
 
     async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
-        stm_cognitive = await agent.short_term_memory.retrieve_recent_memories(limit=1)
+        stm_cognitive = await agent.short_term_memory.retrieve_recent_memories(
+            limit=2,
+            cognitive_step="action"
+        )
         short_term_memories = [
             {
                 "cognitive_step": mem.cognitive_step,
@@ -103,7 +107,6 @@ class PerceptionStep(CognitiveStep):
             for mem in stm_cognitive
         ]
 
-        # Debug: Color print short-term memories with content
         print("\nShort-term Memory Results:")
         memory_strings = [f"Memory {i+1}:\n{mem['content']}" for i, mem in enumerate(short_term_memories)]
         print("\033[94m" + "\n\n".join(memory_strings) + "\033[0m")
@@ -148,6 +151,7 @@ class PerceptionStep(CognitiveStep):
         perception_prompt = agent.prompt_manager.get_perception_prompt(variables.model_dump())
 
         if agent.chat_thread and self.structured_tool:
+            agent.chat_thread.tools = [perception_tool]
             agent.chat_thread.forced_output = perception_tool
 
         if agent.task:
@@ -176,10 +180,6 @@ class PerceptionStep(CognitiveStep):
         return result
 
 class ActionStep(CognitiveStep):
-    """
-    Decides the agent's next action using zero or more schemas/tools,
-    then applies it in the environment.
-    """
     step_name: str = "action"
     action_space: Optional[
         Union[
@@ -193,51 +193,86 @@ class ActionStep(CognitiveStep):
         description="Either a single or list of action schema(s)/tool(s)"
     )
 
-    perception: Optional[str] = Field(
-        default=None,
-        description="Optional perception from the previous step"
-    )
-
     async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
-        """
-        Decide on an action to execute in the environment,
-        possibly using structured or callable tools.
-        Then calls environment.step(...) with the resulting action.
-        """
         environment = agent.environments[self.environment_name]
         action_space = environment.action_space if environment else None
 
-        serialized_action_space = {
-            "allowed_actions": [
-                action_type.__name__
-                for action_type in getattr(action_space, "allowed_actions", [])
-            ],
-            "constraints": getattr(action_space, "get_constraints", lambda: {})(),
-        }
+        print(f"ActionSpace type: {type(action_space)}")
+            # Debug: Print available tools
+        if hasattr(environment, 'action_space') and hasattr(environment.action_space, 'allowed_actions'):
+            print(f"ActionStep: Found {len(environment.action_space.allowed_actions)} tools in action_space")
+            for tool in environment.action_space.allowed_actions:
+                print(f"  - Tool: {tool.name}")
+        else:
+            print("ActionStep: No tools found in action_space")
+        print(f"ActionSpace has workflow attr: {hasattr(action_space, 'workflow')}")
+        if hasattr(action_space, 'workflow'):
+            print(f"ActionSpace workflow value: {action_space.workflow}")
+
+        tools = getattr(action_space, "tools", [])
+        allowed_actions = getattr(action_space, "allowed_actions", [])
+    
+        if agent.chat_thread:
+            print(f"Chat thread before setup: format={agent.chat_thread.llm_config.response_format}, tools={[t.name for t in agent.chat_thread.tools if t]}")
+            
+            # Check action space's workflow flag
+            if hasattr(action_space, "workflow") and action_space.workflow:
+                print("Setting up workflow mode")
+                agent.chat_thread.tools = tools or allowed_actions
+                print(f"#tools: {len(allowed_actions)}")
+                agent.chat_thread.llm_config.response_format = ResponseFormat.workflow
+                agent.chat_thread.workflow_step = 0
+                print(f"Chat thread after setup: format={agent.chat_thread.llm_config.response_format}, workflow_step={agent.chat_thread.workflow_step}, tools={[t.name for t in agent.chat_thread.tools if t]}")
+            elif len(allowed_actions) > 1:
+                print(f"Setting up multiple tools mode with {len(allowed_actions)} tools")
+                agent.chat_thread.tools = tools or allowed_actions
+                agent.chat_thread.llm_config.response_format = ResponseFormat.auto_tools
+                print(f"Chat thread after setup: format={agent.chat_thread.llm_config.response_format}, tools={[t.name for t in agent.chat_thread.tools if t]}")
+            # Single tool mode
+            elif len(tools) == 1:
+                agent.chat_thread.tools = tools
+                agent.chat_thread.forced_output = tools[0]
+            elif allowed_actions and isinstance(allowed_actions[0], CallableTool):
+                agent.chat_thread.forced_output = allowed_actions[0]
+                agent.chat_thread.tools = allowed_actions
+            # String action mode
+            elif not allowed_actions or (len(allowed_actions) == 1 and allowed_actions[0] == StrAction):
+                agent.chat_thread.llm_config.response_format = ResponseFormat.text
+                agent.chat_thread.forced_output = None
+                agent.chat_thread.tools = []
+            # Structured output mode
+            elif allowed_actions and isinstance(allowed_actions[0], type) and issubclass(allowed_actions[0], BaseModel):
+                action_tool = StructuredTool(
+                    json_schema=action_space.get_action_schema(),
+                    name="react_reasoning",
+                    description="Generate thought-action-observation cycle"
+                )
+                agent.chat_thread.forced_output = action_tool
+
+        serialized_actions = []
+        for action in allowed_actions:
+            if isinstance(action, CallableTool):
+                serialized_actions.append(action.name)
+            elif isinstance(action, type):
+                serialized_actions.append(action.__name__)
+            else:
+                serialized_actions.append(str(action))
 
         variables = MarketAgentPromptVariables(
             environment_name=self.environment_name,
             environment_info=self.environment_info,
             perception=agent.last_perception,
-            action_space=serialized_action_space,
+            action_space={
+                "tools": [tool.name for tool in tools] if tools else [],
+                "allowed_actions": serialized_actions,
+                "constraints": getattr(action_space, "get_constraints", lambda: {})()
+            },
             last_action=agent.last_action,
             observation=agent.last_observation
         )
+        
         action_prompt = agent.prompt_manager.get_action_prompt(variables.model_dump())
-
-        if agent.chat_thread and self.structured_tool:
-            action_tool = StructuredTool(
-                json_schema=action_space.get_action_schema(),
-                name="react_reasoning",
-                description="Generate thought-action-observation cycle"
-            )
-            agent.chat_thread.forced_output = action_tool
-
-        if agent.chat_thread.new_message:
-            print(agent.chat_thread.new_message)
-        else:
-            print(f"NO NEW MESSAGE")
-
+        
         if agent.chat_thread:
             agent.chat_thread.new_message = action_prompt
 
@@ -246,21 +281,27 @@ class ActionStep(CognitiveStep):
 
         result = await agent.execute()
 
+        if isinstance(result, str) and (not allowed_actions or 
+            (len(allowed_actions) == 1 and 
+             (allowed_actions[0] == StrAction or 
+              (isinstance(allowed_actions[0], type) and allowed_actions[0].__name__ == "StrAction")))):
+            result = {"agent_id": agent.id, "action": result}
+
         await self.store_memory(
             agent,
             content=result,
             metadata={
-                "action_space": serialized_action_space,
+                "action_space": variables.action_space,
                 "perception": agent.last_perception,
                 "last_action": agent.last_action,
                 "observation": agent.last_observation,
                 "environment_name": self.environment_name,
-                "environment_info": self.environment_info
+                "environment_info": self.environment_info,
+                "tools_used": [tool.name for tool in tools] if tools else []
             }
         )
 
         agent.last_action = result
-
         return result
     
 class ReflectionStep(CognitiveStep):
@@ -312,6 +353,7 @@ class ReflectionStep(CognitiveStep):
         )
 
         if agent.chat_thread and self.structured_tool:
+            agent.chat_thread.tools = [reflection_tool]
             agent.chat_thread.forced_output = reflection_tool
 
         if agent.chat_thread:

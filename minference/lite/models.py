@@ -525,6 +525,100 @@ class CallableTool(Entity):
                     input_schema=self.input_schema,
             )
         return None
+
+class CallableMCPTool(CallableTool):
+    """
+    A callable tool intended for MCP server execution.
+    delegates the call to the MCP server's call_tool interface.
+    """
+    mcp_mode: bool = Field(default=True, description="Indicates tool execution via MCP server")
+    mcp_mechanism: Optional[Any] = Field(default=None, description="Reference to the MCP server mechanism")
+
+    @classmethod
+    def from_callable(
+        cls, 
+        name: str, 
+        description: Optional[str] = None, 
+        input_schema: Dict[str, Any] = None
+    ) -> 'CallableMCPTool':
+        """
+        Creates a new MCP tool with only the parameters available from MCP server.
+        
+        Args:
+            name: Unique identifier for the tool
+            description: Human-readable description
+            input_schema: JSON Schema for the tool's parameters
+        """
+        # Create a dummy function with type hints based on the input_schema
+        def dummy_func(input_data: Dict[str, Any] = None) -> Dict[str, Any]:
+            return {}
+            
+        dummy_func.__name__ = name
+        dummy_func.__doc__ = description
+
+        # Call parent class's from_callable with our dummy function
+        tool = super().from_callable(
+            func=dummy_func,
+            name=name,
+            docstring=description,
+            strict_schema=True
+        )
+
+        # Override the schemas with the ones from MCP server
+        tool.input_schema = input_schema or {"type": "object", "properties": {}}
+        tool.output_schema = {}
+
+        return tool
+
+    async def aexecute(self, chat_thread_id: str, input_data: Dict[str, Any]) -> Any:
+            """Execute the tool asynchronously"""
+            try:
+                # Execute the tool
+                result = await self.mcp_mechanism.execute_tool(
+                    tool_name=self.name, 
+                    arguments=input_data,
+                    chat_thread_id=chat_thread_id
+                )
+                EntityRegistry._logger.info(f"Raw MCP tool result: {result}")
+                
+                # Early return if result is None
+                if result is None:
+                    return None
+                    
+                # Handle MCP-specific response format
+                if isinstance(result, dict):
+                    # Check if it's an error response
+                    if result.get('isError', False):
+                        raise Exception(str(result.get('content', 'Unknown error')))
+                        
+                    # Extract content from MCP response
+                    if 'content' in result:
+                        for content_item in result['content']:
+                            if content_item.get('type') == 'text':
+                                text_content = content_item['text']
+                                try:
+                                    # Try to parse as JSON first
+                                    parsed_content = json.loads(text_content)
+                                    EntityRegistry._logger.info(f"Successfully parsed tool result: {parsed_content}")
+                                    return parsed_content
+                                except json.JSONDecodeError:
+                                    # Return as plain text if not JSON
+                                    EntityRegistry._logger.info(f"Returning text content: {text_content}")
+                                    return text_content
+                    
+                    # If we couldn't extract content, return the raw result
+                    EntityRegistry._logger.info(f"Returning raw result: {result}")
+                    return result
+                
+                # If result is not a dict, return as is
+                return result
+                
+            except Exception as e:
+                EntityRegistry._logger.error(f"{self.__class__.__name__}({self.name}): Async execution failed: {str(e)}")
+                # Don't raise TaskGroup errors if we have a result
+                if "unhandled errors in a TaskGroup" not in str(e):
+                    raise
+                return None
         
 class StructuredTool(Entity):
     """
@@ -761,7 +855,7 @@ class LLMConfig(Entity):
         return self
 
 
-ToolType = Literal["Callable", "Structured"]
+ToolType = Literal["Callable", "CallableMCP", "Structured"]
 
 class ChatMessage(Entity):
     """A chat message entity using chatml format."""
@@ -1494,6 +1588,24 @@ class ChatThread(Entity):
                         )
                         self.history.append(tool_message)
                         EntityRegistry._logger.info(f"Added tool validation message({tool_message.id}) with tool_call_id: {tool_message.oai_tool_call_id}")
+                    elif isinstance(tool, CallableMCPTool):
+                        # Handle MCP tool execution
+                        EntityRegistry._logger.info(f"Executing MCP tool: {tool.name} with args: {output.json_object.object}")
+                        tool_result = await tool.aexecute(chat_thread_id=self.id, input_data=output.json_object.object)
+                        EntityRegistry._logger.info(f"MCP tool result: {tool_result}")
+                        
+                        tool_message = ChatMessage(
+                            role=MessageRole.tool,
+                            content=json.dumps(tool_result),
+                            chat_thread_uuid=self.id,
+                            tool_name=tool.name,
+                            tool_uuid=tool.id,
+                            tool_type="CallableMCP",
+                            parent_message_uuid=assistant_message.id,
+                            oai_tool_call_id=assistant_message.oai_tool_call_id
+                        )
+                        self.history.append(tool_message)
+                        EntityRegistry._logger.info(f"Added MCP tool execution message({tool_message.id}) with tool_call_id: {tool_message.oai_tool_call_id}")
                     
                     elif isinstance(tool, CallableTool):
                         # Handle callable tool execution
@@ -1569,7 +1681,6 @@ class ChatThread(Entity):
             if message.role == MessageRole.assistant and message.usage:
                 usages.append(message.usage)
         return usages
-
 
 
 

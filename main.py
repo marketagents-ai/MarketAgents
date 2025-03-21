@@ -1,15 +1,16 @@
 # main.py
 
 import asyncio
+from importlib import import_module
 import logging
+import pkgutil
 import random
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Type
 
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.agents.personas.persona import load_or_generate_personas
-
 from market_agents.economics.econ_agent import EconomicAgent
 from market_agents.memory.knowledge_base import MarketKnowledgeBase
 from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
@@ -17,16 +18,11 @@ from market_agents.memory.config import AgentStorageConfig, load_config_from_yam
 from market_agents.orchestrators.config import load_config
 from market_agents.orchestrators.meta_orchestrator import MetaOrchestrator
 from market_agents.agents.protocols.acl_message import ACLMessage
-
-from market_agents.orchestrators.groupchat_orchestrator import GroupChatOrchestrator
-from market_agents.orchestrators.research_orchestrator import ResearchOrchestrator
-
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
+from market_agents.environments.environment import MultiAgentEnvironment
 
 from minference.lite.models import LLMConfig, ResponseFormat
 from dotenv import load_dotenv
-
-import logging
 
 load_dotenv()
 
@@ -82,16 +78,12 @@ async def create_kb_agent(
         logger.error(f"Failed to initialize knowledge base '{kb_name}': {str(e)}")
         return None
 
-
 async def create_agents(
     config,
     storage_config: AgentStorageConfig,
+    environment_name: str
 ) -> List[MarketAgent]:
-    """
-    Create market agents using the updated MarketAgent framework.
-    Optionally associates a single KnowledgeBaseAgent with all agents if specified.
-    Evenly distributes LLM configs across agents using rotation.
-    """
+    """Create market agents using the updated MarketAgent framework."""
     agents = []
     num_agents = config.num_agents
     storage_utils = AgentStorageAPIUtils(config=storage_config)
@@ -137,16 +129,10 @@ async def create_agents(
                     use_cache=llm_c.use_cache,
                     response_format=response_format
                 ),
-                environments={},
                 protocol=ACLMessage,
                 persona=persona,
                 econ_agent=econ_agent,
                 knowledge_agent=kb_agent
-            )
-
-            logger.info(
-                f"Created agent {agent_id} with LLM client={llm_c.client}, "
-                f"persona={persona.role}, economic agent wallet={econ_agent.wallet}"
             )
             agents.append(agent)
 
@@ -159,26 +145,22 @@ async def create_agents(
 
     return agents
 
-
 async def main():
     logging.basicConfig(level=logging.INFO)
     config = load_config("market_agents/orchestrators/orchestrator_config.yaml")
     storage_config = load_config_from_yaml("market_agents/memory/storage_config.yaml")
 
-    agents = await create_agents(config, storage_config)
+    all_agents = {}
+    for env_name in config.environment_order:
+        agents = await create_agents(config, storage_config, env_name)
+        all_agents[env_name] = agents
 
-    orchestrator_registry = {
-        "group_chat": GroupChatOrchestrator,
-        "research": ResearchOrchestrator
-    }
-
-    meta_orch = MetaOrchestrator(
+    # Create orchestrator with loaded environment
+    orchestrator = MetaOrchestrator(
         config=config,
-        agents=agents,
-        orchestrator_registry=orchestrator_registry
+        agents=agents
     )
-    await meta_orch.run_orchestration()
-
+    await orchestrator.run_orchestration()
 
 if __name__ == "__main__":
     asyncio.run(main())

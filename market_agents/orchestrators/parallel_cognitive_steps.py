@@ -58,10 +58,11 @@ class ParallelCognitiveProcessor:
         """Collect PerceptionStep with return_prompt=True for each agent"""
         perception_prompts = []
         for agent in agents:
+            env_state = agent.environments[environment_name].get_global_state(agent_id=agent.id)
             step = PerceptionStep(
                 agent_id=agent.id,
                 environment_name=environment_name,
-                environment_info=agent.environments[environment_name].get_global_state(),
+                environment_info=env_state,
                 structured_tool=self.tool_mode,
                 return_prompt=True
             )
@@ -99,7 +100,7 @@ class ParallelCognitiveProcessor:
             step = ActionStep(
                 agent_id=agent.id,
                 environment_name=environment_name,
-                environment_info=agent.environments[environment_name].get_global_state(),
+                environment_info=agent.environments[environment_name].get_global_state(agent_id=agent.id),
                 structured_tool=self.tool_mode,
                 return_prompt=True
             )
@@ -140,15 +141,19 @@ class ParallelCognitiveProcessor:
                 step = ReflectionStep(
                     agent_id=agent.id,
                     environment_name=environment_name,
-                    environment_info=agent.environments[environment_name].get_global_state(),
+                    environment_info=agent.environments[environment_name].get_global_state(agent_id=agent.id),
                     structured_tool=self.tool_mode,
                     return_prompt=True
                 )
                 prompt = await agent.run_step(step=step)
+                print(agent.chat_thread.new_message)
+                self.logger.info(f"Running reflection step for agent {agent.id}")
                 reflection_prompts.append(prompt)
                 agents_with_observations.append(agent)
 
         if not reflection_prompts:
+            self.logger.info("No reflection prompts collected")
+
             return []
 
         outputs = await self.ai_utils.run_parallel_ai_completion(reflection_prompts)
@@ -222,7 +227,7 @@ class ParallelCognitiveProcessor:
             self.episode_steps[safe_id].append(memory_obj)
 
             task_str = f"Task: {agent.task}" if agent.task else ""
-            env_state_str = f"Environment: {str(agent.environments[environment_name].get_global_state())}"
+            env_state_str = f"Environment: {str(agent.environments[environment_name].get_global_state(agent_id=agent.id))}"
             combined_query = (task_str + "\n" + env_state_str).strip()
 
             serializable_metadata = {
