@@ -91,10 +91,13 @@ def log_perception(logger: logging.Logger, agent_id: int, perception: str):
         console.print(f"[bold blue]👁️ Agent {agent_id} perceives:[/bold blue]\n[cyan]{perception}[/cyan]")
 
 def log_action(logger: logging.Logger, agent_id: int, action: Any, model_name: str = None):
+    """Logs an agent's action with model info if available."""
+    # Initialize model_info at the start
+    model_info = f" [{model_name}]" if model_name else ""
+    
     try:
         action_dict = json.loads(action) if isinstance(action, str) else action
         markdown = json_to_markdown(action_dict)
-        model_info = f" [{model_name}]" if model_name else ""
         header = f"[bold green]🎯 Agent {agent_id}{model_info} action:[/bold green]\n"
         text = Text.from_markup(header)
         text.append(markdown)
@@ -262,6 +265,24 @@ def log_group_chat_summary(logger: logging.Logger, cohort_id: str, messages_coun
     panel = Panel(
         Align.left(text),
         border_style="magenta",
+        box=HEAVY,
+        width=80,
+        title=header,
+        title_align="left"
+    )
+    console.print(panel)
+
+def log_task_assignment(logger: logging.Logger, agent_id: str, task: str, is_subtask: bool = False):
+    """Logs task assignment to an agent."""
+    task_type = "Subtask" if is_subtask else "Task"
+    header = f"[bold cyan]📋 {task_type} Assignment[/bold cyan]"
+    agent_info = f"[bold]🤖 Agent: {agent_id}[/bold]"
+    task_info = f"[cyan]📝 {task_type}: {task}[/cyan]"
+    
+    text = Text.from_markup(f"{agent_info}\n\n{task_info}")
+    panel = Panel(
+        Align.left(text),
+        border_style="cyan",
         box=HEAVY,
         width=80,
         title=header,
