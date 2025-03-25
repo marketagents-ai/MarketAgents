@@ -56,8 +56,14 @@ class MultiAgentOrchestrator:
     def _get_environment_class(self) -> Type[MultiAgentEnvironment]:
         """Dynamically discover and load environment mechanism classes."""
         try:
-            # Import the module directly
-            module = import_module(f"market_agents.environments.mechanisms.{self.environment_name}")
+            # Get mechanism type from config
+            if not hasattr(self.config, 'mechanism'):
+                raise ValueError(f"No mechanism type specified for environment {self.environment_name}")
+            
+            mechanism_type = self.config.mechanism  # Access directly as attribute
+            
+            # Import the module based on mechanism type
+            module = import_module(f"market_agents.environments.mechanisms.{mechanism_type}")
             
             # Look for any class that inherits from MultiAgentEnvironment
             for attr_name in dir(module):
@@ -67,25 +73,20 @@ class MultiAgentOrchestrator:
                     attr != MultiAgentEnvironment):
                     self.logger.debug(f"Found environment class: {attr.__name__}")
                     return attr
-                        
-            raise ValueError(f"No environment class found in {self.environment_name}")
+                    
+            raise ValueError(f"No environment class found for mechanism {mechanism_type}")
                 
         except ImportError as e:
             self.logger.error(f"Failed to import environment module: {e}")
-            raise ValueError(f"Could not load environment: {self.environment_name}") from e
+            raise ValueError(f"Could not load mechanism: {mechanism_type}") from e
 
     def _initialize_environment(self) -> MultiAgentEnvironment:
         """Initialize the environment based on config."""
         try:
             environment_class = self._get_environment_class()
             
-            # Get environment config from the orchestrator config
-            env_config = self.orchestrator_config.environment_configs.get(self.environment_name)
-            if not env_config:
-                raise ValueError(f"No config found for environment {self.environment_name}")
-                
-            # Convert config to dict and ensure required fields
-            env_params = env_config.dict() if hasattr(env_config, 'dict') else env_config
+            # Convert config to dict if it's a Pydantic model
+            env_params = self.config.model_dump() if hasattr(self.config, 'model_dump') else dict(self.config)
             
             # Add ai_utils to the environment parameters
             env_params['ai_utils'] = self.ai_utils

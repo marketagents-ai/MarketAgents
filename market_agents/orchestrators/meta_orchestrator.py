@@ -82,6 +82,10 @@ class MetaOrchestrator:
                 continue
 
             try:
+                # Access mechanism directly from Pydantic model
+                if not hasattr(env_cfg, 'mechanism'):
+                    raise ValueError(f"No mechanism type specified for environment '{env_name}'")
+
                 orchestrator = MultiAgentOrchestrator(
                     config=env_cfg,
                     orchestrator_config=self.config,
@@ -91,8 +95,9 @@ class MetaOrchestrator:
                     logger=self.logger,
                     ai_utils=self.ai_utils,
                 )
+                
                 self.environment_orchestrators[env_name] = orchestrator
-                self.logger.info(f"Initialized MultiAgentOrchestrator for environment '{env_name}'")
+                self.logger.info(f"Initialized orchestrator for {env_name} using {env_cfg.mechanism} mechanism")
             except Exception as e:
                 self.logger.error(f"Failed to initialize orchestrator for environment '{env_name}': {e}")
                 continue
