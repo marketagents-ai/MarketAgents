@@ -36,8 +36,12 @@ CallableRegistry._logger = logger
 class MCPServerEnvironmentConfig(EnvironmentConfig):
     """Configuration for MCP server environment"""
     name: str = Field(
+        ...,
+        description="Domain-specific name for this instance (e.g., mcp_finance)"
+    )
+    mechanism: str = Field(
         default="mcp_server",
-        description="Name of the MCP server environment"
+        description="Type of mechanism (always mcp_server for this class)"
     )
     mcp_server_module: str = Field(
         ...,

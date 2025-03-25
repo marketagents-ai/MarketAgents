@@ -140,7 +140,7 @@ class Agent(BaseModel):
         if not self.chat_thread:
             raise RuntimeError("No ChatThread is available to run inference.")
 
-        results = await self.orchestrator.run_parallel_ai_completion([self.chat_thread])
+        results = await self.llm_orchestrator.run_parallel_ai_completion([self.chat_thread])
         if not results:
             raise RuntimeError("No LLM outputs returned from orchestrator.")
 

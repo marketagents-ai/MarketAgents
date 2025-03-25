@@ -22,8 +22,8 @@ class EnvironmentConfig(BaseSettings):
         ...,
         description="Name of the group chat environment"
     )
-    api_url: str = Field(
-        ...,
+    api_url: Optional[str] = Field(
+        default=None,
         description="API endpoint for the environment"
     )
     model_config = {
@@ -48,7 +48,7 @@ class GroupChatConfig(EnvironmentConfig):
         description="Number of agents in the group chat"
     )
     api_url: str = Field(
-        default="http://localhost:8001",
+        default="http://localhost:8002",
         description="API endpoint for group chat environment"
     )
 
@@ -196,14 +196,6 @@ class OrchestratorConfig(BaseSettings):
         ...,
         description="Maximum number of rounds in the orchestrator"
     )
-    agent_config: AgentConfig = Field(
-        ...,
-        description="Configuration for the agent"
-    )
-    llm_configs: List[LLMConfigModel] = Field(
-        ...,
-        description="List of LLM configurations"
-    )
     environment_configs: Dict[str, EnvironmentConfig] = Field(
         ...,
         description="Configurations for different environments"
@@ -212,17 +204,25 @@ class OrchestratorConfig(BaseSettings):
         ...,
         description="Order of environments"
     )
-    protocol: str = Field(
+    tool_mode: bool = Field(
         ...,
-        description="Protocol used by the orchestrator"
+        description="Flag to indicate if tool mode is enabled"
+    )
+    agent_config: Optional[AgentConfig] = Field(
+        None,
+        description="Optional configuration for the agent"
+    )
+    llm_configs: Optional[List[LLMConfigModel]] = Field(
+        None,
+        description="Optional list of LLM configurations"
+    )
+    protocol: Optional[str] = Field(
+        None,
+        description="Optional protocol used by the orchestrator"
     )
     database_config: DatabaseConfig = Field(
         default_factory=DatabaseConfig,
         description="Database configuration"
-    )
-    tool_mode: bool = Field(
-        ...,
-        description="Flag to indicate if tool mode is enabled"
     )
 
     model_config = SettingsConfigDict(
