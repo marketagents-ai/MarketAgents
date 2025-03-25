@@ -202,7 +202,8 @@ class ActionStep(CognitiveStep):
         if hasattr(environment, 'action_space') and hasattr(environment.action_space, 'allowed_actions'):
             print(f"ActionStep: Found {len(environment.action_space.allowed_actions)} tools in action_space")
             for tool in environment.action_space.allowed_actions:
-                print(f"  - Tool: {tool.name}")
+                if hasattr(tool, 'name'):
+                    print(f"  - Tool: {tool.name}")
         else:
             print("ActionStep: No tools found in action_space")
         print(f"ActionSpace has workflow attr: {hasattr(action_space, 'workflow')}")
