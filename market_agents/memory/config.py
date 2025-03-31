@@ -30,6 +30,9 @@ class AgentStorageConfig(BaseSettings):
     similarity_threshold: float = Field(default=0.7)
     encoding_format: str = Field(default="float")
     embedding_provider: str = Field(default="tei", description="Options: tei, openai, etc.")
+    stm_top_k: int = Field(default=2)
+    ltm_top_k: int = Field(default=1)
+    kb_top_k: int = Field(default=3)
 
 def load_config_from_yaml(yaml_path: str = "config.yaml") -> AgentStorageConfig:
     with open(yaml_path, 'r') as f:

@@ -26,11 +26,18 @@ class ShortTermMemory(BaseModel):
     items_cache: List[MemoryObject] = Field(default_factory=list)
     agent_storage_utils: AgentStorageAPIUtils
     agent_id: str
+    default_top_k: int = Field(default=2)
 
-    def __init__(self, agent_id: str, agent_storage_utils: AgentStorageAPIUtils):
+    def __init__(
+        self,
+        agent_id: str,
+        agent_storage_utils: AgentStorageAPIUtils,
+        default_top_k: int = 2
+    ):
         super().__init__(
             agent_storage_utils=agent_storage_utils,
-            agent_id=agent_id
+            agent_id=agent_id,
+            default_top_k=default_top_k
         )
 
     async def initialize(self):
@@ -50,7 +57,7 @@ class ShortTermMemory(BaseModel):
 
     async def retrieve_recent_memories(
         self,
-        limit: int = 10,
+        limit: int = 5,
         cognitive_step: Optional[str] = None,
         metadata_filters: Optional[Dict] = None,
         start_time: Optional[datetime] = None,
@@ -59,7 +66,7 @@ class ShortTermMemory(BaseModel):
         memories = await self.agent_storage_utils.get_cognitive_memory_sql(
             self.agent_id,
             CognitiveMemoryParams(
-                limit=limit,
+                limit=limit if limit is not None else self.default_top_k,
                 cognitive_step=cognitive_step,
                 metadata_filters=metadata_filters,
                 start_time=start_time,
@@ -88,12 +95,19 @@ class LongTermMemory(BaseModel):
     )
     agent_storage_utils: AgentStorageAPIUtils
     agent_id: str
+    default_top_k: int = Field(default=1)
 
-    def __init__(self, agent_id: str, agent_storage_utils: AgentStorageAPIUtils):
 
+    def __init__(
+        self,
+        agent_id: str,
+        agent_storage_utils: AgentStorageAPIUtils,
+        default_top_k: int = 1
+    ):
         super().__init__(
             agent_storage_utils=agent_storage_utils,
-            agent_id=agent_id
+            agent_id=agent_id,
+            default_top_k=default_top_k
         )
 
     async def initialize(self):
@@ -156,7 +170,7 @@ class LongTermMemory(BaseModel):
         """Retrieve episodic memories using semantic search."""
         retrieved = await self.agent_storage_utils.get_episodic_memory_vector(
             agent_id=self.agent_id,
-            top_k=top_k,
+            top_k=top_k if top_k is not None else self.default_top_k,
             query=query
         )
         
