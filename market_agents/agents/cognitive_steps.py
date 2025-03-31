@@ -95,7 +95,6 @@ class PerceptionStep(CognitiveStep):
 
     async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
         stm_cognitive = await agent.short_term_memory.retrieve_recent_memories(
-            limit=2,
             cognitive_step="action"
         )
         short_term_memories = [
@@ -118,9 +117,7 @@ class PerceptionStep(CognitiveStep):
 
         ltm_episodes = await agent.long_term_memory.retrieve_episodic_memories(
             agent_id=self.agent_id,
-            query=query_str,
-            top_k=1
-        )
+            query=query_str        )
 
         print("\nLong-term Memory Results:")
         memory_strings = [f"Memory {i+1}:\n{episode.model_dump()}" for i, episode in enumerate(ltm_episodes)]
@@ -129,8 +126,7 @@ class PerceptionStep(CognitiveStep):
         retrieved_documents = []
         if agent.knowledge_agent:
             retrieved_documents = await agent.knowledge_agent.retrieve(
-                query=query_str,
-                top_k=1
+                query=query_str
             )
 
         if retrieved_documents:
@@ -398,7 +394,7 @@ class ReflectionStep(CognitiveStep):
             )
 
             await agent.long_term_memory.store_episode(
-                task_query=agent.task if agent.task else None,
+                task_query=agent.task if agent.task else "",
                 steps=agent.episode_steps,
                 total_reward=reward_data["total_reward"],
                 strategy_update=result.get("strategy_update", ""),

@@ -20,6 +20,10 @@ class KnowledgeBaseAgent(BaseModel):
         default_factory=list,
         description="List of retrieved knowledge entries"
     )
+    default_top_k: int = Field(
+        default=3,
+        description="Default # of douments to retrieve"
+    )
 
     class Config:
         arbitrary_types_allowed = True
@@ -30,8 +34,11 @@ class KnowledgeBaseAgent(BaseModel):
         """
         return await self.market_kb.ingest_knowledge(text=text, metadata=metadata)
 
-    async def retrieve(self, query: str, top_k: int):
+    async def retrieve(self, query: str, top_k: Optional[int] = None):
         """
         Retrieve knowledge from the knowledge base using a query.
         """
-        return await self.market_kb.search(query=query, top_k=top_k)
+        return await self.market_kb.search(
+            query=query, 
+            top_k=top_k if top_k is not None else self.default_top_k
+        )

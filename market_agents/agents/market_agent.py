@@ -102,13 +102,15 @@ class MarketAgent(Agent):
     ) -> 'MarketAgent':
         stm = ShortTermMemory(
             agent_id=agent_id,
-            agent_storage_utils=storage_utils
+            agent_storage_utils=storage_utils,
+            default_top_k=storage_utils.config.stm_top_k
         )
         await stm.initialize()
         
         ltm = LongTermMemory(
             agent_id=agent_id,
-            agent_storage_utils=storage_utils
+            agent_storage_utils=storage_utils,
+            default_top_k=storage_utils.config.ltm_top_k
         )
         await ltm.initialize()
 

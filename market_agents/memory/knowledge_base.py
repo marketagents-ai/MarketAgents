@@ -121,7 +121,7 @@ class SemanticChunker(KnowledgeChunker):
                 continue
 
             if current_length + len(segment) > self.max_size and current_chunk:
-                chunk_text = ' '.join(current_chunk)
+                chunk_text = '\n\n'.join(current_chunk)
                 chunks.append(KnowledgeChunk(
                     text=chunk_text,
                     start=chunk_start,
@@ -133,10 +133,10 @@ class SemanticChunker(KnowledgeChunker):
 
             current_chunk.append(segment)
             current_length += len(segment)
-            current_pos += len(segment) + 1
+            current_pos += len(segment) + 2
 
             if current_length >= self.min_size:
-                chunk_text = ' '.join(current_chunk)
+                chunk_text = '\n\n'.join(current_chunk)
                 chunks.append(KnowledgeChunk(
                     text=chunk_text,
                     start=chunk_start,
@@ -147,7 +147,7 @@ class SemanticChunker(KnowledgeChunker):
                 chunk_start = current_pos
 
         if current_chunk:
-            chunk_text = ' '.join(current_chunk)
+            chunk_text = '\n\n'.join(current_chunk)
             chunks.append(KnowledgeChunk(
                 text=chunk_text,
                 start=chunk_start,

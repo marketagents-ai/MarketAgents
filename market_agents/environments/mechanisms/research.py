@@ -26,6 +26,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class ResearchSchema(BaseModel):
+    """Minimal default schema for research output"""
+    summary: str = Field(
+        description="Main findings or summary of the research"
+    )
+    key_points: List[str] = Field(
+        default_factory=list,
+        description="Key points or findings from the research"
+    )
+    sources: List[str] = Field(
+        default_factory=list,
+        description="Sources used in the research"
+    )
+
 class ResearchEnvironmentConfig(EnvironmentConfig):
     """Configuration for research environment orchestration"""
     name: str = Field(
@@ -48,9 +62,9 @@ class ResearchEnvironmentConfig(EnvironmentConfig):
         default=4,
         description="Number of agents in research group"
     )
-    schema_model: str = Field(
-        default="LiteraryAnalysis",
-        description="Name of Pydantic model defining research output schema"
+    schema_model: Union[str, Type[BaseModel]] = Field(
+        default=ResearchSchema,
+        description="Name of schema model or Pydantic BaseModel class defining research output schema"
     )
     form_cohorts: bool = Field(
         default=False,
@@ -428,13 +442,27 @@ class ResearchEnvironment(MultiAgentEnvironment):
             
             # Get the schema model
             summary_model = self._get_schema_model(env_config.schema_model)
+
+            # Enhance initial topic with schema fields
+            schema_fields = summary_model.model_json_schema().get('properties', {})
+            field_descriptions = [
+                f"- {field}: {props.get('description', '')}"
+                for field, props in schema_fields.items()
+                if field not in ('model_config', 'model_fields')
+            ]
+            
+            enhanced_topic = (
+                f"{env_config.initial_topic}\n\n"
+                f"Please extract the following metrics:\n"
+                f"{chr(10).join(field_descriptions)}"
+            )
             
             # Initialize action space with the schema model
             action_space = ResearchActionSpace(summary_model=summary_model)
             
             # Initialize mechanism with relevant config
             mechanism = ResearchMechanism(
-                initial_topic=env_config.initial_topic,
+                initial_topic=enhanced_topic,
                 summary_model=summary_model,
                 form_cohorts=env_config.form_cohorts,
                 group_size=env_config.group_size,
@@ -447,7 +475,7 @@ class ResearchEnvironment(MultiAgentEnvironment):
                 action_space=action_space,
                 observation_space=ResearchObservationSpace(),
                 mechanism=mechanism,
-                initial_topic=env_config.initial_topic
+                initial_topic=enhanced_topic
             )
             self._global_state: Dict[str, Any] = {}
             
@@ -458,24 +486,32 @@ class ResearchEnvironment(MultiAgentEnvironment):
         except Exception as e:
             raise ValueError(f"Failed to initialize ResearchEnvironment: {e}")
 
-    def _get_schema_model(self, schema_name: str) -> Type[BaseModel]:
+    def _get_schema_model(self, schema_model: Union[str, Type[BaseModel]]) -> Type[BaseModel]:
         """Dynamically import and return the schema model class."""
-        try:
-            schemas_module = import_module('market_agents.orchestrators.research_schemas')
+        # First check if it's already a BaseModel class
+        if isinstance(schema_model, type) and issubclass(schema_model, BaseModel):
+            return schema_model
             
-            if not hasattr(schemas_module, schema_name):
-                raise ValueError(f"Schema model '{schema_name}' not found in research_schemas")
+        # If it's a string, try to load from research_schemas
+        if isinstance(schema_model, str):
+            try:
+                schemas_module = import_module('market_agents.orchestrators.research_schemas')
                 
-            model_class = getattr(schemas_module, schema_name)
-            
-            if not issubclass(model_class, BaseModel):
-                raise ValueError(f"Schema model {schema_name} must be a Pydantic model")
+                if not hasattr(schemas_module, schema_model):
+                    raise ValueError(f"Schema model '{schema_model}' not found in research_schemas")
+                    
+                model_class = getattr(schemas_module, schema_model)
                 
-            return model_class
-        except ImportError as e:
-            raise ValueError(f"Could not import research_schemas module: {e}")
-        except Exception as e:
-            raise ValueError(f"Could not load schema model '{schema_name}': {e}")
+                if not issubclass(model_class, BaseModel):
+                    raise ValueError(f"Schema model {schema_model} must be a Pydantic model")
+                    
+                return model_class
+            except ImportError as e:
+                raise ValueError(f"Could not import research_schemas module: {e}")
+            except Exception as e:
+                raise ValueError(f"Could not load schema model '{schema_model}': {e}")
+                
+        raise ValueError(f"Schema model must be either a string name or BaseModel class, got {type(schema_model)}")
 
     def get_global_state(self, agent_id: str = None) -> Dict[str, Any]:
         """Return the environment's global state with filtered mechanism state."""
