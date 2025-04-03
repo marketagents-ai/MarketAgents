@@ -542,21 +542,54 @@ class CallableMCPTool(CallableTool):
         input_schema: Dict[str, Any] = None
     ) -> 'CallableMCPTool':
         """
-        Creates a new MCP tool with only the parameters available from MCP server.
+        Creates a new MCP tool with parameters matching the input_schema.
         
         Args:
             name: Unique identifier for the tool
             description: Human-readable description
             input_schema: JSON Schema for the tool's parameters
         """
-        # Create a dummy function with type hints based on the input_schema
-        def dummy_func(input_data: Dict[str, Any] = None) -> Dict[str, Any]:
-            return {}
-            
+        if input_schema is None or 'properties' not in input_schema:
+            raise ValueError("Input schema must have 'properties' key with parameter definitions.")
+
+        # Map JSON Schema types to Python types
+        type_mapping = {
+            'string': 'str',
+            'number': 'float',
+            'integer': 'int',
+            'boolean': 'bool',
+            'array': 'list',
+            'object': 'dict',
+        }
+
+        param_definitions = input_schema['properties']
+        params = []
+
+        for param_name, param_info in param_definitions.items():
+            json_type = param_info.get('type', 'Any')
+            python_type = type_mapping.get(json_type, 'Any')
+            params.append(f"{param_name}: {python_type}")
+
+        params_str = ", ".join(params)
+        func_code = f"def dummy_func({params_str}) -> Dict[str, Any]:\n    return {{}}"
+
+        namespace = {
+            'Any': Any,
+            'Dict': Dict,
+            'str': str,
+            'int': int,
+            'float': float,
+            'bool': bool,
+            'list': list,
+            'dict': dict,
+            '__builtins__': {}
+        }
+
+        exec(func_code, namespace)
+        dummy_func = namespace['dummy_func']
         dummy_func.__name__ = name
         dummy_func.__doc__ = description
 
-        # Call parent class's from_callable with our dummy function
         tool = super().from_callable(
             func=dummy_func,
             name=name,
@@ -564,8 +597,7 @@ class CallableMCPTool(CallableTool):
             strict_schema=True
         )
 
-        # Override the schemas with the ones from MCP server
-        tool.input_schema = input_schema or {"type": "object", "properties": {}}
+        tool.input_schema = input_schema
         tool.output_schema = {}
 
         return tool
