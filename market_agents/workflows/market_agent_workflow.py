@@ -82,7 +82,8 @@ class WorkflowStep(Entity):
             # Create a new action space with only the selected tools
             selected_action_space = MCPServerActionSpace(
                 mechanism=mcp_server.mechanism,
-                selected_tools=self.tools  # Pass the tools from WorkflowStep
+                selected_tools=self.tools,
+                workflow=self.sequential_tools
             )
             
             # Create a temporary environment with restricted tools
