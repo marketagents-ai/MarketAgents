@@ -547,6 +547,10 @@ class MCPServerActionSpace(ActionSpace):
         default=None,
         description="Specific tools this action space should provide access to"
     )
+    workflow: bool = Field(
+        default=False,
+        description="Whether each tool should be executed sequentially or auto"
+    )
     
     def __init__(self, mechanism: MCPServerMechanism, selected_tools: Optional[List] = None, **data):
         logger.info("Initializing MCPServerActionSpace...")
