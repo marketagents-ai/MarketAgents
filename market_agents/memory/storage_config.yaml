@@ -27,6 +27,8 @@ max_chunk_size: 1024
 vector_dim: 1536 #openai embed dim
 #vector_dim: 768
 max_input: 4096
+stm_top_k: 2
+ltm_top_k: 1
 top_k: 3
 similarity_threshold: 0.7
 encoding_format: "float"
