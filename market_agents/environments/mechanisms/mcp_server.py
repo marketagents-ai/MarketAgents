@@ -3,7 +3,8 @@ import sys
 import asyncio
 import subprocess
 import logging
-from typing import Dict, Any, List, Union, Optional, Type
+from typing import Dict, Any, List, Union, Optional
+from minference.lite.models import CallableMCPTool, CallableTool, StructuredTool
 from market_agents.environments.config import EnvironmentConfig
 from mcp.client.stdio import stdio_client
 from mcp import StdioServerParameters
@@ -24,10 +25,8 @@ from market_agents.environments.environment import (
     LocalEnvironmentStep,
     EnvironmentStep,
     ActionSpace,
-    ObservationSpace,
-    StrAction
+    ObservationSpace
 )
-from minference.lite.models import CallableMCPTool, CallableTool, StructuredTool
 from minference.caregistry import CallableRegistry
 
 logger = logging.getLogger(__name__)
@@ -104,8 +103,6 @@ class MCPToolAction(LocalAction):
     @classmethod
     def sample(cls, agent_id: str) -> 'MCPToolAction':
         """Sample a random tool action (not implemented)"""
-        # This would require knowledge of the available tools and their parameters
-        # For now, just return a placeholder
         return cls(agent_id=agent_id, tool_name="sample_tool", tool_args={})
 
 class MCPServerMechanism(Mechanism):
@@ -114,7 +111,10 @@ class MCPServerMechanism(Mechanism):
         default=False,
         description="Whether the mechanism is sequential (one agent at a time)"
     )
-    current_round: int = Field(default=0, description="Current interaction round")
+    current_round: int = Field(
+        default=0,
+        description="Current interaction round"
+    )
     max_rounds: int = Field(
         default=0,
         description="Max steps or rounds"
@@ -204,14 +204,14 @@ class MCPServerMechanism(Mechanism):
             if len(current_cohort) >= self.group_size:
                 cohort_id = f"mcp_cohort_{cohort_count}"
                 self.cohorts[cohort_id] = current_cohort
-                self.tool_history[cohort_id] = []  # Initialize tool history for cohort
+                self.tool_history[cohort_id] = []
                 current_cohort = []
                 cohort_count += 1
 
         if current_cohort:
             cohort_id = f"mcp_cohort_{cohort_count}"
             self.cohorts[cohort_id] = current_cohort
-            self.tool_history[cohort_id] = []  # Initialize tool history for cohort
+            self.tool_history[cohort_id] = []
 
         self.logger.info(f"Formed {len(self.cohorts)} MCP server cohorts")
         for cohort_id, cohort_agents in self.cohorts.items():
@@ -259,9 +259,7 @@ class MCPServerMechanism(Mechanism):
             )
             print(f"Initialized client connection parameters for server: {self.server_path}")
             
-            
             # Set the mcp_server attribute to the server parameters
-            # This will be used to create sessions when needed
             self.mcp_server = self.server_params
             print("Client connection parameters initialized")
             
@@ -277,7 +275,7 @@ class MCPServerMechanism(Mechanism):
         
         while retry_count < max_retries:
             try:
-                async with asyncio.timeout(30):  # 30 second timeout
+                async with asyncio.timeout(30):
                     async with stdio_client(self.server_params) as (read, write):
                         async with ClientSession(read, write) as session:
                             await session.initialize()
@@ -310,15 +308,24 @@ class MCPServerMechanism(Mechanism):
                     break
             except Exception as e:
                 logger.error(f"Error executing tool {tool_name}: {str(e)}")
+                if "unhandled errors in a TaskGroup" in str(e):
+                    # Still record the history even for TaskGroup errors
+                    try:
+                        self.record_tool_history(
+                            tool_name=tool_name,
+                            arguments=arguments,
+                            result=result,
+                            chat_thread_id=chat_thread_id
+                        )
+                    except Exception as record_error:
+                        logger.error(f"Failed to record tool history: {str(record_error)}")
+                    return result
                 last_error = e
-                if "unhandled errors in a TaskGroup" not in str(e):
-                    last_error = e
-                else:
-                    return None
 
-            retry_count += 1
-            if retry_count < max_retries:
-                await asyncio.sleep(1)
+
+                retry_count += 1
+                if retry_count < max_retries:
+                    await asyncio.sleep(1)
         
         # If we've exhausted retries or got cancelled, raise the last error
         if isinstance(last_error, asyncio.CancelledError):
@@ -333,30 +340,29 @@ class MCPServerMechanism(Mechanism):
         chat_thread_id: Optional[str] = None
     ) -> None:
         """Record tool execution history in appropriate cohort."""
-        # Find agent from chat_thread_id
-        agent_id = None
-        cohort_id = None
+        logger.info(f"Recording tool history for {tool_name}")
+        logger.info(f"Current tool_history state: {self.tool_history}")
+        
+        # Default values
+        history_key = "default"
+        agent_id = chat_thread_id or "system"
 
-        # Find agent (and cohort if enabled)
-        if chat_thread_id:
+        # Only try to find matching agent if we're using cohorts
+        if self.form_cohorts and chat_thread_id:
             for cid, agents in self.cohorts.items():
                 for agent in agents:
                     if (hasattr(agent, 'chat_thread') and 
                         agent.chat_thread and 
                         str(agent.chat_thread.id) == str(chat_thread_id)):
                         agent_id = agent.id
-                        if self.form_cohorts:
-                            cohort_id = cid
+                        history_key = cid
                         break
-                if agent_id:
+                if agent_id != "system":
                     break
 
-        if not agent_id:
-            raise ValueError(f"Could not find agent for chat_thread_id: {chat_thread_id}")
-
-        # Determine where to store the history
-        history_key = cohort_id if self.form_cohorts else "default"
+        # Initialize history list if needed
         if history_key not in self.tool_history:
+            logger.info("Initializing default history list")
             self.tool_history[history_key] = []
 
         # Create and record the history entry
@@ -370,10 +376,7 @@ class MCPServerMechanism(Mechanism):
         }
 
         self.tool_history[history_key].append(history_entry)
-        log_msg = f"Recorded tool execution in round {self.current_round} for agent {agent_id}"
-        if self.form_cohorts:
-            log_msg += f" in cohort {cohort_id}"
-        logger.debug(log_msg)
+        logger.info(f"Added entry to history. New size: {len(self.tool_history[history_key])}")
 
     async def initialize(self):
         """Initialize the mechanism by extracting available tools"""
@@ -540,56 +543,60 @@ class MCPServerActionSpace(ActionSpace):
         ..., 
         description="Mechanism that handles MCP server operations"
     )
+    selected_tools: Optional[List[Union[CallableTool, StructuredTool, CallableMCPTool]]] = Field(
+        default=None,
+        description="Specific tools this action space should provide access to"
+    )
     
-    def __init__(self, mechanism: MCPServerMechanism, **data):
+    def __init__(self, mechanism: MCPServerMechanism, selected_tools: Optional[List] = None, **data):
         logger.info("Initializing MCPServerActionSpace...")
         
         data.update({
-            "mechanism": mechanism
+            "mechanism": mechanism,
+            "selected_tools": selected_tools
         })
         super().__init__(**data)
         
         self.allowed_actions = []
-        
-        logger.info(f"Available tools in mechanism: {list(mechanism.available_tools.keys())}")
-        
-        # Create a tool for each available MCP server tool
-        for tool_name, tool_info in mechanism.available_tools.items():
-            logger.info(f"\nProcessing tool: {tool_name}")
-            logger.info(f"Tool info: {tool_info}")
-            
-            try:
-                from minference.lite.models import CallableMCPTool
-                
-                # Check if we have the function object
-                if "input_schema" in tool_info and tool_info["input_schema"] is not None:
-                    logger.info(f"Creating CallableMCPTool with schema: {tool_info['input_schema']}")
-                    
-                    # Create the tool from the function
-                    mcp_tool = CallableMCPTool.from_callable(
-                        name=tool_name,
-                        description=tool_info.get("description"),
-                        input_schema=tool_info.get("input_schema")
-                    )
-                    
-                    # Set the MCP server
-                    mcp_tool.mcp_mechanism = mechanism
-                    
-                    self.allowed_actions.append(mcp_tool)
-                    logger.info(f"Successfully created and added tool: {tool_name}")
-                else:
-                    logger.warning(f"Skipping tool {tool_name} - no input schema provided")
-                    logger.warning(f"Tool info available: {tool_info}")
-                    continue
-                
-            except Exception as e:
-                logger.error(f"Error creating tool {tool_name}: {str(e)}")
-                logger.error(f"Tool info that caused error: {tool_info}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-        
-        logger.info(f"Total allowed_actions: {len(self.allowed_actions)}")
 
+        if selected_tools is not None:
+            tool_names = [t.name for t in selected_tools]
+            logger.info(f"Validating selected tools: {tool_names}")
+
+            for tool in selected_tools:
+                if isinstance(tool, CallableMCPTool):
+                    if tool.name in mechanism.available_tools:
+                        tool.mcp_mechanism = mechanism
+                        self.allowed_actions.append(tool)
+                        logger.debug(f"Added MCP tool: {tool.name}")
+                    else:
+                        logger.warning(f"Skipping MCP tool {tool.name} - not available in this server")
+                else:
+                    self.allowed_actions.append(tool)
+                    logger.debug(f"Added non-MCP tool: {tool.name}")
+        else:    
+            logger.info(f"Available tools in mechanism: {list(mechanism.available_tools.keys())}")
+            self._create_tools_from_server()
+
+        logger.info(f"Total allowed_actions: {len(self.allowed_actions)}")
+        
+    # Create a tool for each available MCP server tool
+    def _create_tools_from_server(self):
+            """Create tools from server's complete tool set"""
+            for tool_name, tool_info in self.mechanism.available_tools.items():
+                try:
+                    if "input_schema" in tool_info and tool_info["input_schema"] is not None:
+                        mcp_tool = CallableMCPTool.from_callable(
+                            name=tool_name,
+                            description=tool_info.get("description"),
+                            input_schema=tool_info.get("input_schema")
+                        )
+                        mcp_tool.mcp_mechanism = self.mechanism
+                        self.allowed_actions.append(mcp_tool)
+                        logger.debug(f"Created tool: {tool_name}")
+                except Exception as e:
+                    logger.error(f"Error creating tool {tool_name}: {str(e)}")
+        
     def get_action_schema(self):
         """Return JSON schema for all available tools"""
         schemas = {}
