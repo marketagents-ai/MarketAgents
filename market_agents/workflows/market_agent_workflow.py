@@ -10,7 +10,7 @@ from market_agents.agents.cognitive_steps import (
     PerceptionStep,
     ReflectionStep
 )
-from market_agents.environments.mechanisms.mcp_server import MCPServerEnvironment
+from market_agents.environments.mechanisms.mcp_server import MCPServerActionSpace, MCPServerEnvironment
 from minference.lite.models import (
     CallableTool, 
     StructuredTool, 
@@ -30,44 +30,42 @@ class WorkflowStep(Entity):
     A step in a workflow that executes through MarketAgent's cognitive architecture.
     Can run as a single ActionStep or full cognitive episode.
     """
-    name: str = Field(..., description="Name identifier for this step")
-    description: str = Field(..., description="Description of what this step does")
-    
+    name: str = Field(
+        ...,
+        description="Name identifier for this step"
+    )
+    description: str = Field(
+        ...,
+        description="Description of what this step does"
+    )
     tools: List[Union[CallableTool, StructuredTool, CallableMCPTool]] = Field(
         ..., 
         description="Tools to be executed in this step"
     )
-    
     environment_name: str = Field(
         ...,
         description="Name of the MCP server environment for this step"
     )
-    
     inputs: List[WorkflowStepIO] = Field(
         default_factory=list,
         description="Input schema definitions"
     )
-    
     outputs: List[WorkflowStepIO] = Field(
         default_factory=list,
         description="Output schema definitions"
     )
-    
     instruction_prompt: str = Field(
         ..., 
         description="Instruction to follow for this workflow"
     )
-
     run_full_episode: bool = Field(
         default=False,
         description="Whether to run full cognitive episode (perception->action->reflection) or just action step"
     )
-
     sequential_tools: bool = Field(
         default=True,
         description="Whether tools should be executed in sequence through ActionStep's workflow mode"
     )
-
     async def execute(
         self,
         agent: "MarketAgent",
@@ -75,33 +73,33 @@ class WorkflowStep(Entity):
         mcp_servers: Dict[str, MCPServerEnvironment]
     ) -> Dict[str, Any]:
         """Execute this workflow step using MarketAgent's cognitive architecture."""
-        
         try:
-            
-            # Get the specific MCP server for this step
             if self.environment_name not in mcp_servers:
                 raise ValueError(f"MCP server environment '{self.environment_name}' not found")
             
             mcp_server = mcp_servers[self.environment_name]
+            
+            # Create a new action space with only the selected tools
+            selected_action_space = MCPServerActionSpace(
+                mechanism=mcp_server.mechanism,
+                selected_tools=self.tools  # Pass the tools from WorkflowStep
+            )
+            
+            # Create a temporary environment with restricted tools
+            mcp_server.action_space = selected_action_space
+            
+            # Add temporary environment to agent
             agent.environments[self.environment_name] = mcp_server
-            
-            # This ensures tools are properly configured in the expected format
-            action_space = mcp_server.action_space
-            
-            # Filter the action space to only include the tools we want
-            tool_names = [tool.name for tool in self.tools]
-            filtered_tools = [
-                tool for tool in action_space.allowed_actions 
-                if tool.name in tool_names
-            ]
+            initial_history_len = len(mcp_server.mechanism.tool_history.get("default", []))
 
-            # Create action step with the proper action space
+            
+            # Create action step
             action_step = ActionStep(
                 step_name=self.name,
                 agent_id=agent.id,
                 environment_name=self.environment_name,
                 environment_info=inputs,
-                action_space=filtered_tools if self.sequential_tools else filtered_tools[0]
+                action_space=self.tools[0] if not self.sequential_tools and self.tools else None
             )
 
             if self.run_full_episode:
@@ -111,36 +109,42 @@ class WorkflowStep(Entity):
                     environment_name=self.environment_name,
                     metadata={
                         "workflow_step": self.name,
-                        "tools": tool_names
+                        "tools": [t.name for t in self.tools]
                     }
                 )
                 results = await agent.run_episode(episode=episode)
+                
+                print(f"Tool Execution History:\n {mcp_server.mechanism.tool_history.get("default", [])}")
+                tool_results = mcp_server.mechanism.tool_history.get("default", [])[initial_history_len:]
                 
                 return {
                     "step_id": self.name,
                     "perception": results[0],
                     "action": results[1],
+                    "tool_results": tool_results,
                     "reflection": results[2],
                     "status": "completed",
                     "metadata": {
                         "agent_id": agent.id,
                         "environment": self.environment_name,
-                        "tools_used": tool_names,
+                        "tools_used": [t.name for t in self.tools],
                         "timestamp": datetime.utcnow().isoformat()
                     }
                 }
             else:
                 # Run just the action step
                 result = await agent.run_step(step=action_step)
-                
+                tool_results = mcp_server.mechanism.tool_history.get("default", [])[initial_history_len:]
+
                 return {
                     "step_id": self.name,
-                    "result": result,
-                    "status": "completed", 
+                    "action": result,
+                    "tool_results": tool_results,
+                    "status": "completed",
                     "metadata": {
                         "agent_id": agent.id,
                         "environment": self.environment_name,
-                        "tools_used": tool_names,
+                        "tools_used": [t.name for t in self.tools],
                         "timestamp": datetime.utcnow().isoformat()
                     }
                 }
@@ -148,7 +152,7 @@ class WorkflowStep(Entity):
         except Exception as e:
             return {
                 "step_id": self.name,
-                "result": None,
+                "action": None,
                 "status": "failed",
                 "error": str(e),
                 "metadata": {
@@ -227,7 +231,6 @@ class Workflow(Entity):
         logger.debug(f"Workflow execute starting")
         logger.debug(f"mcp_servers type: {type(self.mcp_servers)}")
         logger.debug(f"mcp_servers keys: {list(self.mcp_servers.keys())}")
-        logger.debug(f"mcp_servers contents: {self.mcp_servers}")
         
         # Execute steps sequentially
         for step in self.steps:
@@ -257,6 +260,7 @@ class Workflow(Entity):
                     state.update({
                         "perception": step_result["perception"],
                         "action": step_result["action"],
+                        "tool_results": step_result.get("tool_results", []),
                         "reflection": step_result["reflection"]
                     })
             
@@ -265,5 +269,9 @@ class Workflow(Entity):
         return {
             "workflow_id": self.name,
             "final_state": state,
-            "step_results": results
+            "step_results": results,
+            "tool_history": {
+                env_name: env.mechanism.tool_history
+                for env_name, env in self.mcp_servers.items()
+            }
         }
