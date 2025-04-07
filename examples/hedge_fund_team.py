@@ -1,5 +1,5 @@
 from market_agents.agents.market_agent import MarketAgent
-from market_agents.orchestrators.market_team import MarketAgentTeam
+from market_agents.orchestrators.market_agent_team import MarketAgentTeam
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from market_agents.memory.config import load_config_from_yaml
 from market_agents.economics.econ_agent import EconomicAgent
