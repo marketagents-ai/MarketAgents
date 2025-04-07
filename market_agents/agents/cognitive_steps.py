@@ -268,7 +268,8 @@ class ActionStep(CognitiveStep):
             observation=agent.last_observation
         )
         
-        action_prompt = agent.prompt_manager.get_action_prompt(variables.model_dump())
+        action_prompt = agent.task
+        action_prompt += agent.prompt_manager.get_action_prompt(variables.model_dump())
         
         if agent.chat_thread:
             agent.chat_thread.new_message = action_prompt
