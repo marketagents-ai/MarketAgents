@@ -110,10 +110,12 @@ def get_company_news(symbol: str) -> dict:
 def get_technical_indicators(symbol: str) -> dict:
     """
     Get technical indicators for a given stock symbol.
+    Returns 3 months of daily data for technical analysis.
     """
     try:
         stock = yf.Ticker(symbol)
-        history = stock.history(period="max")
+        # Get 3 months of daily data
+        history = stock.history(period="3mo", interval="1d")
         return history.to_json() if not history.empty else {}
     except Exception as e:
         return {}
