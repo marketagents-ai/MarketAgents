@@ -149,6 +149,7 @@ class PerceptionStep(CognitiveStep):
         if agent.chat_thread and self.structured_tool:
             agent.chat_thread.tools = [perception_tool]
             agent.chat_thread.forced_output = perception_tool
+            agent.chat_thread.llm_config.response_format = ResponseFormat.tool
 
         if agent.task:
             agent._refresh_prompts()
@@ -213,7 +214,9 @@ class ActionStep(CognitiveStep):
             print(f"Chat thread before setup: format={agent.chat_thread.llm_config.response_format}, tools={[t.name for t in agent.chat_thread.tools if t]}")
             
             # Check action space's workflow flag
-            if hasattr(action_space, "workflow") and action_space.workflow:
+            if (hasattr(action_space, "workflow") and 
+                action_space.workflow and 
+                len(allowed_actions) > 1):                
                 print("Setting up workflow mode")
                 agent.chat_thread.tools = tools or allowed_actions
                 print(f"#tools: {len(allowed_actions)}")
@@ -226,9 +229,14 @@ class ActionStep(CognitiveStep):
                 agent.chat_thread.llm_config.response_format = ResponseFormat.auto_tools
                 print(f"Chat thread after setup: format={agent.chat_thread.llm_config.response_format}, tools={[t.name for t in agent.chat_thread.tools if t]}")
             # Single tool mode
-            elif len(tools) == 1:
-                agent.chat_thread.tools = tools
-                agent.chat_thread.forced_output = tools[0]
+            elif len(allowed_actions) == 1 or len(tools) == 1:
+                agent.chat_thread.llm_config.response_format = ResponseFormat.tool
+                if len(allowed_actions) == 1:
+                    agent.chat_thread.tools = allowed_actions
+                    agent.chat_thread.forced_output = allowed_actions[0]
+                else:
+                    agent.chat_thread.tools = tools
+                    agent.chat_thread.forced_output = tools[0]
             elif allowed_actions and isinstance(allowed_actions[0], CallableTool):
                 agent.chat_thread.forced_output = allowed_actions[0]
                 agent.chat_thread.tools = allowed_actions
@@ -353,6 +361,7 @@ class ReflectionStep(CognitiveStep):
         if agent.chat_thread and self.structured_tool:
             agent.chat_thread.tools = [reflection_tool]
             agent.chat_thread.forced_output = reflection_tool
+            agent.chat_thread.llm_config.response_format = ResponseFormat.tool
 
         if agent.chat_thread:
             agent.chat_thread.new_message = reflection_prompt
