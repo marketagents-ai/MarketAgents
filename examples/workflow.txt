@@ -1,0 +1,1389 @@
+Building effective agents
+Published Dec 19, 2024
+
+We've worked with dozens of teams building LLM agents across industries. Consistently, the most successful implementations use simple, composable patterns rather than complex frameworks.
+
+Over the past year, we've worked with dozens of teams building large language model (LLM) agents across industries. Consistently, the most successful implementations weren't using complex frameworks or specialized libraries. Instead, they were building with simple, composable patterns.
+
+In this post, we share what we’ve learned from working with our customers and building agents ourselves, and give practical advice for developers on building effective agents.
+
+What are agents?
+"Agent" can be defined in several ways. Some customers define agents as fully autonomous systems that operate independently over extended periods, using various tools to accomplish complex tasks. Others use the term to describe more prescriptive implementations that follow predefined workflows. At Anthropic, we categorize all these variations as agentic systems, but draw an important architectural distinction between workflows and agents:
+
+Workflows are systems where LLMs and tools are orchestrated through predefined code paths.
+Agents, on the other hand, are systems where LLMs dynamically direct their own processes and tool usage, maintaining control over how they accomplish tasks.
+Below, we will explore both types of agentic systems in detail. In Appendix 1 (“Agents in Practice”), we describe two domains where customers have found particular value in using these kinds of systems.
+
+When (and when not) to use agents
+When building applications with LLMs, we recommend finding the simplest solution possible, and only increasing complexity when needed. This might mean not building agentic systems at all. Agentic systems often trade latency and cost for better task performance, and you should consider when this tradeoff makes sense.
+
+When more complexity is warranted, workflows offer predictability and consistency for well-defined tasks, whereas agents are the better option when flexibility and model-driven decision-making are needed at scale. For many applications, however, optimizing single LLM calls with retrieval and in-context examples is usually enough.
+
+When and how to use frameworks
+There are many frameworks that make agentic systems easier to implement, including:
+
+LangGraph from LangChain;
+Amazon Bedrock's AI Agent framework;
+Rivet, a drag and drop GUI LLM workflow builder; and
+Vellum, another GUI tool for building and testing complex workflows.
+These frameworks make it easy to get started by simplifying standard low-level tasks like calling LLMs, defining and parsing tools, and chaining calls together. However, they often create extra layers of abstraction that can obscure the underlying prompts ​​and responses, making them harder to debug. They can also make it tempting to add complexity when a simpler setup would suffice.
+
+We suggest that developers start by using LLM APIs directly: many patterns can be implemented in a few lines of code. If you do use a framework, ensure you understand the underlying code. Incorrect assumptions about what's under the hood are a common source of customer error.
+
+See our cookbook for some sample implementations.
+
+Building blocks, workflows, and agents
+In this section, we’ll explore the common patterns for agentic systems we’ve seen in production. We'll start with our foundational building block—the augmented LLM—and progressively increase complexity, from simple compositional workflows to autonomous agents.
+
+Building block: The augmented LLM
+The basic building block of agentic systems is an LLM enhanced with augmentations such as retrieval, tools, and memory. Our current models can actively use these capabilities—generating their own search queries, selecting appropriate tools, and determining what information to retain.
+
+
+The augmented LLM
+We recommend focusing on two key aspects of the implementation: tailoring these capabilities to your specific use case and ensuring they provide an easy, well-documented interface for your LLM. While there are many ways to implement these augmentations, one approach is through our recently released Model Context Protocol, which allows developers to integrate with a growing ecosystem of third-party tools with a simple client implementation.
+
+For the remainder of this post, we'll assume each LLM call has access to these augmented capabilities.
+
+Workflow: Prompt chaining
+Prompt chaining decomposes a task into a sequence of steps, where each LLM call processes the output of the previous one. You can add programmatic checks (see "gate” in the diagram below) on any intermediate steps to ensure that the process is still on track.
+
+
+The prompt chaining workflow
+When to use this workflow: This workflow is ideal for situations where the task can be easily and cleanly decomposed into fixed subtasks. The main goal is to trade off latency for higher accuracy, by making each LLM call an easier task.
+
+Examples where prompt chaining is useful:
+
+Generating Marketing copy, then translating it into a different language.
+Writing an outline of a document, checking that the outline meets certain criteria, then writing the document based on the outline.
+Workflow: Routing
+Routing classifies an input and directs it to a specialized followup task. This workflow allows for separation of concerns, and building more specialized prompts. Without this workflow, optimizing for one kind of input can hurt performance on other inputs.
+
+
+The routing workflow
+When to use this workflow: Routing works well for complex tasks where there are distinct categories that are better handled separately, and where classification can be handled accurately, either by an LLM or a more traditional classification model/algorithm.
+
+Examples where routing is useful:
+
+Directing different types of customer service queries (general questions, refund requests, technical support) into different downstream processes, prompts, and tools.
+Routing easy/common questions to smaller models like Claude 3.5 Haiku and hard/unusual questions to more capable models like Claude 3.5 Sonnet to optimize cost and speed.
+Workflow: Parallelization
+LLMs can sometimes work simultaneously on a task and have their outputs aggregated programmatically. This workflow, parallelization, manifests in two key variations:
+
+Sectioning: Breaking a task into independent subtasks run in parallel.
+Voting: Running the same task multiple times to get diverse outputs.
+
+The parallelization workflow
+When to use this workflow: Parallelization is effective when the divided subtasks can be parallelized for speed, or when multiple perspectives or attempts are needed for higher confidence results. For complex tasks with multiple considerations, LLMs generally perform better when each consideration is handled by a separate LLM call, allowing focused attention on each specific aspect.
+
+Examples where parallelization is useful:
+
+Sectioning:
+Implementing guardrails where one model instance processes user queries while another screens them for inappropriate content or requests. This tends to perform better than having the same LLM call handle both guardrails and the core response.
+Automating evals for evaluating LLM performance, where each LLM call evaluates a different aspect of the model’s performance on a given prompt.
+Voting:
+Reviewing a piece of code for vulnerabilities, where several different prompts review and flag the code if they find a problem.
+Evaluating whether a given piece of content is inappropriate, with multiple prompts evaluating different aspects or requiring different vote thresholds to balance false positives and negatives.
+Workflow: Orchestrator-workers
+In the orchestrator-workers workflow, a central LLM dynamically breaks down tasks, delegates them to worker LLMs, and synthesizes their results.
+
+
+The orchestrator-workers workflow
+When to use this workflow: This workflow is well-suited for complex tasks where you can’t predict the subtasks needed (in coding, for example, the number of files that need to be changed and the nature of the change in each file likely depend on the task). Whereas it’s topographically similar, the key difference from parallelization is its flexibility—subtasks aren't pre-defined, but determined by the orchestrator based on the specific input.
+
+Example where orchestrator-workers is useful:
+
+Coding products that make complex changes to multiple files each time.
+Search tasks that involve gathering and analyzing information from multiple sources for possible relevant information.
+Workflow: Evaluator-optimizer
+In the evaluator-optimizer workflow, one LLM call generates a response while another provides evaluation and feedback in a loop.
+
+
+The evaluator-optimizer workflow
+When to use this workflow: This workflow is particularly effective when we have clear evaluation criteria, and when iterative refinement provides measurable value. The two signs of good fit are, first, that LLM responses can be demonstrably improved when a human articulates their feedback; and second, that the LLM can provide such feedback. This is analogous to the iterative writing process a human writer might go through when producing a polished document.
+
+Examples where evaluator-optimizer is useful:
+
+Literary translation where there are nuances that the translator LLM might not capture initially, but where an evaluator LLM can provide useful critiques.
+Complex search tasks that require multiple rounds of searching and analysis to gather comprehensive information, where the evaluator decides whether further searches are warranted.
+Agents
+Agents are emerging in production as LLMs mature in key capabilities—understanding complex inputs, engaging in reasoning and planning, using tools reliably, and recovering from errors. Agents begin their work with either a command from, or interactive discussion with, the human user. Once the task is clear, agents plan and operate independently, potentially returning to the human for further information or judgement. During execution, it's crucial for the agents to gain “ground truth” from the environment at each step (such as tool call results or code execution) to assess its progress. Agents can then pause for human feedback at checkpoints or when encountering blockers. The task often terminates upon completion, but it’s also common to include stopping conditions (such as a maximum number of iterations) to maintain control.
+
+Agents can handle sophisticated tasks, but their implementation is often straightforward. They are typically just LLMs using tools based on environmental feedback in a loop. It is therefore crucial to design toolsets and their documentation clearly and thoughtfully. We expand on best practices for tool development in Appendix 2 ("Prompt Engineering your Tools").
+
+
+Autonomous agent
+When to use agents: Agents can be used for open-ended problems where it’s difficult or impossible to predict the required number of steps, and where you can’t hardcode a fixed path. The LLM will potentially operate for many turns, and you must have some level of trust in its decision-making. Agents' autonomy makes them ideal for scaling tasks in trusted environments.
+
+The autonomous nature of agents means higher costs, and the potential for compounding errors. We recommend extensive testing in sandboxed environments, along with the appropriate guardrails.
+
+Examples where agents are useful:
+
+The following examples are from our own implementations:
+
+A coding Agent to resolve SWE-bench tasks, which involve edits to many files based on a task description;
+Our “computer use” reference implementation, where Claude uses a computer to accomplish tasks.
+
+High-level flow of a coding agent
+Combining and customizing these patterns
+These building blocks aren't prescriptive. They're common patterns that developers can shape and combine to fit different use cases. The key to success, as with any LLM features, is measuring performance and iterating on implementations. To repeat: you should consider adding complexity only when it demonstrably improves outcomes.
+
+Summary
+Success in the LLM space isn't about building the most sophisticated system. It's about building the right system for your needs. Start with simple prompts, optimize them with comprehensive evaluation, and add multi-step agentic systems only when simpler solutions fall short.
+
+When implementing agents, we try to follow three core principles:
+
+Maintain simplicity in your agent's design.
+Prioritize transparency by explicitly showing the agent’s planning steps.
+Carefully craft your agent-computer interface (ACI) through thorough tool documentation and testing.
+Frameworks can help you get started quickly, but don't hesitate to reduce abstraction layers and build with basic components as you move to production. By following these principles, you can create agents that are not only powerful but also reliable, maintainable, and trusted by their users.
+
+Acknowledgements
+Written by Erik Schluntz and Barry Zhang. This work draws upon our experiences building agents at Anthropic and the valuable insights shared by our customers, for which we're deeply grateful.
+
+Appendix 1: Agents in practice
+Our work with customers has revealed two particularly promising applications for AI agents that demonstrate the practical value of the patterns discussed above. Both applications illustrate how agents add the most value for tasks that require both conversation and action, have clear success criteria, enable feedback loops, and integrate meaningful human oversight.
+
+A. Customer support
+Customer support combines familiar chatbot interfaces with enhanced capabilities through tool integration. This is a natural fit for more open-ended agents because:
+
+Support interactions naturally follow a conversation flow while requiring access to external information and actions;
+Tools can be integrated to pull customer data, order history, and knowledge base articles;
+Actions such as issuing refunds or updating tickets can be handled programmatically; and
+Success can be clearly measured through user-defined resolutions.
+Several companies have demonstrated the viability of this approach through usage-based pricing models that charge only for successful resolutions, showing confidence in their agents' effectiveness.
+
+B. Coding agents
+The software development space has shown remarkable potential for LLM features, with capabilities evolving from code completion to autonomous problem-solving. Agents are particularly effective because:
+
+Code solutions are verifiable through automated tests;
+Agents can iterate on solutions using test results as feedback;
+The problem space is well-defined and structured; and
+Output quality can be measured objectively.
+In our own implementation, agents can now solve real GitHub issues in the SWE-bench Verified benchmark based on the pull request description alone. However, whereas automated testing helps verify functionality, human review remains crucial for ensuring solutions align with broader system requirements.
+
+Appendix 2: Prompt engineering your tools
+No matter which agentic system you're building, tools will likely be an important part of your agent. Tools enable Claude to interact with external services and APIs by specifying their exact structure and definition in our API. When Claude responds, it will include a tool use block in the API response if it plans to invoke a tool. Tool definitions and specifications should be given just as much prompt engineering attention as your overall prompts. In this brief appendix, we describe how to prompt engineer your tools.
+
+There are often several ways to specify the same action. For instance, you can specify a file edit by writing a diff, or by rewriting the entire file. For structured output, you can return code inside markdown or inside JSON. In software engineering, differences like these are cosmetic and can be converted losslessly from one to the other. However, some formats are much more difficult for an LLM to write than others. Writing a diff requires knowing how many lines are changing in the chunk header before the new code is written. Writing code inside JSON (compared to markdown) requires extra escaping of newlines and quotes.
+
+Our suggestions for deciding on tool formats are the following:
+
+Give the model enough tokens to "think" before it writes itself into a corner.
+Keep the format close to what the model has seen naturally occurring in text on the internet.
+Make sure there's no formatting "overhead" such as having to keep an accurate count of thousands of lines of code, or string-escaping any code it writes.
+One rule of thumb is to think about how much effort goes into human-computer interfaces (HCI), and plan to invest just as much effort in creating good agent-computer interfaces (ACI). Here are some thoughts on how to do so:
+
+Put yourself in the model's shoes. Is it obvious how to use this tool, based on the description and parameters, or would you need to think carefully about it? If so, then it’s probably also true for the model. A good tool definition often includes example usage, edge cases, input format requirements, and clear boundaries from other tools.
+How can you change parameter names or descriptions to make things more obvious? Think of this as writing a great docstring for a junior developer on your team. This is especially important when using many similar tools.
+Test how the model uses your tools: Run many example inputs in our workbench to see what mistakes the model makes, and iterate.
+Poka-yoke your tools. Change the arguments so that it is harder to make mistakes.
+While building our agent for SWE-bench, we actually spent more time optimizing our tools than the overall prompt. For example, we found that the model would make mistakes with tools using relative filepaths after the agent had moved out of the root directory. To fix this, we changed the tool to always require absolute filepaths—and we found that the model used this method flawlessly.
+
+LlamaIndex • 2025-01-22
+
+Introducing AgentWorkflow: A Powerful System for Building AI Agent Systems
+Agents
+Agentic Document Workflows
+We're excited to introduce AgentWorkflow, a new system in LlamaIndex that makes it easy to build and orchestrate AI agent systems. AgentWorkflow builds on top of our popular Workflow abstractions to make agents even easier to get up and running. AgentWorkflows take care of coordinating between agents, maintaining state, and more, while still giving you the flexibility and extensibility of Workflows.
+
+Whether you need a single specialized agent or a team of collaborative agents, AgentWorkflow provides the building blocks to create robust, stateful agent applications.
+
+The Challenge of Building Agent Systems
+As AI applications grow more sophisticated, simple one-off agent interactions often aren't enough. Consider building a research assistant that needs to:
+
+Search and analyze information from multiple sources
+Synthesize findings into a coherent report
+Review and refine the content for accuracy
+Maintain context across multiple interactions
+Handle complex back-and-forth between different specialized components
+Traditional approaches to building such systems often involve:
+
+Complex coordination logic between components
+Difficulty maintaining state and context
+Brittle handoffs between different stages
+Limited visibility into the system's operation
+After introducing Workflows in LlamaIndex, these types of systems became much easier to build. We even built our own multi-agent example! However, we found that there was enough boilerplate code and complexity that we could abstract away to make it easier to build agent systems, while still maintaining the flexibility and power of the Workflow system.
+
+Enter AgentWorkflow
+The AgentWorkflow addresses these challenges by providing a structured way to build agent systems that can:
+
+Maintain state and context across interaction
+Coordinate between specialized agents
+Handle complex multi-step processes
+Stream and monitor agent activities in real-time
+Built on top of our battle-tested Workflows, AgentWorkflow makes it easy to create both simple and sophisticated agent systems.
+
+Getting Started is Simple
+For basic use cases, you can quickly create a workflow with a single agent:
+
+workflow = AgentWorkflow.from_tools_or_functions(
+    [search_web],
+    llm=llm,
+    system_prompt=(
+        "You are a helpful assistant that can search the web for information."
+    )
+)
+
+# Run the agent
+response = await workflow.run(
+    user_msg="What is the latest news about AI?",
+)
+Building Multi-Agent Systems
+For more complex scenarios, AgentWorkflow can also be used to build multi-agent systems. Let's look at how to build a research report system with multiple specialized agents:
+
+# Create specialized agents
+research_agent = FunctionAgent(
+    name="ResearchAgent",
+    description="Searches and analyzes information from multiple sources",
+    system_prompt="You are a thorough researcher...",
+    tools=[search_web, record_notes],
+    can_handoff_to=["WriteAgent"]
+)
+
+write_agent = FunctionAgent(
+    name="WriteAgent",
+    description="Writes clear, comprehensive reports",
+    system_prompt="You are an expert writer...",
+    tools=[write_report],
+    can_handoff_to=["ReviewAgent", "ResearchAgent"]
+)
+
+review_agent = FunctionAgent(
+    name="ReviewAgent",
+    description="Reviews content for accuracy and quality",
+    system_prompt="You are a meticulous reviewer...",
+    tools=[review_report],
+    can_handoff_to=["WriteAgent"]
+)
+
+# Create the workflow
+agent_workflow = AgentWorkflow(
+    agents=[research_agent, write_agent, review_agent],
+    root_agent="ResearchAgent",
+    initial_state={
+        "research_notes": {},
+        "report_draft": "",
+        "review_feedback": "",
+    }
+)
+Key Features That Make It Powerful
+1. Flexible Agent Types
+Support for different agent architectures to match your needs:
+
+FunctionAgent for LLMs with function calling capabilities
+ReActAgent for any LLM
+Easily extensible for custom agent types
+2. Built-in State Management
+Maintain context across interactions. Tools/functions in an AgentWorkflow have access to the global workflow Context.
+
+async def record_notes(ctx: Context, notes: str) -> str:
+    """Record research notes for later use."""
+    current_state = await ctx.get("state")
+    current_state["research_notes"].append(notes)
+    await ctx.set("state", current_state)
+    return "Notes recorded."
+3. Real-time Visibility
+Monitor the execution process through event streaming:
+
+handler = workflow.run(user_msg="Research quantum computing")
+async for event in handler.stream_events():
+    if isinstance(event, AgentInput):
+        print(f"Agent {event.current_agent_name}: ")
+    if isinstance(event, AgentStream):
+        print(f"{event.delta}", end="")
+    elif isinstance(event, ToolCallResult):
+        print(f"Tool called: {event.tool_name} -> {event.tool_output}")
+4. Human-in-the-Loop Support
+Easily integrate human oversight and input:
+
+async def get_approval(ctx: Context) -> bool:
+    """Request human approval before proceeding."""
+    ctx.write_event_to_stream(
+        InputRequiredEvent(
+            prefix="Please review and approve this section:"
+        )
+    )
+    response = await ctx.wait_for_event(HumanResponseEvent)
+    return response.approved
+Ready to build?
+Dive in!
+
+Start with our basic agent workflow tutorial
+Check out the more detailed documentation
+Explore the multi-agent research workflow example
+Join our Discord community to discuss your use cases
+Check out our introductory video on YouTube
+Over the coming weeks, we'll be releasing more examples showing how to use AgentWorkflow for various real-world applications. Stay tuned!
+
+Sequential Workflow
+Sequential Workflow is a multi-agent design pattern where agents respond in a deterministic sequence. Each agent in the workflow performs a specific task by processing a message, generating a response, and then passing it to the next agent. This pattern is useful for creating deterministic workflows where each agent contributes to a pre-specified sub-task.
+
+In this example, we demonstrate a sequential workflow where multiple agents collaborate to transform a basic product description into a polished marketing copy.
+
+The pipeline consists of four specialized agents:
+
+Concept Extractor Agent: Analyzes the initial product description to extract key features, target audience, and unique selling points (USPs). The output is a structured analysis in a single text block.
+
+Writer Agent: Crafts compelling marketing copy based on the extracted concepts. This agent transforms the analytical insights into engaging promotional content, delivering a cohesive narrative in a single text block.
+
+Format & Proof Agent: Polishes the draft copy by refining grammar, enhancing clarity, and maintaining consistent tone. This agent ensures professional quality and delivers a well-formatted final version.
+
+User Agent: Presents the final, refined marketing copy to the user, completing the workflow.
+
+The following diagram illustrates the sequential workflow in this example:
+
+Sequential Workflow
+
+We will implement this workflow using publish-subscribe messaging. Please read about Topic and Subscription for the core concepts and Broadcast Messaging for the the API usage.
+
+In this pipeline, agents communicate with each other by publishing their completed work as messages to the topic of the next agent in the sequence. For example, when the ConceptExtractor finishes analyzing the product description, it publishes its findings to the "WriterAgent" topic, which the WriterAgent is subscribed to. This pattern continues through each step of the pipeline, with each agent publishing to the topic that the next agent in line subscribed to.
+
+from dataclasses import dataclass
+
+from autogen_core import (
+    MessageContext,
+    RoutedAgent,
+    SingleThreadedAgentRuntime,
+    TopicId,
+    TypeSubscription,
+    message_handler,
+    type_subscription,
+)
+from autogen_core.models import ChatCompletionClient, SystemMessage, UserMessage
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+Message Protocol
+The message protocol for this example workflow is a simple text message that agents will use to relay their work.
+
+@dataclass
+class Message:
+    content: str
+Topics
+Each agent in the workflow will be subscribed to a specific topic type. The topic types are named after the agents in the sequence, This allows each agent to publish its work to the next agent in the sequence.
+
+concept_extractor_topic_type = "ConceptExtractorAgent"
+writer_topic_type = "WriterAgent"
+format_proof_topic_type = "FormatProofAgent"
+user_topic_type = "User"
+Agents
+Each agent class is defined with a type_subscription decorator to specify the topic type it is subscribed to. Alternative to the decorator, you can also use the add_subscription() method to subscribe to a topic through runtime directly.
+
+The concept extractor agent comes up with the initial bullet points for the product description.
+
+@type_subscription(topic_type=concept_extractor_topic_type)
+class ConceptExtractorAgent(RoutedAgent):
+    def __init__(self, model_client: ChatCompletionClient) -> None:
+        super().__init__("A concept extractor agent.")
+        self._system_message = SystemMessage(
+            content=(
+                "You are a marketing analyst. Given a product description, identify:\n"
+                "- Key features\n"
+                "- Target audience\n"
+                "- Unique selling points\n\n"
+            )
+        )
+        self._model_client = model_client
+
+    @message_handler
+    async def handle_user_description(self, message: Message, ctx: MessageContext) -> None:
+        prompt = f"Product description: {message.content}"
+        llm_result = await self._model_client.create(
+            messages=[self._system_message, UserMessage(content=prompt, source=self.id.key)],
+            cancellation_token=ctx.cancellation_token,
+        )
+        response = llm_result.content
+        assert isinstance(response, str)
+        print(f"{'-'*80}\n{self.id.type}:\n{response}")
+
+        await self.publish_message(Message(response), topic_id=TopicId(writer_topic_type, source=self.id.key))
+The writer agent performs writing.
+
+@type_subscription(topic_type=writer_topic_type)
+class WriterAgent(RoutedAgent):
+    def __init__(self, model_client: ChatCompletionClient) -> None:
+        super().__init__("A writer agent.")
+        self._system_message = SystemMessage(
+            content=(
+                "You are a marketing copywriter. Given a block of text describing features, audience, and USPs, "
+                "compose a compelling marketing copy (like a newsletter section) that highlights these points. "
+                "Output should be short (around 150 words), output just the copy as a single text block."
+            )
+        )
+        self._model_client = model_client
+
+    @message_handler
+    async def handle_intermediate_text(self, message: Message, ctx: MessageContext) -> None:
+        prompt = f"Below is the info about the product:\n\n{message.content}"
+
+        llm_result = await self._model_client.create(
+            messages=[self._system_message, UserMessage(content=prompt, source=self.id.key)],
+            cancellation_token=ctx.cancellation_token,
+        )
+        response = llm_result.content
+        assert isinstance(response, str)
+        print(f"{'-'*80}\n{self.id.type}:\n{response}")
+
+        await self.publish_message(Message(response), topic_id=TopicId(format_proof_topic_type, source=self.id.key))
+The format proof agent performs the formatting.
+
+@type_subscription(topic_type=format_proof_topic_type)
+class FormatProofAgent(RoutedAgent):
+    def __init__(self, model_client: ChatCompletionClient) -> None:
+        super().__init__("A format & proof agent.")
+        self._system_message = SystemMessage(
+            content=(
+                "You are an editor. Given the draft copy, correct grammar, improve clarity, ensure consistent tone, "
+                "give format and make it polished. Output the final improved copy as a single text block."
+            )
+        )
+        self._model_client = model_client
+
+    @message_handler
+    async def handle_intermediate_text(self, message: Message, ctx: MessageContext) -> None:
+        prompt = f"Draft copy:\n{message.content}."
+        llm_result = await self._model_client.create(
+            messages=[self._system_message, UserMessage(content=prompt, source=self.id.key)],
+            cancellation_token=ctx.cancellation_token,
+        )
+        response = llm_result.content
+        assert isinstance(response, str)
+        print(f"{'-'*80}\n{self.id.type}:\n{response}")
+
+        await self.publish_message(Message(response), topic_id=TopicId(user_topic_type, source=self.id.key))
+In this example, the user agent simply prints the final marketing copy to the console. In a real-world application, this could be replaced by storing the result to a database, sending an email, or any other desired action.
+
+@type_subscription(topic_type=user_topic_type)
+class UserAgent(RoutedAgent):
+    def __init__(self) -> None:
+        super().__init__("A user agent that outputs the final copy to the user.")
+
+    @message_handler
+    async def handle_final_copy(self, message: Message, ctx: MessageContext) -> None:
+        print(f"\n{'-'*80}\n{self.id.type} received final copy:\n{message.content}")
+Workflow
+Now we can register the agents to the runtime. Because we used the type_subscription decorator, the runtime will automatically subscribe the agents to the correct topics.
+
+model_client = OpenAIChatCompletionClient(
+    model="gpt-4o-mini",
+    # api_key="YOUR_API_KEY"
+)
+
+runtime = SingleThreadedAgentRuntime()
+
+await ConceptExtractorAgent.register(
+    runtime, type=concept_extractor_topic_type, factory=lambda: ConceptExtractorAgent(model_client=model_client)
+)
+
+await WriterAgent.register(runtime, type=writer_topic_type, factory=lambda: WriterAgent(model_client=model_client))
+
+await FormatProofAgent.register(
+    runtime, type=format_proof_topic_type, factory=lambda: FormatProofAgent(model_client=model_client)
+)
+
+await UserAgent.register(runtime, type=user_topic_type, factory=lambda: UserAgent())
+Run the Workflow
+Finally, we can run the workflow by publishing a message to the first agent in the sequence.
+
+runtime.start()
+
+await runtime.publish_message(
+    Message(content="An eco-friendly stainless steel water bottle that keeps drinks cold for 24 hours"),
+    topic_id=TopicId(concept_extractor_topic_type, source="default"),
+)
+
+await runtime.stop_when_idle()
+--------------------------------------------------------------------------------
+ConceptExtractorAgent:
+**Key Features:**
+- Made from eco-friendly stainless steel
+- Can keep drinks cold for up to 24 hours
+- Durable and reusable design
+- Lightweight and portable
+- BPA-free and non-toxic materials
+- Sleek, modern aesthetic available in various colors
+
+**Target Audience:**
+- Environmentally conscious consumers
+- Health and fitness enthusiasts
+- Outdoor adventurers (hikers, campers, etc.)
+- Urban dwellers looking for sustainable alternatives
+- Individuals seeking stylish and functional drinkware
+
+**Unique Selling Points:**
+- Eco-friendly design minimizes plastic waste and supports sustainability
+- Superior insulation technology that maintains cold temperatures for a full day
+- Durable construction ensures long-lasting use, offering a great return on investment
+- Attractive design that caters to fashion-forward individuals 
+- Versatile use for both everyday hydration and outdoor activities
+--------------------------------------------------------------------------------
+WriterAgent:
+🌍🌿 Stay Hydrated, Stay Sustainable! 🌿🌍 
+
+Introducing our eco-friendly stainless steel drinkware, the perfect companion for the environmentally conscious and style-savvy individuals. With superior insulation technology, our bottles keep your beverages cold for an impressive 24 hours—ideal for hiking, camping, or just tackling a busy day in the city. Made from lightweight, BPA-free materials, this durable and reusable design not only helps reduce plastic waste but also ensures you’re making a responsible choice for our planet.
+
+Available in a sleek, modern aesthetic with various colors to match your personality, this drinkware isn't just functional—it’s fashionable! Whether you’re hitting the trails or navigating urban life, equip yourself with a stylish hydration solution that supports your active and sustainable lifestyle. Join the movement today and make a positive impact without compromising on style! 🌟🥤
+--------------------------------------------------------------------------------
+FormatProofAgent:
+🌍🌿 Stay Hydrated, Stay Sustainable! 🌿🌍 
+
+Introducing our eco-friendly stainless steel drinkware—the perfect companion for environmentally conscious and style-savvy individuals. With superior insulation technology, our bottles keep your beverages cold for an impressive 24 hours, making them ideal for hiking, camping, or simply tackling a busy day in the city. Crafted from lightweight, BPA-free materials, this durable and reusable design not only helps reduce plastic waste but also ensures that you’re making a responsible choice for our planet.
+
+Our drinkware features a sleek, modern aesthetic available in a variety of colors to suit your personality. It’s not just functional; it’s also fashionable! Whether you’re exploring the trails or navigating urban life, equip yourself with a stylish hydration solution that supports your active and sustainable lifestyle. Join the movement today and make a positive impact without compromising on style! 🌟🥤
+
+--------------------------------------------------------------------------------
+User received final copy:
+🌍🌿 Stay Hydrated, Stay Sustainable! 🌿🌍 
+
+Introducing our eco-friendly stainless steel drinkware—the perfect companion for environmentally conscious and style-savvy individuals. With superior insulation technology, our bottles keep your beverages cold for an impressive 24 hours, making them ideal for hiking, camping, or simply tackling a busy day in the city. Crafted from lightweight, BPA-free materials, this durable and reusable design not only helps reduce plastic waste but also ensures that you’re making a responsible choice for our planet.
+
+Our drinkware features a sleek, modern aesthetic available in a variety of colors to suit your personality. It’s not just functional; it’s also fashionable! Whether you’re exploring the trails or navigating urban life, equip yourself with a stylish hydration solution that supports your active and sustainable lifestyle. Join the movement today and make a positive impact without compromising on style! 🌟🥤
+
+Workflows and Agents¶
+This guide reviews common patterns for agentic systems. In describing these systems, it can be useful to make a distinction between "workflows" and "agents". One way to think about this difference is nicely explained in Anthropic's Building Effective Agents blog post:
+
+Workflows are systems where LLMs and tools are orchestrated through predefined code paths. Agents, on the other hand, are systems where LLMs dynamically direct their own processes and tool usage, maintaining control over how they accomplish tasks.
+
+Here is a simple way to visualize these differences:
+
+Agent Workflow
+
+When building agents and workflows, LangGraph offers a number of benefits including persistence, streaming, and support for debugging as well as deployment.
+
+Set up¶
+You can use any chat model that supports structured outputs and tool calling. Below, we show the process of installing the packages, setting API keys, and testing structured outputs / tool calling for Anthropic.
+
+Install dependencies
+Initialize an LLM
+
+
+import os
+import getpass
+
+from langchain_anthropic import ChatAnthropic
+
+def _set_env(var: str):
+    if not os.environ.get(var):
+        os.environ[var] = getpass.getpass(f"{var}: ")
+
+
+_set_env("ANTHROPIC_API_KEY")
+
+llm = ChatAnthropic(model="claude-3-5-sonnet-latest")
+API Reference: ChatAnthropic
+
+Building Blocks: The Augmented LLM¶
+LLM have augmentations that support building workflows and agents. These include structured outputs and tool calling, as shown in this image from the Anthropic blog on Building Effective Agents:
+
+augmented_llm.png
+
+
+# Schema for structured output
+from pydantic import BaseModel, Field
+
+class SearchQuery(BaseModel):
+    search_query: str = Field(None, description="Query that is optimized web search.")
+    justification: str = Field(
+        None, description="Why this query is relevant to the user's request."
+    )
+
+
+# Augment the LLM with schema for structured output
+structured_llm = llm.with_structured_output(SearchQuery)
+
+# Invoke the augmented LLM
+output = structured_llm.invoke("How does Calcium CT score relate to high cholesterol?")
+
+# Define a tool
+def multiply(a: int, b: int) -> int:
+    return a * b
+
+# Augment the LLM with tools
+llm_with_tools = llm.bind_tools([multiply])
+
+# Invoke the LLM with input that triggers the tool call
+msg = llm_with_tools.invoke("What is 2 times 3?")
+
+# Get the tool call
+msg.tool_calls
+Prompt chaining¶
+In prompt chaining, each LLM call processes the output of the previous one.
+
+As noted in the Anthropic blog on Building Effective Agents:
+
+Prompt chaining decomposes a task into a sequence of steps, where each LLM call processes the output of the previous one. You can add programmatic checks (see "gate” in the diagram below) on any intermediate steps to ensure that the process is still on track.
+
+When to use this workflow: This workflow is ideal for situations where the task can be easily and cleanly decomposed into fixed subtasks. The main goal is to trade off latency for higher accuracy, by making each LLM call an easier task.
+
+prompt_chain.png
+
+
+Graph API
+Functional API
+
+from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, START, END
+from IPython.display import Image, display
+
+
+# Graph state
+class State(TypedDict):
+    topic: str
+    joke: str
+    improved_joke: str
+    final_joke: str
+
+
+# Nodes
+def generate_joke(state: State):
+    """First LLM call to generate initial joke"""
+
+    msg = llm.invoke(f"Write a short joke about {state['topic']}")
+    return {"joke": msg.content}
+
+
+def check_punchline(state: State):
+    """Gate function to check if the joke has a punchline"""
+
+    # Simple check - does the joke contain "?" or "!"
+    if "?" in state["joke"] or "!" in state["joke"]:
+        return "Fail"
+    return "Pass"
+
+
+def improve_joke(state: State):
+    """Second LLM call to improve the joke"""
+
+    msg = llm.invoke(f"Make this joke funnier by adding wordplay: {state['joke']}")
+    return {"improved_joke": msg.content}
+
+
+def polish_joke(state: State):
+    """Third LLM call for final polish"""
+
+    msg = llm.invoke(f"Add a surprising twist to this joke: {state['improved_joke']}")
+    return {"final_joke": msg.content}
+
+
+# Build workflow
+workflow = StateGraph(State)
+
+# Add nodes
+workflow.add_node("generate_joke", generate_joke)
+workflow.add_node("improve_joke", improve_joke)
+workflow.add_node("polish_joke", polish_joke)
+
+# Add edges to connect nodes
+workflow.add_edge(START, "generate_joke")
+workflow.add_conditional_edges(
+    "generate_joke", check_punchline, {"Fail": "improve_joke", "Pass": END}
+)
+workflow.add_edge("improve_joke", "polish_joke")
+workflow.add_edge("polish_joke", END)
+
+# Compile
+chain = workflow.compile()
+
+# Show workflow
+display(Image(chain.get_graph().draw_mermaid_png()))
+
+# Invoke
+state = chain.invoke({"topic": "cats"})
+print("Initial joke:")
+print(state["joke"])
+print("\n--- --- ---\n")
+if "improved_joke" in state:
+    print("Improved joke:")
+    print(state["improved_joke"])
+    print("\n--- --- ---\n")
+
+    print("Final joke:")
+    print(state["final_joke"])
+else:
+    print("Joke failed quality gate - no punchline detected!")
+LangSmith Trace
+
+https://smith.langchain.com/public/a0281fca-3a71-46de-beee-791468607b75/r
+
+Resources:
+
+LangChain Academy
+
+See our lesson on Prompt Chaining here.
+
+
+Parallelization¶
+With parallelization, LLMs work simultaneously on a task:
+
+LLMs can sometimes work simultaneously on a task and have their outputs aggregated programmatically. This workflow, parallelization, manifests in two key variations: Sectioning: Breaking a task into independent subtasks run in parallel. Voting: Running the same task multiple times to get diverse outputs.
+
+When to use this workflow: Parallelization is effective when the divided subtasks can be parallelized for speed, or when multiple perspectives or attempts are needed for higher confidence results. For complex tasks with multiple considerations, LLMs generally perform better when each consideration is handled by a separate LLM call, allowing focused attention on each specific aspect.
+
+parallelization.png
+
+
+Graph API
+Functional API
+
+# Graph state
+class State(TypedDict):
+    topic: str
+    joke: str
+    story: str
+    poem: str
+    combined_output: str
+
+
+# Nodes
+def call_llm_1(state: State):
+    """First LLM call to generate initial joke"""
+
+    msg = llm.invoke(f"Write a joke about {state['topic']}")
+    return {"joke": msg.content}
+
+
+def call_llm_2(state: State):
+    """Second LLM call to generate story"""
+
+    msg = llm.invoke(f"Write a story about {state['topic']}")
+    return {"story": msg.content}
+
+
+def call_llm_3(state: State):
+    """Third LLM call to generate poem"""
+
+    msg = llm.invoke(f"Write a poem about {state['topic']}")
+    return {"poem": msg.content}
+
+
+def aggregator(state: State):
+    """Combine the joke and story into a single output"""
+
+    combined = f"Here's a story, joke, and poem about {state['topic']}!\n\n"
+    combined += f"STORY:\n{state['story']}\n\n"
+    combined += f"JOKE:\n{state['joke']}\n\n"
+    combined += f"POEM:\n{state['poem']}"
+    return {"combined_output": combined}
+
+
+# Build workflow
+parallel_builder = StateGraph(State)
+
+# Add nodes
+parallel_builder.add_node("call_llm_1", call_llm_1)
+parallel_builder.add_node("call_llm_2", call_llm_2)
+parallel_builder.add_node("call_llm_3", call_llm_3)
+parallel_builder.add_node("aggregator", aggregator)
+
+# Add edges to connect nodes
+parallel_builder.add_edge(START, "call_llm_1")
+parallel_builder.add_edge(START, "call_llm_2")
+parallel_builder.add_edge(START, "call_llm_3")
+parallel_builder.add_edge("call_llm_1", "aggregator")
+parallel_builder.add_edge("call_llm_2", "aggregator")
+parallel_builder.add_edge("call_llm_3", "aggregator")
+parallel_builder.add_edge("aggregator", END)
+parallel_workflow = parallel_builder.compile()
+
+# Show workflow
+display(Image(parallel_workflow.get_graph().draw_mermaid_png()))
+
+# Invoke
+state = parallel_workflow.invoke({"topic": "cats"})
+print(state["combined_output"])
+LangSmith Trace
+
+https://smith.langchain.com/public/3be2e53c-ca94-40dd-934f-82ff87fac277/r
+
+Resources:
+
+Documentation
+
+See our documentation on parallelization here.
+
+LangChain Academy
+
+See our lesson on parallelization here.
+
+
+Routing¶
+Routing classifies an input and directs it to a followup task. As noted in the Anthropic blog on Building Effective Agents:
+
+Routing classifies an input and directs it to a specialized followup task. This workflow allows for separation of concerns, and building more specialized prompts. Without this workflow, optimizing for one kind of input can hurt performance on other inputs.
+
+When to use this workflow: Routing works well for complex tasks where there are distinct categories that are better handled separately, and where classification can be handled accurately, either by an LLM or a more traditional classification model/algorithm.
+
+routing.png
+
+
+Graph API
+Functional API
+
+from typing_extensions import Literal
+from langchain_core.messages import HumanMessage, SystemMessage
+
+
+# Schema for structured output to use as routing logic
+class Route(BaseModel):
+    step: Literal["poem", "story", "joke"] = Field(
+        None, description="The next step in the routing process"
+    )
+
+
+# Augment the LLM with schema for structured output
+router = llm.with_structured_output(Route)
+
+
+# State
+class State(TypedDict):
+    input: str
+    decision: str
+    output: str
+
+
+# Nodes
+def llm_call_1(state: State):
+    """Write a story"""
+
+    result = llm.invoke(state["input"])
+    return {"output": result.content}
+
+
+def llm_call_2(state: State):
+    """Write a joke"""
+
+    result = llm.invoke(state["input"])
+    return {"output": result.content}
+
+
+def llm_call_3(state: State):
+    """Write a poem"""
+
+    result = llm.invoke(state["input"])
+    return {"output": result.content}
+
+
+def llm_call_router(state: State):
+    """Route the input to the appropriate node"""
+
+    # Run the augmented LLM with structured output to serve as routing logic
+    decision = router.invoke(
+        [
+            SystemMessage(
+                content="Route the input to story, joke, or poem based on the user's request."
+            ),
+            HumanMessage(content=state["input"]),
+        ]
+    )
+
+    return {"decision": decision.step}
+
+
+# Conditional edge function to route to the appropriate node
+def route_decision(state: State):
+    # Return the node name you want to visit next
+    if state["decision"] == "story":
+        return "llm_call_1"
+    elif state["decision"] == "joke":
+        return "llm_call_2"
+    elif state["decision"] == "poem":
+        return "llm_call_3"
+
+
+# Build workflow
+router_builder = StateGraph(State)
+
+# Add nodes
+router_builder.add_node("llm_call_1", llm_call_1)
+router_builder.add_node("llm_call_2", llm_call_2)
+router_builder.add_node("llm_call_3", llm_call_3)
+router_builder.add_node("llm_call_router", llm_call_router)
+
+# Add edges to connect nodes
+router_builder.add_edge(START, "llm_call_router")
+router_builder.add_conditional_edges(
+    "llm_call_router",
+    route_decision,
+    {  # Name returned by route_decision : Name of next node to visit
+        "llm_call_1": "llm_call_1",
+        "llm_call_2": "llm_call_2",
+        "llm_call_3": "llm_call_3",
+    },
+)
+router_builder.add_edge("llm_call_1", END)
+router_builder.add_edge("llm_call_2", END)
+router_builder.add_edge("llm_call_3", END)
+
+# Compile workflow
+router_workflow = router_builder.compile()
+
+# Show the workflow
+display(Image(router_workflow.get_graph().draw_mermaid_png()))
+
+# Invoke
+state = router_workflow.invoke({"input": "Write me a joke about cats"})
+print(state["output"])
+LangSmith Trace
+
+https://smith.langchain.com/public/c4580b74-fe91-47e4-96fe-7fac598d509c/r
+
+Resources:
+
+LangChain Academy
+
+See our lesson on routing here.
+
+Examples
+
+Here is RAG workflow that routes questions. See our video here.
+
+
+Orchestrator-Worker¶
+With orchestrator-worker, an orchestrator breaks down a task and delegates each sub-task to workers. As noted in the Anthropic blog on Building Effective Agents:
+
+In the orchestrator-workers workflow, a central LLM dynamically breaks down tasks, delegates them to worker LLMs, and synthesizes their results.
+
+When to use this workflow: This workflow is well-suited for complex tasks where you can’t predict the subtasks needed (in coding, for example, the number of files that need to be changed and the nature of the change in each file likely depend on the task). Whereas it’s topographically similar, the key difference from parallelization is its flexibility—subtasks aren't pre-defined, but determined by the orchestrator based on the specific input.
+
+worker.png
+
+
+Graph API
+Functional API
+
+from typing import Annotated, List
+import operator
+
+
+# Schema for structured output to use in planning
+class Section(BaseModel):
+    name: str = Field(
+        description="Name for this section of the report.",
+    )
+    description: str = Field(
+        description="Brief overview of the main topics and concepts to be covered in this section.",
+    )
+
+
+class Sections(BaseModel):
+    sections: List[Section] = Field(
+        description="Sections of the report.",
+    )
+
+
+# Augment the LLM with schema for structured output
+planner = llm.with_structured_output(Sections)
+Creating Workers in LangGraph
+
+Because orchestrator-worker workflows are common, LangGraph has the Send API to support this. It lets you dynamically create worker nodes and send each one a specific input. Each worker has its own state, and all worker outputs are written to a shared state key that is accessible to the orchestrator graph. This gives the orchestrator access to all worker output and allows it to synthesize them into a final output. As you can see below, we iterate over a list of sections and Send each to a worker node. See further documentation here and here.
+
+
+from langgraph.constants import Send
+
+
+# Graph state
+class State(TypedDict):
+    topic: str  # Report topic
+    sections: list[Section]  # List of report sections
+    completed_sections: Annotated[
+        list, operator.add
+    ]  # All workers write to this key in parallel
+    final_report: str  # Final report
+
+
+# Worker state
+class WorkerState(TypedDict):
+    section: Section
+    completed_sections: Annotated[list, operator.add]
+
+
+# Nodes
+def orchestrator(state: State):
+    """Orchestrator that generates a plan for the report"""
+
+    # Generate queries
+    report_sections = planner.invoke(
+        [
+            SystemMessage(content="Generate a plan for the report."),
+            HumanMessage(content=f"Here is the report topic: {state['topic']}"),
+        ]
+    )
+
+    return {"sections": report_sections.sections}
+
+
+def llm_call(state: WorkerState):
+    """Worker writes a section of the report"""
+
+    # Generate section
+    section = llm.invoke(
+        [
+            SystemMessage(
+                content="Write a report section following the provided name and description. Include no preamble for each section. Use markdown formatting."
+            ),
+            HumanMessage(
+                content=f"Here is the section name: {state['section'].name} and description: {state['section'].description}"
+            ),
+        ]
+    )
+
+    # Write the updated section to completed sections
+    return {"completed_sections": [section.content]}
+
+
+def synthesizer(state: State):
+    """Synthesize full report from sections"""
+
+    # List of completed sections
+    completed_sections = state["completed_sections"]
+
+    # Format completed section to str to use as context for final sections
+    completed_report_sections = "\n\n---\n\n".join(completed_sections)
+
+    return {"final_report": completed_report_sections}
+
+
+# Conditional edge function to create llm_call workers that each write a section of the report
+def assign_workers(state: State):
+    """Assign a worker to each section in the plan"""
+
+    # Kick off section writing in parallel via Send() API
+    return [Send("llm_call", {"section": s}) for s in state["sections"]]
+
+
+# Build workflow
+orchestrator_worker_builder = StateGraph(State)
+
+# Add the nodes
+orchestrator_worker_builder.add_node("orchestrator", orchestrator)
+orchestrator_worker_builder.add_node("llm_call", llm_call)
+orchestrator_worker_builder.add_node("synthesizer", synthesizer)
+
+# Add edges to connect nodes
+orchestrator_worker_builder.add_edge(START, "orchestrator")
+orchestrator_worker_builder.add_conditional_edges(
+    "orchestrator", assign_workers, ["llm_call"]
+)
+orchestrator_worker_builder.add_edge("llm_call", "synthesizer")
+orchestrator_worker_builder.add_edge("synthesizer", END)
+
+# Compile the workflow
+orchestrator_worker = orchestrator_worker_builder.compile()
+
+# Show the workflow
+display(Image(orchestrator_worker.get_graph().draw_mermaid_png()))
+
+# Invoke
+state = orchestrator_worker.invoke({"topic": "Create a report on LLM scaling laws"})
+
+from IPython.display import Markdown
+Markdown(state["final_report"])
+LangSmith Trace
+
+https://smith.langchain.com/public/78cbcfc3-38bf-471d-b62a-b299b144237d/r
+
+Resources:
+
+LangChain Academy
+
+See our lesson on orchestrator-worker here.
+
+Examples
+
+Here is a project that uses orchestrator-worker for report planning and writing. See our video here.
+
+
+Evaluator-optimizer¶
+In the evaluator-optimizer workflow, one LLM call generates a response while another provides evaluation and feedback in a loop:
+
+In the evaluator-optimizer workflow, one LLM call generates a response while another provides evaluation and feedback in a loop.
+
+When to use this workflow: This workflow is particularly effective when we have clear evaluation criteria, and when iterative refinement provides measurable value. The two signs of good fit are, first, that LLM responses can be demonstrably improved when a human articulates their feedback; and second, that the LLM can provide such feedback. This is analogous to the iterative writing process a human writer might go through when producing a polished document.
+
+evaluator_optimizer.png
+
+
+Graph API
+Functional API
+
+# Graph state
+class State(TypedDict):
+    joke: str
+    topic: str
+    feedback: str
+    funny_or_not: str
+
+
+# Schema for structured output to use in evaluation
+class Feedback(BaseModel):
+    grade: Literal["funny", "not funny"] = Field(
+        description="Decide if the joke is funny or not.",
+    )
+    feedback: str = Field(
+        description="If the joke is not funny, provide feedback on how to improve it.",
+    )
+
+
+# Augment the LLM with schema for structured output
+evaluator = llm.with_structured_output(Feedback)
+
+
+# Nodes
+def llm_call_generator(state: State):
+    """LLM generates a joke"""
+
+    if state.get("feedback"):
+        msg = llm.invoke(
+            f"Write a joke about {state['topic']} but take into account the feedback: {state['feedback']}"
+        )
+    else:
+        msg = llm.invoke(f"Write a joke about {state['topic']}")
+    return {"joke": msg.content}
+
+
+def llm_call_evaluator(state: State):
+    """LLM evaluates the joke"""
+
+    grade = evaluator.invoke(f"Grade the joke {state['joke']}")
+    return {"funny_or_not": grade.grade, "feedback": grade.feedback}
+
+
+# Conditional edge function to route back to joke generator or end based upon feedback from the evaluator
+def route_joke(state: State):
+    """Route back to joke generator or end based upon feedback from the evaluator"""
+
+    if state["funny_or_not"] == "funny":
+        return "Accepted"
+    elif state["funny_or_not"] == "not funny":
+        return "Rejected + Feedback"
+
+
+# Build workflow
+optimizer_builder = StateGraph(State)
+
+# Add the nodes
+optimizer_builder.add_node("llm_call_generator", llm_call_generator)
+optimizer_builder.add_node("llm_call_evaluator", llm_call_evaluator)
+
+# Add edges to connect nodes
+optimizer_builder.add_edge(START, "llm_call_generator")
+optimizer_builder.add_edge("llm_call_generator", "llm_call_evaluator")
+optimizer_builder.add_conditional_edges(
+    "llm_call_evaluator",
+    route_joke,
+    {  # Name returned by route_joke : Name of next node to visit
+        "Accepted": END,
+        "Rejected + Feedback": "llm_call_generator",
+    },
+)
+
+# Compile the workflow
+optimizer_workflow = optimizer_builder.compile()
+
+# Show the workflow
+display(Image(optimizer_workflow.get_graph().draw_mermaid_png()))
+
+# Invoke
+state = optimizer_workflow.invoke({"topic": "Cats"})
+print(state["joke"])
+LangSmith Trace
+
+https://smith.langchain.com/public/86ab3e60-2000-4bff-b988-9b89a3269789/r
+
+Resources:
+
+Examples
+
+Here is an assistant that uses evaluator-optimizer to improve a report. See our video here.
+
+Here is a RAG workflow that grades answers for hallucinations or errors. See our video here.
+
+
+Agent¶
+Agents are typically implemented as an LLM performing actions (via tool-calling) based on environmental feedback in a loop. As noted in the Anthropic blog on Building Effective Agents:
+
+Agents can handle sophisticated tasks, but their implementation is often straightforward. They are typically just LLMs using tools based on environmental feedback in a loop. It is therefore crucial to design toolsets and their documentation clearly and thoughtfully.
+
+When to use agents: Agents can be used for open-ended problems where it’s difficult or impossible to predict the required number of steps, and where you can’t hardcode a fixed path. The LLM will potentially operate for many turns, and you must have some level of trust in its decision-making. Agents' autonomy makes them ideal for scaling tasks in trusted environments.
+
+agent.png
+
+
+from langchain_core.tools import tool
+
+
+# Define tools
+@tool
+def multiply(a: int, b: int) -> int:
+    """Multiply a and b.
+
+    Args:
+        a: first int
+        b: second int
+    """
+    return a * b
+
+
+@tool
+def add(a: int, b: int) -> int:
+    """Adds a and b.
+
+    Args:
+        a: first int
+        b: second int
+    """
+    return a + b
+
+
+@tool
+def divide(a: int, b: int) -> float:
+    """Divide a and b.
+
+    Args:
+        a: first int
+        b: second int
+    """
+    return a / b
+
+
+# Augment the LLM with tools
+tools = [add, multiply, divide]
+tools_by_name = {tool.name: tool for tool in tools}
+llm_with_tools = llm.bind_tools(tools)
+API Reference: tool
+
+
+Graph API
+Functional API
+
+from langgraph.graph import MessagesState
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+
+
+# Nodes
+def llm_call(state: MessagesState):
+    """LLM decides whether to call a tool or not"""
+
+    return {
+        "messages": [
+            llm_with_tools.invoke(
+                [
+                    SystemMessage(
+                        content="You are a helpful assistant tasked with performing arithmetic on a set of inputs."
+                    )
+                ]
+                + state["messages"]
+            )
+        ]
+    }
+
+
+def tool_node(state: dict):
+    """Performs the tool call"""
+
+    result = []
+    for tool_call in state["messages"][-1].tool_calls:
+        tool = tools_by_name[tool_call["name"]]
+        observation = tool.invoke(tool_call["args"])
+        result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
+    return {"messages": result}
+
+
+# Conditional edge function to route to the tool node or end based upon whether the LLM made a tool call
+def should_continue(state: MessagesState) -> Literal["environment", END]:
+    """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
+
+    messages = state["messages"]
+    last_message = messages[-1]
+    # If the LLM makes a tool call, then perform an action
+    if last_message.tool_calls:
+        return "Action"
+    # Otherwise, we stop (reply to the user)
+    return END
+
+
+# Build workflow
+agent_builder = StateGraph(MessagesState)
+
+# Add nodes
+agent_builder.add_node("llm_call", llm_call)
+agent_builder.add_node("environment", tool_node)
+
+# Add edges to connect nodes
+agent_builder.add_edge(START, "llm_call")
+agent_builder.add_conditional_edges(
+    "llm_call",
+    should_continue,
+    {
+        # Name returned by should_continue : Name of next node to visit
+        "Action": "environment",
+        END: END,
+    },
+)
+agent_builder.add_edge("environment", "llm_call")
+
+# Compile the agent
+agent = agent_builder.compile()
+
+# Show the agent
+display(Image(agent.get_graph(xray=True).draw_mermaid_png()))
+
+# Invoke
+messages = [HumanMessage(content="Add 3 and 4.")]
+messages = agent.invoke({"messages": messages})
+for m in messages["messages"]:
+    m.pretty_print()
+LangSmith Trace
+
+https://smith.langchain.com/public/051f0391-6761-4f8c-a53b-22231b016690/r
+
+Resources:
+
+LangChain Academy
+
+See our lesson on agents here.
+
+Examples
+
+Here is a project that uses a tool calling agent to create / store long-term memories.
+
+
+Pre-built¶
+LangGraph also provides a pre-built method for creating an agent as defined above (using the create_react_agent function):
+
+https://langchain-ai.github.io/langgraph/how-tos/create-react-agent/
+
+
+from langgraph.prebuilt import create_react_agent
+
+# Pass in:
+# (1) the augmented LLM with tools
+# (2) the tools list (which is used to create the tool node)
+pre_built_agent = create_react_agent(llm, tools=tools)
+
+# Show the agent
+display(Image(pre_built_agent.get_graph().draw_mermaid_png()))
+
+# Invoke
+messages = [HumanMessage(content="Add 3 and 4.")]
+messages = pre_built_agent.invoke({"messages": messages})
+for m in messages["messages"]:
+    m.pretty_print()
+API Reference: create_react_agent
+
+LangSmith Trace
+
+https://smith.langchain.com/public/abab6a44-29f6-4b97-8164-af77413e494d/r
+
+What LangGraph provides¶
+By constructing each of the above in LangGraph, we get a few things:
+
+Persistence: Human-in-the-Loop¶
+LangGraph persistence layer supports interruption and approval of actions (e.g., Human In The Loop). See Module 3 of LangChain Academy.
+
+Persistence: Memory¶
+LangGraph persistence layer supports conversational (short-term) memory and long-term memory. See Modules 2 and 5 of LangChain Academy:
+
+Streaming¶
+LangGraph provides several ways to stream workflow / agent outputs or intermediate state. See Module 3 of LangChain Academy.
+
+Deployment¶
+LangGraph provides an easy on-ramp for deployment, observability, and evaluation. See module 6 of LangChain Academy.

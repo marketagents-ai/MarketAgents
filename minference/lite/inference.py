@@ -125,14 +125,22 @@ async def run_parallel_ai_completion(
     EntityRegistry._logger.info(f"Processing {len(llm_outputs)} LLM outputs")
     processed_outputs = await process_outputs_and_execute_tools(chat_threads, llm_outputs)
 
-    for thread, output in zip(chat_threads, processed_outputs):
-        orchestrator.all_requests.append({
-            'chat_thread': thread,
-            'output': output,
-            'timestamp': time.time()
-        })
+    # Identify threads that need to continue their workflow
+    continuing_thread_ids = set()
+    for chat_thread in chat_threads:
+        if (chat_thread.llm_config.response_format == ResponseFormat.workflow and 
+            chat_thread.workflow_step is not None and 
+            chat_thread.workflow_step < len(chat_thread.tools)):
+            continuing_thread_ids.add(chat_thread.id)
+            print(f"Thread {chat_thread.id} continuing workflow at step {chat_thread.workflow_step}")
     
-    print(f"Total AI Requests: {len(orchestrator.all_requests)}")
+    if continuing_thread_ids:
+        # Only return outputs for non-continuing threads
+        completed_outputs = [o for o in processed_outputs if o.chat_thread_id not in continuing_thread_ids]
+        # Process continuing threads until completion
+        continuing_threads = [ct for ct in chat_threads if ct.id in continuing_thread_ids]
+        workflow_outputs = await run_parallel_ai_completion(continuing_threads, orchestrator)
+        return completed_outputs + workflow_outputs
     
     return processed_outputs
 
