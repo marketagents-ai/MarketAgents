@@ -600,14 +600,6 @@ class MCPServerActionSpace(ActionSpace):
                         logger.debug(f"Created tool: {tool_name}")
                 except Exception as e:
                     logger.error(f"Error creating tool {tool_name}: {str(e)}")
-        
-    def get_action_schema(self):
-        """Return JSON schema for all available tools"""
-        schemas = {}
-        for tool in self.allowed_actions:
-            schemas[tool.name] = tool.json_schema()
-        return schemas
-
     
     def get_action_schema(self):
         """Return JSON schema for all available tools"""
