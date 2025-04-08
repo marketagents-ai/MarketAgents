@@ -31,7 +31,7 @@ action: |
   ## Available Actions
   {action_space}
 
-  Choose an appropriate action for this environment.
+  Given the environment state and available actions, perform appriopriate actions.
 
 reflection: |
   Reflect on this observation from the {environment_name} environment:
