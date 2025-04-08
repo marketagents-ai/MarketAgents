@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Any, List, Type
+from typing import Dict, Any, List, Type, Optional
 from pydantic import BaseModel, Field
 from market_agents.agents.cognitive_schemas import ChainOfThoughtSchema, ThoughtStep
 from market_agents.environments.environment import (
@@ -78,7 +78,8 @@ class ChatMechanism(Mechanism):
             info={"chat_history": self.chat_history}
         )
 
-    def get_global_state(self) -> List[ChatMessage]:
+    def get_global_state(self, agent_id: Optional[str] = None) -> List[ChatMessage]:
+        """Get the global state of the chat, optionally filtered for an agent."""
         return self.chat_history
 
     def add_user_message(self, content: str):
@@ -93,6 +94,10 @@ class ChatMechanism(Mechanism):
 class ChatActionSpace(ActionSpace):
     allowed_actions: List[Type[LocalAction]] = [ChatAction]
 
+    def get_action_schema(self) -> Dict[str, Any]:
+        """Return JSON schema for chat actions"""
+        return ChainOfThoughtSchema.model_json_schema()
+
 class ChatObservationSpace(ObservationSpace):
     allowed_observations: List[Type[LocalObservation]] = [ChatObservation]
 
@@ -101,3 +106,7 @@ class ChatEnvironment(MultiAgentEnvironment):
     action_space: ActionSpace = Field(default_factory=ChatActionSpace)
     observation_space: ObservationSpace = Field(default_factory=ChatObservationSpace)
     mechanism: Mechanism = Field(default_factory=ChatMechanism)
+
+    def get_global_state(self, agent_id: Optional[str] = None) -> Any:
+        """Get the global state, optionally filtered for an agent."""
+        return self.mechanism.get_global_state(agent_id)
