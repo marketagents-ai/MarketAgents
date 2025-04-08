@@ -89,10 +89,8 @@ class MarketAgent(Agent):
     async def create(
         cls,
         storage_utils: AgentStorageAPIUtils,
-        agent_id: str,
-        ai_utils: Optional[InferenceOrchestrator] = None, 
-        use_llm: bool = True,
         llm_config: Optional[LLMConfig] = None,
+        ai_utils: Optional[InferenceOrchestrator] = None,
         environments: Optional[Dict[str, MultiAgentEnvironment]] = None,
         protocol: Optional[Type[Protocol]] = None,
         persona: Optional[Persona] = None,
@@ -100,24 +98,8 @@ class MarketAgent(Agent):
         knowledge_agent: Optional[KnowledgeBaseAgent] = None,
         reward_function: Optional[BaseRewardFunction] = None,
     ) -> 'MarketAgent':
-        stm = ShortTermMemory(
-            agent_id=agent_id,
-            agent_storage_utils=storage_utils,
-            default_top_k=storage_utils.config.stm_top_k
-        )
-        await stm.initialize()
-        
-        ltm = LongTermMemory(
-            agent_id=agent_id,
-            agent_storage_utils=storage_utils,
-            default_top_k=storage_utils.config.ltm_top_k
-        )
-        await ltm.initialize()
-
+        # Create base agent with fields that don't need agent.id
         agent = cls(
-            id=agent_id,
-            short_term_memory=stm,
-            long_term_memory=ltm,
             llm_orchestrator=ai_utils or InferenceOrchestrator(),
             role=persona.role if persona else "AI agent",
             persona=persona.persona if persona else None,
@@ -125,21 +107,36 @@ class MarketAgent(Agent):
             llm_config=llm_config or LLMConfig(),
             environments=environments or {},
             protocol=protocol,
-            address=f"agent_{agent_id}_address",
-            use_llm=use_llm,
-            economic_agent=econ_agent,
-            knowledge_agent=knowledge_agent,
             rl_agent=VerbalRLAgent(reward_function=reward_function) if reward_function else VerbalRLAgent()
         )
 
-        if agent.economic_agent:
-            agent.economic_agent.id = agent_id
+        # Initialize everything that needs agent.id
+        agent.short_term_memory = ShortTermMemory(
+            agent_id=agent.id,
+            agent_storage_utils=storage_utils,
+            default_top_k=storage_utils.config.stm_top_k
+        )
+        await agent.short_term_memory.initialize()
+        
+        agent.long_term_memory = LongTermMemory(
+            agent_id=agent.id,
+            agent_storage_utils=storage_utils,
+            default_top_k=storage_utils.config.ltm_top_k
+        )
+        await agent.long_term_memory.initialize()
 
+        agent.address = f"agent/{str(agent.id)}"
+        agent.economic_agent = econ_agent
+        agent.knowledge_agent = knowledge_agent
+
+        # Propagate ID to sub-components
+        if agent.economic_agent:
+            agent.economic_agent.id = agent.id
         if agent.knowledge_agent:
-            agent.knowledge_agent.id = agent_id
+            agent.knowledge_agent.id = agent.id
 
         return agent
-    
+        
     async def run_step(
         self,
         step: Optional[Union[CognitiveStep, Type[CognitiveStep]]] = None,

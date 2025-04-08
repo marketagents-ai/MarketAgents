@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
+from uuid import UUID
 
 from market_agents.memory.storage_models import RetrievedMemory
 from market_agents.memory.knowledge_base import MarketKnowledgeBase
@@ -8,7 +9,7 @@ class KnowledgeBaseAgent(BaseModel):
     """
     A Pydantic model representing a knowledge base agent.
     """
-    id: Optional[str] = Field(
+    id: Optional[UUID] = Field(
         None, 
         description="Agent ID or reference for the knowledge base agent"
     )

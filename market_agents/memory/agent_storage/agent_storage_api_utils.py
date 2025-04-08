@@ -65,13 +65,16 @@ class AgentStorageAPIUtils:
 
     async def store_cognitive_memory(self, memory: MemoryObject) -> Dict[str, Any]:
         try:
-            memory_dict = memory.model_dump(exclude_none=True)
-            async with aiohttp.ClientSession(json_serialize=lambda x: json.dumps(x, cls=self.json_encoder)) as session:
+            memory_dict = memory.model_dump(mode='json')
+            async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.api_url}/memory/cognitive",
                     json=memory_dict
                 ) as resp:
-                    resp.raise_for_status()
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        self.logger.error(f"Failed to store cognitive memory. Status: {resp.status}, Response: {error_text}")
+                        resp.raise_for_status()
                     return await resp.json()
         except Exception as e:
             self.logger.error(f"Error storing cognitive memory: {e}")
@@ -93,7 +96,7 @@ class AgentStorageAPIUtils:
 
     async def get_cognitive_memory_sql(
         self,
-        agent_id: str,
+        agent_id: UUID,
         params: CognitiveMemoryParams
     ) -> List[MemoryObject]:
         """Get cognitive memories using SQL query."""
@@ -120,7 +123,7 @@ class AgentStorageAPIUtils:
             self.logger.error(f"Error getting cognitive memory: {e}")
             raise
 
-    async def get_episodic_memory_sql(self, agent_id: str, params: EpisodicMemoryParams) -> Dict[str, Any]:
+    async def get_episodic_memory_sql(self, agent_id: UUID, params: EpisodicMemoryParams) -> Dict[str, Any]:
         """
         Calls GET /memory/episodic/sql/{agent_id} for standard SQL retrieval
         using time range, metadata filters, etc.
@@ -146,7 +149,7 @@ class AgentStorageAPIUtils:
             self.logger.error(f"Error retrieving episodic memory (SQL): {e}")
             raise
 
-    async def get_cognitive_memory_vector(self, agent_id: str, query: str, top_k: int = 5) -> Dict[str, Any]:
+    async def get_cognitive_memory_vector(self, agent_id: UUID, query: str, top_k: int = 5) -> Dict[str, Any]:
         """Calls GET /memory/cognitive/vector/{agent_id} for embedding-based retrieval."""
         try:
             params = {"query": query, "top_k": top_k}
@@ -161,7 +164,7 @@ class AgentStorageAPIUtils:
             self.logger.error(f"Error searching cognitive memory (vector): {e}")
             raise
 
-    async def get_episodic_memory_vector(self, agent_id: str, query: str, top_k: int = 5) -> Dict[str, Any]:
+    async def get_episodic_memory_vector(self, agent_id: UUID, query: str, top_k: int = 5) -> Dict[str, Any]:
         """Calls GET /memory/episodic/vector/{agent_id} for embedding-based retrieval."""
         try:
             params = {"query": query, "top_k": top_k}
@@ -219,7 +222,7 @@ class AgentStorageAPIUtils:
     async def create_tables(self, request: CreateTablesRequest) -> Dict[str, Any]:
         """Create database tables."""
         try:
-            payload = request.model_dump()
+            payload = request.model_dump(mode='json')
             self.logger.info(f"Sending create tables request with payload: {payload}")
             
             async with aiohttp.ClientSession() as session:
@@ -239,7 +242,7 @@ class AgentStorageAPIUtils:
             self.logger.error(f"Error creating tables: {str(e)}")
             raise
 
-    async def clear_agent_memory(self, agent_id: str, memory_type: Optional[str] = None) -> Dict[str, Any]:
+    async def clear_agent_memory(self, agent_id: UUID, memory_type: Optional[str] = None) -> Dict[str, Any]:
         try:
             params = {"memory_type": memory_type}
             async with aiohttp.ClientSession() as session:

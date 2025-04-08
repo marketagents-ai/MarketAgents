@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional, Type, Union, List
 from datetime import datetime, timezone
+from uuid import UUID
 import json
-import asyncio
 
 from pydantic import BaseModel, Field
 
@@ -22,7 +22,7 @@ class CognitiveStep(BaseModel):
         ..., 
         description="Name identifier for this cognitive step"
     )
-    agent_id: str = Field(
+    agent_id: UUID = Field(
         ...,
         description="ID of the agent executing this step"
     )

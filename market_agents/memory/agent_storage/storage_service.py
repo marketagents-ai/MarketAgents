@@ -24,7 +24,7 @@ class StorageService:
         self.config = config
         self.logger = logging.getLogger("storage_service")
 
-    async def create_tables(self, table_type: str, agent_id: Optional[str] = None, table_prefix: Optional[str] = None):
+    async def create_tables(self, table_type: str, agent_id: Optional[UUID] = None, table_prefix: Optional[str] = None):
         """Creates tables based on the specified type."""
         try:
             # Verify database connection
@@ -70,7 +70,7 @@ class StorageService:
                     CREATE TABLE IF NOT EXISTS ai_requests (
                         id SERIAL PRIMARY KEY,
                         request_id TEXT NOT NULL,
-                        agent_id TEXT,
+                        agent_id UUID,
                         prompt TEXT NOT NULL,
                         response JSONB,
                         metadata JSONB DEFAULT '{}',
@@ -131,16 +131,15 @@ class StorageService:
             self.logger.error(f"Error creating knowledge base tables: {str(e)}")
             raise
 
-    async def create_agent_cognitive_memory_table(self, agent_id: str) -> None:
+    async def create_agent_cognitive_memory_table(self, agent_id: UUID) -> None:
         """
         Create a separate cognitive memory table for a specific agent.
         This can store single-step or short-horizon items (akin to 'STM').
         """
         try:
             # Sanitize the agent_id to create a valid table name
-            sanitized_agent_id = self.db._sanitize_table_name(agent_id)
-            cognitive_table = f"agent_{sanitized_agent_id}_cognitive"
-            index_name = f"agent_{sanitized_agent_id}_cognitive_index"
+            cognitive_table = self._get_agent_table_name(agent_id, "cognitive")
+            index_name = f"{cognitive_table}_index"
 
             # Use a transaction to ensure atomic execution
             async with self.db.safe_transaction() as conn:
@@ -167,7 +166,7 @@ class StorageService:
             self.logger.error(f"Error creating agent cognitive memory table: {str(e)}")
             raise
 
-    async def create_agent_episodic_memory_table(self, agent_id: str) -> None:
+    async def create_agent_episodic_memory_table(self, agent_id: UUID) -> None:
         """
         Create a separate episodic memory table for a specific agent.
         Each row will store an entire 'episode' (cognitive_steps in JSON),
@@ -175,9 +174,8 @@ class StorageService:
         """
         try:
             # Sanitize the agent_id to create a valid table name
-            sanitized_agent_id = self.db._sanitize_table_name(agent_id)
-            episodic_table = f"agent_{sanitized_agent_id}_episodic"
-            index_name = f"agent_{sanitized_agent_id}_episodic_index"
+            episodic_table = self._get_agent_table_name(agent_id, "episodic")
+            index_name = f"{episodic_table}_index"
 
             # Use a transaction to ensure atomic execution
             async with self.db.safe_transaction() as conn:
@@ -215,7 +213,7 @@ class StorageService:
             # Convert embedding list to PostgreSQL vector string format
             vector_str = f"[{','.join(map(str, memory_object.embedding))}]"
 
-            cognitive_table = f"agent_{memory_object.agent_id}_cognitive"
+            cognitive_table = self._get_agent_table_name(memory_object.agent_id, "cognitive")
             now = datetime.now(timezone.utc)
 
             result = await self.db.execute(
@@ -248,7 +246,7 @@ class StorageService:
             # Convert embedding list to PostgreSQL vector string format
             vector_str = f"[{','.join(map(str, episode.embedding))}]"
 
-            episodic_table = f"agent_{episode.agent_id}_episodic"
+            episodic_table = self._get_agent_table_name(episode.agent_id, "episodic")
 
             await self.db.execute(
                 f"""
@@ -272,7 +270,7 @@ class StorageService:
 
     async def get_cognitive_memory(
             self,
-            agent_id: str,
+            agent_id: UUID,
             limit: int = 10,
             cognitive_step: Optional[Union[str, List[str]]] = None,
             metadata_filters: Optional[Dict] = None,
@@ -283,7 +281,7 @@ class StorageService:
         try:
             conditions = []
             params = []
-            cognitive_table = f"agent_{agent_id}_cognitive"
+            cognitive_table = self._get_agent_table_name(agent_id, "cognitive")
 
             # Build query conditions
             if cognitive_step:
@@ -367,7 +365,7 @@ class StorageService:
 
     async def get_episodic_memory(
             self,
-            agent_id: str,
+            agent_id: UUID,
             limit: int = 5,
             metadata_filters: Optional[Dict] = None,
             start_time: Optional[datetime] = None,
@@ -375,7 +373,7 @@ class StorageService:
     ) -> List[EpisodicMemoryObject]:
         """Retrieve episodic memories based on filters."""
         try:
-            episodic_table = f"agent_{agent_id}_episodic"
+            episodic_table = self._get_agent_table_name(agent_id, "episodic")
             conditions = []
             params = []
 
@@ -447,17 +445,19 @@ class StorageService:
             self.logger.error(f"Error retrieving episodic memory: {str(e)}")
             raise
 
-    async def clear_agent_memory(self, agent_id: str, memory_type: Optional[str] = None) -> int:
+    async def clear_agent_memory(self, agent_id: UUID, memory_type: Optional[str] = None) -> int:
         """Clear agent memories of specified type(s)."""
         try:
             deleted_count = 0
             if memory_type in (None, "cognitive"):
+                cognitive_table = self._get_agent_table_name(agent_id, "cognitive")
                 deleted_count += await self.db.execute(
-                    f"TRUNCATE TABLE agent_{agent_id}_cognitive;"
+                    f"TRUNCATE TABLE {cognitive_table};"
                 )
             if memory_type in (None, "episodic"):
+                episodic_table = self._get_agent_table_name(agent_id, "episodic")
                 deleted_count += await self.db.execute(
-                    f"TRUNCATE TABLE agent_{agent_id}_episodic;"
+                    f"TRUNCATE TABLE {episodic_table};"
                 )
             return deleted_count
         except Exception as e:
@@ -579,14 +579,13 @@ class StorageService:
     async def search_cognitive_memory(
             self,
             query: str,
-            agent_id: str,
+            agent_id: UUID,
             top_k: int = 5
     ) -> List[RetrievedMemory]:
         query_embedding = self.embedding_service.get_embeddings(query)
         top_k = top_k or self.config.top_k
 
-        safe_id = self.db._sanitize_table_name(agent_id)
-        agent_cognitive_table = f"agent_{safe_id}_cognitive"
+        agent_cognitive_table = self._get_agent_table_name(agent_id, "cognitive")
 
         rows = await self.db.fetch(f"""
             SELECT content,
@@ -604,7 +603,7 @@ class StorageService:
 
     async def search_episodic_memory(
         self,
-        agent_id: str,
+        agent_id: UUID,
         query: str,
         top_k: int = 5
     ) -> List[Dict[str, Any]]:
@@ -616,8 +615,7 @@ class StorageService:
             # Format the embedding vector for PostgreSQL
             vector_str = f"[{','.join(map(str, query_embedding))}]"
             
-            safe_id = self.db._sanitize_table_name(agent_id)
-            episodic_table = f"agent_{safe_id}_episodic"
+            episodic_table = self._get_agent_table_name(agent_id, "episodic")
 
             # Use the vector_str in the query
             results = await self.db.fetch(f"""
@@ -703,7 +701,7 @@ class StorageService:
             ORDER BY created_at ASC;
         """
 
-    def _build_memory_object(self, row: Dict[str, Any], agent_id: str) -> MemoryObject:
+    def _build_memory_object(self, row: Dict[str, Any], agent_id: UUID) -> MemoryObject:
         """Convert a database row to a MemoryObject."""
         try:
             memory_id = UUID(row["memory_id"])
@@ -729,7 +727,7 @@ class StorageService:
             self.logger.error(f"Error building MemoryObject: {str(e)}")
             raise
 
-    def _build_episodic_object(self, row: Dict[str, Any], agent_id: str) -> EpisodicMemoryObject:
+    def _build_episodic_object(self, row: Dict[str, Any], agent_id: UUID) -> EpisodicMemoryObject:
         """Convert a database row to an EpisodicMemoryObject."""
         try:
             memory_id = UUID(row["memory_id"])
@@ -780,6 +778,13 @@ class StorageService:
         if isinstance(obj, datetime):
             return obj.isoformat()
         raise TypeError(f'Object of type {type(obj)} is not JSON serializable')
+    
+    def _get_agent_table_name(self, agent_id: Union[str, UUID], memory_type: str) -> str:
+        """Get sanitized table name for an agent's memory type."""
+        agent_id_str = agent_id if isinstance(agent_id, str) else str(agent_id)
+        self.logger.debug(f"Converting agent_id of type {type(agent_id)} to string: {agent_id_str}")
+        sanitized_id = self.db._sanitize_table_name(agent_id_str)
+        return f"agent_{sanitized_id}_{memory_type}"
 
     async def store_ai_requests(self, requests: List[Dict[str, Any]]):
         """Store AI requests in the database."""

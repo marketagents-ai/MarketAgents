@@ -1,15 +1,15 @@
-import uuid
 import logging
 from typing import List, Dict, Any, Optional
 from market_agents.economics.econ_models import AgentWallet, BaseHoldings, BaseWallet, Portfolio
 from pydantic import BaseModel, Field
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
 class EconomicAgent(BaseModel):
-    id: Optional[str] = None 
+    id: Optional[UUID] = None
     rewards: List[float] = Field(default_factory=list)
     total_reward: float = 0.0
     wallet: Optional[BaseWallet] = None
