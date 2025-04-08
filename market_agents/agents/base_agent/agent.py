@@ -1,7 +1,8 @@
 import uuid
 import logging
 from typing import Optional, List, Union, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import Field
+from minference.lite.models import Entity
 
 from minference.lite.models import (
     EntityRegistry,
@@ -19,15 +20,11 @@ from market_agents.agents.base_agent.prompter import PromptManager
 EntityRegistry()
 agent_logger = logging.getLogger(__name__)
 
-class Agent(BaseModel):
+class Agent(Entity):
     """
     Base LLM-driven agent using ChatThread-based inference.
     """
 
-    id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Unique string identifier for the agent instance."
-    )
     role: str = Field(
         ...,
         description="Functional role of the agent (e.g., 'financial analyst')."
