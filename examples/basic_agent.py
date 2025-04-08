@@ -1,12 +1,10 @@
 import asyncio
-import os
-from pathlib import Path
+import json
 
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from market_agents.memory.config import AgentStorageConfig
 from market_agents.agents.personas.persona import Persona
-from market_agents.agents.cognitive_steps import ActionStep
 from market_agents.environments.mechanisms.chat import ChatEnvironment
 from minference.lite.models import LLMConfig, ResponseFormat
 
@@ -43,13 +41,11 @@ async def create_basic_agent():
     # Create agent
     agent = await MarketAgent.create(
         storage_utils=storage_utils,
-        agent_id="tech_analyst",
-        use_llm=True,
         llm_config=LLMConfig(
             model="gpt-4o-mini",
             client="openai",
             temperature=0.7,
-            response_format=ResponseFormat.text
+            response_format=ResponseFormat.tool
         ),
         environments={"chat": chat_env},
         persona=persona
@@ -76,12 +72,10 @@ async def execute_agent_task(agent, question):
     result = await agent.run_step()
     
     if isinstance(result, dict):
-        response = result.get('action', 'No response generated.')
+        print(f"Response: {json.dumps(result, indent=2)}")
     else:
-        response = result
-    
-    print(f"Response: {response}")
-    return response
+        print(f"Response: {result}")
+    return result
 
 async def main():
     # Create a basic agent
