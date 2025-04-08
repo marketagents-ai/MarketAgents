@@ -229,17 +229,14 @@ class ActionStep(CognitiveStep):
                 agent.chat_thread.llm_config.response_format = ResponseFormat.auto_tools
                 print(f"Chat thread after setup: format={agent.chat_thread.llm_config.response_format}, tools={[t.name for t in agent.chat_thread.tools if t]}")
             # Single tool mode
-            elif len(allowed_actions) == 1 or len(tools) == 1:
+            elif allowed_actions == 1 and isinstance(allowed_actions[0], CallableTool):
                 agent.chat_thread.llm_config.response_format = ResponseFormat.tool
-                if len(allowed_actions) == 1:
-                    agent.chat_thread.tools = allowed_actions
-                    agent.chat_thread.forced_output = allowed_actions[0]
-                else:
-                    agent.chat_thread.tools = tools
-                    agent.chat_thread.forced_output = tools[0]
-            elif allowed_actions and isinstance(allowed_actions[0], CallableTool):
                 agent.chat_thread.forced_output = allowed_actions[0]
                 agent.chat_thread.tools = allowed_actions
+            elif len(tools) == 1:
+                agent.chat_thread.llm_config.response_format = ResponseFormat.tool
+                agent.chat_thread.tools = tools
+                agent.chat_thread.forced_output = tools[0]
             # String action mode
             elif not allowed_actions or (len(allowed_actions) == 1 and allowed_actions[0] == StrAction):
                 agent.chat_thread.llm_config.response_format = ResponseFormat.text
