@@ -1,46 +1,38 @@
-import asyncio
 import json
-
+import asyncio
 from market_agents.agents.market_agent import MarketAgent
-from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
-from market_agents.memory.config import AgentStorageConfig
 from market_agents.agents.personas.persona import Persona
 from market_agents.environments.mechanisms.chat import ChatEnvironment
+from market_agents.memory.config import AgentStorageConfig
+from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from minference.lite.models import LLMConfig, ResponseFormat
 
-async def create_basic_agent():
+async def main():
     """
-    Create a basic market agent with a simple persona.
+    Market Agent with a research analyst persona.
     """
-    # Configure storage
+    # Initialize storage
     storage_config = AgentStorageConfig(
         model="text-embedding-3-small",
         embedding_provider="openai",
-        vector_dim=256,
-        stm_top_k=2,
-        ltm_top_k=1,
-        kb_top_k=3,
+        vector_dim=256
     )
-    
-    # Initialize storage utilities
     storage_utils = AgentStorageAPIUtils(config=storage_config)
+    
+    # Create chat environment
+    chat_env = ChatEnvironment(name="market_chat")
     
     # Create persona
     persona = Persona(
         role="Research Analyst",
-        persona="I am a research analyst specializing in technology trends and market analysis.",
+        persona="You are a market research analyst specializing in technology sector analysis.",
         objectives=[
-            "Analyze emerging technology trends",
-            "Provide insights on market developments",
             "Identify investment opportunities in the tech sector"
         ]
     )
-
-    chat_env = ChatEnvironment(name="market_chat")
-    
     # Create agent
     agent = await MarketAgent.create(
-        storage_utils=storage_utils,
+        persona=persona,
         llm_config=LLMConfig(
             model="gpt-4o-mini",
             client="openai",
@@ -48,48 +40,18 @@ async def create_basic_agent():
             response_format=ResponseFormat.tool
         ),
         environments={"chat": chat_env},
-        persona=persona
-    )
-    
-    print(f"Created agent with ID: {agent.id}")
-    print(f"Role: {agent.role}")
-    print(f"Persona: {agent.persona}")
-    print(f"Objectives: {agent.objectives}")
-    
-    return agent
+        storage_utils=storage_utils,
+    )  
+    # Assign a task to the agent
+    agent.task = "Key factors to consider when evaluating semiconductor stocks."
 
-async def execute_agent_task(agent, question):
-    """
-    Ask the agent a question and get a response.
-    """
-    print(f"\nQuestion: {question}")
-    print("-" * 80)
-    
-    # Set the agent's task (question)
-    agent.task = question
-    
-    # Run an action step to get the response
-    result = await agent.run_step()
-    
-    if isinstance(result, dict):
-        print(f"Response: {json.dumps(result, indent=2)}")
-    else:
-        print(f"Response: {result}")
-    return result
+    # Run a single action step
+    #step_result = await agent.run_step()
+    #print(f"Response: {json.dumps(step_result, indent=2)}")
 
-async def main():
-    # Create a basic agent
-    agent = await create_basic_agent()
-    
-    # Ask the agent some questions
-    tasks = [
-        "Explain how network effects and market dynamics typically influence the growth of technology platforms.",
-        "Analyze the general relationship between interest rates and growth stock valuations in technology sectors.",
-        "What are the key factors to consider when evaluating semiconductor companies' competitive advantages?"
-    ]
-    
-    for task in tasks:
-        await execute_agent_task(agent, task)
+    # Run a full cognitive episode [Perception > Action > Reflection]
+    episode_result = await agent.run_episode()
+    print(f"Response: {json.dumps(episode_result, indent=2)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
