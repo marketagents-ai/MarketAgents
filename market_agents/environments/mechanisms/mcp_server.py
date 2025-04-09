@@ -691,6 +691,10 @@ class MCPServerEnvironment(MultiAgentEnvironment):
             
         logger.info("MCPServerEnvironment initialization complete")
 
+    def get_tools(self) -> Dict[str, Any]:
+        """Get a dictionary of all available tools, indexed by name."""
+        return {tool.name: tool for tool in self.action_space.allowed_actions}
+
     def get_global_state(self, agent_id: Optional[str] = None) -> Dict[str, Any]:
         """Return the environment's global state from mechanism"""
         return self.mechanism.get_global_state(agent_id)
