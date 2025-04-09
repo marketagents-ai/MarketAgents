@@ -14,7 +14,7 @@ from market_agents.agents.market_agent_prompter import MarketAgentPromptManager
 from market_agents.agents.personas.persona import Persona
 from market_agents.economics.econ_agent import EconomicAgent
 from minference.lite.inference import InferenceOrchestrator
-from minference.lite.models import LLMConfig
+from minference.lite.models import LLMConfig, CallableTool, StructuredTool
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
 from market_agents.memory.knowledge_base_agent import KnowledgeBaseAgent
 from market_agents.memory.memory import LongTermMemory, MemoryObject, ShortTermMemory
@@ -89,11 +89,12 @@ class MarketAgent(Agent):
     async def create(
         cls,
         storage_utils: AgentStorageAPIUtils,
+        persona: Optional[Persona] = None,
         llm_config: Optional[LLMConfig] = None,
+        tools: Optional[List[Union[CallableTool, StructuredTool]]] = None, 
         ai_utils: Optional[InferenceOrchestrator] = None,
         environments: Optional[Dict[str, MultiAgentEnvironment]] = None,
         protocol: Optional[Type[Protocol]] = None,
-        persona: Optional[Persona] = None,
         econ_agent: Optional[EconomicAgent] = None,
         knowledge_agent: Optional[KnowledgeBaseAgent] = None,
         reward_function: Optional[BaseRewardFunction] = None,
@@ -105,6 +106,7 @@ class MarketAgent(Agent):
             persona=persona.persona if persona else None,
             objectives=persona.objectives if persona else None,
             llm_config=llm_config or LLMConfig(),
+            tools=tools or [],
             environments=environments or {},
             protocol=protocol,
             rl_agent=VerbalRLAgent(reward_function=reward_function) if reward_function else VerbalRLAgent()
