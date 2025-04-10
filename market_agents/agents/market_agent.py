@@ -27,7 +27,11 @@ logger = logging.getLogger(__name__)
 
 class MarketAgent(Agent):
     """Market agent with cognitive capabilities and memory management."""
-    
+
+    role: str = Field(
+        default="AI Assistant",
+        description="Professional role in market context (e.g., 'Research Analyst')"
+    )   
     short_term_memory: ShortTermMemory = Field(
         default=None,
         description="Short-term memory storage for recent cognitive stps"
@@ -66,7 +70,7 @@ class MarketAgent(Agent):
     )
     address: str = Field(
         default="",
-        description="Agent's address for communication purposes"
+        description="Agent's endpoint for communication, task assignment etc"
     )
     knowledge_agent: Optional[KnowledgeBaseAgent] = Field(
         default=None,
@@ -89,7 +93,9 @@ class MarketAgent(Agent):
     async def create(
         cls,
         storage_utils: AgentStorageAPIUtils,
+        name: str,
         persona: Optional[Persona] = None,
+        task: Optional[str] = None,
         llm_config: Optional[LLMConfig] = None,
         tools: Optional[List[Union[CallableTool, StructuredTool]]] = None, 
         ai_utils: Optional[InferenceOrchestrator] = None,
@@ -99,12 +105,11 @@ class MarketAgent(Agent):
         knowledge_agent: Optional[KnowledgeBaseAgent] = None,
         reward_function: Optional[BaseRewardFunction] = None,
     ) -> 'MarketAgent':
-        # Create base agent with fields that don't need agent.id
         agent = cls(
+            name=name,
+            persona=persona,
+            task=task,
             llm_orchestrator=ai_utils or InferenceOrchestrator(),
-            role=persona.role if persona else "AI agent",
-            persona=persona.persona if persona else None,
-            objectives=persona.objectives if persona else None,
             llm_config=llm_config or LLMConfig(),
             tools=tools or [],
             environments=environments or {},
@@ -112,7 +117,6 @@ class MarketAgent(Agent):
             rl_agent=VerbalRLAgent(reward_function=reward_function) if reward_function else VerbalRLAgent()
         )
 
-        # Initialize everything that needs agent.id
         agent.short_term_memory = ShortTermMemory(
             agent_id=agent.id,
             agent_storage_utils=storage_utils,
@@ -127,11 +131,11 @@ class MarketAgent(Agent):
         )
         await agent.long_term_memory.initialize()
 
+        agent.role = persona.role if persona else "AI Agent"
         agent.address = f"agent/{str(agent.id)}"
         agent.economic_agent = econ_agent
         agent.knowledge_agent = knowledge_agent
 
-        # Propagate ID to sub-components
         if agent.economic_agent:
             agent.economic_agent.id = agent.id
         if agent.knowledge_agent:
