@@ -5,7 +5,7 @@ from market_agents.agents.personas.persona import Persona
 from market_agents.environments.mechanisms.chat import ChatEnvironment
 from market_agents.memory.config import AgentStorageConfig
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
-from minference.lite.models import LLMConfig, ResponseFormat
+from minference.lite.models import LLMConfig, ResponseFormat, LLMClient
 
 async def main():
     """
@@ -22,36 +22,42 @@ async def main():
     # Create chat environment
     chat_env = ChatEnvironment(name="market_chat")
     
-    # Create persona
+    # Create agent persona
     persona = Persona(
         role="Research Analyst",
         persona="You are a market research analyst specializing in technology sector analysis.",
         objectives=[
-            "Identify investment opportunities in the tech sector"
+            "Provide actionable insights based on market research"
+        ],
+        skills=[
+            "Technology Sector Analysis",
+            "Market Research",
         ]
     )
+
     # Create agent
     agent = await MarketAgent.create(
+        name="tech-analyst",
         persona=persona,
         llm_config=LLMConfig(
+            client=LLMClient.openai,
             model="gpt-4o-mini",
-            client="openai",
             temperature=0.7,
             response_format=ResponseFormat.tool
         ),
+        task="What are the key factors to consider when evaluating semiconductor stocks.",
         environments={"chat": chat_env},
-        storage_utils=storage_utils,
-    )  
-    # Assign a task to the agent
-    agent.task = "Key factors to consider when evaluating semiconductor stocks."
-
-    # Run a single action step
-    #step_result = await agent.run_step()
-    #print(f"Response: {json.dumps(step_result, indent=2)}")
+        storage_utils=storage_utils
+    )
 
     # Run a full cognitive episode [Perception > Action > Reflection]
     episode_result = await agent.run_episode()
-    print(f"Response: {json.dumps(episode_result, indent=2)}")
+    
+    # Pretty print the results
+    print("\n=== Cognitive Episode Results ===")
+    for i, result in enumerate(episode_result):
+        print(f"\nStep {i+1}:")
+        print(json.dumps(result, indent=2))
 
 if __name__ == "__main__":
     asyncio.run(main())
