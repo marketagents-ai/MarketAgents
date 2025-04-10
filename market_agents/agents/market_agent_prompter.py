@@ -4,12 +4,12 @@ from pydantic import Field
 from pathlib import Path
 
 from market_agents.agents.base_agent.prompter import (
-    BasePromptVariables,
-    BasePromptTemplate,
+    PromptVariables,
+    PromptTemplate,
     PromptManager
 )
 
-class MarketAgentPromptVariables(BasePromptVariables):
+class MarketAgentPromptVariables(PromptVariables):
     """Variables specific to market agent prompts."""
     environment_name: str = Field(
         ...,
@@ -57,7 +57,7 @@ class MarketAgentPromptVariables(BasePromptVariables):
     class Config:
         arbitrary_types_allowed = True
 
-class MarketAgentPromptTemplate(BasePromptTemplate):
+class MarketAgentPromptTemplate(PromptTemplate):
     """Template loader for market agent prompts."""
     template_path: Path = Field(
         default_factory=lambda: Path(ires.files("market_agents.agents.configs.prompts") / "market_agent_prompt.yaml"),
@@ -69,7 +69,6 @@ class MarketAgentPromptManager(PromptManager):
     
     def __init__(self, template_paths: Optional[List[Path]] = None):
         default_paths = [
-            Path(ires.files("market_agents.agents.configs.prompts") / "default_prompt.yaml"),
             Path(ires.files("market_agents.agents.configs.prompts") / "market_agent_prompt.yaml")
         ]
         super().__init__(template_paths=template_paths if template_paths else default_paths)
@@ -77,14 +76,32 @@ class MarketAgentPromptManager(PromptManager):
     def get_perception_prompt(self, variables: Dict[str, Any]) -> str:
         """Generate perception analysis prompt."""
         vars_model = MarketAgentPromptVariables(**variables)
-        return self.template.format_prompt('perception', vars_model)
+        template_vars = vars_model.get_template_vars()
+        
+        # Get perception template
+        perception_template = self.template.templates.get('perception', '')
+        
+        # Format template with variables
+        return perception_template.format(**template_vars)
 
     def get_action_prompt(self, variables: Dict[str, Any]) -> str:
         """Generate action selection prompt."""
         vars_model = MarketAgentPromptVariables(**variables)
-        return self.template.format_prompt('action', vars_model)
+        template_vars = vars_model.get_template_vars()
+        
+        # Get action template
+        action_template = self.template.templates.get('action', '')
+        
+        # Format template with variables
+        return action_template.format(**template_vars)
 
     def get_reflection_prompt(self, variables: Dict[str, Any]) -> str:
         """Generate strategy reflection prompt."""
         vars_model = MarketAgentPromptVariables(**variables)
-        return self.template.format_prompt('reflection', vars_model)
+        template_vars = vars_model.get_template_vars()
+        
+        # Get reflection template
+        reflection_template = self.template.templates.get('reflection', '')
+        
+        # Format template with variables
+        return reflection_template.format(**template_vars)
