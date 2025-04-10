@@ -1,3 +1,4 @@
+# market_agents/agents/personas/persona.py
 from pydantic import BaseModel, Field
 from typing import List, Optional, Union, Dict, Any
 import yaml
@@ -6,11 +7,7 @@ from pathlib import Path
 import names
 
 class Persona(BaseModel):
-    name: Optional[str] = Field(
-        default=None,
-        description="Optional name of the persona"
-    )
-    
+   
     role: str = Field(
         ...,
         description="Primary role or function of the agent (e.g., 'Research Analyst', 'Market Maker')"
@@ -25,6 +22,11 @@ class Persona(BaseModel):
         ...,
         description="List of primary goals and objectives the agent aims to achieve",
         min_items=1
+    )
+    
+    skills: Optional[Union[List[str], List[Dict[str, Any]]]] = Field(
+        default_factory=list,
+        description="List of skills as either strings or dictionaries with details"
     )
 
 def generate_persona() -> Persona:
