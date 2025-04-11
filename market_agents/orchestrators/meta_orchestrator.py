@@ -138,10 +138,12 @@ class MetaOrchestrator:
                 for k, v in llm_config.items()
             }
 
+            persona_dict = agent.persona.model_dump() if agent.persona else {}
+
             agent_data = {
                 'id': agent.id,
                 'role': getattr(agent, 'role', 'participant'),
-                'persona': agent.persona,
+                'persona': persona_dict,
                 'is_llm': True,
                 'max_iter': 0,
                 'llm_config': llm_config,
