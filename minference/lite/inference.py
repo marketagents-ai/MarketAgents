@@ -129,10 +129,13 @@ async def run_parallel_ai_completion(
     continuing_thread_ids = set()
     for chat_thread in chat_threads:
         if (chat_thread.llm_config.response_format == ResponseFormat.workflow and 
-            chat_thread.workflow_step is not None and 
-            chat_thread.workflow_step < len(chat_thread.tools)):
-            continuing_thread_ids.add(chat_thread.id)
-            print(f"Thread {chat_thread.id} continuing workflow at step {chat_thread.workflow_step}")
+            chat_thread.workflow_step is not None):
+            if chat_thread.workflow_step >= len(chat_thread.tools):
+                # Workflow completed, reset step
+                chat_thread.workflow_step = None
+            elif chat_thread.workflow_step < len(chat_thread.tools):
+                continuing_thread_ids.add(chat_thread.id)
+                print(f"Thread {chat_thread.id} continuing workflow at step {chat_thread.workflow_step}")
     
     if continuing_thread_ids:
         # Only return outputs for non-continuing threads
