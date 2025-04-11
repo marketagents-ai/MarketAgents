@@ -118,7 +118,7 @@ class MarketAgentTeam(BaseModel):
                                 "agent_id": {
                                     "type": "string",
                                     "description": "ID of the agent to assign the subtask",
-                                    "enum": [agent.id for agent in self.agents]
+                                    "enum": [str(agent.id) for agent in self.agents]
                                 },
                                 "subtask": {
                                     "type": "string",
