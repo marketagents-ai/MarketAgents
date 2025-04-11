@@ -10,26 +10,14 @@ from typing import Dict, Any
 async def create_hedge_fund_team() -> MarketAgentTeam:
     """Create a hierarchical hedge fund team with specialized agents."""
     
-    # Load storage config
-    storage_config = load_config_from_yaml("market_agents/memory/storage_config.yaml")
-    storage_utils = AgentStorageAPIUtils(config=storage_config)
-
     # Create Portfolio Manager Persona
     portfolio_manager_persona = Persona(
-        name="Sarah Chen",
         role="Portfolio Manager",
         persona="Experienced investment professional with strong risk management background",
         objectives=[
             "Analyze team insights and make final investment decisions",
             "Manage portfolio risk and allocation",
             "Coordinate team analysis efforts"
-        ],
-        trader_type=["Expert", "Moderate", "Rational"],
-        communication_style="Direct",
-        routines=[
-            "Review team analyses",
-            "Make portfolio decisions",
-            "Monitor risk metrics"
         ],
         skills=[
             "Portfolio management",
@@ -40,9 +28,8 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
 
     # Create Portfolio Manager
     portfolio_manager = await MarketAgent.create(
-        storage_utils=storage_utils,
-        agent_id="portfolio_manager",
-        use_llm=True,
+        name="portfolio_manager",
+        persona=portfolio_manager_persona,
         llm_config=LLMConfig(
             model="gpt-4o",
             client="openai",
@@ -50,7 +37,6 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
             temperature=0.3,
             use_cache=True
         ),
-        persona=portfolio_manager_persona,
         econ_agent=EconomicAgent(
             generate_wallet=True,
             initial_holdings={"USDC": 10000000.0}
@@ -59,20 +45,12 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
 
     # Create Fundamental Analyst Persona
     fundamental_analyst_persona = Persona(
-        name="Michael Wong",
         role="Fundamental Analysis Specialist",
         persona="Detail-oriented financial analyst focused on company fundamentals",
         objectives=[
             "Analyze financial statements and metrics",
             "Evaluate business models and competitive positions",
             "Assess company valuations and fair value estimates"
-        ],
-        trader_type=["Expert", "Conservative", "Rational"],
-        communication_style="Formal",
-        routines=[
-            "Review financial statements",
-            "Conduct company research",
-            "Build valuation models"
         ],
         skills=[
             "Financial analysis",
@@ -83,35 +61,25 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
 
     # Create Fundamental Analyst
     fundamental_analyst = await MarketAgent.create(
-        storage_utils=storage_utils,
-        agent_id="fundamental_analyst",
-        use_llm=True,
+        name="fundamental_analyst",
+        persona=fundamental_analyst_persona,
         llm_config=LLMConfig(
             model="gpt-4o",
             client="openai",
             response_format=ResponseFormat.tool,
             temperature=0.2,
             use_cache=True
-        ),
-        persona=fundamental_analyst_persona
+        )
     )
 
     # Create Technical Analyst Persona
     technical_analyst_persona = Persona(
-        name="Alex Rodriguez",
         role="Technical Analysis Specialist",
         persona="Experienced technical trader focused on price patterns",
         objectives=[
             "Analyze price trends and patterns",
             "Identify key support/resistance levels",
             "Generate trading signals based on technical indicators"
-        ],
-        trader_type=["Expert", "Aggressive", "Impulsive"],
-        communication_style="Direct",
-        routines=[
-            "Monitor price charts",
-            "Update technical indicators",
-            "Track market momentum"
         ],
         skills=[
             "Technical analysis",
@@ -122,9 +90,8 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
 
     # Create Technical Analyst
     technical_analyst = await MarketAgent.create(
-        storage_utils=storage_utils,
-        agent_id="technical_analyst",
-        use_llm=True,
+        name="technical_analyst",
+        persona=technical_analyst_persona,
         llm_config=LLMConfig(
             model="gpt-4o",
             client="openai",
@@ -132,25 +99,16 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
             temperature=0.2,
             use_cache=True
         ),
-        persona=technical_analyst_persona
     )
 
     # Create Macro Analyst Persona
     macro_analyst_persona = Persona(
-        name="Emma Thompson",
         role="Macro Research Specialist",
         persona="Global macro analyst focused on economic trends",
         objectives=[
             "Monitor global economic indicators",
             "Analyze central bank policies and implications",
             "Assess geopolitical risks and market impacts"
-        ],
-        trader_type=["Expert", "Moderate", "Rational"],
-        communication_style="Formal",
-        routines=[
-            "Review economic data",
-            "Monitor policy changes",
-            "Analyze global trends"
         ],
         skills=[
             "Economic analysis",
@@ -161,9 +119,8 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
 
     # Create Macro Analyst
     macro_analyst = await MarketAgent.create(
-        storage_utils=storage_utils,
-        agent_id="macro_analyst",
-        use_llm=True,
+        name="macro_analyst",
+        persona=macro_analyst_persona,
         llm_config=LLMConfig(
             model="gpt-4o",
             client="openai",
@@ -171,25 +128,16 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
             temperature=0.2,
             use_cache=True
         ),
-        persona=macro_analyst_persona
     )
 
     # Create Risk Analyst Persona
     risk_analyst_persona = Persona(
-        name="David Kumar",
         role="Risk Management Specialist",
         persona="Risk-focused analyst specializing in portfolio risk assessment",
         objectives=[
             "Monitor portfolio risk metrics",
             "Analyze position sizing and leverage",
             "Assess market volatility and correlation risks"
-        ],
-        trader_type=["Expert", "Conservative", "Rational"],
-        communication_style="Direct",
-        routines=[
-            "Calculate risk metrics",
-            "Monitor exposures",
-            "Update risk models"
         ],
         skills=[
             "Risk modeling",
@@ -200,30 +148,25 @@ async def create_hedge_fund_team() -> MarketAgentTeam:
 
     # Create Risk Analyst
     risk_analyst = await MarketAgent.create(
-        storage_utils=storage_utils,
-        agent_id="risk_analyst",
-        use_llm=True,
+        name="risk_analyst",
+        persona=risk_analyst_persona,
         llm_config=LLMConfig(
             model="gpt-4o",
             client="openai",
             response_format=ResponseFormat.tool,
             temperature=0.2,
             use_cache=True
-        ),
-        persona=risk_analyst_persona
+        )
     )
 
     # Define environment orchestrators
     mcp_finance = {
         "name": "mcp_finance",
         "mechanism": "mcp_server",
-        "api_url": "local://mcp_server",
         "mcp_server_module": "market_agents.orchestrators.mcp_server.finance_mcp_server",
-        "mcp_server_class": "mcp",
         "form_cohorts": False,
         "sub_rounds": 2,
-        "group_size": 5,
-        "task_prompt": ""
+        "group_size": 5
     }
 
     # Create the hedge fund team with environments
