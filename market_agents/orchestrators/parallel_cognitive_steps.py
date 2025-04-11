@@ -41,9 +41,9 @@ class ParallelCognitiveProcessor:
                 self.logger.warning(f"Failed to serialize content: {e}")
         return str(content)
 
-    def _get_safe_id(self, agent_id: str) -> str:
-        """Sanitize agent ids if needed for dictionary keys."""
-        return agent_id.replace("-", "_")
+    def _get_safe_id(self, agent_id):
+        """Convert agent ID to a safe string format for file names."""
+        return str(agent_id).replace("-", "_")
     
     def get_all_requests(self):
         requests = self.ai_utils.all_requests
