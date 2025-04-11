@@ -1,8 +1,7 @@
 import asyncio
 import json
-from typing import Dict, Any, Optional, List
-from uuid import UUID
-from datetime import datetime
+from typing import List
+from pydantic import BaseModel, Field
 
 from market_agents.agents.market_agent import MarketAgent
 from market_agents.memory.agent_storage.agent_storage_api_utils import AgentStorageAPIUtils
@@ -10,7 +9,41 @@ from market_agents.memory.config import AgentStorageConfig
 from market_agents.agents.personas.persona import Persona
 from market_agents.environments.mechanisms.mcp_server import MCPServerEnvironmentConfig, MCPServerActionSpace
 from market_agents.workflows.workflow_utils import setup_mcp_environment
-from minference.lite.models import LLMConfig, ResponseFormat
+from minference.lite.models import LLMConfig, ResponseFormat, StructuredTool
+
+class StockAnalysisOutput(BaseModel):
+    ticker: str = Field(
+        default="<ticker>",
+        description="The stock ticker symbol."
+    )
+    stock_rating: str = Field(
+        default="<rating>; <analyst_rationale>",
+        description="The stock rating and analyst rationale separated by semicolon (;). Stock ratings from analysts such as Buy, Strong Sell, Hold, Outperform, Overweight etc."
+    )
+    target_price: str = Field(
+        default="<price>",
+        description="The target stock price mentioned in documents."
+    )
+    sentiment: str = Field(
+        default="<sentiment>",
+        description="The NLP based sentiment towards the stock."
+    )
+    key_catalysts: List[str] = Field(
+        default=[
+            "<catalyst_1>; <comment>"
+        ],
+        description="List of top 4 key catalysts with comments separated by semicolon (;). Do not repeat kpis here. Provide qualitative metrics here"
+    )
+    key_kpis: List[str] = Field(
+        default=[
+            "<kpi_1>; <comment>",
+        ],
+        description="List of top 4 key performance indicators with comments separated by semicolon (;). Do not reapeat catalysts here. Provide quantitative metrics here"
+    )
+    portfolio_action: str = Field(
+        default="<long_short_action>; <reason>",
+        description="Portfolio action with reason separated by semicolon (;). Portfolio recommendations such as Add Long, Reduce Long, Close Long, Add Short, Reduce Short, Close Short etc."
+    )
 
 async def main():
     """
@@ -42,13 +75,21 @@ async def main():
         "get_technical_indicators",
         "get_analyst_recommendations"
     ]
-    
+
     # Extract the specific tools we want
-    selected_mcp_tools = [tools[name] for name in selected_tool_names if name in tools]
+    selected_tools = [tools[name] for name in selected_tool_names if name in tools]
+
+    stock_analysis_tool = StructuredTool.from_pydantic(
+        model=StockAnalysisOutput,
+        name="stock_analysis_summary",
+        description="Generate a structured stock analysis summary with ratings, catalysts, KPIs, and portfolio actions"
+    )
+
+    selected_tools.append(stock_analysis_tool)
 
     finance_mcp.action_space = MCPServerActionSpace(
         mechanism=finance_mcp.mechanism,
-        selected_tools=selected_mcp_tools,
+        selected_tools=selected_tools,
         workflow=True
     )
     
@@ -61,12 +102,16 @@ async def main():
             "Evaluate securities based on fundamental and technical factors",
             "Monitor market trends and economic indicators",
             "Generate investment ideas and recommendations"
+        ],
+        skills=[
+            "Fundamental Analysis", "Technical Analysis", "Risk Assessment", "Valuation Methods", "Industry Analysis"
         ]
     )
 
     # Create agent with MCP server environment
     print("Creating investment analyst agent...")
     agent = await MarketAgent.create(
+        name="investment-analyst",
         persona=investment_analyst_persona,
         llm_config=LLMConfig(
             model="gpt-4o-mini",
@@ -75,7 +120,7 @@ async def main():
             response_format=ResponseFormat.workflow
         ),
         environments={"finance": finance_mcp},
-        tools=selected_mcp_tools,
+        tools=selected_tools,
         storage_utils=storage_utils,
     )
     
@@ -98,8 +143,8 @@ async def main():
     print("-" * 80)
     
     # Run a step or an entire episode
-    results = await agent.run_step()
-    #results = await agent.run_episode()
+    #results = await agent.run_step()
+    results = await agent.run_episode()
     
     # Display results
     print(f"\nInvestment Analysis Results for {ticker}:")
