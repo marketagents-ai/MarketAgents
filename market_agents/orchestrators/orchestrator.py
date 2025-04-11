@@ -1,5 +1,5 @@
 # orchestrator.py
-
+import uuid
 import asyncio
 from datetime import datetime, timezone
 from importlib import import_module
@@ -224,7 +224,8 @@ class MultiAgentOrchestrator:
         )
         
         for agent, perception in zip(agents, perceptions or []):
-            log_persona(self.logger, agent.id, agent.persona)
+            persona_str = agent.persona.persona if agent.persona else str(agent.persona)
+            log_persona(self.logger, agent.id, persona_str)
             content = None
             if perception and perception.json_object:
                 content = perception.json_object.object
@@ -306,29 +307,27 @@ class MultiAgentOrchestrator:
                 else:
                     action_content = {}
                     
-                # Create LocalAction with raw dict content
-                local_actions[agent.id] = OrchestratorLocalAction(
-                    agent_id=agent.id, 
+                # Convert UUID to string for agent_id
+                agent_id_str = str(agent.id)
+                    
+                # Create LocalAction with string agent_id
+                local_actions[agent_id_str] = OrchestratorLocalAction(
+                    agent_id=agent_id_str,  # Use string version of UUID
                     action=action_content
                 )
             except Exception as e:
-                self.logger.error(f"Error creating global action for agent {agent.id}: {e}", exc_info=True)
-                local_actions[agent.id] = OrchestratorLocalAction(
-                    agent_id=agent.id, 
+                self.logger.error(f"Error creating global action for agent {agent.id}: {e}")
+                # Use string version in fallback case too
+                agent_id_str = str(agent.id)
+                local_actions[agent_id_str] = OrchestratorLocalAction(
+                    agent_id=agent_id_str,
                     action={}
                 )
         
         return GlobalAction(actions=local_actions)
 
-    async def _update_agent_observations(
-        self, 
-        step_result: EnvironmentStep, 
-        agent_summaries: Dict[str, Any],
-        agents: List[Any]
-    ):
-        """Update agent observations based on the environment's step result."""
+    async def _update_agent_observations(self, step_result: EnvironmentStep, agent_summaries: Dict[str, Any], agents: List[Any]):
         try:
-            # Update global observation with current round's actions
             if (step_result.global_observation and 
                 hasattr(step_result.global_observation, 'all_actions_this_round')):
                 step_result.global_observation.all_actions_this_round = agent_summaries
@@ -336,15 +335,14 @@ class MultiAgentOrchestrator:
             # Update individual agent observations
             if step_result.global_observation:
                 for agent in agents:
-                    if agent.id in step_result.global_observation.observations:
-                        agent.last_observation = step_result.global_observation.observations[agent.id]
-                        self.logger.debug(
-                            f"Updated observation for agent {agent.id}: {agent.last_observation}"
-                        )
+                    # Convert UUID to string for comparison
+                    agent_id_str = str(agent.id)
+                    if agent_id_str in step_result.global_observation.observations:
+                        agent.last_observation = step_result.global_observation.observations[agent_id_str]
+                        self.logger.debug(f"Updated observation for agent {agent_id_str}: {agent.last_observation}")
                     else:
-                        self.logger.warning(f"No observation for agent {agent.id}")
+                        self.logger.warning(f"No observation for agent {agent_id_str}")
                         agent.last_observation = None
-
         except Exception as e:
             self.logger.error(f"Error in _update_agent_observations: {e}")
             raise
@@ -359,7 +357,7 @@ class MultiAgentOrchestrator:
             self.logger.info("=== Agent Observations Before Reflection ===")
             for agent in agents:
                 self.logger.info(
-                    f"Agent {agent.id}:"
+                    f"Agent {str(agent.id)}:"  # Convert UUID to string
                     f"\nlast_observation: {agent.last_observation}"
                 )
 
@@ -374,9 +372,9 @@ class MultiAgentOrchestrator:
             if not agents_with_observations:
                 self.logger.info("No agents had observations to reflect on")
                 self.logger.info("Agents without observations: " + 
-                                ", ".join(agent.id for agent in agents))
+                                ", ".join(str(agent.id) for agent in agents))
                 return
-                
+                    
             self.logger.info(f"Running reflection for {len(agents_with_observations)} agents")
             reflections = await self.cognitive_processor.run_parallel_reflection(
                 agents_with_observations,
@@ -387,10 +385,20 @@ class MultiAgentOrchestrator:
                 self.logger.info(f"Received {len(reflections)} reflections")
             else:
                 self.logger.info("No reflections received")
-                    
+                        
         except Exception as e:
             self.logger.error(f"Error during reflection step: {str(e)}", exc_info=True)
             self.logger.exception("Reflection step failed but continuing...")
+
+    def _convert_uuids_to_strings(self, obj):
+        """Recursively convert all UUIDs to strings in a nested structure."""
+        if isinstance(obj, dict):
+            return {k: self._convert_uuids_to_strings(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_uuids_to_strings(item) for item in obj]
+        elif isinstance(obj, uuid.UUID):
+            return str(obj)
+        return obj
 
     async def process_round_results(self, round_num: int, sub_round: int, cohort_agents: Optional[List[Any]] = None):
         """Process and store results for the round."""
@@ -400,7 +408,7 @@ class MultiAgentOrchestrator:
             for agent in agents:
                 if hasattr(agent, 'last_action') and agent.last_action:
                     actions_data.append({
-                        'agent_id': agent.id,
+                        'agent_id': str(agent.id),
                         'environment_name': self.config.name,
                         'round': round_num,
                         'sub_round': sub_round,
@@ -413,17 +421,24 @@ class MultiAgentOrchestrator:
             # Get environment state for each agent in cohort
             if hasattr(self.environment, 'get_global_state'):
                 for agent in agents:
-                    env_state = self.environment.get_global_state(agent_id=agent.id)
+                    # Get and convert environment state
+                    env_state = self.environment.get_global_state(agent_id=str(agent.id))
+                    env_state = self._convert_uuids_to_strings(env_state)
+                    
+                    # Convert config to dict and handle UUIDs
                     config_dict = self.orchestrator_config.model_dump() if hasattr(self.orchestrator_config, 'model_dump') else vars(self.orchestrator_config)
+                    config_dict = self._convert_uuids_to_strings(config_dict)
+                    
                     metadata = {
                         'config': config_dict,
                         'timestamp': datetime.now(timezone.utc).isoformat(),
                         'num_agents': len(agents),
                         'sub_round': sub_round,
-                        'agent_id': agent.id
+                        'agent_id': str(agent.id)
                     }
+                    
                     await self.data_inserter.insert_environment_state(self.config.name, round_num, env_state, metadata)
-            self.logger.info(f"Data for round {round_num}, sub-round {sub_round} inserted.")
+                self.logger.info(f"Data for round {round_num}, sub-round {sub_round} inserted.")
         except Exception as e:
             self.logger.error(f"Error processing round {round_num} results: {e}", exc_info=True)
             raise
@@ -494,7 +509,7 @@ class MultiAgentOrchestrator:
                         try:
                             jsonl_entry = {
                                 "cohort": cohort_id,
-                                "agent_id": agent.id,
+                                "agent_id": str(agent.id),
                                 "last_action": agent.last_action if isinstance(agent.last_action, dict) else json.loads(agent.last_action)
                             }
                             print(f"{PINK}{json.dumps(jsonl_entry)}{RESET}")
@@ -507,7 +522,7 @@ class MultiAgentOrchestrator:
                 if agent.last_action:
                     try:
                         jsonl_entry = {
-                            "agent_id": agent.id,
+                            "agent_id": str(agent.id),
                             "last_action": agent.last_action if isinstance(agent.last_action, dict) else json.loads(agent.last_action)
                         }
                         print(f"{PINK}{json.dumps(jsonl_entry)}{RESET}")
@@ -520,7 +535,7 @@ class MultiAgentOrchestrator:
             for cohort_id, cohort_agents in self.environment.mechanism.cohorts.items():
                 print(f"\n{TEAL}Cohort {cohort_id}:{RESET}")
                 for agent in cohort_agents:
-                    print(f"\n{TEAL}Agent {agent.id}:{RESET}")
+                    print(f"\n{TEAL}Agent {str(agent.id)}:{RESET}")
                     if agent.last_action:
                         try:
                             if isinstance(agent.last_action, dict):
@@ -533,7 +548,7 @@ class MultiAgentOrchestrator:
                         print(f"{TEAL}Last action = None{RESET}")
         else:
             for agent in self.agents:
-                print(f"\n{TEAL}Agent {agent.id}:{RESET}")
+                print(f"\n{TEAL}Agent {str(agent.id)}:{RESET}")
                 if agent.last_action:
                     try:
                         if isinstance(agent.last_action, dict):
