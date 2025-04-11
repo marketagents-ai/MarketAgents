@@ -4,7 +4,7 @@ import aiohttp
 import logging
 from uuid import UUID
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 
 from market_agents.memory.storage_models import (
     AIRequest,
@@ -29,15 +29,17 @@ class CustomJSONEncoder(json.JSONEncoder):
 class AgentStorageAPIUtils:
     def __init__(
         self,
-        config: AgentStorageConfig | str,
+        config: Optional[Union[AgentStorageConfig, str]] = None,
         logger: Optional[logging.Logger] = None
     ):
-        if isinstance(config, str):
+        if config is None:
+            self.config = AgentStorageConfig()
+        elif isinstance(config, str):
             self.config = load_config_from_yaml(config)
         elif isinstance(config, AgentStorageConfig):
             self.config = config
         else:
-            raise ValueError("config must be either a path or AgentStorageConfig instance")
+            raise ValueError("config must be either a path, AgentStorageConfig instance, or None for defaults")
         
         self.api_url = self.config.storage_api_url
         self.logger = logger or logging.getLogger(__name__)

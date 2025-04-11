@@ -92,19 +92,23 @@ class MarketAgent(Agent):
     @classmethod
     async def create(
         cls,
-        storage_utils: AgentStorageAPIUtils,
         name: str,
         persona: Optional[Persona] = None,
         task: Optional[str] = None,
         llm_config: Optional[LLMConfig] = None,
-        tools: Optional[List[Union[CallableTool, StructuredTool]]] = None, 
+        tools: Optional[List[Union[CallableTool, StructuredTool]]] = None,
         ai_utils: Optional[InferenceOrchestrator] = None,
+        storage_utils: Optional[AgentStorageAPIUtils] = None,
         environments: Optional[Dict[str, MultiAgentEnvironment]] = None,
         protocol: Optional[Type[Protocol]] = None,
         econ_agent: Optional[EconomicAgent] = None,
         knowledge_agent: Optional[KnowledgeBaseAgent] = None,
         reward_function: Optional[BaseRewardFunction] = None,
+        
     ) -> 'MarketAgent':
+        
+        storage_utils = storage_utils or AgentStorageAPIUtils()
+        
         agent = cls(
             name=name,
             persona=persona,
