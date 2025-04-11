@@ -1,7 +1,8 @@
 import uuid
 import logging
 from typing import Optional, List, Union, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import Field
+from minference.lite.models import Entity
 
 from minference.lite.models import (
     EntityRegistry,
@@ -15,30 +16,23 @@ from minference.lite.models import (
 from minference.lite.inference import InferenceOrchestrator
 
 from market_agents.agents.base_agent.prompter import PromptManager
+from market_agents.agents.personas.persona import Persona
 
 EntityRegistry()
-agent_logger = logging.getLogger(__name__)
+logger = EntityRegistry._logger
 
-class Agent(BaseModel):
+class Agent(Entity):
     """
     Base LLM-driven agent using ChatThread-based inference.
     """
 
-    id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Unique string identifier for the agent instance."
-    )
-    role: str = Field(
+    name: str = Field(
         ...,
-        description="Functional role of the agent (e.g., 'financial analyst')."
+        description="Unique alphanumeric identifier for the agent (no spaces)"
     )
-    persona: Optional[str] = Field(
-        default=None,
-        description="Additional persona or background info for the agent."
-    )
-    objectives: Optional[List[str]] = Field(
-        default=None,
-        description="High-level goals or objectives for the agent."
+    persona: Union[str, Persona] = Field(
+        default="You are a helpful AI agent",
+        description="Agent's persona prompt as string or Persona object"
     )
     task: Optional[str] = Field(
         default=None,
@@ -68,9 +62,42 @@ class Agent(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+    @property
+    def persona_prompt(self) -> str:
+        """Get formatted persona as system prompt."""
+        if isinstance(self.persona, str):
+            return self.persona
+        elif isinstance(self.persona, Persona):
+            return self.prompt_manager.get_system_prompt({
+                "role": self.persona.role,
+                "persona": self.persona.persona,
+                "objectives": self.persona.objectives,
+                "skills": self.persona.skills
+            })
+        else:
+            return str(self.persona)
+            
+    @property
+    def task_prompt(self) -> str:
+        """Get formatted task text."""
+        if not self.task:
+            return "observe environment"
+            
+        if self.prompt_manager:
+            return self.prompt_manager.get_task_prompt({
+                "task": self.task,
+                "output_schema": None,
+                "output_format": "text"
+            })
+        else:
+            return self.task
+
     def __init__(self, **data: Any) -> None:
         """Initialize the agent and set up ChatThread from the prompt manager."""
         super().__init__(**data)
+
+        if 'name' not in data or data['name'] is None:
+            data['name'] = f"agent-{uuid.uuid4().hex[:8]}"
 
         if not self.llm_config:
             raise ValueError(
@@ -80,56 +107,39 @@ class Agent(BaseModel):
         if not self.prompt_manager:
             self.prompt_manager = PromptManager()
 
-        system_str = self.prompt_manager.get_system_prompt({
-            "role": self.role,
-            "persona": self.persona,
-            "objectives": self.objectives
-        })
         system_prompt = SystemPrompt(
-            name=f"SystemPrompt_{self.id}",
-            content=system_str
+            name=self.name,
+            content=self.persona_prompt
         )
 
-        initial_message = self.prompt_manager.get_task_prompt({
-            "task": self.task or "observe environment",
-            "output_schema": None,
-            "output_format": "text"
-        })
-
         self.chat_thread = ChatThread(
-            name=f"ChatThread_{self.id}",
+            name=self.name,
             system_prompt=system_prompt,
             llm_config=self.llm_config,
             tools=self.tools,
-            new_message=initial_message
+            new_message=self.task_prompt
         )
 
     def _refresh_prompts(self) -> None:
         """
-        Re-generate system and user prompts from PromptManager,
-        and place the user prompt into `chat_thread.new_message`.
+        Re-generate persona and task prompts,
+        and update the chat thread with the latest versions.
         """
-        agent_logger.debug("Refreshing prompts via PromptManager.")
+        logger.debug(f"Agent {self.name}: Refreshing prompts")
 
-        if not self.prompt_manager or not self.chat_thread:
-            agent_logger.warning("PromptManager or ChatThread not properly initialized.")
+        if not self.chat_thread:
+            logger.warning(f"Agent {self.name}: ChatThread not properly initialized")
             return
 
-        system_str = self.prompt_manager.get_system_prompt({
-            "role": self.role,
-            "persona": self.persona,
-            "objectives": self.objectives
-        })
+        # Update system prompt with latest persona_prompt
         if self.chat_thread.system_prompt:
-            self.chat_thread.system_prompt.content = system_str
+            self.chat_thread.system_prompt.content = self.persona_prompt
+            logger.debug(f"Agent {self.name}: Updated system prompt")
 
+        # Update task message if task is set
         if self.task:
-            task_str = self.prompt_manager.get_task_prompt({
-                "task": self.task,
-                "output_schema": None,
-                "output_format": "text"
-            })
-            self.chat_thread.new_message = task_str
+            self.chat_thread.new_message = self.task_prompt
+            logger.debug(f"Agent {self.name}: Updated task prompt")
 
     async def execute(self) -> Union[str, Dict[str, Any]]:
         """
@@ -145,7 +155,7 @@ class Agent(BaseModel):
             raise RuntimeError("No LLM outputs returned from orchestrator.")
 
         last_output: ProcessedOutput = results[-1]
-        agent_logger.info(f"Agent {self.id} received LLM output from {self.llm_config.client}.")
+        logger.info(f"Agent {self.id} received LLM output from {self.llm_config.client}.")
 
         if last_output.json_object:
             return last_output.json_object.object

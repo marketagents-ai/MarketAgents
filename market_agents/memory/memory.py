@@ -25,12 +25,12 @@ class ShortTermMemory(BaseModel):
 
     items_cache: List[MemoryObject] = Field(default_factory=list)
     agent_storage_utils: AgentStorageAPIUtils
-    agent_id: str
+    agent_id: UUID
     default_top_k: int = Field(default=2)
 
     def __init__(
         self,
-        agent_id: str,
+        agent_id: UUID,
         agent_storage_utils: AgentStorageAPIUtils,
         default_top_k: int = 2
     ):
@@ -94,13 +94,13 @@ class LongTermMemory(BaseModel):
         protected_namespaces=()
     )
     agent_storage_utils: AgentStorageAPIUtils
-    agent_id: str
+    agent_id: UUID
     default_top_k: int = Field(default=1)
 
 
     def __init__(
         self,
-        agent_id: str,
+        agent_id: UUID,
         agent_storage_utils: AgentStorageAPIUtils,
         default_top_k: int = 1
     ):

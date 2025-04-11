@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 import yaml
 import importlib.resources as ires
 
-class BasePromptVariables(BaseModel):
+class PromptVariables(BaseModel):
     """Base class for prompt variables with common utility methods."""
     
     def format_value(self, value: Any) -> str:
@@ -24,7 +24,7 @@ class BasePromptVariables(BaseModel):
             for key, value in self.model_dump().items()
         }
 
-class SystemPromptVariables(BasePromptVariables):
+class SystemPromptVariables(PromptVariables):
     """Variables for system prompt template."""
     role: str = Field(
         ...,
@@ -35,34 +35,34 @@ class SystemPromptVariables(BasePromptVariables):
     objectives: Optional[List[str]] = Field(
         default=None,
         description="Agent's objectives")
+    skills: Optional[Union[List[str], List[Dict[str, str]]]] = Field(
+        default_factory=list,
+        description="Agent's skills as either list of strings or list of dicts")
     datetime: str = Field(
         default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        description="Current timestamp"
-    )
+        description="Current timestamp")
 
-class TaskPromptVariables(BasePromptVariables):
+class TaskPromptVariables(PromptVariables):
     """Variables for task prompt template."""
     task: Union[str, List[str]] = Field(
         ...,
         description="Task instructions")
+    output_format: Optional[str] = Field(
+        default="text",
+        description="Expected output format")
     output_schema: Optional[str] = Field(
         default=None,
         description="Output schema")
-    output_format: str = Field(
-        default="text",
-        description="Expected output format ('text' or 'json_object')"
-    )
 
-class BasePromptTemplate(BaseSettings):
-    """Base class for loading and managing prompt templates."""
-    
+class PromptTemplate(BaseSettings):
+    """Template loader for agent prompts."""
     template_paths: List[Path] = Field(
         default_factory=lambda: [
             Path(ires.files("market_agents.agents.configs.prompts") / "default_prompt.yaml")
         ],
         description="Paths to the YAML template files."
     )
-    templates: Dict[str, str] = Field(
+    templates: Dict[str, Dict[str, str]] = Field(
         default_factory=dict,
         description="Dictionary of loaded prompt templates."
     )
@@ -84,26 +84,6 @@ class BasePromptTemplate(BaseSettings):
             except FileNotFoundError:
                 raise FileNotFoundError(f"Prompt template file not found: {path}")
 
-    def format_prompt(self, prompt_type: str, variables: BasePromptVariables) -> str:
-        """Format a specific prompt type with variables."""
-        if not self.templates:
-            raise ValueError("No templates loaded. Check template file path and contents.")
-            
-        if prompt_type not in self.templates:
-            raise ValueError(f"Unknown prompt type: {prompt_type}. Available types: {list(self.templates.keys())}")
-        
-        template = self.templates[prompt_type]
-        return template.format(**variables.get_template_vars())
-
-class PromptTemplate(BasePromptTemplate):
-    """Template loader for default agent prompts."""
-    template_paths: List[Path] = Field(
-        default_factory=lambda: [
-            Path(ires.files("market_agents.agents.configs.prompts") / "default_prompt.yaml")
-        ],
-        description="Default path to prompt template file."
-    )
-    
 class PromptManager:
     """Manages prompts for agents with template-based generation."""
     
@@ -115,11 +95,37 @@ class PromptManager:
         )
 
     def get_system_prompt(self, variables: Dict[str, Any]) -> str:
-        """Generate system prompt."""
+        """Generate system prompt from persona template sections."""
         vars_model = SystemPromptVariables(**variables)
-        return self.template.format_prompt('system', vars_model)
+        template_vars = vars_model.get_template_vars()
+        
+        # Get persona template sections
+        persona_template = self.template.templates.get('persona', {})
+        
+        # Format each section
+        sections = []
+        for section, template in persona_template.items():
+            formatted = template.format(**template_vars)
+            sections.append(formatted)
+            
+        # Join all sections with newlines
+        return "\n".join(sections)
 
     def get_task_prompt(self, variables: Dict[str, Any]) -> str:
-        """Generate task prompt."""
+        """Generate task prompt from task template sections."""
         vars_model = TaskPromptVariables(**variables)
-        return self.template.format_prompt('task', vars_model)
+        template_vars = vars_model.get_template_vars()
+        
+        # Get task template sections
+        task_template = self.template.templates.get('task', {})
+        
+        # Format each section
+        sections = []
+        for section, template in task_template.items():
+            # Only include sections that have corresponding variables
+            if any(var in template for var in template_vars):
+                formatted = template.format(**template_vars)
+                sections.append(formatted)
+            
+        # Join all sections with newlines
+        return "\n".join(sections)

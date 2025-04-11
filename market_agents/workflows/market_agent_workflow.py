@@ -14,6 +14,7 @@ from minference.lite.models import (
     CallableTool, 
     StructuredTool, 
     CallableMCPTool,
+    ResponseFormat,
     Entity
 )
 
@@ -214,6 +215,7 @@ class WorkflowStep(Entity):
             
             # Create a temporary environment with restricted tools
             mcp_server.action_space = selected_action_space
+            agent.chat_thread.tools = self.tools
             
             # Add temporary environment to agent
             agent.environments[self.environment_name] = mcp_server
@@ -228,6 +230,10 @@ class WorkflowStep(Entity):
                 environment_info=inputs,
                 action_space=self.tools[0] if not self.sequential_tools and self.tools else None
             )
+
+            if not self.sequential_tools:
+                agent.chat_thread.llm_config.response_format = ResponseFormat.auto_tools
+                agent.chat_thread.workflow_step = None
 
             if self.run_full_episode:
                 # Run full cognitive episode

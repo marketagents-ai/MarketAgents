@@ -600,14 +600,6 @@ class MCPServerActionSpace(ActionSpace):
                         logger.debug(f"Created tool: {tool_name}")
                 except Exception as e:
                     logger.error(f"Error creating tool {tool_name}: {str(e)}")
-        
-    def get_action_schema(self):
-        """Return JSON schema for all available tools"""
-        schemas = {}
-        for tool in self.allowed_actions:
-            schemas[tool.name] = tool.json_schema()
-        return schemas
-
     
     def get_action_schema(self):
         """Return JSON schema for all available tools"""
@@ -698,6 +690,10 @@ class MCPServerEnvironment(MultiAgentEnvironment):
             await self.mechanism.form_agent_cohorts(self.agents)
             
         logger.info("MCPServerEnvironment initialization complete")
+
+    def get_tools(self) -> Dict[str, Any]:
+        """Get a dictionary of all available tools, indexed by name."""
+        return {tool.name: tool for tool in self.action_space.allowed_actions}
 
     def get_global_state(self, agent_id: Optional[str] = None) -> Dict[str, Any]:
         """Return the environment's global state from mechanism"""

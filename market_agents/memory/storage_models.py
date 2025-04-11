@@ -16,7 +16,7 @@ class RetrievedMemory(BaseModel):
 class MemoryObject(BaseModel):
     """A single step of cognitive memory."""
     memory_id: UUID = Field(default_factory=uuid.uuid4)
-    agent_id: str
+    agent_id: UUID
     cognitive_step: str
     content: str
     embedding: Optional[List[float]] = None
@@ -60,7 +60,7 @@ class EpisodicMemoryObject(BaseModel):
     plus optional fields like total_reward, strategy_update, etc.
     """
     memory_id: UUID = Field(default_factory=uuid.uuid4)
-    agent_id: str
+    agent_id: UUID
     task_query: str
     cognitive_steps: List[CognitiveStep] = Field(default_factory=list)
     total_reward: Optional[float] = None
@@ -115,12 +115,12 @@ class IngestKnowledgeRequest(BaseModel):
 class CreateTablesRequest(BaseModel):
     """Request model for table creation."""
     table_type: str = Field(..., description="Type of tables to create (cognitive/episodic/knowledge)")
-    agent_id: Optional[str] = Field(default=None, description="Agent ID for memory tables")
+    agent_id: Optional[UUID] = Field(default=None, description="Agent ID for memory tables")
     table_prefix: Optional[str] = Field(default=None, description="Optional table prefix for multi-tenant setups")
 
 class AIRequest(BaseModel):
     request_id: str
-    agent_id: Optional[str] = None
+    agent_id: Optional[UUID] = None
     prompt: str
     response: Any
     metadata: Dict[str, Any] = {}

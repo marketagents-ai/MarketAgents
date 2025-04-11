@@ -1,19 +1,33 @@
-from pydantic import BaseModel
-from typing import List, Dict, Union
+# market_agents/agents/personas/persona.py
+from pydantic import BaseModel, Field
+from typing import List, Optional, Union, Dict, Any
 import yaml
 import random
 from pathlib import Path
 import names
 
 class Persona(BaseModel):
-    name: str
-    role: str
-    persona: str
-    objectives: List[str]
-    trader_type: List[str]
-    communication_style: str
-    routines: List[str]
-    skills: List[str]
+   
+    role: str = Field(
+        ...,
+        description="Primary role or function of the agent (e.g., 'Research Analyst', 'Market Maker')"
+    )
+    
+    persona: str = Field(
+        ...,
+        description="Core description of the persona's background and personality"
+    )
+    
+    objectives: List[str] = Field(
+        ...,
+        description="List of primary goals and objectives the agent aims to achieve",
+        min_items=1
+    )
+    
+    skills: Optional[Union[List[str], List[Dict[str, Any]]]] = Field(
+        default_factory=list,
+        description="List of skills as either strings or dictionaries with details"
+    )
 
 def generate_persona() -> Persona:
     # Gender and Name
@@ -293,11 +307,7 @@ def generate_persona() -> Persona:
         name=name,
         role=role,
         persona=persona_description,
-        objectives=objectives,
-        trader_type=trader_type,
-        communication_style=communication_style,
-        routines=routines,
-        skills=skills
+        objectives=objectives
     )
 
 def save_persona_to_file(persona: Persona, output_dir: Path):
