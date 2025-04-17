@@ -1,91 +1,92 @@
+from typing import Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
-import requests, datetime as dt
+import requests
+import datetime as dt
+import logging
+import json
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize MCP server
 mcp = FastMCP("DexScreenerServer")
 BASE = "https://api.dexscreener.com"
 
-# ---------------------------------------------------------------------------
-# Helper: resolve pair / token via DexScreener fuzzy search
-# ---------------------------------------------------------------------------
-def _resolve_pair(chain: str, query: str):
+# Map common chain aliases to DexScreener's canonical chainId strings
+_CHAIN_ALIASES = {
+    "eth": "ethereum",
+    "ethereum": "ethereum",
+    "sol": "solana",
+    "solana": "solana",
+    "arb": "arbitrum",
+    "arbitrum": "arbitrum",
+    "bsc": "bsc",
+    "binance-smart-chain": "bsc",
+    "polygon": "polygon",
+    "matic": "polygon",
+    "base": "base",
+}
+
+def _canonical_chain(chain: str) -> str:
+    """Return DexScreener‑compatible chainId for common aliases."""
+    return _CHAIN_ALIASES.get(chain.lower(), chain.lower())
+
+def _resolve_pair(chain: str, query: str) -> Dict[str, Any]:
     """
     Return the first search‑match dict for *query* on the given *chain*
     using DexScreener's public search endpoint.
+
+    Parameters
+    ----------
+    chain : str
+        Chain identifier (e.g. 'ethereum', 'solana')
+    query : str
+        Search query string
+
+    Returns
+    -------
+    dict
+        Matching pair information
     """
-    url = f"{BASE}/latest/dex/search?q={query}"
-    resp = requests.get(url, timeout=8).json().get("pairs", [])
-    for p in resp:
-        if p.get("chainId") == chain:
-            return p
-    return resp[0] if resp else {}
+    chain = _canonical_chain(chain)
+    try:
+        url = f"{BASE}/latest/dex/search?q={query}"
+        resp = requests.get(url, timeout=8).json().get("pairs", [])
+        for p in resp:
+            if p.get("chainId") == chain:
+                return p
+        return resp[0] if resp else {}
+    except Exception as e:
+        logger.error(f"Error resolving pair: {str(e)}")
+        return {}
 
 @mcp.tool()
 def get_dex_pair(
     chain: str,
-    query: str | None = None,
-    pair_address: str | None = None,
-):
-    """
-    Return price/liquidity snapshot for a DEX pair.
-
-    Parameters
-    ----------
-    chain : str
-        Chain slug (e.g. 'solana', 'ethereum', 'base').
-    query : str, optional
-        Human‑friendly string such as 'SOL/USDC' or 'JitoSOL'. The server
-        will resolve it to a pair on the specified chain when *pair_address*
-        is omitted.
-    pair_address : str, optional
-        Full on‑chain LP address.  Most agents can ignore this and rely on
-        *query* resolution.
-
-    Examples
-    --------
-    • get_dex_pair(chain='solana', query='SOL/USDC')
-    • get_dex_pair(chain='solana', pair_address='G6drsaPCR3pxsEmS…')
-    """
-    if pair_address is None:
-        if query is None:
-            return {"error": "provide pair_address or query"}
+    query: str,  # Only chain and query required
+) -> Dict[str, Any]:
+    """Return price/liquidity snapshot for a DEX pair."""
+    chain = _canonical_chain(chain)
+    try:
         match = _resolve_pair(chain, query)
         pair_address = match.get("pairAddress")
         if not pair_address:
             return {"error": "pair not found"}
-    url = f"{BASE}/latest/dex/pairs/{chain}/{pair_address}"
-    return requests.get(url, timeout=8).json()
-
-@mcp.tool()
-def search_pairs(query: str):
-    """Fuzzy search pairs or tokens (e.g., 'SOL/USDC'). This function still works but agents can now skip it."""
-    return requests.get(f"{BASE}/latest/dex/search?q={query}", timeout=8).json()
+        url = f"{BASE}/latest/dex/pairs/{chain}/{pair_address}"
+        return requests.get(url, timeout=8).json()
+    except Exception as e:
+        logger.error(f"Error fetching DEX pair: {str(e)}")
+        return {"error": str(e)}
 
 @mcp.tool()
 def get_token_profile(
     chain: str,
-    token_symbol: str | None = None,
-    token_address: str | None = None,
-):
-    """
-    Static token metadata (icon, website, socials).
-
-    Prefer giving a *token_symbol* (e.g. "SOL" or "JitoSOL").
-    The helper will resolve it to an on‑chain address via DexScreener
-    search.  Power users may still supply *token_address* directly.
-
-    Parameters
-    ----------
-    chain : str
-        Chain slug ('solana', 'base', 'arbitrum', etc.).
-    token_symbol : str, optional
-        Human‑friendly ticker or token name.  If provided, it is resolved
-        to the correct contract address on the given chain.
-    token_address : str, optional
-        Full contract address.  Only needed when the symbol is ambiguous
-        or not yet indexed by DexScreener.
-    """
-    # Resolve symbol first (safer for LLM agents)
-    if token_symbol is not None:
+    token_symbol: str,  # Only chain and symbol required
+) -> Dict[str, Any]:
+    """Get static token metadata (icon, website, socials)."""
+    chain = _canonical_chain(chain)
+    try:
         match = _resolve_pair(chain, token_symbol)
         token_address = (
             match.get("baseToken", {}).get("address")
@@ -93,19 +94,44 @@ def get_token_profile(
         )
         if not token_address:
             return {"error": "token not found"}
-    elif token_address is None:
-        return {"error": "provide token_symbol or token_address"}
 
-    url = (
-        f"{BASE}/token-profiles/latest/v1?"
-        f"chainId={chain}&tokenAddress={token_address}"
-    )
-    return requests.get(url, timeout=8).json()
+        url = (
+            f"{BASE}/token-profiles/latest/v1?"
+            f"chainId={chain}&tokenAddress={token_address}"
+        )
+        return requests.get(url, timeout=8).json()
+    except Exception as e:
+        logger.error(f"Error fetching token profile: {str(e)}")
+        return {"error": str(e)}
 
 @mcp.tool()
-def get_boosted_tokens():
-    url = f"{BASE}/token-boosts/latest/v1"
-    return requests.get(url, timeout=8).json()
+def get_boosted_tokens(
+    chain: str,
+    limit: int,
+) -> Dict[str, Any]:
+    """Get list of currently boosted tokens from DexScreener."""
+    chain = _canonical_chain(chain)
+    try:
+        resp_text = requests.get(f"{BASE}/token-boosts/latest/v1", timeout=8).text
+        tokens: list[dict] = []
+        for line in resp_text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parsed = json.loads(line)
+            if isinstance(parsed, list):
+                tokens.extend(parsed)
+            else:
+                tokens.append(parsed)
+
+        tokens = [t for t in tokens if t.get("chainId") == chain]
+        tokens = tokens[:limit]
+
+        return {"boosted_tokens": tokens}
+    except Exception as e:
+        logger.error(f"Error fetching boosted tokens: {str(e)}")
+        return {"error": str(e)}
 
 if __name__ == "__main__":
+    logger.info("Starting DexScreener MCP Server...")
     mcp.run()
