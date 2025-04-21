@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from market_agents.orchestrators.config import OrchestratorConfig
 from market_agents.memory.agent_storage.storage_service import StorageService
 from market_agents.agents.market_agent import MarketAgent
-from minference.lite.inference import InferenceOrchestrator  # <-- Import your InferenceOrchestrator
+from minference.lite.inference import InferenceOrchestrator
 
 class BaseEnvironmentOrchestrator(BaseModel, ABC):
     """
@@ -27,6 +27,10 @@ class BaseEnvironmentOrchestrator(BaseModel, ABC):
     agents: List["MarketAgent"] = Field(
         ...,
         description="List of agents participating in this environment orchestrator.",
+    )
+    cohorts: Optional[List[List["MarketAgent"]]] = Field(
+        default=None,
+        description="Pre-formed agent cohorts to be used across environments"
     )
     storage_service: "StorageService" = Field(
         ...,
