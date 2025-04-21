@@ -30,12 +30,14 @@ class MultiAgentOrchestrator:
         storage_service: StorageService,
         orchestrator_config: Any,
         environment_name: str,
+        cohorts: Optional[List[List[Any]]] = None,
         logger: Optional[logging.Logger] = None,
         ai_utils: Any = None,
         **kwargs
     ):
         self.config = config
         self.agents = agents
+        self.cohorts=cohorts
         self.storage_service = storage_service
         self.orchestrator_config = orchestrator_config
         self.logger = logger or logging.getLogger(__name__)
@@ -106,28 +108,44 @@ class MultiAgentOrchestrator:
         """Set up or reset the environment."""
         self.logger.info("Setting up the Environment...")
         if self.environment:
-            # Add this line to properly initialize the environment
             if hasattr(self.environment, 'initialize'):
                 self.logger.info("Initializing environment...")
                 await self.environment.initialize()
                 self.logger.info("Environment initialization complete")
                 
-            self._initialize_agents_for_environment()
+            # Reset agents for new environment
+            for agent in self.agents:
+                # Reset chat thread configuration
+                if hasattr(agent, 'chat_thread'):
+                    agent.chat_thread.tools = []
+                    agent.chat_thread.forced_output = None
+                    agent.chat_thread.workflow_step = None
+                    agent.chat_thread.llm_config.response_format = None
+                
+                # Update environment reference
+                agent.environments[self.environment_name] = self.environment
+                
+                # Set task based on environment topic
+                topic = getattr(self.environment, "initial_topic", None) or getattr(self.environment, "initial_query", "")
+                agent.task = f"Your task: {topic}"
+                if hasattr(agent, "_refresh_prompts"):
+                    agent._refresh_prompts()
             
-            # Rest of the setup...
             if hasattr(self.environment.mechanism, '_cognitive_processor'):
                 self.environment.mechanism._cognitive_processor = self.cognitive_processor
             
-            form_cohorts = (
-                hasattr(self.environment.mechanism, 'form_cohorts') and 
-                getattr(self.environment.mechanism, 'form_cohorts', False)
-            )
-            
-            if form_cohorts:
-                self.logger.info(f"Forming cohorts with {len(self.agents)} agents")
-                await self.environment.mechanism.form_agent_cohorts(self.agents)
-                
-        self.logger.info("Environment setup complete.")
+            # Use existing cohorts if provided
+            if self.cohorts and hasattr(self.environment.mechanism, 'cohorts'):
+                self.logger.info(f"Setting up {len(self.cohorts)} pre-formed cohorts")
+                # Assign the pre-formed cohorts to the mechanism
+                for i, cohort in enumerate(self.cohorts, 1):
+                    cohort_id = f"{self.environment_name}_cohort_{i}"
+                    self.environment.mechanism.cohorts[cohort_id] = cohort
+                    # Initialize any cohort-specific state
+                    if hasattr(self.environment.mechanism, 'round_messages'):
+                        self.environment.mechanism.round_messages[cohort_id] = []
+                    if hasattr(self.environment.mechanism, 'search_history'):
+                        self.environment.mechanism.search_history[cohort_id] = []
 
     async def run_environment(self, round_num: Optional[int] = None):
         """Run the environment for the specified round or for all rounds."""
@@ -235,7 +253,7 @@ class MultiAgentOrchestrator:
     async def _run_action_phase(self, round_num: int, sub_round: int, cohort_agents: Optional[List[Any]] = None) -> EnvironmentStep:
         """Generic action phase."""
         agents = cohort_agents if cohort_agents is not None else self.agents
-        self.logger.info(f"Round {round_num}.{sub_round}: Executing agent actions...")
+        self.logger.info(f"Environment: {self.environment_name}\nRound {round_num}.{sub_round}: Executing agent actions...")
         
         actions = await self.cognitive_processor.run_parallel_action(
             agents,
@@ -391,13 +409,17 @@ class MultiAgentOrchestrator:
             self.logger.exception("Reflection step failed but continuing...")
 
     def _convert_uuids_to_strings(self, obj):
-        """Recursively convert all UUIDs to strings in a nested structure."""
+        """Recursively convert all UUIDs and ModelMetaclass to strings in a nested structure."""
         if isinstance(obj, dict):
             return {k: self._convert_uuids_to_strings(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [self._convert_uuids_to_strings(item) for item in obj]
         elif isinstance(obj, uuid.UUID):
             return str(obj)
+        elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'ModelMetaclass':
+            return obj.__name__ if hasattr(obj, '__name__') else str(obj)
+        elif hasattr(obj, 'model_dump'):
+            return obj.model_dump()
         return obj
 
     async def process_round_results(self, round_num: int, sub_round: int, cohort_agents: Optional[List[Any]] = None):
