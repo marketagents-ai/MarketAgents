@@ -1,5 +1,5 @@
-from typing import Dict, List, Any, Type, Optional, Union, Literal
-from pydantic import BaseModel, Field
+from typing import Dict, List, Any, Self, Type, Optional, Union, Literal
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 import json
 from market_agents.agents.market_agent import MarketAgent
@@ -139,8 +139,8 @@ class WorkflowStep(Entity):
         default_factory=list,
         description="Input schema definitions"
     )
-    outputs: List[WorkflowStepIO] = Field(
-        default_factory=list,
+    output: Optional[WorkflowStepIO] = Field(
+        default=None,
         description="Output schema definitions"
     )
     run_full_episode: bool = Field(
@@ -428,9 +428,33 @@ class Workflow(Entity):
         results: List[WorkflowStepResult] = []
         
         formatted_workflow_task = self.task.format(**initial_inputs) if self.task else None
+        
+        # Create expanded steps list when output schemas are defined
+        expanded_steps = []
+        for step in self.steps:
+            # Add original step
+            expanded_steps.append(step)
             
+            # If step has output schema, add IO step
+            if step.output and isinstance(step.output.data, type) and issubclass(step.output.data, BaseModel):
+                output_tool = StructuredTool.from_pydantic(
+                    model=step.output.data,
+                    name=step.output.data.__name__.lower(),
+                    description=f"Structure output for {step.name} step"
+                )
+                
+                io_step = WorkflowStep(
+                    name=f"{step.name}_io",
+                    environment_name=step.environment_name,
+                    tools=[output_tool],
+                    subtask=f"Structure the workflow results including previous step's output using the {output_tool.name} schema.",
+                    sequential_tools=False,
+                    run_full_episode=False
+                )
+                expanded_steps.append(io_step)
+        
         previous_result = None
-        for i, step in enumerate(self.steps):
+        for i, step in enumerate(expanded_steps):
             logger.debug(f"Executing step '{step.name}' with inputs: {state}")
             
             # Add previous step result to inputs if available

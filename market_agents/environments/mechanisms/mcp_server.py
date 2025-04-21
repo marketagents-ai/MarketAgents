@@ -584,22 +584,27 @@ class MCPServerActionSpace(ActionSpace):
 
         logger.info(f"Total allowed_actions: {len(self.allowed_actions)}")
         
-    # Create a tool for each available MCP server tool
     def _create_tools_from_server(self):
-            """Create tools from server's complete tool set"""
-            for tool_name, tool_info in self.mechanism.available_tools.items():
-                try:
-                    if "input_schema" in tool_info and tool_info["input_schema"] is not None:
-                        mcp_tool = CallableMCPTool.from_callable(
-                            name=tool_name,
-                            description=tool_info.get("description"),
-                            input_schema=tool_info.get("input_schema")
-                        )
-                        mcp_tool.mcp_mechanism = self.mechanism
-                        self.allowed_actions.append(mcp_tool)
-                        logger.debug(f"Created tool: {tool_name}")
-                except Exception as e:
-                    logger.error(f"Error creating tool {tool_name}: {str(e)}")
+        """Create tools from server's complete tool set"""
+        logger.info(f"Available tools in mechanism: {list(self.mechanism.available_tools.keys())}")
+        
+        for tool_name, tool_info in self.mechanism.available_tools.items():
+            try:
+                input_schema = tool_info.get("input_schema", {})
+                # Add empty required list if not present
+                if 'required' not in input_schema:
+                    input_schema['required'] = []
+                
+                mcp_tool = CallableMCPTool.from_callable(
+                    name=tool_name,
+                    description=tool_info.get("description"),
+                    input_schema=input_schema
+                )
+                mcp_tool.mcp_mechanism = self.mechanism
+                self.allowed_actions.append(mcp_tool)
+                
+            except Exception as e:
+                logger.error(f"Error creating tool {tool_name}: {str(e)}")
     
     def get_action_schema(self):
         """Return JSON schema for all available tools"""
