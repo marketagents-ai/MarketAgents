@@ -191,11 +191,23 @@ class ActionStep(CognitiveStep):
     )
 
     async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
+        print(f"Executing action step for environment: {self.environment_name}")
+        print(f"Available environments: {list(agent.environments.keys())}")
+
         environment = agent.environments[self.environment_name]
         action_space = environment.action_space if environment else None
+        print(f"Got action space type: {type(action_space)}")
+        print(f"Action space has workflow: {hasattr(action_space, 'workflow')}")
+        print(f"Action space allowed actions: {getattr(action_space, 'allowed_actions', [])}")
+
+        if agent.chat_thread:
+            print(f"Chat thread before setup: format={agent.chat_thread.llm_config.response_format}, tools={[t.name for t in agent.chat_thread.tools if t]}")
+            # Clear previous environment's tools
+            agent.chat_thread.tools = []
+            agent.chat_thread.forced_output = None
+            agent.chat_thread.workflow_step = None
 
         print(f"ActionSpace type: {type(action_space)}")
-            # Debug: Print available tools
         if hasattr(environment, 'action_space') and hasattr(environment.action_space, 'allowed_actions'):
             print(f"ActionStep: Found {len(environment.action_space.allowed_actions)} tools in action_space")
             for tool in environment.action_space.allowed_actions:
@@ -218,7 +230,7 @@ class ActionStep(CognitiveStep):
                 action_space.workflow and 
                 len(allowed_actions) > 1):                
                 print("Setting up workflow mode")
-                agent.chat_thread.tools = tools or allowed_actions
+                agent.chat_thread.tools = allowed_actions
                 print(f"#tools: {len(allowed_actions)}")
                 agent.chat_thread.llm_config.response_format = ResponseFormat.workflow
                 agent.chat_thread.workflow_step = 0
