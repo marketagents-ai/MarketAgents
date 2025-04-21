@@ -15,17 +15,6 @@ from market_agents.orchestrators.parallel_cognitive_steps import ParallelCogniti
 
 logger = logging.getLogger(__name__)
 
-from typing import List, Dict, Any, Union, Type, Optional
-from pydantic import BaseModel, Field
-import logging
-
-from market_agents.environments.environment import (
-    Mechanism, LocalAction, GlobalAction, LocalObservation, GlobalObservation,
-    EnvironmentStep, ActionSpace, ObservationSpace, LocalEnvironmentStep
-)
-
-logger = logging.getLogger(__name__)
-
 class MessageType(str, Enum):
     CHAT = "chat_message"
     TOPIC_PROPOSAL = "propose_topic"
