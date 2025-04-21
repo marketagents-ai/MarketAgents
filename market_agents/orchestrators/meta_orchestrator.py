@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Type
+from typing import Any, Dict, List, Optional, Type
 import logging
 import uuid
 import warnings
@@ -30,10 +30,12 @@ class MetaOrchestrator:
         self,
         config: OrchestratorConfig,
         agents,
+        cohorts: Optional[List[List[Any]]],
         logger: logging.Logger = None
     ):
         self.config = config
         self.agents = agents
+        self.cohorts = cohorts
         self.logger = logger or orchestration_logger
         self.environment_order = config.environment_order
 
@@ -73,7 +75,7 @@ class MetaOrchestrator:
             cache_folder=None
         )
 
-    def _initialize_environment_orchestrators(self):
+    async def _initialize_environment_orchestrators(self):
         """Initialize generic orchestrators for each environment."""
         for env_name in self.environment_order:
             env_cfg = self.config.environment_configs.get(env_name)
@@ -94,7 +96,11 @@ class MetaOrchestrator:
                     environment_name=env_name,
                     logger=self.logger,
                     ai_utils=self.ai_utils,
+                    cohorts=self.cohorts
                 )
+                
+                # Set up the environment immediately after initialization
+                await orchestrator.setup_environment()
                 
                 self.environment_orchestrators[env_name] = orchestrator
                 self.logger.info(f"Initialized orchestrator for {env_name} using {env_cfg.mechanism} mechanism")
@@ -111,7 +117,7 @@ class MetaOrchestrator:
 
         await self._store_agent_states()
 
-        self._initialize_environment_orchestrators()
+        await self._initialize_environment_orchestrators()
 
         for i, env_name in enumerate(self.environment_order, 1):
             env_orch = self.environment_orchestrators.get(env_name)

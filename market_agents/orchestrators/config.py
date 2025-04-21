@@ -2,7 +2,7 @@
 
 from enum import Enum
 from pydantic import BaseModel, Field, validator
-from typing import Any, List, Dict, Optional, Union
+from typing import Any, List, Dict, Optional, Type, Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import yaml
 from pathlib import Path
@@ -79,16 +79,40 @@ class ResearchConfig(EnvironmentConfig):
         description="Name of Pydantic model defining research output schema"
     )
 
-class WebResearchConfig(BaseModel):
-    name: str
-    api_url: str
-    initial_query: str
-    sub_rounds: int = 2
-    search_config: Dict[str, Any]
-    schema_model: str = Field(
-        default="ResearchSummary",
-        description="Name of Pydantic model defining research output schema"
+class WebResearchConfig(EnvironmentConfig):
+    """Configuration for web research environment"""
+    name: str = Field(
+        default="web_research",
+        description="Name of the web research environment"
     )
+    initial_query: str = Field(
+        ...,
+        description="Initial search query to start the research with"
+    )
+    mechanism: str = Field(
+        default="web_research",
+        description="Mechanism type for web research"
+    )
+    urls_per_query: int = Field(
+        default=3,
+        description="Number of URLs to fetch per query"
+    )
+    summary_model: Optional[Type[BaseModel]] = Field(
+        default=None,
+        description="Pydantic model class for structuring research summaries"
+    )
+    max_rounds: int = Field(
+        default=3,
+        description="Maximum number of rounds"
+    )
+    sub_rounds: int = Field(
+        default=1,
+        description="Number of sub-rounds within each main round"
+    )
+
+    model_config = {
+        "extra": "allow"
+    }
 
 class MCPServerConfig(EnvironmentConfig):
     """Configuration for MCP Server environment"""

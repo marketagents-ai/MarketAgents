@@ -164,9 +164,13 @@ class MarketAgent(Agent):
         if environment_name and environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
         
+        if step and not isinstance(step, type) and hasattr(step, 'environment_name') and not environment_name:
+            environment_name = step.environment_name
+            print(f"Using environment_name from step: {environment_name}")
+        
         env_name = environment_name or next(iter(self.environments.keys()))
         environment = self.environments[env_name]
-        
+                
         if step is None:
             step = ActionStep(
                 agent_id=self.id,
@@ -187,9 +191,9 @@ class MarketAgent(Agent):
             step.agent_id = self.id
         
         logger.info(f"Executing cognitive step: {step.step_name}")
-        
+                
         result = await step.execute(self)
-
+        
         return result
 
     async def run_episode(

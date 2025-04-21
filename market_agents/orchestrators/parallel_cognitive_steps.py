@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 import logging
 from typing import Any, List, Dict
+from pydantic import Field
 
 from market_agents.agents.cognitive_steps import PerceptionStep, ActionStep, ReflectionStep
 from market_agents.agents.market_agent import MarketAgent
@@ -96,7 +97,9 @@ class ParallelCognitiveProcessor:
     ) -> List[ProcessedOutput]:
         """Collect ActionStep prompts with return_prompt=True"""
         action_prompts = []
+
         for agent in agents:
+
             step = ActionStep(
                 agent_id=agent.id,
                 environment_name=environment_name,
@@ -104,9 +107,9 @@ class ParallelCognitiveProcessor:
                 structured_tool=self.tool_mode,
                 return_prompt=True
             )
-            prompt_thread = await agent.run_step(step=step)
-            print(agent.chat_thread.new_message)
 
+            prompt_thread = await agent.run_step(step=step, environment_name=environment_name)
+            print(agent.chat_thread.new_message)
             action_prompts.append(prompt_thread)
 
         outputs = await self.ai_utils.run_parallel_ai_completion(action_prompts)
