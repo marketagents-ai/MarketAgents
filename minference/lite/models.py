@@ -354,7 +354,11 @@ class CallableTool(Entity):
         )
         
         # Derive schemas
-        input_schema = derive_input_schema(registered_func)
+        try:
+            input_schema = derive_input_schema(registered_func)
+        except StopIteration:
+            input_schema = {"type": "object", "properties": {}, "additionalProperties": False}
+        
         output_schema = derive_output_schema(registered_func)
         
         # Create tool instance
@@ -420,7 +424,11 @@ class CallableTool(Entity):
                 self.callable_text = str(func)
         
         # Derive and validate schemas
-        derived_input = derive_input_schema(func)
+        try:
+            derived_input = derive_input_schema(func)
+        except StopIteration:
+            derived_input = {"type": "object", "properties": {}, "additionalProperties": False}
+
         derived_output = derive_output_schema(func)
         
         # Validate and set input schema
