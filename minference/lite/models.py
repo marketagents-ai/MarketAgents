@@ -1211,7 +1211,7 @@ class RawOutput(Entity):
                 except json.JSONDecodeError:
                     return None
             return None
-
+        
     def _parse_oai_completion(self, chat_completion: ChatCompletion) -> Tuple[Optional[str], Optional[GeneratedJsonObject], Optional[Usage], None]:
         """Parse OpenAI completion format."""
         message = chat_completion.choices[0].message
@@ -1500,7 +1500,7 @@ class ChatThread(Entity):
         
         for msg in self.history:
             EntityRegistry._logger.info(f"Processing message: role={msg.role}, "
-                                      f"tool_call_id={msg.oai_tool_call_id}")
+                                    f"tool_call_id={msg.oai_tool_call_id}")
             
             if msg.role == MessageRole.user:
                 messages.append({
@@ -1509,7 +1509,7 @@ class ChatThread(Entity):
                 })
                 
             elif msg.role == MessageRole.assistant:
-                if msg.tool_call:
+                if msg.tool_name:
                     messages.append({
                         "role": "assistant",
                         "content": msg.content or "",
@@ -1518,7 +1518,7 @@ class ChatThread(Entity):
                             "type": "function",
                             "function": {
                                 "name": msg.tool_name,
-                                "arguments": json.dumps(msg.tool_call)
+                                "arguments": json.dumps(msg.tool_call if msg.tool_call else {})
                             }
                         }]
                     })
