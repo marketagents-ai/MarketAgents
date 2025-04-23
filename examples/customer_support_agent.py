@@ -131,7 +131,7 @@ async def main() -> None:
 
     agent.task = "Hi, can you check the status of my latest order?"
 
-    reply = await agent.run_step(max_steps=4)
+    reply = await agent.run_step(max_steps=4, terminal_tools = ["speak_to_user"])
     #reply = await agent.run_episode(max_steps=2)
     print("Assistant:", reply)
 
