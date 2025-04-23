@@ -151,22 +151,39 @@ class MarketAgent(Agent):
         self,
         step: Optional[Union[CognitiveStep, Type[CognitiveStep]]] = None,
         environment_name: Optional[str] = None,
+        *,
+        max_steps: int | None = 1,
         **kwargs
-    ) -> Union[str, Dict[str, Any]]:
+    ) -> Union[str, Dict[str, Any], List[Union[str, Dict[str, Any]]]]:
         """
         Execute a single cognitive step.
         
         Args:
             step: CognitiveStep instance or class (defaults to ActionStep)
             environment_name: Optional environment context
+            max_steps: Optional[int] – run the step this many times (None or 1 ⇒ single execution).
             **kwargs: Additional parameters for step initialization
         """
+        # Handle iterative execution when max_steps > 1
+        if max_steps is not None and max_steps > 1:
+            outputs: List[Union[str, Dict[str, Any]]] = []
+            for loop_idx in range(max_steps):
+                logger.info(f"[MarketAgent] run_step loop iteration {loop_idx + 1}/{max_steps}")
+                out = await self.run_step(
+                    step=step,
+                    environment_name=environment_name,
+                    max_steps=1,
+                    **kwargs,
+                )
+                outputs.append(out)
+            return outputs
+
         if environment_name and environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
         
         if step and not isinstance(step, type) and hasattr(step, 'environment_name') and not environment_name:
             environment_name = step.environment_name
-            print(f"Using environment_name from step: {environment_name}")
+            logger.info(f"Using environment_name from step: {environment_name}")
         
         env_name = environment_name or next(iter(self.environments.keys()))
         environment = self.environments[env_name]
@@ -200,16 +217,33 @@ class MarketAgent(Agent):
         self,
         episode: Optional[CognitiveEpisode] = None,
         environment_name: Optional[str] = None,
+        *,
+        max_steps: int | None = 1,
         **kwargs
-    ) -> List[Union[str, Dict[str, Any]]]:
+    ) -> Union[List[Union[str, Dict[str, Any]]], List[List[Union[str, Dict[str, Any]]]]]:
         """
         Run a complete cognitive episode.
         
         Args:
             episode: CognitiveEpisode instance (defaults to Perception->Action[Observation]->Reflection)
             environment_name: Optional environment to use
+            max_steps: Optional[int] – run the episode this many times (None or 1 ⇒ single execution).
             **kwargs: Additional parameters passed to each step
         """
+        # Handle iterative execution when max_steps > 1
+        if max_steps is not None and max_steps > 1:
+            episodes_out: List[List[Union[str, Dict[str, Any]]]] = []
+            for loop_idx in range(max_steps):
+                logger.info(f"[MarketAgent] run_episode loop iteration {loop_idx + 1}/{max_steps}")
+                ep_out = await self.run_episode(
+                    episode=episode,
+                    environment_name=environment_name,
+                    max_steps=1,
+                    **kwargs,
+                )
+                episodes_out.append(ep_out)
+            return episodes_out
+
         self._refresh_prompts()
         
         if episode is None:
