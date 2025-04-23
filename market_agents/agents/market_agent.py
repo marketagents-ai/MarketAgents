@@ -8,7 +8,8 @@ from market_agents.agents.cognitive_steps import (
     CognitiveStep,
     PerceptionStep,
     ActionStep,
-    ReflectionStep
+    ReflectionStep,
+    TerminalToolInvoked
 )
 from market_agents.agents.market_agent_prompter import MarketAgentPromptManager
 from market_agents.agents.personas.persona import Persona
@@ -153,6 +154,7 @@ class MarketAgent(Agent):
         environment_name: Optional[str] = None,
         *,
         max_steps: int | None = 1,
+        terminal_tools: Optional[List[str]] = None,
         **kwargs
     ) -> Union[str, Dict[str, Any], List[Union[str, Dict[str, Any]]]]:
         """
@@ -162,21 +164,40 @@ class MarketAgent(Agent):
             step: CognitiveStep instance or class (defaults to ActionStep)
             environment_name: Optional environment context
             max_steps: Optional[int] – run the step this many times (None or 1 ⇒ single execution).
+            terminal_tools: Optional[List[str]] – List of tool names that should terminate execution
             **kwargs: Additional parameters for step initialization
+        
+        Returns:
+            For single step (max_steps=1): The step result
+            For multiple steps: List of results including any terminal tool result
+            
+        Raises:
+            TerminalToolInvoked: When a terminal tool is used (in single step mode)
+            ValueError: If environment not found or other validation errors
         """
         # Handle iterative execution when max_steps > 1
         if max_steps is not None and max_steps > 1:
             outputs: List[Union[str, Dict[str, Any]]] = []
-            for loop_idx in range(max_steps):
-                logger.info(f"[MarketAgent] run_step loop iteration {loop_idx + 1}/{max_steps}")
-                out = await self.run_step(
-                    step=step,
-                    environment_name=environment_name,
-                    max_steps=1,
-                    **kwargs,
-                )
-                outputs.append(out)
-            return outputs
+            try:
+                for loop_idx in range(max_steps):
+                    logger.info(f"[MarketAgent] run_step loop iteration {loop_idx + 1}/{max_steps}")
+                    try:
+                        out = await self.run_step(
+                            step=step,
+                            environment_name=environment_name,
+                            max_steps=1,
+                            terminal_tools=terminal_tools,
+                            **kwargs
+                        )
+                        outputs.append(out)
+                    except TerminalToolInvoked as e:
+                        outputs.append(e.payload)
+                        logger.info(f"[MarketAgent] Terminal tool '{e.tool_name}' invoked - stopping iteration")
+                        break
+                return outputs
+            except Exception as e:
+                logger.error(f"[MarketAgent] Error in run_step: {str(e)}")
+                raise
 
         if environment_name and environment_name not in self.environments:
             raise ValueError(f"Environment {environment_name} not found")
@@ -193,6 +214,7 @@ class MarketAgent(Agent):
                 agent_id=self.id,
                 environment_name=env_name,
                 environment_info=environment.get_global_state(agent_id=self.id),
+                terminal_tools=terminal_tools,
                 **kwargs
             )
         elif isinstance(step, type):
@@ -200,17 +222,18 @@ class MarketAgent(Agent):
                 agent_id=self.id,
                 environment_name=env_name,
                 environment_info=environment.get_global_state(agent_id=self.id),
+                terminal_tools=terminal_tools,
                 **kwargs
             )
         else:
             step.environment_name = env_name
             step.environment_info = environment.get_global_state(agent_id=self.id)
             step.agent_id = self.id
+            if terminal_tools is not None:
+                step.terminal_tools = terminal_tools
         
         logger.info(f"Executing cognitive step: {step.step_name}")
-                
         result = await step.execute(self)
-        
         return result
 
     async def run_episode(
@@ -219,29 +242,47 @@ class MarketAgent(Agent):
         environment_name: Optional[str] = None,
         *,
         max_steps: int | None = 1,
+        terminal_tools: Optional[List[str]] = None,
         **kwargs
     ) -> Union[List[Union[str, Dict[str, Any]]], List[List[Union[str, Dict[str, Any]]]]]:
         """
         Run a complete cognitive episode.
         
         Args:
-            episode: CognitiveEpisode instance (defaults to Perception->Action[Observation]->Reflection)
+            episode: CognitiveEpisode instance (defaults to Perception->Action->Reflection)
             environment_name: Optional environment to use
             max_steps: Optional[int] – run the episode this many times (None or 1 ⇒ single execution).
+            terminal_tools: Optional[List[str]] – List of tool names that should terminate execution
             **kwargs: Additional parameters passed to each step
+        
+        Returns:
+            For single episode: List of step results
+            For multiple episodes: List of episode results
+            
+        Raises:
+            ValueError: If environment not found or other validation errors
         """
         # Handle iterative execution when max_steps > 1
         if max_steps is not None and max_steps > 1:
             episodes_out: List[List[Union[str, Dict[str, Any]]]] = []
             for loop_idx in range(max_steps):
                 logger.info(f"[MarketAgent] run_episode loop iteration {loop_idx + 1}/{max_steps}")
-                ep_out = await self.run_episode(
-                    episode=episode,
-                    environment_name=environment_name,
-                    max_steps=1,
-                    **kwargs,
-                )
-                episodes_out.append(ep_out)
+                try:
+                    ep_out = await self.run_episode(
+                        episode=episode,
+                        environment_name=environment_name,
+                        max_steps=1,
+                        terminal_tools=terminal_tools,
+                        **kwargs
+                    )
+                    episodes_out.append(ep_out)
+                except TerminalToolInvoked as e:
+                    # Add the terminal tool result and stop iterations
+                    if isinstance(ep_out, list):
+                        ep_out.append(e.payload)
+                    episodes_out.append(ep_out)
+                    logger.info(f"[MarketAgent] Terminal tool '{e.tool_name}' invoked - stopping episodes")
+                    break
             return episodes_out
 
         self._refresh_prompts()
@@ -255,12 +296,17 @@ class MarketAgent(Agent):
             episode.environment_name = environment_name
 
         results = []
-        for step_class in episode.steps:
-            result = await self.run_step(
-                step=step_class,
-                environment_name=episode.environment_name,
-                **kwargs
-            )
-            results.append(result)
-            
+        try:
+            for step_class in episode.steps:
+                result = await self.run_step(
+                    step=step_class,
+                    environment_name=episode.environment_name,
+                    terminal_tools=terminal_tools,
+                    **kwargs
+                )
+                results.append(result)
+        except TerminalToolInvoked as e:
+            results.append(e.payload)
+            raise
+                
         return results
