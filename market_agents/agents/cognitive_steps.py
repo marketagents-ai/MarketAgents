@@ -3,12 +3,15 @@ from datetime import datetime, timezone
 from uuid import UUID
 import json
 
+import logging
+logger = logging.getLogger(__name__)
+
 from pydantic import BaseModel, Field
 
 from market_agents.environments.environment import StrAction
 from market_agents.memory.memory import MemoryObject
 from market_agents.agents.market_agent_prompter import MarketAgentPromptVariables
-from minference.lite.models import CallableTool, ResponseFormat, StructuredTool
+from minference.lite.models import CallableTool, ResponseFormat, StructuredTool, MessageRole
 from market_agents.agents.cognitive_tools import (
     perception_tool,
     reflection_tool
@@ -176,6 +179,14 @@ class PerceptionStep(CognitiveStep):
         agent.last_perception = result
         return result
 
+class TerminalToolInvoked(Exception):
+    """Raised when a designated terminal tool is executed so that upstream
+    controllers (run_step / run_episode / WorkflowStep) can stop the loop early."""
+    def __init__(self, tool_name: str, payload: Any | None = None):
+        self.tool_name = tool_name
+        self.payload = payload
+        super().__init__(f"Terminal tool '{tool_name}' invoked")
+        
 class ActionStep(CognitiveStep):
     step_name: str = "action"
     action_space: Optional[
@@ -188,6 +199,10 @@ class ActionStep(CognitiveStep):
     ] = Field(
         default=None,
         description="Either a single or list of action schema(s)/tool(s)"
+    )
+    terminal_tools: Optional[List[str]] = Field(
+        default=None,
+        description="Names of tools that, when invoked, should terminate the current loop/episode"
     )
 
     async def execute(self, agent: BaseModel) -> Union[str, Dict[str, Any]]:
@@ -319,6 +334,15 @@ class ActionStep(CognitiveStep):
         )
 
         agent.last_action = result
+        if self.terminal_tools and agent.chat_thread:
+            for msg in reversed(agent.chat_thread.history):
+                if msg.role in (MessageRole.assistant, MessageRole.tool):
+                    if msg.tool_name and msg.tool_name in self.terminal_tools:
+                        logger.info(
+                            "[ActionStep] Terminal tool '%s' invoked – stopping loop",
+                            msg.tool_name,
+                        )
+                        raise TerminalToolInvoked(msg.tool_name, payload=result)
         return result
     
 class ReflectionStep(CognitiveStep):

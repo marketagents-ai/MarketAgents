@@ -14,11 +14,13 @@ from minference.lite.models import (
     StructuredTool
 )
 from minference.lite.inference import InferenceOrchestrator
+from minference.caregistry import CallableRegistry
 
 from market_agents.agents.base_agent.prompter import PromptManager
 from market_agents.agents.personas.persona import Persona
 
 EntityRegistry()
+CallableRegistry()
 logger = EntityRegistry._logger
 
 class Agent(Entity):

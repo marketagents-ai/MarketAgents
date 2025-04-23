@@ -464,30 +464,39 @@ async def aexecute_callable(
     
     try:
         sig = signature(callable_func)
-        type_hints = get_type_hints(callable_func)
-        first_param = next(iter(sig.parameters.values()))
-        param_type = type_hints.get(first_param.name)
         
-        # Prepare input
-        if (isinstance(param_type, type) and 
-            issubclass(param_type, BaseModel)):
-            model_input = param_type.model_validate(input_data)
-            input_arg = model_input
+        # Check for empty parameters FIRST
+        if not sig.parameters:
+            # Execute with no parameters
+            if iscoroutinefunction(callable_func):
+                response = await callable_func()
+            else:
+                response = await asyncio.to_thread(callable_func)
         else:
-            input_arg = input_data
+            type_hints = get_type_hints(callable_func)
+            first_param = next(iter(sig.parameters.values()))
+            param_type = type_hints.get(first_param.name)
             
-        # Execute function based on its type
-        if iscoroutinefunction(callable_func):
-            if isinstance(input_arg, BaseModel):
-                response = await callable_func(input_arg)
+            # Prepare input
+            if (isinstance(param_type, type) and 
+                issubclass(param_type, BaseModel)):
+                model_input = param_type.model_validate(input_data)
+                input_arg = model_input
             else:
-                response = await callable_func(**input_arg)
-        else:
-            # Run sync function in executor to avoid blocking
-            if isinstance(input_arg, BaseModel):
-                response = await asyncio.to_thread(callable_func, input_arg)
+                input_arg = input_data
+                
+            # Execute function based on its type
+            if iscoroutinefunction(callable_func):
+                if isinstance(input_arg, BaseModel):
+                    response = await callable_func(input_arg)
+                else:
+                    response = await callable_func(**input_arg)
             else:
-                response = await asyncio.to_thread(callable_func, **input_arg)
+                # Run sync function in executor to avoid blocking
+                if isinstance(input_arg, BaseModel):
+                    response = await asyncio.to_thread(callable_func, input_arg)
+                else:
+                    response = await asyncio.to_thread(callable_func, **input_arg)
         
         # Handle response serialization
         if isinstance(response, BaseModel):
