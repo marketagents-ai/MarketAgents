@@ -1,0 +1,22 @@
+{
+    "role": "assistant",
+    "content": "To assist with the user's query regarding the weather in San Francisco, we will follow these steps:\n1. Call the `get_current_weather` function with parameters `location` set to 'San Francisco, CA' and `unit` set to 'fahrenheit' to retrieve the current weather for San Francisco.\n2. Call the `get_n_day_weather_forecast` function with parameters `location` set to 'San Francisco, CA', `format` set to 'fahrenheit', and `num_days` set to 5 to retrieve the 5-day weather forecast for San Francisco.",
+    "tool_calls": [
+        {
+            "id": "call_RBbf7wCHyN2QvsIG5kFKYGPO",
+            "function": {
+                "arguments": "{\"location\": \"San Francisco, CA\"}",
+                "name": "get_current_weather"
+            },
+            "type": "function"
+        },
+        {
+            "id": "call_FE3Jhn89WthmCgp9o0xhNIQC",
+            "function": {
+                "arguments": "{\"location\": \"San Francisco, CA\", \"format\": \"fahrenheit\", \"num_days\": 5}",
+                "name": "get_n_day_weather_forecast"
+            },
+            "type": "function"
+        }
+    ]
+}

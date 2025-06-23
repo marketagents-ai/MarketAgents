@@ -1,0 +1,272 @@
+Category, SubCategory, Task
+File System, File, Create a new File
+File System, File, Edit the contents of a File
+File System, File, Read the contents of a File
+File System, File, Delete a File
+File System, File, Copy a File
+File System, File, Move a File
+File System, File, Rename a File
+File Syste, Folder, Create a new Folder
+File System, Handling File Formats, Read the contents of a PDF file
+File System, Handling File Formats, Read the contents of a Word file
+File System, Handling File Formats, Read the contents of an Excel file
+File System, Notes, Create a new Note
+File System, Notes, Edit the contents of a Note
+File System, Notes, Read the contents of a Note
+File System, Notes, Delete a Note
+Media, Image, Generate an image from text using a diffuser 
+Media, Image, Perform OCR on an image
+Media, Audio, Generate an audio file from text
+Media, Audio, Transcribe an audio file
+Web Browser, Search, Search over a query
+Web Browser, Search, Search for images
+Web Browser, Search, Search for news
+Web Browser, Access, Scrape the content of a website
+Web Browser, Access, Take a screenshot of a website
+Web Browser, Access, Download a file/files from a website
+Web Browser, Navigation, Interact with pop-ups and dialogs
+Web Browser, Navigation, Handle multiple tabs and windows
+Web Browser, Navigation, Fill out forms
+Communication, Email, Send an email
+Communication, Email, Read the contents of an email
+Communication, Email, Retrieve the last n emails
+Communication, Messages, Send a text message
+Communication, Messages, Read the contents of a text message
+Communication, Messages, Retrieve the last n text messages
+Scheduling, Calendar, Create an event
+Scheduling, Calendar, Edit an event
+Scheduling, Calendar, Delete an event
+Scheduling, Calendar, Retrieve the events of a day
+Scheduling, Calendar, Retrieve the events of a week
+Scheduling, Calendar, Retrieve the events of a month
+Scheduling, To-Do List, Create a task
+Scheduling, To-Do List, Edit a task
+Scheduling, To-Do List, Delete a task
+Scheduling, To-Do List, Mark a task as completed
+Scheduling, To-Do List, Retrieve the tasks of a day
+Scheduling, To-Do List, Retrieve the tasks of a week
+Scheduling, To-Do List, Retrieve the tasks of a month
+Daily Life, Weather, Retrieve the weather forecast of a location for a day
+Daily Life, Weather, Retrieve th weekly weather forecast of a location 
+Daily Life, Food, Order food from an app
+Daily Life, Food, Order food from a website
+Daily Life, Food, Order food from a restaurant
+Daily Life, Food, Check the status of a food order (app/website)
+Daily Life, Food, Cancel a food order
+Daily Life, Food, Schedule a food order
+Basic Utilities, Statistics, Calculate the mean of a list of numbers
+Basic Utilities, Statistics, Calculate the median of a list of numbers
+Basic Utilities, Text Processing, Search regex patterns in a text
+Basic Utilities, Text Processing, Convert markdown to HTML
+Basic Utilities, Text Processing, Convert HTML to markdown
+Device Control, Volume, Increase the volume
+Device Control, Volume, Decrease the volume
+Device Control, Volume, Mute the volume
+Device Control, Volume, Unmute the volume
+Device Control, Brightness, Increase the brightness
+Device Control, Brightness, Decrease the brightness
+Device Control, Brightness, Set the brightness to a specific value
+Device Control, Camera, Take a photo
+Device Control, Camera, Record a video
+Device Control, Camera, Scan and access QR code(s)
+Cameras, Photography, Take a photo with the rear camera
+Cameras, Photography, Take a photo with the front camera
+Cameras, Photography, Apply a filter to a photo
+Cameras, Photography, Adjust the exposure of a photo
+Cameras, Photography, Adjust the white balance of a photo
+Cameras, Photography, Crop a photo
+Cameras, Photography, Edit the brightness and contrast of a photo
+Cameras, Photography, Create a time-lapse video
+Cameras, Photography, Create a slow-motion video
+Cameras, Photography, Capture a panoramic photo
+Document Readers, PDF, Open a PDF document
+Document Readers, PDF, Highlight text in a PDF
+Document Readers, PDF, Add a comment or annotation to a PDF
+Document Readers, PDF, Search for text within a PDF
+Document Readers, PDF, Bookmark a page in a PDF
+Document Readers, PDF, Extract text from a PDF
+Document Readers, PDF, Fill out a form in a PDF
+Document Readers, eBook, Open an ePub file
+Document Readers, eBook, Add a bookmark in an eBook
+Document Readers, eBook, Change the font size in an eBook
+Mail, Email, Compose a new email
+Mail, Email, Reply to an email
+Mail, Email, Forward an email
+Mail, Email, Attach a file to an email
+Mail, Email, Open an attachment from an email
+Mail, Email, Mark an email as read/unread
+Mail, Email, Move an email to a folder
+Mail, Email, Delete an email
+Mail, Email, Search for an email by keyword
+Mail, Email, Filter emails by sender
+Photos, Management, Import photos from the camera roll
+Photos, Management, Delete a photo from the library
+Photos, Management, Create a new album
+Photos, Management, Add photos to an album
+Photos, Management, Remove photos from an album
+Photos, Editing, Apply a preset filter to a photo
+Photos, Editing, Adjust the saturation of a photo
+Photos, Editing, Rotate or flip a photo
+Photos, Editing, Remove red-eye from a photo
+Photos, Sharing, Share a photo via email
+Word Processors, Document Creation, Create a new document
+Word Processors, Document Creation, "Save a document in different formats (e.g., DOCX, PDF)"
+Word Processors, Text Formatting, "Apply bold, italic, and underline styles to text"
+Word Processors, Text Formatting, Change the font type and size
+Word Processors, Text Formatting, Insert and format a table
+Word Processors, Collaboration, Track changes made to a document
+Word Processors, Collaboration, Add comments to a document
+Word Processors, Media Insertion, Insert an image into a document
+Word Processors, Media Insertion, Embed a video or audio clip in a document
+Word Processors, Document Management, Find and replace text in a document
+Spreadsheets, Data Entry, Create a new spreadsheet
+Spreadsheets, Data Entry, Input and format a data table
+Spreadsheets, Data Management, Sort data by multiple columns
+Spreadsheets, Data Management, Filter data based on specific criteria
+Spreadsheets, Data Analysis, Create a pivot table to summarize data
+Spreadsheets, Data Analysis, "Use functions to calculate sums, averages, and other statistics"
+Spreadsheets, Data Visualization, Create and format a bar chart
+Spreadsheets, Data Visualization, Generate a line graph from data
+Spreadsheets, Collaboration, Share a spreadsheet for collaboration
+Spreadsheets, Document Management, Export a spreadsheet as a PDF or CSV file
+Presentations, Slide Creation, Create a new presentation
+Presentations, Slide Creation, Add a new slide to a presentation
+Presentations, Slide Content, Insert text boxes on a slide
+Presentations, Slide Content, Add images to a slide
+Presentations, Slide Content, Embed a video into a slide
+Presentations, Formatting, Apply a theme to the presentation
+Presentations, Formatting, Customize slide transitions and animations
+Presentations, Data Visualization, Insert and format a chart
+Presentations, Collaboration, Share a presentation for collaborative editing
+Presentations, Presentation Delivery, Export the presentation as a PDF or video
+Journals, Entry Creation, Create a new journal entry
+Journals, Entry Creation, Add a title and content to a journal entry
+Journals, Entry Creation, Insert images into a journal entry
+Journals, Entry Creation, Record and attach an audio note to an entry
+Journals, Entry Editing, Edit the contents of an existing journal entry
+Journals, Entry Organization, Tag a journal entry for easy retrieval
+Journals, Entry Organization, Search for journal entries by keyword or date
+Journals, Entry Organization, Organize journal entries into categories or folders
+Journals, Multimedia Integration, Attach a location to a journal entry
+Journals, Security, Lock a journal with a password or biometrics
+Whiteboards, Board Creation, Create a new digital whiteboard
+Whiteboards, Board Creation, Name and set initial settings for the whiteboard
+Whiteboards, Drawing Tools, Draw freehand lines on the whiteboard
+Whiteboards, Drawing Tools, "Insert predefined shapes (e.g., rectangles, circles)"
+Whiteboards, Drawing Tools, Use different colors and line thicknesses for drawing
+Whiteboards, Text and Annotations, Add text boxes to the whiteboard
+Whiteboards, Text and Annotations, Insert sticky notes or comments
+Whiteboards, Multimedia Integration, Import images or screenshots onto the whiteboard
+Whiteboards, Multimedia Integration, Embed videos or audio clips onto the whiteboard
+Whiteboards, Collaboration, Share the whiteboard for real-time collaborative editing
+Books, eBook Management, Browse the library of available eBooks
+Books, eBook Management, Purchase an eBook from the store
+Books, eBook Management, Download an eBook for offline reading
+Books, eBook Management, Remove an eBook from the library
+Books, eBook Reading, Open an eBook for reading
+Books, eBook Reading, Adjust font size and style in an eBook
+Books, eBook Reading, Navigate through pages or chapters of an eBook
+Books, eBook Reading, Search for text within an eBook
+Books, eBook Reading, Bookmark a page in an eBook
+Books, eBook Reading, Highlight text or make annotations in an eBook
+Music, Library Management, Browse the music library
+Music, Library Management, Add a song to the library
+Music, Library Management, Remove a song from the library
+Music, Library Management, Create and manage playlists
+Music, Playback Control, Play a song
+Music, Playback Control, Pause a song
+Music, Playback Control, Skip to the next song
+Music, Playback Control, Go back to the previous song
+Music, Playback Control, Adjust volume during playback
+Music, Playback Control, Shuffle the playlist or library
+Podcasts, Subscription Management, Subscribe to a new podcast
+Podcasts, Subscription Management, Unsubscribe from a podcast
+Podcasts, Subscription Management, Manage podcast subscriptions
+Podcasts, Episode Management, Download a podcast episode for offline listening
+Podcasts, Episode Management, Mark an episode as played/unplayed
+Podcasts, Episode Management, Delete a downloaded episode
+Podcasts, Episode Management, Stream a podcast episode
+Podcasts, Episode Management, Add episodes to a playlist
+Podcasts, Episode Management, "Create custom episode filters (e.g., by date, duration)"
+Podcasts, Discovery, Explore and discover new podcasts based on interests or genres
+Audiobooks, Library Management, Browse the audiobook library
+Audiobooks, Library Management, Add an audiobook to the library
+Audiobooks, Library Management, Remove an audiobook from the library
+Audiobooks, Playback Control, Play an audiobook
+Audiobooks, Playback Control, Pause an audiobook
+Audiobooks, Playback Control, Skip to the next chapter
+Audiobooks, Playback Control, Go back to the previous chapter
+Audiobooks, Playback Control, Adjust playback speed
+Audiobooks, Bookmarking, Add a bookmark to resume listening later
+Audiobooks, Bookmarking, View and manage bookmarks
+Shopping Lists, Create, Create a new shopping list
+Shopping Lists, Add Items, Add an item to the shopping list
+Shopping Lists, Add Items, Add multiple items to the shopping list
+Shopping Lists, Remove Items, Remove an item from the shopping list
+Shopping Lists, Edit Items, Edit the quantity of an item on the shopping list
+Shopping Lists, Edit Items, Edit the description of an item on the shopping list
+Shopping Lists, Mark Items, Mark an item as purchased
+Shopping Lists, Mark Items, Unmark an item as purchased
+Shopping Lists, Share, Share a shopping list with others
+Shopping Lists, Clear, Clear all items from the shopping list
+Notes, Edit, Edit the contents of a note
+Notes, Delete, Delete a note
+Notes, Read, Read the contents of a note
+Notes, Search, Search for notes by keyword
+Notes, Organize, Organize notes into folders or categories
+Notes, Tagging, Add tags to notes for easy retrieval
+Notes, Collaboration, Share a note with others
+Notes, Voice Input, Create a note using voice input
+Notes, Reminders, Set a reminder on a note
+Messaging, Send, Send a text message
+Messaging, Send, Send a multimedia message (MMS)
+Messaging, Send, Send a message to a specific contact
+Messaging, Send, Send a message to multiple contacts
+Messaging, Read, Read the latest received message
+Messaging, Read, Read messages from a specific contact
+Messaging, Read, Read unread messages
+Messaging, Delete, Delete a message
+Messaging, Delete, Delete messages from a specific contact
+Messaging, Notification, Receive and read new message notifications
+Payments, Set Reminders, Set a reminder for upcoming bill payments
+Payments, Track Expenses, "Track expenses by category (e.g., groceries, utilities)"
+Payments, Schedule Payments, Schedule a payment for a specific bill
+Payments, View Bills, View upcoming bills and due dates
+Payments, Pay Bills, Pay a bill from a linked account
+Payments, Payment History, View payment history for bills
+Payments, Manage Accounts, Add or remove payment accounts
+Payments, Notifications, Receive notifications for bill due dates
+Payments, Budgeting, Set monthly budget limits for different categories
+Payments, Subscription Management, Manage subscriptions and renewal dates
+Restaurant Reservations, Find Restaurants, Find nearby restaurants based on cuisine or location
+Restaurant Reservations, Browse Menus, Browse menus of selected restaurants
+Restaurant Reservations, Check Availability, Check availability for a specific date and time
+Restaurant Reservations, Make Reservation, Make a reservation at a selected restaurant
+Restaurant Reservations, Modify Reservation,"Modify an existing reservation (date, time, number of guests)"
+Restaurant Reservations, Cancel Reservation, Cancel a previously made reservation
+Restaurant Reservations, Special Requests, "Add special requests (e.g., dietary preferences, special occasion notes)"
+Restaurant Reservations, Confirm Reservation, Confirm the details of a reservation
+Restaurant Reservations, Receive Confirmation, Receive confirmation via email or text
+Restaurant Reservations, Reminder, Set a reminder for the reservation date and time
+Workouts, Exercise Suggestions, Provide exercise suggestions based on fitness goals
+Workouts, Workout Plans, Create a personalized workout plan
+Workouts, Exercise Instructions, Provide step-by-step instructions for exercises
+Workouts, Workout Tracking, Track workout progress and performance
+Workouts, Set Goals, "Set fitness goals (e.g., weight loss, muscle gain)"
+Workouts, Nutrition Guidance, Offer nutrition advice related to workouts
+Workouts, Motivation, Send motivational messages or quotes
+Workouts, Schedule Workouts, Schedule workout sessions in a calendar
+Workouts, Recovery Tips, Provide tips for post-workout recovery
+Workouts, Fitness Challenges, Propose fitness challenges to engage users
+VoIP Calling, Make Calls, Initiate a VoIP call to a contact
+VoIP Calling, Receive Calls, Receive incoming VoIP calls
+VoIP Calling, End Calls, End an ongoing VoIP call
+VoIP Calling, Call History, "View call history (missed, received, dialed)"
+VoIP Calling, Contacts, "Manage VoIP contacts (add, edit, delete)"
+VoIP Calling, Call Forwarding, Set up call forwarding options
+VoIP Calling, Do Not Disturb, Activate or deactivate Do Not Disturb mode
+VoIP Calling, Conference Calls, Initiate a conference call with multiple contacts
+VoIP Calling, Call Recording, Record VoIP calls
+VoIP Calling, Voicemail, Access and manage VoIP voicemail messages
+VoIP Calling, Call Quality, Check and troubleshoot call quality issues
+VoIP Calling, Call Settings, "Customize VoIP calling settings (e.g., ringtone, notifications)"

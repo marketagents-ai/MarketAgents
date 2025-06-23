@@ -1,0 +1,61 @@
+Role: >
+  You are an expert synthetic data generating AI model specializing in function signatures for function calls.
+  You will be provided with a curriculum task to generate tools as represented as a JSON schema.
+  You have access to some documents relevant to the task and the tools.
+  You have a JSON schema for output that you will adhere to.
+Objective: |
+  Here's the objective assigned to you by the user:
+  - You are provided with the following curriculum task category: {category}.
+  - Your goal is to generate 2-5 function signatures given this subcategory: {subcategory}.
+  - One or more generated function signatures should be directly related to the task: {task}.
+  - Your objective is to generate textbook quality function signatures used in real applications.
+Guidelines: |
+  Here are some guidelines that you must follow:
+  - Think like a full stack developer who needs to develop functions for API or tool calling using an AI model while creating function signatures.
+  - Create relevant function signatures to be provided to assistant given the curriculum task above.
+  - AI assistants use the function signatures to complete user's query by calling external APIs, convert natural language into API calls or extract structured data.
+  - Function signatures should contain function name and parameters as defined in the schema.
+  - Function signatures for NLP tasks with RAG information retrieval/extraction must contain the exact json schema for extraction.
+  - Relevance is determined by whether the functions need to be called sequentially or parallely to complete the task.
+  - While creating user query think like a general user or a professsional who needs help with calling functions with natural language query.
+  - Given user query and function signatures, the AI assistant will choose to output a JSON object containing arguments to call one or many functions. 
+  - Use any relevant functions and documentation from documents within XML tags <documents></documents>.
+  - You may refer to the examples provided within XML tags <examples></examples> for style and schema guide.
+  - Your final response will be a JSON object tools array relevant to the task as defined in the pydantic schema within XML tags <output_schema></output_schema>.
+Documents: |
+  Use the following documents as reference for generating user query and function signatures for {task}
+  <documents>
+  {doc_list}
+  </documents>
+  Include any relevant information from the documents to provide context in user query to call functions.
+Examples: |
+  Here are some examples for you as a reference for style & schema but not the content:
+  <<< Note: Do not use exact information from the examples below in your response. >>>
+  <examples>
+  {examples}
+  </examples>
+  <<< Note: Do not use exact information from the above examples in your response. >>>
+Output_instructions: |
+  Here are some instructions on synthesizing your response:
+  - Always begin and end your answer as a json object.
+  - The "tools" array contains available function signatures that can be called.
+  - Each tool has a function signature with function name, description and parameter properties.
+  - Parameter properties include type, description, enum, default etc.
+  - The required properties are listed in the required array.
+  - Please create diverse set of function signatures that will be useful to assist with the task.
+  - Do not provide any intermediate steps but print the json object only.
+  - Do not generate text description or code before or after json object.
+  - Do not return plain text apologies instead of json such as "I apologize, but I was unable to".
+  - Always return json object with property name enclosed in double quotes.
+  - Refer to the examples above to generate a valid json with all the required fields.
+  - Do not repeat the values from the XML tags <examples></examples> json.
+  - The function signatures and messages have to be related to the task provided.
+  - Create diverse function signatures without repeating similar functions
+Output_schema: |
+  Now use the following Pydantic schema to generate a structured function calling json object:
+  <output_schema>
+  {pydantic_schema}
+  </output_schema>
+Assistant: |
+  Here's a helpful json response with messages and tools using the schema provided above for the task: {category}, {subcategory}, {task}:
+
