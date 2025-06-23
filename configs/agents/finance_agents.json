@@ -1,0 +1,65 @@
+[
+    {
+        "name": "Financial Analyst",
+        "default_tools": ["web_search", "rag_search"],
+        "tools": [
+            "search_10q",
+            "search_10k",
+            "get_stock_fundamentals",
+            "get_financial_statements"
+        ],
+        "llm_config": {
+            "client": "azure_openai",
+            "model": "gpt4o",
+            "temperature": 0.6,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "financial_analyst",
+        "output_format": "FinancialAnalystOutput",
+        "dependencies": []
+    },
+    {
+        "name": "Research Analyst",
+        "default_tools": ["web_search", "rag_search"],
+        "tools": [
+            "google_search_and_scrape",
+            "get_company_news"
+        ],
+        "llm_config": {
+            "client": "azure_openai",
+            "model": "gpt4o",
+            "temperature": 0.6,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "research_analyst",
+        "output_format": "ResearchAnalystOutput",
+        "dependencies": ["Financial Analyst"]
+    },
+    {
+        "name": "Investment Advisor",
+        "default_tools": ["web_search", "rag_search"],
+        "tools": [],
+        "llm_config": {
+            "client": "azure_openai",
+            "model": "gpt4o",
+            "temperature": 0.6,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "investment_advisor",
+        "output_format": "InvestmentAdvisorOutput",
+        "dependencies": ["Financial Analyst", "Research Analyst"]
+    },
+    {
+        "name": "Financial Summarizer",
+        "tools": [],
+        "llm_config": {
+            "client": "azure_openai",
+            "model": "gpt4o",
+            "temperature": 0.6,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "financial_summarizer",
+        "output_format": "FinancialSummaryOutput",
+        "dependencies": ["Financial Analyst", "Research Analyst", "Investment Advisor"]
+    }
+]

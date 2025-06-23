@@ -1,0 +1,62 @@
+[
+    {
+        "name": "Docstring Generator",
+        "default_tools": [],
+        "tools": [],
+        "llm_config": {
+            "client": "anthropic",
+            "model": "claude-3-5-sonnet-20240620",
+            "temperature": 0.2,
+            "response_format": "json"
+        },
+        "prompt_type": "docstring_generator",
+        "output_format": "ToolDocStrings",
+        "dependencies": [],
+        "few_shot": false
+    },
+    {
+        "name": "Content Schema Generator",
+        "default_tools": ["web_search"],
+        "tools": [],
+        "llm_config": {
+            "client": "anthropic",
+            "model": "claude-3-5-sonnet-20240620",
+            "temperature": 0.2,
+            "response_format": "json"
+        },
+        "prompt_type": "content_schema",
+        "output_format": "ContentSchemas",
+        "dependencies": [],
+        "few_shot": false
+    },
+    {
+        "name": "Function Results Generator",
+        "default_tools": [],
+        "tools": [],
+        "llm_config": {
+            "client": "anthropic",
+            "model": "claude-3-5-sonnet-20240620",
+            "temperature": 0.4,
+            "response_format": "json"
+        },
+        "prompt_type": "tool_results",
+        "output_format": "ToolMessages",
+        "dependencies": [],
+        "few_shot": false
+    },
+    {
+        "name": "Follow-up Query Generator",
+        "default_tools": ["web_search"],
+        "tools": [],
+        "llm_config": {
+            "client": "azure_openai",
+            "model": "gpt4o",
+            "temperature": 0.6,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "followup_query",
+        "output_format": "UserMessage",
+        "dependencies": [],
+        "few_shot": false
+    }
+]

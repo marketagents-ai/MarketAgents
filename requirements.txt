@@ -1,0 +1,27 @@
+# Networkx
+networkx
+
+# Matlpotlib
+matplotlib
+
+# Tenacity
+tenacity 
+
+# LLM Vendors
+anthropic
+openai
+groq
+
+# Python-dotenv
+python-dotenv
+
+# Beautiful Soup
+beautifulsoup4
+
+# Langchain
+langchain
+langchain-openai
+langchain-community
+
+#additional package
+unstructureds

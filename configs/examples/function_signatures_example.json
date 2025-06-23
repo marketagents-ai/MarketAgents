@@ -1,0 +1,158 @@
+{
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_current_weather",
+                "description": "Get the current weather in a given location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA"
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": [
+                                "celsius",
+                                "fahrenheit"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "location"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_n_day_weather_forecast",
+                "description": "Get an N-day weather forecast",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA"
+                        },
+                        "format": {
+                            "type": "string",
+                            "enum": [
+                                "celsius",
+                                "fahrenheit"
+                            ],
+                            "description": "The temperature unit to use. Infer this from the user's location."
+                        },
+                        "num_days": {
+                            "type": "integer",
+                            "description": "The number of days to forecast"
+                        }
+                    },
+                    "required": [
+                        "location",
+                        "format",
+                        "num_days"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_detailed_weather",
+                "description": "Get detailed weather information for a given location and date, including temperature, humidity, wind speed, and precipitation chances.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA"
+                        },
+                        "date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The date for which to get the detailed weather information."
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": [
+                                "celsius",
+                                "fahrenheit"
+                            ]
+                        },
+                        "humidity": {
+                            "type": "boolean",
+                            "description": "Include humidity information."
+                        },
+                        "wind_speed": {
+                            "type": "boolean",
+                            "description": "Include wind speed information."
+                        },
+                        "precipitation_chance": {
+                            "type": "boolean",
+                            "description": "Include precipitation chance information."
+                        }
+                    },
+                    "required": [
+                        "location",
+                        "date"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_hourly_weather_forecast",
+                "description": "Get an hourly weather forecast for a given location and date.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA"
+                        },
+                        "date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The date for which to get the hourly weather forecast."
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": [
+                                "celsius",
+                                "fahrenheit"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "location",
+                        "date"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather_alerts",
+                "description": "Get weather alerts or warnings for a specific location.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA"
+                        }
+                    },
+                    "required": [
+                        "location"
+                    ]
+                }
+            }
+        }                        
+    ]
+}
