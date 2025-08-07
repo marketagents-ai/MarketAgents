@@ -1,0 +1,48 @@
+model_list:
+  - model_name: openai/gpt-oss-20b
+    litellm_params:
+      model: openai/openai/gpt-oss-20b
+      api_base: http://vllm-gpt-oss-20b:8000/v1
+      api_key: none
+
+  - model_name: NousResearch/DeepHermes-3-Llama-3-8B-Preview
+    litellm_params:
+      model: openai/NousResearch/DeepHermes-3-Llama-3-8B-Preview
+      api_base: http://vllm-deephermes-8b:8000/v1
+      api_key: none
+  
+  - model_name: meta-llama/Llama-3.1-8B-Instruct
+    litellm_params:
+      model: openai/meta-llama/Llama-3.1-8B-Instruct
+      api_base: http://vllm-llama-3.1-8b:8000/v1
+      api_key: none
+
+  - model_name: mistralai/Ministral-8B-Instruct-2410
+    litellm_params:
+      model: openai/mistralai/Ministral-8B-Instruct-2410
+      api_base: http://vllm-ministral-8b:8000/v1
+      api_key: none
+
+  - model_name: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+    litellm_params:
+      model: openai/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+      api_base: http://vllm-deepseek-qwen-32b:8000/v1
+      api_key: none
+
+  - model_name: google/gemma-3-12b-it
+    litellm_params:
+      model: openai/google/gemma-3-12b-it
+      api_base: http://vllm-gemma-3-12b:8000/v1
+      api_key: none
+
+  - model_name: Qwen/Qwen3-30B-A3B-Thinking-2507
+    litellm_params:
+      model: openai/Qwen/Qwen3-30B-A3B-Thinking-2507
+      api_base: http://vllm-qwen3-thinking:8000/v1
+      api_key: none
+
+  - model_name: Qwen/Qwen3-30B-A3B-Instruct-2507
+    litellm_params:
+      model: openai/Qwen/Qwen3-30B-A3B-Instruct-2507
+      api_base: http://vllm-qwen3-instruct:8000/v1
+      api_key: none
