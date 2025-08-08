@@ -1,0 +1,149 @@
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "time_series",
+        "description": "Fetches futures contracts over a specified date range for a given symbol.\n\n    Args:\n        is_from (str): Start date of range in 'YYYY-MM-DD' format.\n        symbol (str): Symbol for futures contracts.\n        offset (int, optional): Offset for pagination. Defaults to None.\n        to (str, optional): End date of range. Defaults to '2022-01-30'.\n        format (str, optional): Response format ('json' or 'xml'). Defaults to 'json'.\n        month (str, optional): Specific month for contract data. Defaults to '8'.\n\n    Returns:\n        Futures contracts data for the specified symbol and date range.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "is_from": {
+              "type": "string",
+              "description": "The start date of the range in 'YYYY-MM-DD' format."
+            },
+            "symbol": {
+              "type": "string",
+              "description": "The symbol for which futures contracts are to be fetched."
+            },
+            "offset": {
+              "type": "integer",
+              "description": "Offset for pagination to fetch results beyond the first 100 objects. Defaults to None."
+            },
+            "to": {
+              "type": "string",
+              "description": "The end date of the range in 'YYYY-MM-DD' format. Defaults to '2022-01-30'."
+            },
+            "format": {
+              "type": "string",
+              "description": "The format of the response, such as 'json' or 'xml'. Defaults to 'json'."
+            },
+            "month": {
+              "type": "string",
+              "description": "The specific month for which to retrieve contract data. Defaults to '8'."
+            }
+          },
+          "required": [
+            "is_from",
+            "symbol"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "piercing_line",
+        "description": "Returns stocks with a Piercing Line signal from the BarPatterns API.\n\n    Args:\n        page (int): Page number for paginated results. Defaults to 1.\n\n    Returns:\n        List of stocks with Piercing Line signal.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "The page number for paginated results. Defaults to 1."
+            }
+          },
+          "required": [
+            "page"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "rates",
+        "description": "Fetches live currency conversion rates.\n\n    Args:\n        output (str): Response format ('JSON' or 'XML'). Defaults to 'JSON'.\n        base (str): Base currency for conversion rates. Defaults to 'USD'.\n\n    Returns:\n        Live currency conversion rates.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "output": {
+              "type": "string",
+              "description": "The output format of the response. Can be either 'JSON' or 'XML'. Default is 'JSON'."
+            },
+            "base": {
+              "type": "string",
+              "description": "The base currency for conversion rates. Examples include 'USD', 'GBP', or 'BTC'. Default is 'USD'."
+            }
+          },
+          "required": [
+            "output",
+            "base"
+          ]
+        }
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "system",
+      "content": "# Role:\nYou are a function calling AI agent with self-recursion. You may use the Goal -> Action -> Observation -> Reflection agentic framework. You will be provided with a user query or task that you need to assist with. You have access to serveral tools that you may use for synthesizing your response. The current date and time is 2024-06-28 12:17:35.\n# Objective:\nHere's the objective assigned to you by the user:\n- You will use Goal Oriented Action Planning (GOAP) framework for reasoning and planning to help with user query.\n- You will always wrap your planning within <scratch_pad> </scratch_pad> XML tags before proceeding with next action.\n- You can call one or more functions at a time and analyse data you get from function response.\n- After calling & executing the functions, you will be provided with function results to summarize or take further actions.\n- Analyze the data once you get the results and call another function if necessary, otherwise you can end the conversation with the summary.\n- At each iteration please continue adding your new analysis to previous summaries if follow-up queries are relevant.\n- Your final response should directly answer the user query with an analysis or summary of the results of function calls.\n# Guidelines:\nHere are some guidelines you must follow:\n- Given a user request, you will come up with a plan to solve the problem which answers questions such as \"Which tools should be used,\" and \"In what order should they be used.\"\n- You will carry out the plan by repeatedly executing actions (using whatever tools are appropriate), reasoning over the results, and re-evaluating the plan.\n- After each Action -> Observation -> Reflection cycle, you will reflect about what to do next. This reflection involves analyzing what has been figured out so far, determining whether any changes need to be made to the plan, and what to do next. You can take as many steps as it deems necessary.\n- Once you decide you know how to answer the user question, proceed to generating the final response.\n- If available tools are not relevant in assisting with user query, just respond in natural conversational language.\n- Give a proper reasoning to the user as part of <scratch_pad> and then call the appropriate function when all requirements and/or parameters for a function are given.\n- Ask the user for clarification to meet all the requirements of a function if user request is ambiguous.\n- Do not call functions before providing step-by-step reasoning for each function you call within <scratch_pad>.\n- Please keep a running summary with analysis of previous function results and summaries from previous iterations when relevant.\n# Documents:\n# Examples:\nHere are some example function calls for you as a reference:\n<<< Note: Do not use information from the examples below in your response. >>>\n<example>\n[{\"name\": \"rates\", \"arguments\": {\"output\": \"XML\", \"base\": \"GBP\"}}]\n</example>\n<<< Note: Do not use information from the above examples in your response. >>> \n# Output_instructions:\n- Don't make assumptions about what values to plug into function arguments.\n- If functions have \"required\" parameters, do not call functions without those arguments.\n- If you don't have the capability to execute the task provided, i.e. generate an image etc  even with the tools provided, explain that you don't have the tools available to complete the task.\n- If the response can be generated from your internal knowledge (e.g., as in the case of queries like \"What is the capital of Poland?\") but function is not available, please do so.\n- Some possible ways to respond in case of capability issues are instead of saying \"Unfortunately, I do not have the capability...\"\n  - The tools available do not give me the capability to generate images yet\n  - Since the tools available do not provide the capability...\n  - I'm sorry, the tools I have available aren't capable of generating images\n- <scratch_pad> is mandatory! Always start your response with <scratch_pad>\n# Output_schema:\n## Scratchpad Reasoning Format:\n- You must use <scratch_pad> </scratch_pad> XML tags to record your reasoning and planning before you call the functions as follows.\n- The Action needs to be a python executable function call with results variable assignment:\n  for eg. Action: Action: web_chain_details = functions.web_chain_details(chain_slug='ethereum')\n- For multi tool parallel, assign a result variable for every function call beginning with dash:\n  Action:\n  - web_chain_details = functions.web_chain_details(chain_slug='ethereum')\n  - t3ma_result = functions.t3ma(symbol='ETH/BTC', interval='1h', time_period=14)\n- Don't generate JSON object for tool call within the \"Action\" section of scratchpad\n- You will not have observation (function results) in the first turn but reflection is required to evaluate actions.\n- You will only add observation once function results are provided in the subsequent turns.\n- In the first turn reflection will evaluate query and tool relevance and if user query provides required details.\n- In the subsequent turns, reflection need to evaluate previous actions & observations and then analyze and summarize the results as per the user query.\n<scratch_pad>\n{Goal -> Action -> Observation -> Reflection cycle}\n</scratch_pad>\n\n## Scratchpad Reasoning Examples\neg. query with all required details: \"What's the weather in San Francisco today? And what does the 5 day forecast look like in San Francisco? Please provide temperature in Fahrenheit\"\n<scratch_pad>\nGoal: Obtain current weather and 5-day forecast for San Francisco\nAction:\n- weather = functions.get_current_weather(location='San Francisco')\n- forecast = functions.get_n_day_weather_forecast(location='San Francisco', format='fahrenheit', num_days=5)\nReflection: Functions match query needs; location provided; unit preference provided.\n</scratch_pad>\n\neg. query with missing details: Could you help me swap ETH to BTC?\n<scratch_pad>\nGoal: Swap ETH (Ethereum) to BTC (Bitcoin)\nAction: Aborting function call; missing details. Ask user to specify the amount to swap since it is required.\nReflection: Function 'swap_agent' matches the user's need to swap cryptocurrencies; however, the user didn't specify the amount to swap, which is a required parameter.\n</scratch_pad>\n\neg. scratchpad after functions executed and results have been obtained:\n<scratch_pad>\nGoal: Obtain the time zone and local time for the US zip code 10001 and the local time in Paris.\nAction:\n- time_zone_10001 = functions.time_zone_api(q='10001')\n- time_zone_paris = functions.time_zone_api(q='Paris')\nObservation:\n- The time zone for the US zip code 10001 is 'America/New_York' and the local time is '2024-06-27T16:26:46-04:00'.\n- The time zone for Paris is 'Europe/Paris' and the local time is '2024-06-27T22:26:46+02:00'.\nReflection: I have obtained the required time zone and local time information for both locations successfully in correct format as requested.\n</scratch_pad>\n# Assistant:\nHere's the helpful answer with reasoning & planning within <scratch_pad> and function calls to assist with user query:\n"
+    },
+    {
+      "role": "user",
+      "content": "Fetch currency rates in XML format with 'GBP' as the base."
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Fetch live currency conversion rates with 'GBP' as the base currency in XML format.\nAction: rates = functions.rates(output='XML', base='GBP')\nReflection: The function 'rates' matches the user's need to fetch live currency conversion rates. The user has provided all required parameters: output format (XML) and base currency (GBP).\n</scratch_pad>\n",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "id": "call_X2BFdg8e0abUqscZyrg1VM1z",
+          "function": {
+            "arguments": "{\"output\":\"XML\",\"base\":\"GBP\"}",
+            "name": "rates"
+          },
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_X2BFdg8e0abUqscZyrg1VM1z",
+      "name": "rates",
+      "content": "{'base': 'GBP', 'rates': {'USD': 1.2674, 'EUR': 1.1623, 'JPY': 183.4521, 'CHF': 1.1342, 'CAD': 1.6852, 'AUD': 1.9132, 'CNY': 9.1821, 'HKD': 9.9234, 'NZD': 2.0743, 'SEK': 13.6932}, 'timestamp': '2024-06-28T12:17:58Z'}"
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Fetch live currency conversion rates with 'GBP' as the base currency in XML format.\nAction: rates = functions.rates(output='XML', base='GBP')\nObservation: The function returned the following currency conversion rates with 'GBP' as the base:\n- USD: 1.2674\n- EUR: 1.1623\n- JPY: 183.4521\n- CHF: 1.1342\n- CAD: 1.6852\n- AUD: 1.9132\n- CNY: 9.1821\n- HKD: 9.9234\n- NZD: 2.0743\n- SEK: 13.6932\nReflection: The function successfully provided the live currency conversion rates in the requested format and base currency.\n</scratch_pad>\n\nThe live currency conversion rates with 'GBP' as the base currency are as follows:\n- USD: 1.2674\n- EUR: 1.1623\n- JPY: 183.4521\n- CHF: 1.1342\n- CAD: 1.6852\n- AUD: 1.9132\n- CNY: 9.1821\n- HKD: 9.9234\n- NZD: 2.0743\n- SEK: 13.6932",
+      "role": "assistant"
+    },
+    {
+      "role": "user",
+      "content": "I would like to see the currency rates in XML format with 'USD' as the base."
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Fetch live currency conversion rates with 'USD' as the base currency in XML format.\nAction: rates = functions.rates(output='XML', base='USD')\nReflection: The function 'rates' matches the user's need to fetch live currency conversion rates. The user has provided all required parameters: output format (XML) and base currency (USD).\n</scratch_pad>\n",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "id": "call_CwhsGaG0N2CRTm8orEaX4KxV",
+          "function": {
+            "arguments": "{\"output\":\"XML\",\"base\":\"USD\"}",
+            "name": "rates"
+          },
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_CwhsGaG0N2CRTm8orEaX4KxV",
+      "name": "rates",
+      "content": "{'base': 'USD', 'rates': {'EUR': 0.9187, 'GBP': 0.7891, 'JPY': 144.62, 'CHF': 0.8976, 'CAD': 1.3298, 'AUD': 1.5102, 'CNY': 7.2453, 'HKD': 7.8231, 'NZD': 1.6387, 'SEK': 10.8234}, 'timestamp': '2024-06-28T12:21:00Z'}"
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Fetch live currency conversion rates with 'USD' as the base currency in XML format.\nAction: rates = functions.rates(output='XML', base='USD')\nObservation: The function returned the following currency conversion rates with 'USD' as the base:\n- EUR: 0.9187\n- GBP: 0.7891\n- JPY: 144.62\n- CHF: 0.8976\n- CAD: 1.3298\n- AUD: 1.5102\n- CNY: 7.2453\n- HKD: 7.8231\n- NZD: 1.6387\n- SEK: 10.8234\nReflection: The function successfully provided the live currency conversion rates in the requested format and base currency.\n</scratch_pad>\n\nThe live currency conversion rates with 'USD' as the base currency are as follows:\n- EUR: 0.9187\n- GBP: 0.7891\n- JPY: 144.62\n- CHF: 0.8976\n- CAD: 1.3298\n- AUD: 1.5102\n- CNY: 7.2453\n- HKD: 7.8231\n- NZD: 1.6387\n- SEK: 10.8234",
+      "role": "assistant"
+    }
+  ]
+}

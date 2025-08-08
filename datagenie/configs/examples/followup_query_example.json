@@ -1,0 +1,10 @@
+[
+    {
+        "role": "user",
+        "content": "I got the weather in San Francisco from the previous query. Can you provide detailed weather information for San Francisco, including temperature, humidity, wind speed, and chances of precipitation?"
+    },
+    {
+        "role": "user",
+        "content": "I found some live giveaways for beta access and games from the previous query. Could you help me find more details about these specific giveaways?\n\n1. **Beta Access for Game XYZ** \n   - Description: Get exclusive beta access to the upcoming game XYZ. Limited keys available!\n   - Platforms: PC, PS5\n\n2. **Game ABC Full Version Giveaway**\n   - Description: Win a full version of the popular game ABC. Enter now for your chance to win!\n   - Platforms: PC\n\n3. **Mystery Beta Access Giveaway**\n   - Description: Join our mystery beta access giveaway and be among the first to try out an unreleased game! Platforms: PC, Xbox One.\n\n4. **Exclusive Beta Key for Game DEF** \n    - Description: Claim your exclusive beta key for Game DEF and start playing before anyone else!\n    - Platforms: Xbox Series X"
+    }
+]

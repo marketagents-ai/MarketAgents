@@ -1,0 +1,280 @@
+
+services:
+
+  vllm-gpt-oss-20b:
+    image: vllm/vllm-openai:gptoss 
+    entrypoint: [
+      "vllm", "serve", "openai/gpt-oss-20b",
+      "--tensor-parallel-size", "1",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:
+      - "8000:8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["0"]
+
+  vllm-deephermes-8b:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "NousResearch/DeepHermes-3-Llama-3-8B-Preview",
+      "--tensor-parallel-size", "1",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser", "hermes",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:
+      - "8001:8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["1"]
+
+  vllm-llama-3.1-8b:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "meta-llama/Llama-3.1-8B-Instruct",
+      "--tensor-parallel-size", "1",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser", "llama3_json",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:
+      - "8002:8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["2"]
+
+  vllm-ministral-8b:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "mistralai/Ministral-8B-Instruct-2410",
+      "--tensor-parallel-size", "1",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser", "mistral",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ]     
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:
+      - "8003:8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["3"]
+
+  vllm-qwen3-thinking:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "Qwen/Qwen3-30B-A3B-Thinking-2507",
+      "--tensor-parallel-size", "1",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser", "hermes",
+      "--reasoning-parser", "deepseek_r1",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:
+      - "8004:8000"
+    ipc: host 
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["4"]
+
+  vllm-qwen3-instruct:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "--tensor-parallel-size", "1",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser", "hermes",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ] 
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:  
+      - "8005:8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:  
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["5"]
+
+  vllm-deepseek-qwen-32b:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+      "--tensor-parallel-size", "1",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser", "hermes",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:
+      - "8006:8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["6"]
+
+  vllm-gemma-3-12b:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "google/gemma-3-12b-it",
+      "--tensor-parallel-size", "1",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.90",
+      "--max-model-len", "32768",
+      "--num-scheduler-steps", "1"
+    ]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - /ephemeral/huggingface:/root/.cache/huggingface
+      - ./configs:/usr/app
+    ports:
+      - "8007:8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["7"] 
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    # ports:
+      # no public port needed- "9000:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3030:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    restart: unless-stopped
+
+  text-embeddings-inference:
+    image: ghcr.io/huggingface/text-embeddings-inference:hopper-1.8
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: "nvidia"
+              capabilities: ["gpu"]
+              device_ids: ["7"]
+    environment:
+      HF_TOKEN: ${HUGGINGFACE_TOKEN}
+      HUGGINGFACE_HUB_CACHE: /data
+    volumes:
+      - /ephemeral/huggingface:/data
+    ports:
+      - "8080:80"
+    command: ["--model-id","Qwen/Qwen3-Embedding-0.6B"]
+    restart: unless-stopped
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yml:/app/config.yaml
+    command:
+      - "--config=/app/config.yaml"
+
+volumes:
+  grafana-storage:
+  prometheus-data:

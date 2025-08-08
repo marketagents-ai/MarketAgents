@@ -1,0 +1,158 @@
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_pokemon_data_by_name",
+        "description": "Fetches data for a specified Pokemon using its name from the Pokemon Unite API.\n\n    Args:\n        name (str): The name of the Pokemon for which data is to be fetched.\n\n    Returns:\n        Data for the specified Pokemon from the Pokemon Unite API.\n    ",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the Pokemon for which data is to be fetched."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "custom_dice",
+        "description": "Roll a specified number of dice with a specified number of sides using the RapidAPI Dice Roll Simulator.\n\n    Args:\n        dice (int, optional): The number of dice to roll. Defaults to 3.\n        sides (int, optional): The number of sides on each die. Defaults to 8.\n\n    Returns:\n        Results of the custom dice roll.\n    ",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "dice": {
+              "type": "integer",
+              "description": "The number of dice to roll. Defaults to 3."
+            },
+            "sides": {
+              "type": "integer",
+              "description": "The number of sides on each die. Defaults to 8."
+            }
+          },
+          "required": []
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "leaguetotalstandings",
+        "description": "Fetches the total standings for a specific E-Sports league given the season ID and tournament ID.\n\n    Args:\n        seasonid (int): The season ID for which to retrieve the league's total standings.\n        tournamentid (int): The unique tournament ID for which to retrieve the league's total standings.\n\n    Returns:\n        Total standings for the specified E-Sports league.\n    ",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "seasonid": {
+              "type": "integer",
+              "description": "The season ID for which to retrieve the league's total standings."
+            },
+            "tournamentid": {
+              "type": "integer",
+              "description": "The unique tournament ID for which to retrieve the league's total standings."
+            }
+          },
+          "required": [
+            "seasonid",
+            "tournamentid"
+          ]
+        }
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "system",
+      "content": "# Role:\nYou are a function calling AI agent with self-recursion. You may use the Goal -> Action -> Observation -> Reflection agentic framework. You will be provided with a user query or task that you need to assist with. You have access to serveral tools that you may use for synthesizing your response. The current date and time is 2024-06-28 12:17:34.\n# Objective:\nHere's the objective assigned to you by the user:\n- You will use Goal Oriented Action Planning (GOAP) framework for reasoning and planning to help with user query.\n- You will always wrap your planning within <scratch_pad> </scratch_pad> XML tags before proceeding with next action.\n- You can call one or more functions at a time and analyse data you get from function response.\n- After calling & executing the functions, you will be provided with function results to summarize or take further actions.\n- Analyze the data once you get the results and call another function if necessary, otherwise you can end the conversation with the summary.\n- At each iteration please continue adding your new analysis to previous summaries if follow-up queries are relevant.\n- Your final response should directly answer the user query with an analysis or summary of the results of function calls.\n# Guidelines:\nHere are some guidelines you must follow:\n- Given a user request, you will come up with a plan to solve the problem which answers questions such as \"Which tools should be used,\" and \"In what order should they be used.\"\n- You will carry out the plan by repeatedly executing actions (using whatever tools are appropriate), reasoning over the results, and re-evaluating the plan.\n- After each Action -> Observation -> Reflection cycle, you will reflect about what to do next. This reflection involves analyzing what has been figured out so far, determining whether any changes need to be made to the plan, and what to do next. You can take as many steps as it deems necessary.\n- Once you decide you know how to answer the user question, proceed to generating the final response.\n- If available tools are not relevant in assisting with user query, just respond in natural conversational language.\n- Give a proper reasoning to the user as part of <scratch_pad> and then call the appropriate function when all requirements and/or parameters for a function are given.\n- Ask the user for clarification to meet all the requirements of a function if user request is ambiguous.\n- Do not call functions before providing step-by-step reasoning for each function you call within <scratch_pad>.\n- Please keep a running summary with analysis of previous function results and summaries from previous iterations when relevant.\n# Documents:\n# Examples:\nHere are some example function calls for you as a reference:\n<<< Note: Do not use information from the examples below in your response. >>>\n<example>\n[{\"name\": \"get_pokemon_data_by_name\", \"arguments\": {\"name\": \"Mewtwo\"}}, {\"name\": \"get_pokemon_data_by_name\", \"arguments\": {\"name\": \"Greninja\"}}]\n</example>\n<<< Note: Do not use information from the above examples in your response. >>> \n# Output_instructions:\n- Don't make assumptions about what values to plug into function arguments.\n- If functions have \"required\" parameters, do not call functions without those arguments.\n- If you don't have the capability to execute the task provided, i.e. generate an image etc  even with the tools provided, explain that you don't have the tools available to complete the task.\n- If the response can be generated from your internal knowledge (e.g., as in the case of queries like \"What is the capital of Poland?\") but function is not available, please do so.\n- Some possible ways to respond in case of capability issues are instead of saying \"Unfortunately, I do not have the capability...\"\n  - The tools available do not give me the capability to generate images yet\n  - Since the tools available do not provide the capability...\n  - I'm sorry, the tools I have available aren't capable of generating images\n- <scratch_pad> is mandatory! Always start your response with <scratch_pad>\n# Output_schema:\n## Scratchpad Reasoning Format:\n- You must use <scratch_pad> </scratch_pad> XML tags to record your reasoning and planning before you call the functions as follows.\n- The Action needs to be a python executable function call with results variable assignment:\n  for eg. Action: Action: web_chain_details = functions.web_chain_details(chain_slug='ethereum')\n- For multi tool parallel, assign a result variable for every function call beginning with dash:\n  Action:\n  - web_chain_details = functions.web_chain_details(chain_slug='ethereum')\n  - t3ma_result = functions.t3ma(symbol='ETH/BTC', interval='1h', time_period=14)\n- Don't generate JSON object for tool call within the \"Action\" section of scratchpad\n- You will not have observation (function results) in the first turn but reflection is required to evaluate actions.\n- You will only add observation once function results are provided in the subsequent turns.\n- In the first turn reflection will evaluate query and tool relevance and if user query provides required details.\n- In the subsequent turns, reflection need to evaluate previous actions & observations and then analyze and summarize the results as per the user query.\n<scratch_pad>\n{Goal -> Action -> Observation -> Reflection cycle}\n</scratch_pad>\n\n## Scratchpad Reasoning Examples\neg. query with all required details: \"What's the weather in San Francisco today? And what does the 5 day forecast look like in San Francisco? Please provide temperature in Fahrenheit\"\n<scratch_pad>\nGoal: Obtain current weather and 5-day forecast for San Francisco\nAction:\n- weather = functions.get_current_weather(location='San Francisco')\n- forecast = functions.get_n_day_weather_forecast(location='San Francisco', format='fahrenheit', num_days=5)\nReflection: Functions match query needs; location provided; unit preference provided.\n</scratch_pad>\n\neg. query with missing details: Could you help me swap ETH to BTC?\n<scratch_pad>\nGoal: Swap ETH (Ethereum) to BTC (Bitcoin)\nAction: Aborting function call; missing details. Ask user to specify the amount to swap since it is required.\nReflection: Function 'swap_agent' matches the user's need to swap cryptocurrencies; however, the user didn't specify the amount to swap, which is a required parameter.\n</scratch_pad>\n\neg. scratchpad after functions executed and results have been obtained:\n<scratch_pad>\nGoal: Obtain the time zone and local time for the US zip code 10001 and the local time in Paris.\nAction:\n- time_zone_10001 = functions.time_zone_api(q='10001')\n- time_zone_paris = functions.time_zone_api(q='Paris')\nObservation:\n- The time zone for the US zip code 10001 is 'America/New_York' and the local time is '2024-06-27T16:26:46-04:00'.\n- The time zone for Paris is 'Europe/Paris' and the local time is '2024-06-27T22:26:46+02:00'.\nReflection: I have obtained the required time zone and local time information for both locations successfully in correct format as requested.\n</scratch_pad>\n# Assistant:\nHere's the helpful answer with reasoning & planning within <scratch_pad> and function calls to assist with user query:\n"
+    },
+    {
+      "role": "user",
+      "content": "What are the details for 'Mewtwo' and 'Greninja' from the Pokemon Unite API?"
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Obtain details for 'Mewtwo' and 'Greninja' from the Pokemon Unite API.\nAction:\n- mewtwo_data = functions.get_pokemon_data_by_name(name='Mewtwo')\n- greninja_data = functions.get_pokemon_data_by_name(name='Greninja')\nReflection: Both 'Mewtwo' and 'Greninja' are specified Pokemon names. The function `get_pokemon_data_by_name` is appropriate for retrieving their details.\n</scratch_pad>",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "id": "call_X2BFdg8e0abUqscZyrg1VM1z",
+          "function": {
+            "arguments": "{\"name\": \"Mewtwo\"}",
+            "name": "get_pokemon_data_by_name"
+          },
+          "type": "function"
+        },
+        {
+          "id": "call_SkRLen3KvRlygd1WMQvSrxLZ",
+          "function": {
+            "arguments": "{\"name\": \"Greninja\"}",
+            "name": "get_pokemon_data_by_name"
+          },
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_X2BFdg8e0abUqscZyrg1VM1z",
+      "name": "get_pokemon_data_by_name",
+      "content": "{'name': 'Mewtwo', 'type': ['Psychic'], 'abilities': ['Pressure', 'Unnerve', 'Insomnia'], 'stats': {'hp': 106, 'attack': 110, 'defense': 90, 'special_attack': 154, 'special_defense': 90, 'speed': 130}, 'moves': ['Psystrike', 'Psychic', 'Shadow Ball', 'Aura Sphere', 'Ice Beam'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png'}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_SkRLen3KvRlygd1WMQvSrxLZ",
+      "name": "get_pokemon_data_by_name",
+      "content": "{'name': 'Greninja', 'type': ['Water', 'Dark'], 'abilities': ['Torrent', 'Protean', 'Battle Bond'], 'stats': {'hp': 72, 'attack': 95, 'defense': 67, 'special_attack': 103, 'special_defense': 71, 'speed': 122}, 'moves': ['Water Shuriken', 'Dark Pulse', 'Ice Beam', 'Night Slash', 'Hydro Pump'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/658.png'}"
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Obtain details for 'Mewtwo' and 'Greninja' from the Pokemon Unite API.\nAction:\n- mewtwo_data = functions.get_pokemon_data_by_name(name='Mewtwo')\n- greninja_data = functions.get_pokemon_data_by_name(name='Greninja')\nObservation:\n- Mewtwo Data: {'name': 'Mewtwo', 'type': ['Psychic'], 'abilities': ['Pressure', 'Unnerve', 'Insomnia'], 'stats': {'hp': 106, 'attack': 110, 'defense': 90, 'special_attack': 154, 'special_defense': 90, 'speed': 130}, 'moves': ['Psystrike', 'Psychic', 'Shadow Ball', 'Aura Sphere', 'Ice Beam'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png'}\n- Greninja Data: {'name': 'Greninja', 'type': ['Water', 'Dark'], 'abilities': ['Torrent', 'Protean', 'Battle Bond'], 'stats': {'hp': 72, 'attack': 95, 'defense': 67, 'special_attack': 103, 'special_defense': 71, 'speed': 122}, 'moves': ['Water Shuriken', 'Dark Pulse', 'Ice Beam', 'Night Slash', 'Hydro Pump'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/658.png'}\nReflection: Successfully retrieved detailed information for both 'Mewtwo' and 'Greninja' from the Pokemon Unite API.\n</scratch_pad>\n\nHere are the details for 'Mewtwo' and 'Greninja' from the Pokemon Unite API:\n\n### Mewtwo\n- **Type:** Psychic\n- **Abilities:** Pressure, Unnerve, Insomnia\n- **Stats:**\n  - HP: 106\n  - Attack: 110\n  - Defense: 90\n  - Special Attack: 154\n  - Special Defense: 90\n  - Speed: 130\n- **Moves:** Psystrike, Psychic, Shadow Ball, Aura Sphere, Ice Beam\n- **Image:** ![Mewtwo](https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png)\n\n### Greninja\n- **Type:** Water, Dark\n- **Abilities:** Torrent, Protean, Battle Bond\n- **Stats:**\n  - HP: 72\n  - Attack: 95\n  - Defense: 67\n  - Special Attack: 103\n  - Special Defense: 71\n  - Speed: 122\n- **Moves:** Water Shuriken, Dark Pulse, Ice Beam, Night Slash, Hydro Pump\n- **Image:** ![Greninja](https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/658.png)",
+      "role": "assistant"
+    },
+    {
+      "role": "user",
+      "content": "Can you fetch the details for 'Pikachu' and 'Charizard' from the Pokemon Unite API?"
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Obtain details for 'Pikachu' and 'Charizard' from the Pokemon Unite API.\nAction:\n- pikachu_data = functions.get_pokemon_data_by_name(name='Pikachu')\n- charizard_data = functions.get_pokemon_data_by_name(name='Charizard')\nReflection: Both 'Pikachu' and 'Charizard' are specified Pokemon names. The function `get_pokemon_data_by_name` is appropriate for retrieving their details.\n</scratch_pad>",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "id": "call_RIdckIHNpe3kRRf44SaD5ZVn",
+          "function": {
+            "arguments": "{\"name\": \"Pikachu\"}",
+            "name": "get_pokemon_data_by_name"
+          },
+          "type": "function"
+        },
+        {
+          "id": "call_fbXfW2XrxA7Mrno69bILSIHy",
+          "function": {
+            "arguments": "{\"name\": \"Charizard\"}",
+            "name": "get_pokemon_data_by_name"
+          },
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_RIdckIHNpe3kRRf44SaD5ZVn",
+      "name": "get_pokemon_data_by_name",
+      "content": "{'name': 'Pikachu', 'type': ['Electric'], 'abilities': ['Static', 'Lightning Rod'], 'stats': {'hp': 35, 'attack': 55, 'defense': 40, 'special_attack': 50, 'special_defense': 50, 'speed': 90}, 'moves': ['Thunder Shock', 'Quick Attack', 'Thunderbolt', 'Iron Tail', 'Electro Ball'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png'}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_fbXfW2XrxA7Mrno69bILSIHy",
+      "name": "get_pokemon_data_by_name",
+      "content": "{'name': 'Charizard', 'type': ['Fire', 'Flying'], 'abilities': ['Blaze', 'Solar Power'], 'stats': {'hp': 78, 'attack': 84, 'defense': 78, 'special_attack': 109, 'special_defense': 85, 'speed': 100}, 'moves': ['Flamethrower', 'Dragon Claw', 'Air Slash', 'Fire Blast', 'Solar Beam'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png'}"
+    },
+    {
+      "content": "<scratch_pad>\nGoal: Obtain details for 'Pikachu' and 'Charizard' from the Pokemon Unite API.\nAction:\n- pikachu_data = functions.get_pokemon_data_by_name(name='Pikachu')\n- charizard_data = functions.get_pokemon_data_by_name(name='Charizard')\nObservation:\n- Pikachu Data: {'name': 'Pikachu', 'type': ['Electric'], 'abilities': ['Static', 'Lightning Rod'], 'stats': {'hp': 35, 'attack': 55, 'defense': 40, 'special_attack': 50, 'special_defense': 50, 'speed': 90}, 'moves': ['Thunder Shock', 'Quick Attack', 'Thunderbolt', 'Iron Tail', 'Electro Ball'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png'}\n- Charizard Data: {'name': 'Charizard', 'type': ['Fire', 'Flying'], 'abilities': ['Blaze', 'Solar Power'], 'stats': {'hp': 78, 'attack': 84, 'defense': 78, 'special_attack': 109, 'special_defense': 85, 'speed': 100}, 'moves': ['Flamethrower', 'Dragon Claw', 'Air Slash', 'Fire Blast', 'Solar Beam'], 'image_url': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png'}\nReflection: Successfully retrieved detailed information for both 'Pikachu' and 'Charizard' from the Pokemon Unite API.\n</scratch_pad>\n\nHere are the details for 'Pikachu' and 'Charizard' from the Pokemon Unite API:\n\n### Pikachu\n- **Type:** Electric\n- **Abilities:** Static, Lightning Rod\n- **Stats:**\n  - HP: 35\n  - Attack: 55\n  - Defense: 40\n  - Special Attack: 50\n  - Special Defense: 50\n  - Speed: 90\n- **Moves:** Thunder Shock, Quick Attack, Thunderbolt, Iron Tail, Electro Ball\n- **Image:** ![Pikachu](https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png)\n\n### Charizard\n- **Type:** Fire, Flying\n- **Abilities:** Blaze, Solar Power\n- **Stats:**\n  - HP: 78\n  - Attack: 84\n  - Defense: 78\n  - Special Attack: 109\n  - Special Defense: 85\n  - Speed: 100\n- **Moves:** Flamethrower, Dragon Claw, Air Slash, Fire Blast, Solar Beam\n- **Image:** ![Charizard](https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png)",
+      "role": "assistant"
+    }
+  ]
+}

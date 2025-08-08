@@ -1,0 +1,61 @@
+[
+    {
+        "name": "Function Signature Generator",
+        "default_tools": ["web_search"],
+        "tools": [],
+        "llm_config": {
+            "client": "groq",
+            "model": "llama3-70b-8192",
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "function_signatures",
+        "output_format": "Tools",
+        "dependencies": [],
+        "few_shot": true
+    },
+    {
+        "name": "User Query Generator",
+        "default_tools": ["web_search"],
+        "tools": [],
+        "llm_config": {
+            "client": "groq",
+            "model": "llama3-70b-8192",
+            "temperature": 0.5,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "user_query",
+        "output_format": "UserMessage",
+        "dependencies": ["Function Signature Generator"],
+        "few_shot": true
+    },
+    {
+        "name": "Function Results Generator",
+        "default_tools": ["web_search"],
+        "tools": [],
+        "llm_config": {
+            "client": "groq",
+            "model": "llama3-70b-8192",
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "function_results",
+        "output_format": "ToolMessages",
+        "dependencies": ["Function Signature Generator", "User Query Generator"],
+        "few_shot": true
+    },
+    {
+        "name": "Follow-up Query Generator",
+        "default_tools": ["web_search"],
+        "tools": [],
+        "llm_config": {
+            "client": "groq",
+            "model": "llama3-70b-8192",
+            "temperature": 0.6,
+            "response_format": {"type": "json_object"}
+        },
+        "prompt_type": "user_query",
+        "output_format": "UserMessage",
+        "dependencies": ["Function Signature Generator", "User Query Generator","Function Results Generator"],
+        "few_shot": true
+    }
+]

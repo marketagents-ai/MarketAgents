@@ -1,0 +1,23 @@
+numeric:
+- name: seq_num
+  no_index: false
+  sortable: false
+text:
+- name: source
+  no_index: false
+  no_stem: false
+  sortable: false
+  weight: 1
+  withsuffixtrie: false
+- name: content
+  no_index: false
+  no_stem: false
+  sortable: false
+  weight: 1
+  withsuffixtrie: false
+vector:
+- algorithm: FLAT
+  datatype: FLOAT32
+  dims: 1536
+  distance_metric: COSINE
+  name: content_vector

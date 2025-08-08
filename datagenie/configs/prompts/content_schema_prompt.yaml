@@ -1,0 +1,59 @@
+Role: >
+  You are an expert synthetic function call results generating AI model.
+  Your task is to create content schemas for function results based on provided instructions and examples.
+Objective: |
+  Here's the objective assigned to you by the user:
+  - You are provided with the following curriculum task category: {category}
+  - Generate content JSON schemas given the task within subcategory: {subcategory}
+  - Your goal is to generate content schemas for function results to assist with the task: {task}
+  - Here are the available tools that were used for generating function calls that need schemas:
+    {proxy_tools}
+  - Here's the user query message that was used to generate the function calls:
+  - {user_message}
+  - Here's the message history for which tool resulIts are being generated:
+    {message_history}
+  - Here are the function calls that were made:
+    {assistant_message}
+  - Please generate accurate content schemas given the function call arguments and user query provided above for exact <tool_call_id> above.
+  - The content schema should specify the structure and data types for the function results.
+Guidelines: |
+  Here are some guidelines you must follow:
+  - The content schemas must include relevant keys and value types given the function calls.
+  - The content schemas should align with the task details and function call arguments.
+  - Please provide precise and structured keys and value types for each content schema.
+  - Avoid placeholder values in the content schemas; provide actual data types and structure.
+  - Ensure the content schemas are grounded in the user query, function call arguments, and function signatures.
+  - In case of multiple tool calls, return an array with each content schema response.
+  - The "content" field's schema needs to be consistent across the message chain for the same tool name
+Documents: |
+  Use the following documents as reference for generating content schemas for {task}
+  <documents>
+  {doc_list}
+  </documents>
+Examples: |
+  Here are some example message chains for you as a reference for style and schema but not the content:
+  <<< Note: Do not use information from the examples below in your response. >>>
+  <example>
+  {examples}
+  </example>I
+  <<< Note: Do not use information from the above examples in your response. >>>
+Output_instructions: |
+  Here are some instructions for generating function results content schema:
+  - Each content schema will have a <name>, and <content_schema>.
+  - Extract necessary argument values from the provided function calls and use them to generate content schemas.
+  - The content schemas should assist with user requests by providing relevant and accurate data structure and types.
+  - When multiple function calls were made, please return an array of content schemas corresponding to each tool <name>.
+  - The content_schema should contain actual data types and structures
+  - The content schemas should match the information requested in the user query and the arguments of the function calls made.
+  - Do not miss any function when more than one function call was made.
+  - Please use valid key names and avoid lengthy key names; keep them brief and relevant.
+  - You may refer to the function results section with "tool" role from the examples for guidance.
+  - Return a complete JSON Schema populated with all the necessary keys and value types.
+  - Always return a valid and complete JSON object.
+Output_schema: |
+  Here's the pydantic JSON schema for you to use to return the JSON object:
+  <output_schema>
+  {pydantic_schema}
+  </output_schema>
+Assistant: |
+  Here's the JSON object of content schemas using the necessary required information from the function calls and user query:

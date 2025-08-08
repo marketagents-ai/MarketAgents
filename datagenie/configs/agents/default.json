@@ -1,0 +1,65 @@
+[
+    {
+        "name": "Function Signature Generator",
+        "default_tools": "web_search",
+        "tools": [],
+        "llm_config": {
+            "client": "anthropic",
+            "model": "claude-3-opus-20240229",
+            "temperature": 0.2,
+            "response_format": {
+                "type": "json_object"
+            }
+        },
+        "prompt_type": "function_signature_prompt",
+        "output_format": "Tools",
+        "dependencies": []
+    },
+    {
+        "name": "User Query Generator",
+        "default_tools": "web_search",
+        "tools": [],
+        "llm_config": {
+            "client": "openai",
+            "model": "gpt-4-1106-preview",
+            "temperature": 0.5,
+            "response_format": {
+                "type": "json_object"
+            }
+        },
+        "prompt_type": "user_query_prompt",
+        "output_format": "UserMessage",
+        "dependencies": ["Function Signature Generator"]
+    },
+    {
+        "name": "Function Caller",
+        "default_tools": "web_search",
+        "tools": [],
+        "llm_config": {
+            "client": "anthropic",
+            "model": "claude-3-sonnet-20240229",
+            "response_format": {
+                "type": "json_object"
+            }
+        },
+        "prompt_type": "function_results_prompt",
+        "output_format": "AssistantMessage",
+        "dependencies": ["User Query Generator"]
+    },
+    {
+        "name": "Follow-up Query Generator",
+        "default_tools": "web_search",
+        "tools": [],
+        "llm_config": {
+            "client": "anthropic",
+            "model": "claude-3-haiku-20240307",
+            "temperature": 0.6,
+            "response_format": {
+                "type": "json_object"
+            }
+        },
+        "prompt_type": "user_query_prompt",
+        "output_format": "UserMessage",
+        "dependencies": ["Function Caller"]
+    }
+]

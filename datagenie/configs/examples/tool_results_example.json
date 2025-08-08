@@ -1,0 +1,48 @@
+[
+    {
+      "role": "system",
+      "content": "You are a function calling AI model. You may call one or more functions to assist with the user query. Don't make assumptions about what values to plug into functions. Please use <scratch_pad> XML tags to record your reasoning and planning before you call the functions as follows:\n<scratch_pad>\n{step-by-step reasoning and plan in bullet points}\n</scratch_pad>\n"
+    },
+    {
+      "role": "user",
+      "content": "What's the weather in San Francisco today? And what does the 5 day forecast look like in San Francisco?"
+    },
+    {
+      "content": "<scratch_pad>\n- Call the `get_current_weather` function with the `location` parameter set to 'San Francisco'.\n- Call the `get_n_day_weather_forecast` function with the `location` parameter set to 'San Francisco', the `format` parameter set to 'fahrenheit', and the `num_days` parameter set to 5\n</scratch_pad>\n",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "id": "call_H8gvAVKtLFCtqp3l3C3FDXFn",
+          "function": {
+            "arguments": "{\"location\": \"San Francisco, CA\"}",
+            "name": "get_current_weather"
+          },
+          "type": "function"
+        },
+        {
+          "id": "call_N5J0q46CRjrlRPIoFcHk9Vmg",
+          "function": {
+            "arguments": "{\"location\": \"San Francisco, CA\", \"format\": \"fahrenheit\", \"num_days\": 5}",
+            "name": "get_n_day_weather_forecast"
+          },
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_H8gvAVKtLFCtqp3l3C3FDXFn",
+      "name": "get_current_weather",
+      "content": "\n{\n    \"location\": \"San Francisco\",\n    \"temperature\": \"72\",\n    \"unit\": \"fahrenheit\"\n}\n"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_N5J0q46CRjrlRPIoFcHk9Vmg",
+      "name": "get_n_day_weather_forecast",
+      "content": "\n{\n        \"location\": \"San Francisco, CA\",\n        \"forecast\": [\n          {\n            \"date\": \"2023-12-27\",\n            \"temperature\": \"70\",\n            \"unit\": \"fahrenheit\",\n            \"description\": \"Sunny\"\n          },\n          {\n            \"date\": \"2023-12-28\",\n            \"temperature\": \"68\",\n            \"unit\": \"fahrenheit\",\n            \"description\": \"Partly Cloudy\"\n          },\n          {\n            \"date\": \"2023-12-29\",\n            \"temperature\": \"72\",\n            \"unit\": \"fahrenheit\",\n            \"description\": \"Sunny\"\n          },\n          {\n            \"date\": \"2023-12-30\",\n            \"temperature\": \"75\",\n            \"unit\": \"fahrenheit\",\n            \"description\": \"Clear\"\n          },\n          {\n            \"date\": \"2023-12-31\",\n            \"temperature\": \"74\",\n            \"unit\": \"fahrenheit\",\n            \"description\": \"Partly Cloudy\"\n          }\n        ],\n        \"unit\": \"fahrenheit\"\n      }\n"
+    },
+    {
+      "content": "The current weather in San Francisco, CA is 72\u00b0F.\n\nHere's the 5-day weather forecast for San Francisco, CA:\n\n1. **December 27, 2023**\n   - Temperature: 70\u00b0F\n   - Description: Sunny\n\n2. **December 28, 2023**\n   - Temperature: 68\u00b0F\n   - Description: Partly Cloudy\n\n3. **December 29, 2023**\n   - Temperature: 72\u00b0F\n   - Description: Sunny\n\n4. **December 30, 2023**\n   - Temperature: 75\u00b0F\n   - Description: Clear\n\n5. **December 31, 2023**\n   - Temperature: 74\u00b0F\n   - Description: Partly Cloudy",
+      "role": "assistant"
+    }
+  ]
