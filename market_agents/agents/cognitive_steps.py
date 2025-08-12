@@ -262,9 +262,10 @@ class ActionStep(CognitiveStep):
                 agent.chat_thread.tools = allowed_actions
                 agent.chat_thread.workflow_step = None
             elif len(tools) == 1:
+                # Single structured tool path
                 agent.chat_thread.llm_config.response_format = ResponseFormat.tool
-                agent.chat_thread.tools = tools
                 agent.chat_thread.forced_output = tools[0]
+                agent.chat_thread.tools = []
                 agent.chat_thread.workflow_step = None
             # String action mode
             elif not allowed_actions or (len(allowed_actions) == 1 and allowed_actions[0] == StrAction):
