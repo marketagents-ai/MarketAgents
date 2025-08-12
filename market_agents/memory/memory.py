@@ -1,5 +1,6 @@
 import asyncio
 import json
+import aiohttp
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Union
 from uuid import UUID
@@ -168,14 +169,23 @@ class LongTermMemory(BaseModel):
         top_k: Optional[int] = None
     ) -> List[EpisodicMemoryObject]:
         """Retrieve episodic memories using semantic search."""
-        retrieved = await self.agent_storage_utils.get_episodic_memory_vector(
-            agent_id=self.agent_id,
-            top_k=top_k if top_k is not None else self.default_top_k,
-            query=query
-        )
-        
+        try:
+            retrieved = await self.agent_storage_utils.get_episodic_memory_vector(
+                agent_id=self.agent_id,
+                top_k=top_k if top_k is not None else self.default_top_k,
+                query=query
+            )
+        except aiohttp.ClientResponseError as e:
+            # Return empty list on 500s from storage API (e.g., when no data or embedding backend issues)
+            if e.status == 500:
+                return []
+            raise
+        except Exception:
+            # Be resilient to transient errors
+            return []
+
         episodes = []
-        for memory_item in retrieved["matches"]:
+        for memory_item in retrieved.get("matches", []):
             content_dict = json.loads(memory_item["text"])
             
             # Parse cognitive steps if they're stored as a string
