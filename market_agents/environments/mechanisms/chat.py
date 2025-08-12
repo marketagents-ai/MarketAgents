@@ -178,15 +178,20 @@ class ToolEnabledChatActionSpace(ActionSpace):
             logger.info("Updated action space with only ChatAction")
     
     def get_action_schema(self) -> Dict[str, Any]:
-        """Return JSON schema for all available tools"""
-        schemas = {}
-        
-        # Add schemas for all tools
-        for tool in self.tools:
-            if hasattr(tool, 'name') and hasattr(tool, 'json_schema'):
-                schemas[tool.name] = tool.json_schema()
-                
-        return schemas
+        """Return JSON schema for available actions/tools.
+
+        - If tools are present, return a mapping of tool name -> tool schema
+        - Otherwise, fall back to the base action schema (e.g., ChatAction)
+        """
+        if self.tools:
+            schemas: Dict[str, Any] = {}
+            for tool in self.tools:
+                if hasattr(tool, 'name') and hasattr(tool, 'json_schema'):
+                    schemas[tool.name] = tool.json_schema()
+            return schemas
+
+        # Fallback: no tools, return the schema of the allowed action (ChatAction)
+        return super().get_action_schema()
 
 class ChatObservationSpace(ObservationSpace):
     allowed_observations: List[Type[LocalObservation]] = [ChatObservation]
