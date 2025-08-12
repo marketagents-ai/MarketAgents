@@ -74,10 +74,8 @@ class MemoryEmbedder:
 
         for i in range(0, len(texts), self.config.batch_size):
             batch = texts[i : i + self.config.batch_size]
-            payload = {
-                "inputs": batch,
-                "model": self.config.model
-            }
+            # TEI expects only the inputs payload. Including "model" can cause 4xx/5xx on some deployments.
+            payload = {"inputs": batch}
             response_json = await self._send_embedding_request(payload, headers)
             all_embeddings.extend(response_json)
 
