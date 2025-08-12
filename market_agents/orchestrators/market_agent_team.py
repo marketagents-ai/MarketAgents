@@ -92,7 +92,8 @@ class MarketAgentTeam(BaseModel):
 
         self.meta_orchestrator = MetaOrchestrator(
             config=config,
-            agents=[self.manager] + self.agents if self.manager else self.agents
+            agents=[self.manager] + self.agents if self.manager else self.agents,
+            cohorts=None  # No cohorts for hierarchical team mode
         )
 
     async def delegate_tasks(self, task: str) -> Dict[str, Any]:
@@ -186,8 +187,23 @@ class MarketAgentTeam(BaseModel):
         for agent in self.agents:
             if mode == "hierarchical" and delegations:
                 # Assign delegated subtasks in hierarchical mode
+                # Handle both direct delegations and nested structure
+                if isinstance(delegations, dict) and "delegations" in delegations:
+                    delegations_list = delegations["delegations"]
+                else:
+                    delegations_list = delegations
+                
+                # Debug logging
+                logger.info(f"Delegations structure: {type(delegations)} - {delegations}")
+                logger.info(f"Delegations list type: {type(delegations_list)} - {delegations_list}")
+                
+                # Ensure delegations_list is a list of dictionaries
+                if not isinstance(delegations_list, list):
+                    logger.warning(f"Expected list of delegations, got {type(delegations_list)}")
+                    continue
+                
                 subtask = next(
-                    (d["subtask"] for d in delegations["delegations"] if d.get("agent_id") == agent.id),
+                    (d["subtask"] for d in delegations_list if isinstance(d, dict) and d.get("agent_id") == agent.id),
                     None
                 )
                 if subtask:
