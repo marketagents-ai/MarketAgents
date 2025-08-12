@@ -1510,11 +1510,13 @@ class ChatThread(Entity):
                 
             elif msg.role == MessageRole.assistant:
                 if msg.tool_name:
+                    # Ensure tool_call id is a valid string; fall back to message UUID if missing
+                    tool_call_id = msg.oai_tool_call_id or f"local-{str(msg.id)}"
                     messages.append({
                         "role": "assistant",
                         "content": msg.content or "",
                         "tool_calls": [{
-                            "id": msg.oai_tool_call_id,
+                            "id": tool_call_id,
                             "type": "function",
                             "function": {
                                 "name": msg.tool_name,
